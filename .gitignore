@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+nba_logo_cache/
+logo_cache/
+headshot_cache/
+custom_roster_swaps.json
+custom_players.json
