@@ -14975,6 +14975,33 @@ def choose_nets_2022_fourth_star(team: Team, need_three: bool = False) -> Player
     return choice
 
 
+def apply_mavs_2024_quarter_scoring_roles(team: Team, period: int):
+    """
+    Luka is the go-to scorer in the 1st and 3rd; Kyrie takes over as the
+    go-to scorer in the 2nd and 4th. Usage/shot_tendency drive shot
+    allocation throughout possession resolution (isolation creation, shot
+    type selection, late-game weighting), so temporarily reweighting them
+    each quarter is the reliable lever here -- swapping just the
+    ball-handler pick wasn't enough to move actual scoring.
+    """
+    if team.name != "2024 Dallas Mavericks" or period not in (1, 2, 3, 4):
+        return
+    luka = player_by_name(team.roster, ("Luka Doncic",))
+    kyrie = player_by_name(team.roster, ("Kyrie Irving",))
+    if luka is None or kyrie is None:
+        return
+    for p in (luka, kyrie):
+        if not hasattr(p, "_mavs_2024_base_usage"):
+            p._mavs_2024_base_usage = p.usage
+            p._mavs_2024_base_shot_tendency = p.shot_tendency
+
+    primary, secondary = (luka, kyrie) if period in (1, 3) else (kyrie, luka)
+    primary.usage = min(0.48, primary._mavs_2024_base_usage * 1.40)
+    primary.shot_tendency = min(0.95, primary._mavs_2024_base_shot_tendency * 1.30)
+    secondary.usage = max(0.05, secondary._mavs_2024_base_usage * 0.60)
+    secondary.shot_tendency = max(0.05, secondary._mavs_2024_base_shot_tendency * 0.65)
+
+
 def mavs_2024_closer_balance_multiplier(player: Player, team: Team) -> float:
     """
     Dallas still runs through Luka overall, but late-game possessions should not
@@ -15657,6 +15684,27 @@ def choose_ballhandler(team: Team) -> Player:
                 * coach_handler_multiplier(team, p)
                 * fatigue_touch_multiplier(p)
                 * (2.15 if p.name == "LeBron James" else 1.0)
+                for p in preferred
+            ]
+            return random.choices(preferred, weights=weights, k=1)[0]
+
+    if team.name == "2024 Dallas Mavericks":
+        # Luka runs the offense in the 1st and 3rd; Kyrie takes the reins
+        # in the 2nd and 4th -- an explicit quarter-by-quarter alternation
+        # of who initiates (and therefore scores) the Mavs' offense.
+        period = SIM_CONTEXT.get("period", 1)
+        primary_name = "Luka Doncic" if period in (1, 3) else "Kyrie Irving"
+        primary = player_by_name(team.on_floor, (primary_name,))
+        if primary is not None and not primary.fouled_out and random.random() < 0.80:
+            return primary
+        preferred = [p for p in team.on_floor if p.name in ("Luka Doncic", "Kyrie Irving")]
+        if preferred:
+            weights = [
+                max(0.01, playmaking_hub_score(p) ** 1.50)
+                * assist_load_factor(p, team)
+                * coach_handler_multiplier(team, p)
+                * fatigue_touch_multiplier(p)
+                * (2.20 if p.name == primary_name else 1.0)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
@@ -19194,6 +19242,8 @@ def simulate_game(teamA: Team, teamB: Team):
         possession = possession_by_quarter[q]
         teamA.current_period = period
         teamB.current_period = period
+        apply_mavs_2024_quarter_scoring_roles(teamA, period)
+        apply_mavs_2024_quarter_scoring_roles(teamB, period)
         teamA.quarter_fouls = 0
         teamB.quarter_fouls = 0
         enforce_timeout_limits(teamA, period, q_time)
