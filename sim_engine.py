@@ -12550,7 +12550,15 @@ def run_late_game_last_shot_possession(off: Team, dff: Team, period: int, period
                                        matchups: Dict[Player, Player]) -> Tuple[Team, int]:
     deficit = dff.score - off.score
     need_three = deficit == 3
-    score_time = random.randint(0, 2) if period_time >= 20 else random.randint(0, 1)
+    # The shot clock only turns off once under 24 seconds remain in the
+    # period -- that's the only case where holding for the game clock's
+    # entire remaining time is legal. With more than 24 on the clock, the
+    # offense still has to get a shot up within 24 seconds of taking the
+    # ball, so at least (period_time - 24) has to be left when it goes up.
+    if period_time > 24:
+        score_time = max(0, period_time - 24) + (random.randint(0, 2) if period_time >= 20 else random.randint(0, 1))
+    else:
+        score_time = random.randint(0, 2) if period_time >= 20 else random.randint(0, 1)
     spent = max(1, period_time - score_time)
 
     shooter = choose_closing_star_scorer(off, need_three=need_three)
