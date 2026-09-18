@@ -18965,6 +18965,70 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
                 return line, mult
         return line, mult
 
+    def _1v1_layup_finish_line(shooter: Player) -> str:
+        # layup_finish_line() builds its pools internally (help defenders,
+        # a "second defender" arriving) rather than exposing them as
+        # importable lists, so re-roll past a banned-term line the same
+        # way _1v1_isolation_shot_creation does.
+        line = ""
+        for _ in range(8):
+            line = layup_finish_line(shooter)
+            if not any(term in line.lower() for term in _1v1_banned_terms):
+                return line
+        return line
+
+    def _1v1_dribble_chain_attempt(shooter: Player, defender: Player, shot_type: str) -> bool:
+        # Same extended dribble-combo storytelling the main game gives its
+        # best ball-handlers (a chained sequence of real moves -- crossover,
+        # hesitation, spin, snatchback, etc. -- instead of one generic
+        # detail line) before the shot itself. Same shared pools, filtered
+        # for 1-on-1 the same way everything else here is.
+        chain_count = dribble_chain_count_for_player(shooter)
+        if chain_count <= 0:
+            return False
+
+        opener_pool = _1v1_safe(dribble_combo_openers) or dribble_combo_openers
+        print(random.choice(opener_pool).format(shooter=shooter.name, defender=defender.name))
+        time.sleep(SLEEP * 0.5)
+
+        move_types = list(dribble_move_variations.keys())
+        random.shuffle(move_types)
+        for move_type in move_types[:max(0, min(chain_count, len(move_types)))]:
+            pool = _1v1_safe(dribble_move_variations[move_type]) or dribble_move_variations[move_type]
+            print(f"{shooter.name} {random.choice(pool)}")
+            time.sleep(SLEEP * 0.5)
+
+        def finish_with_shooter(line: str) -> str:
+            line = line.strip()
+            if line.startswith("He "):
+                line = line[3:]
+            elif line.startswith("he "):
+                line = line[3:]
+            if not line.endswith("."):
+                line += "."
+            return f"{shooter.name} {line}"
+
+        if shot_type == "three":
+            sizeup_lines = [
+                "keeps the defender rocking, loads the ball into his shooting pocket, and rises behind the arc",
+                "uses the last bounce as a size-up, steps behind the line, and fires",
+                "sells the drive, snaps it back, and gets into the off-the-dribble three",
+                "turns the handle into a step-back rhythm three",
+                "freezes the defender for a beat and pulls from above the break",
+                "creates the pocket with the dribble and lets the three go before the closeout",
+            ]
+            print(finish_with_shooter(random.choice(sizeup_lines)))
+        elif shot_type == "mid":
+            pool = _1v1_safe(dribble_combo_mid_finishes) or dribble_combo_mid_finishes
+            print(finish_with_shooter(random.choice(pool)))
+        else:
+            pool = _1v1_safe(dribble_combo_drive_finishes) or dribble_combo_drive_finishes
+            print(finish_with_shooter(random.choice(pool)))
+            time.sleep(SLEEP * 0.5)
+            print(f"{shooter.name} {_1v1_layup_finish_line(shooter)}")
+        time.sleep(SLEEP * 0.5)
+        return True
+
     # Shoot for winners: an uncontested look each to see who gets first
     # ball, exactly how a real pickup 1-on-1 starts. Alternates shooters
     # until somebody actually makes one instead of a coin flip.
@@ -19078,18 +19142,23 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
                 print(f"{shooter.name} rises into the open jumper after the shake.")
             time.sleep(SLEEP * 0.6)
         elif not already_described:
-            if shot_type in ("rim", "dunk"):
-                pool = _1v1_handle_pool(drive_detail_basic, drive_detail_skilled, shooter)
-                print(random.choice(pool).format(off=shooter.name, deff=defender.name))
-                time.sleep(SLEEP * 0.7)
-            elif shot_type == "mid":
-                pool = _1v1_handle_pool(pullup_detail_basic, pullup_detail_skilled, shooter)
-                print(random.choice(pool).format(off=shooter.name, deff=defender.name))
-                time.sleep(SLEEP * 0.7)
-            elif shot_type == "three":
-                pool = _1v1_handle_pool(three_detail_basic, three_detail_skilled, shooter)
-                print(random.choice(pool).format(off=shooter.name, deff=defender.name))
-                time.sleep(SLEEP * 0.7)
+            # A real handle earns the same extended dribble-combo chain the
+            # main game gives its best ball-handlers; everyone else gets
+            # the simpler single-line detail beat.
+            chain_used = shot_type in ("rim", "mid", "three") and _1v1_dribble_chain_attempt(shooter, defender, shot_type)
+            if not chain_used:
+                if shot_type in ("rim", "dunk"):
+                    pool = _1v1_handle_pool(drive_detail_basic, drive_detail_skilled, shooter)
+                    print(random.choice(pool).format(off=shooter.name, deff=defender.name))
+                    time.sleep(SLEEP * 0.7)
+                elif shot_type == "mid":
+                    pool = _1v1_handle_pool(pullup_detail_basic, pullup_detail_skilled, shooter)
+                    print(random.choice(pool).format(off=shooter.name, deff=defender.name))
+                    time.sleep(SLEEP * 0.7)
+                elif shot_type == "three":
+                    pool = _1v1_handle_pool(three_detail_basic, three_detail_skilled, shooter)
+                    print(random.choice(pool).format(off=shooter.name, deff=defender.name))
+                    time.sleep(SLEEP * 0.7)
 
         # Street-ball "make it count" foul rule -- a real foul call, not
         # just flavor text. On a miss it's a do-over (shooter keeps the
@@ -19143,7 +19212,7 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
                 # game uses, so a made layup isn't just "finishes inside"
                 # every single time.
                 def_line = random.choice(safe_def_int_make)
-                print(f"{shooter.name} {layup_finish_line(shooter)} {defender.name} {def_line}")
+                print(f"{shooter.name} {_1v1_layup_finish_line(shooter)} {defender.name} {def_line}")
             else:
                 line = random.choice(safe_def_int_make) if is_paint_shot(shot_type) else random.choice(safe_def_per_make)
                 print(_1v1_commentator_make(shooter.name, defender.name, shot_type, line))
