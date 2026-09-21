@@ -3425,7 +3425,7 @@ def make_rockets_2018() -> Team:
                0.95, 0.84, 0.98, 0.78, 0.90,
                0.38, 0.90, 0.96,
                0.49, 0.54, 0.37, 0.63, 0.990, 0.933,
-               0.73, 0.65, shot_iq = .20),
+               0.65, 0.55, shot_iq = .35),
 
         Player("Chris Paul", "PG",
                0.35, 0.35, 0.20, 0.10, 0.05, 0.384,
@@ -13558,7 +13558,7 @@ def make_lakers_2027() -> Team:
                0.740, 0.700, 0.760, 0.720, 0.740,
                0.080, 0.600, 0.620,
                0.66, 0.50, 0.34, 0.42, 0.333, 0.600,
-               0.88, 0.46,
+               0.88, 0.66,
                clutchness=0.560, badges=('point_of_attack_defender',),
                height=74, speed=0.82, shot_iq=0.58, iso_tendency=0.10,
                secondary_positions=('SG',), archetype='defensive combo guard'),
