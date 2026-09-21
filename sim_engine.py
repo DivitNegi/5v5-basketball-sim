@@ -19111,14 +19111,19 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
         if shot_type == "post":
             back_down_chance = min(0.92, max(0.0, shooter.post_tendency * 1.15 + (0.12 if shooter.height >= 82 else 0.0)))
             if random.random() < back_down_chance:
-                print(f"{shooter.name} {random.choice(back_down_lines).format(deff=defender.name)}")
-                time.sleep(SLEEP * 0.8)
-                # Same two-beat structure as an isolation -- the back-down
-                # is the setup, this is the specific finishing move (drop
-                # step, up-and-under, jump hook, fadeaway...), not just a
-                # generic "gets it to go" resolution afterward.
-                print(random.choice(post_move_lines).format(off=shooter.name, deff=defender.name))
-                time.sleep(SLEEP * 0.7)
+                # A struggle-tier creation line ("smothered the whole way",
+                # "never gets loose") already says he's being shut down, so
+                # a confident back-down + finishing move on top of it would
+                # contradict it -- keep the post shot, skip the setup beats.
+                if iso_mult > 0.93:
+                    print(f"{shooter.name} {random.choice(back_down_lines).format(deff=defender.name)}")
+                    time.sleep(SLEEP * 0.8)
+                    # Same two-beat structure as an isolation -- the back-down
+                    # is the setup, this is the specific finishing move (drop
+                    # step, up-and-under, jump hook, fadeaway...), not just a
+                    # generic "gets it to go" resolution afterward.
+                    print(random.choice(post_move_lines).format(off=shooter.name, deff=defender.name))
+                    time.sleep(SLEEP * 0.7)
             else:
                 shot_type = "rim" if shooter.drive_tendency >= shooter.mid_tendency else "mid"
 
@@ -19142,7 +19147,16 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
         # the defender and rises cleanly" and then, in the very next line,
         # is somehow still driving at the rim. An ankle-breaker already
         # explains the space too, so it gets its own open-shot line instead.
-        already_described = iso_mult >= 1.10 or "pull-up" in outcome_line.lower() or "fadeaway" in outcome_line.lower()
+        # The struggle tier (iso_mult <= 0.93: "forces up an awkward shot",
+        # "settles for a tough look", "never gets loose") has already
+        # committed him to a bad shot too -- a smooth crossover chain and
+        # a clean finish stacked on top of that reads as a contradiction.
+        already_described = (
+            iso_mult >= 1.10
+            or iso_mult <= 0.93
+            or "pull-up" in outcome_line.lower()
+            or "fadeaway" in outcome_line.lower()
+        )
         if ankle_breaker_open:
             if shot_type == "three":
                 print(f"{shooter.name} steps into the open three after the move.")
