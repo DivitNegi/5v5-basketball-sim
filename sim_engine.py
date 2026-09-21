@@ -19848,6 +19848,19 @@ def fantasy_ovr(player: Player) -> int:
             if tpt < 60 and mpt < 82:
                 floor_general_score -= 1.5
             raw = max(raw, floor_general_score)
+        # Two-way scorer: a guard who scores at a high level and defends
+        # at a high level shouldn't be dragged down just because his
+        # playmaking number is modest. This can only replace the score
+        # when it comes out higher, so it never lowers anyone.
+        guard_scoring_average = (tpt + mpt + lpt) / 3
+        if player.position == "PG" and pl < 86 and pdef >= 80 and guard_scoring_average >= 88:
+            two_way_score = (
+                0.22 * tpt + 0.17 * mpt + 0.15 * lpt + 0.15 * pdef +
+                0.11 * handle + 0.08 * cpt + 0.07 * pl + 0.05 * speed
+            )
+            if pdef >= 86 and creator_scoring_peak >= 97 and cpt >= 88:
+                two_way_score += 3
+            raw = max(raw, two_way_score)
         if pl >= 96 and handle >= 88:
             raw += 1.5
         elif pl >= 90 and handle >= 86:
