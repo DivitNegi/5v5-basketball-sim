@@ -3,6 +3,8 @@
 import sim_engine
 from sim_engine import *
 from players_data import *
+from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
+from web_app import run_web_gui_app
 
 class GuiOutputProxy:
     def __init__(self, output_queue, scoreboard_queue, original_stdout, section_queue=None):
