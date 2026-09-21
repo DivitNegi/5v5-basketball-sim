@@ -4436,7 +4436,7 @@ def make_clippers_2024() -> Team:
                0.66, 0.54,
                clutchness=0.84, secondary_positions=("SG",),
                badges=("floor_general_gold", "shot_creator_gold", "limitless_range_silver"),
-               height=77, speed=0.62, shot_iq=0.86, iso_tendency=0.52,
+               height=77, speed=0.62, shot_iq=0.60, iso_tendency=0.52,
                archetype="pick-and-roll engine"),
 
         Player("Terance Mann", "SG",
@@ -8629,9 +8629,9 @@ def make_redeem_team_2008() -> Team:
 def make_olympic_canada_2024() -> Team:
     players = [
         Player('Shai G-Alexander', 'PG',
-               0.42, 0.28, 0.24, 0.06, 0.12, 0.93,
+               0.42, 0.28, 0.24, 0.60, 0.12, 0.93,
                0.89, 0.98, 0.98, 0.86, 0.88,
-               0.36, 0.88, 0.92,
+               0.36, 0.80, 0.92,
                0.86, 0.62, 0.52, 0.62, 0.531, 0.594,
                0.92, 0.66,
                clutchness=0.92, secondary_positions=('SG',),
@@ -13660,14 +13660,14 @@ def make_spurs_2026() -> Team:
 def make_thunder_2024() -> Team:
     players = [
         Player('Shai G-Alexander', 'PG',
-               0.200, 0.390, 0.250, 0.060, 0.260, 0.460,
+               0.200, 0.390, 0.250, 0.60, 0.260, 0.460,
                0.880, 0.980, 0.980, 0.860, 0.790,
                0.360, 0.750, 0.950,
-               0.76, 0.56, 0.36, 0.54, 0.880, 0.733,
+               0.76, 0.75, 0.36, 0.64, 0.90, 0.733,
                0.86, 0.66,
                clutchness=0.900, secondary_positions=("SG",),
                badges=("clutch_gold", "closer_gold", "shot_creator_gold", "ankle_breaker_silver", "transition_engine"),
-               height=78, speed=0.88, shot_iq=0.80, iso_tendency=0.42, archetype="isolation scorer"),
+               height=78, speed=0.88, shot_iq=0.80, iso_tendency=0.82, archetype="isolation scorer"),
         Player('Josh Giddey', 'SG',
                0.10, 0.300, 0.300, 0.140, 0.180, 0.190,
                0.700, 0.800, 0.840, 0.760, 0.740,
@@ -13766,10 +13766,10 @@ def make_thunder_2024() -> Team:
 def make_thunder_2026() -> Team:
     players = [
         Player('Shai G-Alexander', 'PG',
-               0.280, 0.380, 0.280, 0.060, 0.280, 0.437,
-               0.880, 0.990, 0.990, 0.860, 0.900,
-               0.380, 0.920, 0.970,
-               0.70, 0.62, 0.34, 0.54, 0.990, 0.733,
+               0.280, 0.380, 0.280, 0.60, 0.280, 0.437,
+               0.800, 0.990, 0.990, 0.860, 0.900,
+               0.380, 0.80, 0.970,
+               0.70, 0.62, 0.34, 0.44, 0.990, 0.733,
                0.88, 0.69,
                clutchness=0.920),
         Player('Jalen Williams', 'SF',
