@@ -11996,11 +11996,23 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
     if not getattr(off, "inbound_pending", False):
         return None
 
+    late_ato = period >= 4 and period_time <= 30 and abs(off.score - dff.score) <= 4
+    after_timeout = bool(getattr(off, "ato_pending", False))
+    # A scripted inbound play doesn't have to happen every time:
+    #  - with 5-24 seconds left it's just a normal pass into the last shot
+    #    (the late-game / end-of-quarter possession logic takes over), and
+    #  - an ordinary dead-ball inbound is usually just a plain inbound pass
+    #    into a normal possession; only sometimes is it a drawn-up play.
+    #    Timeouts and late close games still get the drawn-up play.
+    if 5 <= period_time <= 24 or (not after_timeout and not late_ato and random.random() >= 0.25):
+        off.inbound_pending = False
+        off.ato_pending = False
+        return None
+
     off.inbound_pending = False
-    ato_boost = bool(getattr(off, "ato_pending", False))
+    ato_boost = after_timeout
     off.ato_pending = False
     inbounder = max(off.on_floor, key=lambda p: p.playmaking)
-    late_ato = period >= 4 and period_time <= 30 and abs(off.score - dff.score) <= 4
     low_clock_inbound = period_time <= 8 or late_ato
     spent = min(period_time, 1 if low_clock_inbound else random.randint(2, 4))
     score_time = max(0, period_time - spent)
