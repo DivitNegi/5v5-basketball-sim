@@ -12006,13 +12006,30 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
     score_time = max(0, period_time - spent)
     need_three = late_ato and off.score <= dff.score - 3
     need_quick_two = late_ato and off.score in (dff.score - 1, dff.score - 2)
+
+    # Inbound plays are drawn up for one of two looks: a three, or a lob
+    # for an alley-oop. Pick the best shooter for the first and the best
+    # lob finisher for the second.
+    others = [p for p in off.on_floor if p is not inbounder] or list(off.on_floor)
+    three_targets = sorted(
+        [p for p in others if p.three_tendency > 0] or others,
+        key=lambda p: 0.52 * p.three_rating + 0.26 * p.clutchness + 0.22 * p.shot_tendency,
+        reverse=True,
+    )
+    lob_targets = sorted(
+        others,
+        key=lambda p: 0.50 * p.dunk_rating + 0.30 * p.rim_rating + 0.20 * p.dunk_tendency,
+        reverse=True,
+    )
     if need_three:
-        targets = sorted(off.on_floor, key=lambda p: 0.52 * p.three_rating + 0.26 * p.clutchness + 0.22 * p.shot_tendency, reverse=True)
+        inbound_play = "three"
     elif need_quick_two:
-        targets = sorted(off.on_floor, key=lambda p: 0.42 * p.rim_rating + 0.28 * p.mid_rating + 0.20 * p.clutchness + 0.10 * p.speed, reverse=True)
+        inbound_play = "alley_oop"
     else:
-        targets = sorted(off.on_floor, key=lambda p: 0.5 * p.three_rating + 0.3 * p.rim_rating + 0.2 * p.clutchness, reverse=True)
-    target = targets[0] if targets[0] is not inbounder else targets[min(1, len(targets) - 1)]
+        lob_quality = 0.50 * lob_targets[0].dunk_rating + 0.30 * lob_targets[0].rim_rating + 0.20 * lob_targets[0].dunk_tendency
+        lob_chance = clamp(0.20 + (lob_quality - 0.50), 0.10, 0.60)
+        inbound_play = "alley_oop" if random.random() < lob_chance else "three"
+    target = lob_targets[0] if inbound_play == "alley_oop" else three_targets[0]
     defender = matchups.get(target, random.choice(dff.on_floor))
 
     if need_three:
@@ -12021,17 +12038,18 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
             f"{inbounder.name} waits for the screen-the-screener action and finds {target.name} outside.",
             f"{off.name} use {target.name} as the late clock shooter off the inbound."
         ]
-    elif need_quick_two:
+    elif inbound_play == "alley_oop":
         lines = [
-            f"{off.name} go for a quick two. {target.name} dives toward the rim.",
-            f"{inbounder.name} looks inside first and hits {target.name} on the move.",
-            f"{off.name} clear the strong side and free {target.name} near the lane."
+            f"{off.name} run a lob out of the inbound. {target.name} cuts backdoor toward the rim.",
+            f"{inbounder.name} looks for the lob on the sideline inbound as {target.name} sprints to the rim.",
+            f"{off.name} stack the lane on the inbound, trying to spring {target.name} for an alley-oop.",
+            f"{off.name} clear the strong side and free {target.name} above the rim for the lob.",
         ]
     else:
         lines = [
-            f"{off.name} run a sideline inbound. {target.name} curls off a screen.",
-            f"{inbounder.name} scans the floor on the inbound and finds {target.name}.",
-            f"{off.name} stack the lane on the inbound, trying to spring {target.name}.",
+            f"{off.name} run a sideline inbound. {target.name} curls off a screen toward the arc.",
+            f"{inbounder.name} scans the floor on the inbound and looks for {target.name} on the perimeter.",
+            f"{off.name} flare {target.name} to the wing off the inbound for a three.",
         ]
     if ato_boost:
         lines.extend([
@@ -12047,24 +12065,20 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
         time.sleep(SLEEP * 0.6)
         return dff, spent
 
-    if need_three:
-        shot_type = "three"
-    elif need_quick_two:
-        shot_type = "rim" if target.rim_rating >= target.mid_rating or random.random() < 0.62 else "mid"
-    else:
-        shot_type = "three" if target.three_rating >= target.rim_rating and random.random() < 0.62 else "rim"
-    if shot_type == "rim" and target.dunk_tendency >= 0.50 and random.random() < inbounder.playmaking:
-        print(f"{inbounder.name} lobs it toward the rim for {target.name}.")
+    if inbound_play == "alley_oop":
         shot_type = "dunk"
-    elif low_clock_inbound:
-        if shot_type == "three":
-            print(f"{target.name} catches, turns, and lets the three go.")
-        elif shot_type in ("rim", "dunk"):
-            print(f"{target.name} catches on the move and goes straight up.")
-        else:
-            print(f"{target.name} catches and rises before the defense can load up.")
+        lob_passes = [line for line in alley_oop_passes if "roller" not in line]
+        print(f"{inbounder.name} {random.choice(lob_passes)} {target.name}" + ("" if target.name.endswith(".") else "."))
+        time.sleep(SLEEP * 0.4)
+        print(f"{target.name} {random.choice(alley_oop_catches)}.")
+        time.sleep(SLEEP * 0.3)
+        print(f"{target.name} {random.choice(alley_oop_finish_attempts)}.")
     else:
-        print(f"{target.name} catches and fires out of the inbound action.")
+        shot_type = "three"
+        if low_clock_inbound:
+            print(f"{target.name} catches, turns, and lets the three go.")
+        else:
+            print(f"{target.name} catches and fires out of the inbound action.")
     time.sleep(SLEEP * 0.5)
 
     target.fga += 1
@@ -12090,12 +12104,18 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
             off.points_paint += pts
         record_score_event(off, dff, pts, period, score_time, teamA, teamB, check_timeout=False)
         record_assist(inbounder, off, pts)
-        print(f"{target.name} converts the inbound set, exactly what they drew up.")
+        if inbound_play == "alley_oop":
+            print(f"{target.name} {random.choice(alley_oop_makes)}")
+        else:
+            print(f"{target.name} converts the inbound set, exactly what they drew up.")
         print_scoreboard(period, score_time, teamA, teamB)
         maybe_call_timeout_after_score(off, dff, period, score_time, teamA, teamB)
         return dff, spent
 
-    print(f"{target.name} cannot finish the inbound look.")
+    if inbound_play == "alley_oop":
+        print(f"{target.name} {random.choice(alley_oop_misses)}")
+    else:
+        print(f"{target.name} cannot finish the inbound look.")
     reb_team, rebounder = choose_rebounder(off, dff, "jumper" if shot_type == "three" else "rim")
     print(commentator_rebound(rebounder.name, reb_team.name))
     print_scoreboard(period, score_time, teamA, teamB)
