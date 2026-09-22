@@ -12299,7 +12299,7 @@ def handle_offensive_rebound(off: Team, dff: Team, rebounder: Player,
         receiver.fga += 1
         if shot_type == "three":
             receiver.tpa += 1
-        record_shot_diet(off, shot_type, "late_oreb_kickout|open", receiver, defender)
+        record_shot_diet(off, shot_type, "late_oreb_kickout|wide_open", receiver, defender)
 
         if random.random() < make_prob:
             pts = 3 if shot_type == "three" else 2
@@ -16819,7 +16819,7 @@ def run_ato_play(off: Team, dff: Team, period: int, period_time: int,
     final_quality_mult = target.shot_quality_mult
 
     target.fga += 1
-    record_shot_diet(off, shot_type, "ato", target, defender, quality_mult=final_quality_mult)
+    record_shot_diet(off, shot_type, shot_quality_diet_context("ato", q_label), target, defender, quality_mult=final_quality_mult)
     if shot_type == "three":
         target.tpa += 1
 
