@@ -55,7 +55,7 @@ except Exception:
 # ============================================================
 
 GAME_SECONDS = 48 * 60         # 48-minute game
-FOUL_SCALE = 1.85          # controls frequency of shooting fouls
+FOUL_SCALE = 1.45          # controls frequency of shooting fouls
 SLEEP = 1.2                    # base sleep between lines
 THREE_ATTEMPT_SCALE = 0.75     # global 3PA volume scaler
 DUNK_RATE_SCALE = 0.25       # lowers how often rim attempts become dunk attempts
@@ -3305,6 +3305,16 @@ def foul_draw_sim(player: "Player | None") -> float:
     if x <= 0.50:
         return 0.04 + x * 0.23
     return 0.04 + 0.50 * 0.23 + (x - 0.50) * 0.23 * 0.75
+
+
+def usage_foul_weight(player: "Player | None") -> float:
+    # Shooting-foul chance used to scale with raw usage, which meant a
+    # 0.70-usage star drew fouls at ~9x the rate of a 0.08-usage bench
+    # player -- free throws piled up on one guy. Compress it so role
+    # players still draw a meaningful share while the star still leads.
+    if player is None:
+        return 0.0
+    return max(0.0, getattr(player, "usage", 0.0)) ** 0.6
 
 
 def foul_rate_sim(player: "Player | None") -> float:
@@ -12660,7 +12670,7 @@ def run_late_game_last_shot_possession(off: Team, dff: Team, period: int, period
     print_late_clock_shot_attempt(shooter, shot_type, assisted=bool(last_passer))
     time.sleep(SLEEP * 0.8)
 
-    foul_chance = foul_draw_sim(shooter) * shooter.usage * FOUL_SCALE
+    foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE
     foul_chance *= shooting_foul_type_multiplier(shot_type) * 0.82
     if random.random() < foul_chance:
         fouler = choose_fouling_defender(dff, defender, shooter, shot_type, "last_shot")
@@ -12838,7 +12848,7 @@ def run_late_game_quick_possession(off: Team, dff: Team, period: int, period_tim
     else:
         print_shot_attempt_sequence(shooter, shot_type, "late_quick")
 
-    foul_chance = foul_draw_sim(shooter) * shooter.usage * FOUL_SCALE
+    foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE
     foul_chance *= shooting_foul_type_multiplier(shot_type)
     if random.random() < foul_chance:
         fouler = choose_fouling_defender(dff, defender, shooter, shot_type, "late_quick")
@@ -16144,7 +16154,7 @@ def run_fastbreak(def_team: Team, off_team: Team, period: int, period_time: int,
     if shot_type == "rim" and random.random() < effective_dunk_attempt_chance(finisher):
         shot_type = "dunk"
 
-    foul_chance = foul_draw_sim(finisher) * finisher.usage * FOUL_SCALE * 1.30 * foul_trouble_foul_factor(defender)
+    foul_chance = foul_draw_sim(finisher) * usage_foul_weight(finisher) * FOUL_SCALE * 1.30 * foul_trouble_foul_factor(defender)
     if PLAYOFF_MODE:
         foul_chance *= 0.88
     is_foul = random.random() < foul_chance
@@ -18218,7 +18228,7 @@ def simulate_possession(off: Team, dff: Team,
     
 
     # FOUL CHECK
-    foul_chance = foul_draw_sim(shooter) * shooter.usage * FOUL_SCALE * foul_trouble_foul_factor(defender)
+    foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE * foul_trouble_foul_factor(defender)
     offensive_foul_plan = getattr(off, "game_plan", {}).get("foul_strategy", "normal")
     defensive_foul_plan = getattr(dff, "game_plan", {}).get("foul_strategy", "normal")
     foul_chance *= shooting_foul_type_multiplier(shot_type)
@@ -18366,7 +18376,7 @@ def simulate_possession(off: Team, dff: Team,
             assist_recorded = True
 
         # LOW-CHANCE AND-ONE ON MADE SHOTS
-        and_one_chance = foul_draw_sim(shooter) * shooter.usage * FOUL_SCALE * 0.58 * foul_trouble_foul_factor(defender)
+        and_one_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE * 0.58 * foul_trouble_foul_factor(defender)
         and_one_chance *= and_one_type_multiplier(shot_type)
 
         if random.random() < and_one_chance:
@@ -19217,7 +19227,7 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
         # Street-ball "make it count" foul rule -- a real foul call, not
         # just flavor text. On a miss it's a do-over (shooter keeps the
         # ball instead of losing it); on a make it's a genuine and-one.
-        foul_chance = foul_draw_sim(shooter) * shooter.usage * FOUL_SCALE * foul_trouble_foul_factor(defender) * shooting_foul_type_multiplier(shot_type)
+        foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE * foul_trouble_foul_factor(defender) * shooting_foul_type_multiplier(shot_type)
         fouled = random.random() < foul_chance
 
         if not fouled and random.random() < block_prob(defender, shot_type, shooter):
