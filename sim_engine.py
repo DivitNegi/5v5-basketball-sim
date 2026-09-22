@@ -3304,7 +3304,16 @@ def foul_draw_sim(player: "Player | None") -> float:
     # of scaling all the way up linearly.
     if x <= 0.50:
         return 0.04 + x * 0.23
-    return 0.04 + 0.50 * 0.23 + (x - 0.50) * 0.23 * 0.75
+    mid = 0.04 + 0.50 * 0.23
+    if x <= 0.85:
+        return mid + (x - 0.50) * 0.23 * 0.75
+    # A genuinely maxed-out (0.99) foul-draw rating on a high-usage player
+    # should land a heavy-minutes star around 10 FTA/game, not just a bit
+    # above average -- steepen sharply only in the true elite tier so this
+    # doesn't drag up the ~140 players sitting at 0.90+ across the whole
+    # league average, just the very top of it.
+    top = mid + (0.85 - 0.50) * 0.23 * 0.75
+    return top + (x - 0.85) * 0.57
 
 
 def usage_foul_weight(player: "Player | None") -> float:
