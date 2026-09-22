@@ -3323,7 +3323,16 @@ def usage_foul_weight(player: "Player | None") -> float:
     # players still draw a meaningful share while the star still leads.
     if player is None:
         return 0.0
-    return max(0.0, getattr(player, "usage", 0.0)) ** 0.6
+    base = max(0.0, getattr(player, "usage", 0.0)) ** 0.6
+    # Diminishing returns as the player's own FTA total climbs in this
+    # game. A flat per-shot rate compounding over 30+ shot attempts could
+    # produce 20+ FTA nights far more often than real basketball ever
+    # sees -- taper the rate once he's already had a big free-throw game,
+    # leaving a normal night (well under a dozen) untouched.
+    fta_so_far = getattr(player, "fta", 0)
+    if fta_so_far > 10:
+        base *= 1.0 / (1.0 + (fta_so_far - 10) * 0.35)
+    return base
 
 
 def foul_rate_sim(player: "Player | None") -> float:
