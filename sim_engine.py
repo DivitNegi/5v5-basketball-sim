@@ -3223,6 +3223,13 @@ class Player:
     badges: Tuple[str, ...] = field(default_factory=tuple, compare=False, hash=False)
     height: int = field(default=0, compare=False, hash=False)  # inches
     speed: float = field(default=0.0, compare=False, hash=False)
+    # Conditioning / endurance (0-1): how well this player holds up as
+    # minutes and possessions pile up in a game. Every roster entry sets
+    # this explicitly (players_data.py) rather than deriving it from other
+    # ratings -- it's a real, individually-judged scouting call per player,
+    # not a formula. 0.0 is only a load-time placeholder; __post_init__
+    # does NOT backfill it the way speed/shot_iq get defaulted.
+    stamina: float = field(default=0.0, compare=False, hash=False)
     shot_iq: float = field(default=0.0, compare=False, hash=False)
     iso_tendency: float = field(default=0.0, compare=False, hash=False)
     archetype: str = field(default="", compare=False, hash=False)
@@ -7488,6 +7495,22 @@ def foul_trouble_foul_factor(defender: Player) -> float:
     return 1.0
 
 
+def stamina_fatigue_multiplier(player: Player) -> float:
+    """
+    Scales how hard the accumulated-minutes/stint fatigue below actually
+    bites for this specific player. Every roster entry carries its own,
+    individually-judged conditioning rating (player.stamina, set in
+    players_data.py) rather than everyone fatiguing on one identical curve.
+
+    0.75 is the pivot -- a player rated right there fatigues exactly like
+    the original, stamina-blind curve did. A grinder rated down near 0.55
+    takes noticeably more drag for the same minutes; an iron-man up near
+    0.95 gets most of it blunted away.
+    """
+    stamina = getattr(player, "stamina", 0.0) or 0.75
+    return max(0.45, min(1.85, 1.0 + (0.75 - stamina) * 1.6))
+
+
 def fatigue_factor(player: Player) -> float:
     minutes = player.minutes / 60
     stint = getattr(player, "current_stint", 0) / 60
@@ -7500,7 +7523,8 @@ def fatigue_factor(player: Player) -> float:
         base = max(0.97, 1.0 - (minutes - 36) * 0.004)
     else:
         base = max(0.94, 0.976 - (minutes - 42) * 0.006)
-    return max(0.92, base - stint_drag)
+    drag = (1.0 - base + stint_drag) * stamina_fatigue_multiplier(player)
+    return max(0.85, 1.0 - drag)
 
 
 def fatigue_offense_factor(player: Player) -> float:
@@ -7515,7 +7539,8 @@ def fatigue_offense_factor(player: Player) -> float:
         base = max(0.97, 1.0 - (minutes - 38) * 0.004)
     else:
         base = max(0.94, 0.976 - (minutes - 44) * 0.006)
-    return max(0.92, base - stint_drag)
+    drag = (1.0 - base + stint_drag) * stamina_fatigue_multiplier(player)
+    return max(0.85, 1.0 - drag)
 
 
 def effective_speed(player: Player) -> float:
@@ -8762,7 +8787,7 @@ def effective_rating(base_rating: float, player: Player, team: Team,
     momentum_boost = getattr(team, "momentum", 0.0) * 0.006
     clutch_boost = clutch_multiplier(player, team, opponent, period, period_time) - 1.0
     series_boost = series_pressure_bonus(player, team, opponent)
-    fatigue_drag = max(0.0, (player.minutes / 60 - 40) * 0.002)
+    fatigue_drag = max(0.0, (player.minutes / 60 - 40) * 0.002) * stamina_fatigue_multiplier(player)
     home_boost = 0.012 if getattr(team, "home_team", False) else 0.0
 
     if is_superstar(player, team):
@@ -11703,7 +11728,7 @@ def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> floa
         else:
             p *= max(0.45, 1.0 + 0.18 * height_advantage(defender, shooter))
 
-    fatigue_drag = max(0.0, (defender.minutes / 60 - 42) * 0.0015)
+    fatigue_drag = max(0.0, (defender.minutes / 60 - 42) * 0.0015) * stamina_fatigue_multiplier(defender)
     return max(0.003, p * (1.0 - fatigue_drag))
 
 
