@@ -15497,7 +15497,14 @@ def isolation_shot_creation(shooter: Player, defender: Player) -> Tuple[str, flo
     )
     roll = random.random()
 
-    if creation >= 0.58 and roll < 0.72:
+    # A real handle should be able to manufacture a clean look even when the
+    # rest of the picture (shot IQ, defense) isn't fully lined up -- same
+    # idea as shot_quality()'s elite_handle carve-out for the main game.
+    # Elite ball-handlers get a lower bar to reach the open tier and a wider
+    # window of rolls that land there, plus their own bonus on top of it.
+    elite_handle = shooter.ball_handle >= 0.86
+    if (creation >= 0.58 or (elite_handle and creation >= 0.46)) and roll < (0.80 if elite_handle else 0.72):
+        handle_bonus = max(0.0, shooter.ball_handle - 0.82) * 0.10 if elite_handle else 0.0
         lines = [
             f"{shooter.name} creates real separation off the bounce.",
             f"{shooter.name} strings the dribble together and gets to his spot.",
@@ -15528,7 +15535,7 @@ def isolation_shot_creation(shooter: Player, defender: Player) -> Tuple[str, flo
             f"{shooter.name} uses the size mismatch to shoot clean over the top.",
             f"{shooter.name} waltzes into his sweet spot as if no one is guarding him.",
         ]
-        return random.choice(lines), 1.12 + min(0.10, (creation - 0.58) * 0.24)
+        return random.choice(lines), 1.12 + handle_bonus + min(0.10, max(0.0, creation - 0.58) * 0.24)
 
     if creation >= 0.43 and roll < 0.70:
         lines = [
