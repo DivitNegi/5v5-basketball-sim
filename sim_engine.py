@@ -11096,17 +11096,20 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         mid = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time)
         base = 0.68 * rim + 0.32 * mid
         skill_rating = base
-        defense_tax = 0.41 if elite_interior_scorer(shooter) else 0.58
-        p = base * (0.94 if elite_interior_scorer(shooter) else 0.82)
+        # Post shots were landing around 29% league-wide -- well below a real
+        # post-up's efficiency even accounting for contact and length down
+        # low. Raised the finish base and eased the interior-defense tax.
+        defense_tax = 0.34 if elite_interior_scorer(shooter) else 0.48
+        p = base * (0.98 if elite_interior_scorer(shooter) else 0.90)
         p *= (1 - defense_tax * effective_interior_def(defender))
 
     elif shot_type == "post_fade":
         rating = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time)
         post_balance = 0.55 * shooter.mid_rating + 0.25 * shooter.post_tendency + 0.20 * shooter.shot_iq
         skill_rating = rating
-        p = rating * (0.72 + min(0.08, shooter.post_tendency * 0.12))
+        p = rating * (0.80 + min(0.08, shooter.post_tendency * 0.12))
         p *= 1.0 + max(0.0, post_balance - 0.74) * 0.14
-        p *= (1 - 0.46 * effective_interior_def(defender))
+        p *= (1 - 0.40 * effective_interior_def(defender))
 
     else:
         rim = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time)
@@ -16551,7 +16554,9 @@ def choose_shot_type(shooter: Player, defender: Player,
         effective_tendency(three_attempt_tendency_curve(shooter.three_tendency), shooter, team, opponent, period, period_time) * three_pref * THREE_ATTEMPT_SCALE * (1 - 0.30 * defender.perimeter_def),
         effective_tendency(shooter.mid_tendency, shooter, team, opponent, period, period_time) * (1 - 0.25 * defender.perimeter_def),
         effective_tendency(shooter.drive_tendency, shooter, team, opponent, period, period_time) * (1 - 0.25 * defender.interior_def),
-        effective_tendency(shooter.post_tendency, shooter, team, opponent, period, period_time) * (1 - 0.30 * defender.interior_def),
+        # Modest across-the-board bump -- post shots were a bit too rare
+        # relative to how often a real post_tendency rating should get used.
+        effective_tendency(shooter.post_tendency, shooter, team, opponent, period, period_time) * (1 - 0.30 * defender.interior_def) * 1.15,
     ]
     offball_gravity = team_offball_gravity(team, shooter)
     if offball_gravity >= 0.70:
