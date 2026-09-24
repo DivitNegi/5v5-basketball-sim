@@ -7954,6 +7954,22 @@ def rotation_star_players(team: Team) -> List[Player]:
 
 
 def initialize_minute_targets(team: Team):
+    _initialize_minute_targets_core(team)
+    apply_gui_minutes_overrides(team)
+
+
+def apply_gui_minutes_overrides(team: Team):
+    # A roster-swap in the GUI can pin a specific player to an explicit
+    # minutes count instead of letting the usual role/rating-based logic
+    # above decide for him. That override always wins -- it's applied last,
+    # after whichever team-specific or generic branch above already ran.
+    for p in team.roster:
+        override = getattr(p, "gui_target_minutes_override", None)
+        if override is not None:
+            p.target_minutes = override
+
+
+def _initialize_minute_targets_core(team: Team):
     ranked = sorted(team.roster, key=overall_rating, reverse=True)
     core_stars = set(rotation_star_players(team))
 

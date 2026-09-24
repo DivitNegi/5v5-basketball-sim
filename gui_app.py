@@ -5126,11 +5126,15 @@ def run_gui_app():
         return True
 
     def serialize_swap_player(player: Player) -> Dict:
-        return {
+        record = {
             "name": player.name,
             "position": player.position,
             "source_team": getattr(player, "source_team", "All-Time"),
         }
+        minutes_override = getattr(player, "gui_target_minutes_override", None)
+        if minutes_override is not None:
+            record["target_minutes"] = minutes_override
+        return record
 
     def find_swap_player_from_record(record: Dict) -> Player | None:
         name = record.get("name")
@@ -5143,7 +5147,15 @@ def run_gui_app():
             exact = [p for p in candidates if getattr(p, "source_team", "All-Time") == source]
             if exact:
                 candidates = exact
-        return max(candidates, key=fantasy_ovr, default=None)
+        found = max(candidates, key=fantasy_ovr, default=None)
+        if found is None:
+            return None
+        minutes_override = record.get("target_minutes")
+        if minutes_override is not None:
+            import copy
+            found = copy.deepcopy(found)
+            found.gui_target_minutes_override = minutes_override
+        return found
 
     def save_custom_rosters():
         if running["active"]:
@@ -5663,7 +5675,12 @@ def run_gui_app():
         ttk.Label(top, text="Version").grid(row=3, column=0, padx=(0, 8), pady=(8, 0), sticky="w")
         version_box = ttk.Combobox(top, textvariable=version_var, values=[], state="readonly", width=72)
         version_box.grid(row=3, column=1, columnspan=2, padx=(0, 14), pady=(8, 0), sticky="ew")
-        ttk.Label(top, textvariable=status_line, foreground=GOLD).grid(row=4, column=0, columnspan=3, pady=(8, 0), sticky="w")
+        ttk.Label(top, text="Minutes").grid(row=4, column=0, padx=(0, 8), pady=(8, 0), sticky="w")
+        minutes_var = tk.StringVar(value="")
+        minutes_entry = dark_entry(top, textvariable=minutes_var, width=8)
+        minutes_entry.grid(row=4, column=1, padx=(0, 14), pady=(8, 0), sticky="w")
+        ttk.Label(top, text="Optional -- pin this swapped-in player to an exact target minutes/game instead of letting the sim decide.", foreground=MUTED).grid(row=4, column=2, pady=(8, 0), sticky="w")
+        ttk.Label(top, textvariable=status_line, foreground=GOLD).grid(row=5, column=0, columnspan=3, pady=(8, 0), sticky="w")
         top.columnconfigure(1, weight=1)
         top.columnconfigure(2, weight=1)
 
@@ -5736,7 +5753,9 @@ def run_gui_app():
                     outgoing_names.append(player.name)
                     incoming = swaps.get(player.name)
                     if incoming is not None:
-                        label = f"{idx}. {player.name} -> {incoming.name} ({getattr(incoming, 'source_team', 'All-Time')})"
+                        minutes_override = getattr(incoming, "gui_target_minutes_override", None)
+                        minutes_note = f" @ {minutes_override} min" if minutes_override is not None else ""
+                        label = f"{idx}. {player.name} -> {incoming.name} ({getattr(incoming, 'source_team', 'All-Time')}){minutes_note}"
                     else:
                         label = f"{idx}. {player.name} ({player.position})"
                     labels.append(label)
@@ -5850,10 +5869,29 @@ def run_gui_app():
             if not team_name or not outgoing_name or incoming is None:
                 status_line.set("Pick both an outgoing player and an incoming player.")
                 return
-            gui_roster_swaps.setdefault(team_name, {})[outgoing_name] = incoming
+            minutes_text = minutes_var.get().strip()
+            minutes_override = None
+            if minutes_text:
+                try:
+                    minutes_override = int(round(float(minutes_text)))
+                except ValueError:
+                    status_line.set("Minutes must be a number (or leave it blank to let the sim decide).")
+                    return
+                if not (0 <= minutes_override <= 48):
+                    status_line.set("Minutes must be between 0 and 48.")
+                    return
+            # Store our own clone rather than the shared fantasy-pool object --
+            # the override is per-swap, and other swaps/dialogs reuse that
+            # same pooled Player instance.
+            import copy
+            incoming_for_swap = copy.deepcopy(incoming)
+            incoming_for_swap.gui_target_minutes_override = minutes_override
+            gui_roster_swaps.setdefault(team_name, {})[outgoing_name] = incoming_for_swap
             source = getattr(incoming, "source_team", "All-Time")
-            status_line.set(f"{team_name}: {outgoing_name} will be replaced by {incoming.name} ({source}).")
+            minutes_note = f" and pinned to {minutes_override} min/game" if minutes_override is not None else ""
+            status_line.set(f"{team_name}: {outgoing_name} will be replaced by {incoming.name} ({source}){minutes_note}.")
             status_var.set(roster_swap_summary())
+            minutes_var.set("")
             refresh_outgoing()
 
         def remove_swap():
