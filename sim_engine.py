@@ -8251,16 +8251,34 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Miami Heat":
         target_ranges = {
-            "Davion Mitchell": (28, 34),
-            "Norman Powell": (32, 36),
-            "Andrew Wiggins": (32, 36),
             "Giannis Antetokounmpo": (38, 42),
-            "Bam Adebayo": (34, 38),
+            "Bam Adebayo": (32, 36),
+            "Andrew Wiggins": (28, 32),
+            "Davion Mitchell": (26, 31),
+            "Klay Thompson": (24, 30),
             "Bobby Portis": (22, 28),
-            "Tim Hardaway Jr.": (18, 24),
-            "Nikola Jovic": (16, 22),
-            "Duncan Robinson": (12, 18),
-            "Pelle Larsson": (10, 16),
+            "Tim Hardaway Jr.": (20, 26),
+            "Pelle Larsson": (16, 22),
+            "Simone Fontecchio": (12, 18),
+            "Dru Smith": (8, 14),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Denver Nuggets":
+        target_ranges = {
+            "Nikola Jokic": (36, 40),
+            "Jamal Murray": (32, 36),
+            "Aaron Gordon": (28, 33),
+            "DeMar DeRozan": (26, 31),
+            "Cameron Johnson": (22, 28),
+            "Christian Braun": (24, 29),
+            "Marvin Bagley III": (16, 22),
+            "Julian Strawther": (16, 22),
+            "Tyus Jones": (14, 20),
+            "Cam Whitmore": (10, 16),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8316,6 +8334,279 @@ def _initialize_minute_targets_core(team: Team):
             "Mike Conley": (18, 24),
             "Terrence Shannon Jr.": (16, 22),
             "Zyon Pullin": (6, 12),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Atlanta Hawks":
+        target_ranges = {
+            "Jalen Johnson": (34, 38), "Nickeil Alexander-Walker": (28, 33),
+            "C.J. McCollum": (30, 35), "Dyson Daniels": (30, 34),
+            "Onyeka Okongwu": (24, 30), "Luguentz Dort": (24, 29),
+            "Aaron Wiggins": (18, 24), "Jock Landale": (14, 20),
+            "Buddy Hield": (16, 22), "Kingston Flemings": (8, 14),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Brooklyn Nets":
+        target_ranges = {
+            "Michael Porter Jr.": (32, 36), "Julius Randle": (32, 36),
+            "Keon Ellis": (20, 26), "Noah Clowney": (20, 26),
+            "Nolan Traore": (18, 24), "Egor Demin": (18, 24),
+            "Day'Ron Sharpe": (16, 22), "Danny Wolf": (14, 20),
+            "Terance Mann": (16, 22), "Mikel Brown Jr.": (8, 14),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Charlotte Hornets":
+        target_ranges = {
+            "Brandon Miller": (34, 38), "Kon Knueppel": (28, 33),
+            "Naz Reid": (28, 33), "Coby White": (26, 31),
+            "Grayson Allen": (24, 29), "Moussa Diabate": (18, 24),
+            "Ryan Kalkbrenner": (16, 22), "Dennis Schroder": (22, 28),
+            "Royce O'Neale": (18, 24), "Dorian Finney-Smith": (14, 20),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Chicago Bulls":
+        target_ranges = {
+            "Norman Powell": (30, 35), "Josh Giddey": (30, 35),
+            "Matas Buzelis": (28, 33), "Nicolas Claxton": (24, 29),
+            "Tre Jones": (24, 29), "Caleb Wilson": (16, 22),
+            "Jalen Smith": (16, 22), "Isaac Okoro": (20, 26),
+            "Zach Collins": (16, 22), "Patrick Williams": (14, 20),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Cleveland Cavaliers":
+        target_ranges = {
+            "Donovan Mitchell": (34, 38), "James Harden": (30, 34),
+            "Evan Mobley": (32, 36), "Jarrett Allen": (26, 31),
+            "Peyton Watson": (20, 26), "Sam Merrill": (20, 26),
+            "Jaylon Tyson": (16, 22), "Mario Hezonja": (14, 20),
+            "Thomas Bryant": (14, 20), "Craig Porter Jr.": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Detroit Pistons":
+        target_ranges = {
+            "Cade Cunningham": (34, 38), "Ausar Thompson": (28, 33),
+            "Jalen Duren": (26, 31), "John Collins": (24, 29),
+            "Daniss Jenkins": (18, 24), "Duncan Robinson": (18, 24),
+            "Isaiah Joe": (18, 24), "Paul Reed": (14, 20),
+            "Ron Holland": (14, 20), "Kevin Huerter": (14, 20),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Golden State Warriors":
+        target_ranges = {
+            "Stephen Curry": (32, 36), "Jimmy Butler": (28, 33),
+            "Kristaps Porzingis": (24, 29), "Draymond Green": (26, 31),
+            "Brandin Podziemski": (22, 28), "Gui Santos": (14, 20),
+            "Al Horford": (16, 22), "De'Anthony Melton": (14, 20),
+            "Moses Moody": (16, 22), "Brandon Williams": (8, 14),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Houston Rockets":
+        target_ranges = {
+            "Kevin Durant": (32, 36), "Alperen Sengun": (28, 33),
+            "Amen Thompson": (26, 31), "Jabari Smith Jr.": (22, 28),
+            "Reed Sheppard": (18, 24), "Fred VanVleet": (22, 28),
+            "Marcus Smart": (18, 24), "Tari Eason": (20, 26),
+            "Steven Adams": (12, 18), "Clint Capela": (14, 20),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Indiana Pacers":
+        target_ranges = {
+            "Tyrese Haliburton": (32, 36), "Pascal Siakam": (30, 34),
+            "Ivica Zubac": (24, 29), "Andrew Nembhard": (24, 29),
+            "T.J. McConnell": (18, 24), "Kelly Oubre Jr.": (18, 24),
+            "Aaron Nesmith": (20, 26), "Obi Toppin": (16, 22),
+            "Jarace Walker": (16, 22), "Jay Huff": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Los Angeles Clippers":
+        target_ranges = {
+            "Darius Garland": (30, 34), "Brandon Ingram": (30, 34),
+            "Rui Hachimura": (22, 28), "Max Strus": (18, 24),
+            "Derrick Jones Jr.": (18, 24), "Brook Lopez": (16, 22),
+            "Bradley Beal": (18, 24), "Keaton Wagler": (8, 14),
+            "Kris Dunn": (14, 20), "Isaiah Jackson": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Memphis Grizzlies":
+        target_ranges = {
+            "Ty Jerome": (22, 28), "Zach Edey": (18, 24),
+            "Cedric Coward": (18, 24), "Jerami Grant": (22, 28),
+            "Cameron Boozer": (18, 24), "Jaylen Wells": (18, 24),
+            "Isaiah Stewart": (14, 20), "GG Jackson": (14, 20),
+            "Cam Spencer": (12, 18), "Scotty Pippen Jr.": (14, 20),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Milwaukee Bucks":
+        target_ranges = {
+            "Tyler Herro": (32, 36), "Ryan Rollins": (22, 28),
+            "Kevin Porter Jr.": (18, 24), "Myles Turner": (24, 29),
+            "Kel'el Ware": (18, 24), "Caris LeVert": (18, 24),
+            "Jaime Jaquez Jr.": (16, 22), "Kyle Kuzma": (16, 22),
+            "Ousmane Dieng": (12, 18), "A.J. Green": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 New Orleans Pelicans":
+        target_ranges = {
+            "Zion Williamson": (28, 33), "Trey Murphy III": (26, 31),
+            "Dejounte Murray": (24, 29), "Saddiq Bey": (18, 24),
+            "Derik Queen": (16, 22), "Herbert Jones": (24, 29),
+            "Jeremiah Fears": (16, 22), "Bennedict Mathurin": (16, 22),
+            "Yves Missi": (14, 20), "Jordan Poole": (12, 18),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 New York Knicks":
+        target_ranges = {
+            "Jalen Brunson": (34, 38), "Karl-Anthony Towns": (30, 34),
+            "OG Anunoby": (26, 31), "Mikal Bridges": (28, 33),
+            "Josh Hart": (24, 29), "Miles McBride": (18, 24),
+            "Landry Shamet": (14, 20), "Jose Alvarado": (16, 22),
+            "Andre Drummond": (14, 20), "Jordan Clarkson": (12, 18),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Oklahoma City Thunder":
+        target_ranges = {
+            "Shai Gilgeous-Alexander": (34, 38), "Chet Holmgren": (28, 33),
+            "Jalen Williams": (28, 33), "Isaiah Hartenstein": (20, 26),
+            "Ajay Mitchell": (18, 24), "Alex Caruso": (18, 24),
+            "Cason Wallace": (18, 24), "Jared McCain": (14, 20),
+            "Jaylin Williams": (14, 20), "Kenrich Williams": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Orlando Magic":
+        target_ranges = {
+            "Paolo Banchero": (32, 36), "Franz Wagner": (28, 33),
+            "Desmond Bane": (26, 31), "Jalen Suggs": (20, 26),
+            "Anthony Black": (18, 24), "Wendell Carter Jr.": (18, 24),
+            "Nikola Vucevic": (16, 22), "Tristan da Silva": (14, 20),
+            "Goga Bitadze": (10, 16), "Jevon Carter": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Phoenix Suns":
+        target_ranges = {
+            "Devin Booker": (32, 36), "Dillon Brooks": (24, 29),
+            "Jalen Green": (20, 26), "Miles Bridges": (20, 26),
+            "Collin Gillespie": (14, 20), "Mark Williams": (16, 22),
+            "Luke Kennard": (14, 20), "Oso Ighodaro": (12, 18),
+            "Pat Spencer": (10, 16), "Jordan Goodwin": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Portland Trail Blazers":
+        target_ranges = {
+            "Deni Avdija": (28, 33), "Damian Lillard": (30, 34),
+            "Ja Morant": (28, 33), "Jrue Holiday": (20, 26),
+            "Donovan Clingan": (18, 24), "Shaedon Sharpe": (18, 24),
+            "Toumani Camara": (16, 22), "Scoot Henderson": (14, 20),
+            "Robert Williams III": (14, 20), "Vit Krejci": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Sacramento Kings":
+        target_ranges = {
+            "Domantas Sabonis": (28, 33), "Zach LaVine": (26, 31),
+            "Malik Monk": (20, 26), "Keegan Murray": (20, 26),
+            "Maxime Raynaud": (16, 22), "De'Andre Hunter": (18, 24),
+            "Precious Achiuwa": (14, 20), "Nique Clifford": (12, 18),
+            "Darius Acuff Jr.": (10, 16), "Ben Simmons": (10, 16),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 San Antonio Spurs":
+        target_ranges = {
+            "Victor Wembanyama": (32, 36), "Stephon Castle": (26, 31),
+            "Dylan Harper": (22, 28), "De'Aaron Fox": (24, 29),
+            "Tobias Harris": (18, 24), "Devin Vassell": (18, 24),
+            "Keldon Johnson": (14, 20), "Julian Champagnie": (12, 18),
+            "Harrison Barnes": (12, 18), "Luke Kornet": (8, 14),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
+    if team.name == "2027 Utah Jazz":
+        target_ranges = {
+            "Jaren Jackson Jr.": (26, 31), "Lauri Markkanen": (28, 33),
+            "Keyonte George": (22, 28), "Isaiah Collier": (18, 24),
+            "Brice Sensabaugh": (14, 20), "Darryn Peterson": (14, 20),
+            "Ace Bailey": (14, 20), "Kyle Filipowski": (14, 20),
+            "Jusuf Nurkic": (12, 18), "Jaxson Hayes": (10, 16),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
