@@ -768,7 +768,6 @@ def run_gui_app():
             "Custom 16-team playoffs",
             "Full playoffs",
             "Full 2016 playoffs",
-            "Season mode",
             "Fantasy draft season",
             "2026 fantasy draft season",
             "Fantasy draft playoffs",
@@ -5560,6 +5559,8 @@ def run_gui_app():
                         continue
                     for p in team.roster:
                         rows.append((t_name, p))
+                for p in load_custom_fantasy_players():
+                    rows.append(("Custom Player", p))
                 rows.sort(key=lambda row: row[1].name)
                 pool_cache["players"] = rows
             return pool_cache["players"]
