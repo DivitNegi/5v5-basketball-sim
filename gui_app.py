@@ -6279,10 +6279,13 @@ def run_gui_app():
                 if not team_name_a or not team_name_b:
                     print("Pick two players for 1-on-1.")
                 else:
-                    roster_a = sim_factories[team_name_a]().roster
-                    roster_b = sim_factories[team_name_b]().roster
-                    player_a = next((p for p in roster_a if p.name == player_name_a), None)
-                    player_b = next((p for p in roster_b if p.name == player_name_b), None)
+                    def resolve_1v1_player(team_name, player_name):
+                        if team_name == "Custom Player":
+                            return next((p for p in load_custom_fantasy_players() if p.name == player_name), None)
+                        roster = sim_factories[team_name]().roster
+                        return next((p for p in roster if p.name == player_name), None)
+                    player_a = resolve_1v1_player(team_name_a, player_name_a)
+                    player_b = resolve_1v1_player(team_name_b, player_name_b)
                     if player_a is None or player_b is None:
                         print("Could not find one of the selected players.")
                     else:
