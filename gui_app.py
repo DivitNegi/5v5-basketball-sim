@@ -6065,12 +6065,10 @@ def run_gui_app():
         badge_box = ttk.Combobox(body, textvariable=badge_choice_var, values=badge_values, state="readonly", style="Dark.TCombobox")
         badge_box.grid(row=height_row + 1, column=1, sticky="ew", padx=(0, 10), pady=(0, 4))
 
-        extra_badges_var = tk.StringVar(value="Extra badges: None")
         ttk.Label(body, text="Selected Extras").grid(row=height_row, column=2, sticky="w", padx=(0, 10), pady=(8, 0))
-        ttk.Label(body, textvariable=extra_badges_var, foreground=GOLD).grid(row=height_row + 1, column=2, sticky="ew", padx=(0, 10), pady=(0, 4))
         selected_badge_var = tk.StringVar(value="")
         selected_badge_box = ttk.Combobox(body, textvariable=selected_badge_var, values=[], state="readonly", style="Dark.TCombobox")
-        selected_badge_box.grid(row=height_row + 1, column=3, sticky="ew", padx=(0, 10), pady=(0, 4))
+        selected_badge_box.grid(row=height_row + 1, column=2, sticky="ew", padx=(0, 10), pady=(0, 4))
 
         ttk.Label(body, text="Go-To Shot").grid(row=height_row + 2, column=0, sticky="w", padx=(0, 10), pady=(8, 0))
         go_to_values = ("Auto",) + tuple(GO_TO_SHOT_PACKS[code]["label"] for code in sorted(GO_TO_SHOT_PACKS))
@@ -6112,7 +6110,6 @@ def run_gui_app():
             return ""
 
         def update_extra_badges_label():
-            extra_badges_var.set("Extra badges: " + (", ".join(selected_extra_badges) if selected_extra_badges else "None"))
             selected_badge_box.configure(values=tuple(selected_extra_badges))
             if selected_extra_badges:
                 if selected_badge_var.get() not in selected_extra_badges:
