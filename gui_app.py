@@ -6080,8 +6080,16 @@ def run_gui_app():
         level_box = ttk.Combobox(body, textvariable=badge_level_var, values=level_values, state="readonly", style="Dark.TCombobox")
         level_box.grid(row=height_row + 3, column=1, sticky="ew", padx=(0, 10), pady=(0, 4))
 
-        preview = tk.Text(body, height=8, bg="#05070f", fg=TEXT, insertbackground=TEXT, relief="flat", wrap="word", font=("Segoe UI", 11), padx=10, pady=8)
-        preview.grid(row=height_row + 4, column=0, columnspan=4, sticky="ew", pady=(12, 8))
+        preview_frame = tk.Frame(body, bg="#05070f")
+        preview_frame.grid(row=height_row + 4, column=0, columnspan=4, sticky="nsew", pady=(12, 8))
+        body.rowconfigure(height_row + 4, weight=1)
+        preview_frame.rowconfigure(0, weight=1)
+        preview_frame.columnconfigure(0, weight=1)
+        preview = tk.Text(preview_frame, height=12, bg="#05070f", fg=TEXT, insertbackground=TEXT, relief="flat", wrap="word", font=("Segoe UI", 11), padx=10, pady=8)
+        preview_scroll = ttk.Scrollbar(preview_frame, orient="vertical", command=preview.yview)
+        preview.configure(yscrollcommand=preview_scroll.set)
+        preview.grid(row=0, column=0, sticky="nsew")
+        preview_scroll.grid(row=0, column=1, sticky="ns")
         preview.configure(state="disabled")
 
         def selected_badge_codes() -> List[str]:
