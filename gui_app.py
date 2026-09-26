@@ -5944,20 +5944,27 @@ def run_gui_app():
         dialog.after_idle(initial_roster_swap_refresh)
         dialog.after(250, initial_roster_swap_refresh)
 
-    def open_create_player_dialog():
+    def open_create_player_dialog(existing_index: int | None = None):
         if running["active"]:
             status_var.set("Finish or clear the current sim before creating a player.")
             return
 
+        existing_player: Player | None = None
+        if existing_index is not None:
+            existing_pool = load_custom_fantasy_players()
+            if 0 <= existing_index < len(existing_pool):
+                existing_player = existing_pool[existing_index]
+            else:
+                status_var.set("Could not find that custom player to edit.")
+                return
+
         dialog = tk.Toplevel(root)
-        dialog.title("Create Player")
+        dialog.title("Edit Player" if existing_player is not None else "Create Player")
         dialog.geometry("1120x780")
         dialog.configure(bg=APP_BG)
         dialog.transient(root)
 
-        fields = [
-            ("name", "Name", "Custom Player"),
-            ("position", "Position", "SG"),
+        field_defs = [
             ("three_tendency", "3PT Tend", "50"),
             ("mid_tendency", "MID Tend", "35"),
             ("drive_tendency", "Drive Tend", "35"),
@@ -5985,18 +5992,47 @@ def run_gui_app():
             ("shot_iq", "Shot IQ", "70"),
             ("iso_tendency", "Iso Tend", "35"),
         ]
+        if existing_player is not None:
+            fields = [("name", "Name", existing_player.name), ("position", "Position", existing_player.position)]
+            for key, label, fallback in field_defs:
+                value = getattr(existing_player, key, None)
+                text = str(round(value * 100)) if isinstance(value, float) else fallback
+                fields.append((key, label, text))
+        else:
+            fields = [("name", "Name", "Custom Player"), ("position", "Position", "SG")] + field_defs
         form_vars = {key: tk.StringVar(value=default) for key, _label, default in fields}
-        height_feet_var = tk.StringVar(value="6")
-        height_inches_var = tk.StringVar(value="6")
+        if existing_player is not None:
+            feet, inches = divmod(int(getattr(existing_player, "height", 78) or 78), 12)
+            height_feet_var = tk.StringVar(value=str(feet))
+            height_inches_var = tk.StringVar(value=str(inches))
+        else:
+            height_feet_var = tk.StringVar(value="6")
+            height_inches_var = tk.StringVar(value="6")
         badge_choice_var = tk.StringVar(value="")
-        go_to_shot_var = tk.StringVar(value="Auto")
+        badge_level_var = tk.StringVar(value="Bronze")
+        LEVEL_LABEL_TO_CODE = {"Bronze": "bronze", "Silver": "silver", "Gold": "gold", "Hall of Fame": "hof"}
+        LEVEL_CODE_TO_LABEL = {code: label for label, code in LEVEL_LABEL_TO_CODE.items()}
+        existing_go_to_label = "Auto"
+        if existing_player is not None:
+            existing_go_to_code = str(getattr(existing_player, "go_to_shot", "") or "")
+            if existing_go_to_code in GO_TO_SHOT_PACKS:
+                existing_go_to_label = GO_TO_SHOT_PACKS[existing_go_to_code]["label"]
+        go_to_shot_var = tk.StringVar(value=existing_go_to_label)
         selected_extra_badges: List[str] = []
+        if existing_player is not None:
+            seen_badge_bases = set()
+            for badge in getattr(existing_player, "badges", ()) or ():
+                base, level = badge_parts(badge)
+                if base in BADGE_DEFAULT_LEVELS and level and base not in seen_badge_bases:
+                    seen_badge_bases.add(base)
+                    level_label = LEVEL_CODE_TO_LABEL.get(level, "Bronze")
+                    selected_extra_badges.append(f"{plan_label(base)} ({level_label})")
         position_widget = {"box": None}
         status_line = tk.StringVar(value=f"Created players save to {CUSTOM_PLAYERS_PATH}")
 
         header = ttk.Frame(dialog, padding=10)
         header.pack(fill="x")
-        ttk.Label(header, text="Create Player", foreground=GOLD, font=("Segoe UI", 16, "bold")).pack(side="left")
+        ttk.Label(header, text="Edit Player" if existing_player is not None else "Create Player", foreground=GOLD, font=("Segoe UI", 16, "bold")).pack(side="left")
         ttk.Label(header, textvariable=status_line, foreground=MUTED).pack(side="left", padx=(18, 0))
 
         body = ttk.Frame(dialog, padding=(10, 0, 10, 10))
@@ -6039,7 +6075,12 @@ def run_gui_app():
         ttk.Label(body, text="Go-To Shot").grid(row=height_row + 2, column=0, sticky="w", padx=(0, 10), pady=(8, 0))
         go_to_values = ("Auto",) + tuple(GO_TO_SHOT_PACKS[code]["label"] for code in sorted(GO_TO_SHOT_PACKS))
         go_to_box = ttk.Combobox(body, textvariable=go_to_shot_var, values=go_to_values, state="readonly", style="Dark.TCombobox")
-        go_to_box.grid(row=height_row + 3, column=0, columnspan=2, sticky="ew", padx=(0, 10), pady=(0, 4))
+        go_to_box.grid(row=height_row + 3, column=0, sticky="ew", padx=(0, 10), pady=(0, 4))
+
+        ttk.Label(body, text="Badge Level").grid(row=height_row + 2, column=1, sticky="w", padx=(0, 10), pady=(8, 0))
+        level_values = ("Bronze", "Silver", "Gold", "Hall of Fame")
+        level_box = ttk.Combobox(body, textvariable=badge_level_var, values=level_values, state="readonly", style="Dark.TCombobox")
+        level_box.grid(row=height_row + 3, column=1, sticky="ew", padx=(0, 10), pady=(0, 4))
 
         preview = tk.Text(body, height=8, bg="#05070f", fg=TEXT, insertbackground=TEXT, relief="flat", wrap="word", font=("Segoe UI", 11), padx=10, pady=8)
         preview.grid(row=height_row + 4, column=0, columnspan=4, sticky="ew", pady=(12, 8))
@@ -6048,9 +6089,17 @@ def run_gui_app():
         def selected_badge_codes() -> List[str]:
             codes = []
             for label in selected_extra_badges:
-                code = label.strip().lower().replace(" ", "_")
-                if code in BADGE_DEFAULT_LEVELS and code not in codes:
-                    codes.append(code)
+                name_part, _, level_part = label.rpartition(" (")
+                if level_part:
+                    name_part = name_part or label
+                    level_label = level_part[:-1] if level_part.endswith(")") else level_part
+                else:
+                    name_part = label
+                    level_label = "Bronze"
+                code = name_part.strip().lower().replace(" ", "_")
+                level_code = LEVEL_LABEL_TO_CODE.get(level_label, "bronze")
+                if code in BADGE_DEFAULT_LEVELS:
+                    codes.append(f"{code}_{level_code}")
             return codes
 
         def selected_go_to_shot_code() -> str:
@@ -6072,15 +6121,19 @@ def run_gui_app():
                 selected_badge_var.set("")
 
         def add_extra_badge():
-            label = badge_choice_var.get().strip()
-            if label and label not in selected_extra_badges:
-                selected_extra_badges.append(label)
-                update_extra_badges_label()
-                status_line.set(f"Added extra badge: {label}")
-                output_queue.put(f"\n[GUI] Create Player extra badge added: {label}.\n")
-                preview_player()
-            elif label:
-                status_line.set(f"{label} is already selected.")
+            name_label = badge_choice_var.get().strip()
+            if not name_label:
+                return
+            level_label = badge_level_var.get().strip() or "Bronze"
+            combined = f"{name_label} ({level_label})"
+            for existing in list(selected_extra_badges):
+                if existing.rpartition(" (")[0] == name_label:
+                    selected_extra_badges.remove(existing)
+            selected_extra_badges.append(combined)
+            update_extra_badges_label()
+            status_line.set(f"Added extra badge: {combined}")
+            output_queue.put(f"\n[GUI] Create Player extra badge added: {combined}.\n")
+            preview_player()
 
         def remove_extra_badge():
             label = selected_badge_var.get().strip()
@@ -6200,11 +6253,16 @@ def run_gui_app():
                 status_line.set("Could not create that player. Check the name and ratings.")
                 return
             players = load_custom_fantasy_players()
-            players.append(player)
+            if existing_index is not None and 0 <= existing_index < len(players):
+                players[existing_index] = player
+                verb = "Updated"
+            else:
+                players.append(player)
+                verb = "Saved"
             save_custom_fantasy_players(players)
-            status_line.set(f"Saved {player.name}. Reopen Create Team or Swap Player to see the updated pool.")
-            status_var.set(f"Created player: {player.name}")
-            output_queue.put(f"\n[GUI] Created custom player {player.name}. Saved to {CUSTOM_PLAYERS_PATH}.\n")
+            status_line.set(f"{verb} {player.name}. Reopen Create Team or Swap Player to see the updated pool.")
+            status_var.set(f"{verb} player: {player.name}")
+            output_queue.put(f"\n[GUI] {verb} custom player {player.name}. Saved to {CUSTOM_PLAYERS_PATH}.\n")
 
         buttons = ttk.Frame(dialog, padding=(10, 0, 10, 10))
         buttons.pack(fill="x")
@@ -6212,13 +6270,60 @@ def run_gui_app():
         ttk.Button(buttons, text="Remove Badge", command=remove_extra_badge).pack(side="left", padx=(0, 8))
         ttk.Button(buttons, text="Clear Badges", command=clear_extra_badges).pack(side="left", padx=(0, 8))
         ttk.Button(buttons, text="Preview Stats", command=preview_player).pack(side="left", padx=(0, 8))
-        ttk.Button(buttons, text="Save Player", command=save_player).pack(side="left", padx=(0, 8))
+        ttk.Button(buttons, text="Save Changes" if existing_player is not None else "Save Player", command=save_player).pack(side="left", padx=(0, 8))
         ttk.Button(buttons, text="Close", command=dialog.destroy).pack(side="right")
         badge_box.bind("<<ComboboxSelected>>", lambda _event: add_extra_badge())
         go_to_box.bind("<<ComboboxSelected>>", create_player_go_to_changed)
         if position_widget["box"] is not None:
             position_widget["box"].bind("<<ComboboxSelected>>", create_player_position_changed)
+        update_extra_badges_label()
         preview_player()
+
+    def open_edit_player_picker():
+        if running["active"]:
+            status_var.set("Finish or clear the current sim before editing a player.")
+            return
+        players = load_custom_fantasy_players()
+        if not players:
+            status_var.set("No custom players yet. Use Create Player first.")
+            return
+
+        dialog = tk.Toplevel(root)
+        dialog.title("Edit Player")
+        dialog.geometry("420x500")
+        dialog.configure(bg=APP_BG)
+        dialog.transient(root)
+
+        ttk.Label(dialog, text="Choose a custom player to edit", foreground=GOLD, font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=10, pady=(10, 4))
+
+        list_frame = tk.Frame(dialog, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
+        list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        list_frame.rowconfigure(0, weight=1)
+        list_frame.columnconfigure(0, weight=1)
+        listbox = tk.Listbox(list_frame, bg=PANEL_DARK, fg=TEXT, selectbackground=BLUE, selectforeground="#ffffff", font=("Segoe UI", 12), activestyle="none", exportselection=False)
+        scroll = ttk.Scrollbar(list_frame, orient="vertical", command=listbox.yview)
+        listbox.configure(yscrollcommand=scroll.set)
+        listbox.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=1, sticky="ns")
+        for p in players:
+            listbox.insert("end", f"{p.name:<24} {p.position}")
+
+        def edit_selected(_event=None):
+            selection = listbox.curselection()
+            if not selection:
+                status_var.set("Pick a custom player to edit first.")
+                return
+            idx = selection[0]
+            dialog.destroy()
+            open_create_player_dialog(existing_index=idx)
+
+        buttons = ttk.Frame(dialog, padding=(10, 0, 10, 10))
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Edit Selected", command=edit_selected).pack(side="left", padx=(0, 8))
+        ttk.Button(buttons, text="Close", command=dialog.destroy).pack(side="right")
+        listbox.bind("<Double-Button-1>", edit_selected)
+        if players:
+            listbox.selection_set(0)
 
     sim_engine.GUI_FANTASY_PICKER = gui_fantasy_picker
     sim_engine.GUI_POSITION_PICKER = gui_position_picker
@@ -6549,7 +6654,8 @@ def run_gui_app():
     ttk.Button(controls, text="Load Rosters", command=load_custom_rosters).grid(row=2, column=6, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Reset Rosters", command=reset_all_roster_swaps).grid(row=2, column=8, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Create Player", command=open_create_player_dialog).grid(row=3, column=0, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
-    ttk.Button(controls, text="Play 1-on-1", command=open_1v1_player_picker).grid(row=3, column=2, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
+    ttk.Button(controls, text="Edit Player", command=open_edit_player_picker).grid(row=3, column=2, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
+    ttk.Button(controls, text="Play 1-on-1", command=open_1v1_player_picker).grid(row=3, column=4, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(adjustments_frame, text="Call Timeout", command=queue_gui_timeout).grid(row=1, column=0, sticky="ew", padx=(0, 5), pady=3)
     ttk.Button(adjustments_frame, text="Queue Subs", command=queue_gui_subs).grid(row=1, column=1, sticky="ew", padx=(5, 0), pady=3)
     ttk.Button(adjustments_frame, text="Cycle Offense", command=cycle_gui_offense).grid(row=2, column=0, sticky="ew", padx=(0, 5), pady=3)
