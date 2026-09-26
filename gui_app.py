@@ -6133,6 +6133,7 @@ def run_gui_app():
             update_extra_badges_label()
             status_line.set(f"Added extra badge: {combined}")
             output_queue.put(f"\n[GUI] Create Player extra badge added: {combined}.\n")
+            badge_level_var.set("Bronze")
             preview_player()
 
         def remove_extra_badge():
