@@ -13426,13 +13426,15 @@ def make_mavs_2027() -> Team:
 
 def make_lakers_2026() -> Team:
     players = [
-        Player('Luka Doncic', 'PG',
-               0.440, 0.320, 0.200, 0.040, 0.080, 0.460,
-               0.880, 0.960, 0.990, 0.780, 0.780,
-               0.400, 0.960, 0.920,
-               0.66, 0.53, 0.55, 0.82, 0.990, 0.800,
-               0.59, 0.58,
-               clutchness=0.940, stamina=0.75),
+        Player('Bronny James', 'PG',
+               0.34, 0.20, 0.30, 0.06, 0.20, 0.092,
+               0.740, 0.700, 0.760, 0.720, 0.740,
+               0.080, 0.600, 0.620,
+               0.66, 0.50, 0.34, 0.42, 0.333, 0.600,
+               0.88, 0.66,
+               clutchness=0.560, badges=('point_of_attack_defender',),
+               height=74, speed=0.82, shot_iq=0.58, iso_tendency=0.10,
+               secondary_positions=('SG',), archetype='defensive combo guard', stamina=0.82),
         Player('Austin Reaves', 'SG',
                0.420, 0.300, 0.220, 0.060, 0.080, 0.287,
                0.880, 0.900, 0.940, 0.700, 0.860,
