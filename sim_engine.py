@@ -8230,6 +8230,24 @@ def _initialize_minute_targets_core(team: Team):
             p.target_minutes = random.randint(low, high)
         return
 
+    if team.name == "2026 Los Angeles Lakers":
+        target_ranges = {
+            "Rui Hachimura": (37, 40),
+            "LeBron James": (36, 40),
+            "Austin Reaves": (34, 39),
+            "Marcus Smart": (32, 37),
+            "Luke Kennard": (30, 35),
+            "Deandre Ayton": (26, 31),
+            "Jaxson Hayes": (13, 19),
+            "Jake LaRavia": (11, 17),
+            "Jarred Vanderbilt": (8, 13),
+            "Bronny James": (3, 8),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (4, 10))
+            p.target_minutes = random.randint(low, high)
+        return
+
     if team.name == "2027 Boston Celtics":
         target_ranges = {
             "Derrick White": (33, 37),
