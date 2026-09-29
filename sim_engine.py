@@ -9708,6 +9708,9 @@ def best_bench_replacement_for(team: Team, out_player: Player, excluded: set[Pla
     ]
     if priority_same_pos:
         return max(priority_same_pos, key=lambda p: (target_minutes(p, team) - p.minutes / 60, overall_rating(p)))
+    same_pos_under_target = [p for p in same_pos if p.minutes / 60 < target_minutes(p, team)]
+    if same_pos_under_target:
+        return max(same_pos_under_target, key=overall_rating)
     if same_pos:
         return max(same_pos, key=overall_rating)
 
@@ -9720,6 +9723,9 @@ def best_bench_replacement_for(team: Team, out_player: Player, excluded: set[Pla
     ]
     if priority_available:
         return max(priority_available, key=lambda p: (target_minutes(p, team) - p.minutes / 60, overall_rating(p)))
+    available_under_target = [p for p in available if p.minutes / 60 < target_minutes(p, team)]
+    if available_under_target:
+        return max(available_under_target, key=overall_rating)
 
     return max(available, key=overall_rating)
 
@@ -10223,7 +10229,6 @@ def maybe_substitute(team: Team, reason: str, protected: Player = None,
     ranked = sorted([p for p in team.roster if not p.fouled_out], key=overall_rating, reverse=True)
     superstar = ranked[0] if ranked else None
     second_star = ranked[1] if len(ranked) > 1 else None
-    top_five = ranked[:5]
 
     def do_sub(out_player: Player, sub_in: Player, label: str):
         swap_players(team, out_player, sub_in, label)
@@ -10262,19 +10267,12 @@ def maybe_substitute(team: Team, reason: str, protected: Player = None,
             bring_in(superstar)
             return
 
-    # At quarter breaks, rebuild around starters/top players.
+    # At quarter breaks, rebuild around the team's designated starters --
+    # not raw overall_rating, which ignores each team's intended rotation
+    # (target_minutes) and can force a bench player ahead of an actual
+    # starter just because he grades out higher on paper.
     if reason == "quarter":
-        desired = []
-
-        # Q1/Q3/Q4 starts: strongest available lineup.
-        # Q2 can stagger, but still keeps the superstar involved.
-        for p in top_five:
-            if len(desired) < 5:
-                desired.append(p)
-
-        team.on_floor = desired[:5]
-        team.bench = [p for p in team.roster if p not in team.on_floor and not p.fouled_out]
-        balance_lineup_positions(team)
+        force_starter_lineup(team, protected=protected)
         return
 
     # Foul/timeout dead-ball subs: rest only players clearly over target.
