@@ -7828,6 +7828,8 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name == "Dylan Harper" and team.name == "2026 San Antonio Spurs":
         return True
+    if player.name == "Luke Kennard" and team.name == "2026 Los Angeles Lakers":
+        return True
     return False
 
 
@@ -7933,7 +7935,12 @@ def get_star_players(team: Team, num: int = 3) -> List[Player]:
 
 def rotation_star_players(team: Team) -> List[Player]:
     ranked = sorted([p for p in team.roster if not p.fouled_out], key=overall_rating, reverse=True)
-    stars = ranked[:2]
+    # Austin Reaves grades out as the Lakers' #2 by overall_rating, but he
+    # isn't a true iron-man closer like LeBron -- giving him the same
+    # near-impossible-to-rest treatment as a star pushed him well past his
+    # own target_minutes every game. Only LeBron gets the star exemption here.
+    star_count = 1 if team.name == "2026 Los Angeles Lakers" else 2
+    stars = ranked[:star_count]
     required_names = set(mandatory_closers(team))
     for p in ranked:
         if p.name in required_names and p not in stars:
@@ -8231,20 +8238,23 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2026 Los Angeles Lakers":
+        # Exact per-player minutes from the real 2025-26 box score, not
+        # ranges, since the rotation engine only aims at whatever this
+        # gives it -- a range just adds noise around the real number.
         target_ranges = {
-            "Rui Hachimura": (37, 40),
-            "LeBron James": (36, 40),
-            "Austin Reaves": (34, 39),
-            "Marcus Smart": (32, 37),
-            "Luke Kennard": (30, 35),
-            "Deandre Ayton": (26, 31),
-            "Jaxson Hayes": (13, 19),
-            "Jake LaRavia": (11, 17),
-            "Jarred Vanderbilt": (8, 13),
-            "Bronny James": (3, 8),
+            "Rui Hachimura": (39, 39),
+            "LeBron James": (38, 38),
+            "Austin Reaves": (37, 37),
+            "Marcus Smart": (35, 35),
+            "Luke Kennard": (33, 33),
+            "Deandre Ayton": (29, 29),
+            "Jaxson Hayes": (16, 16),
+            "Jake LaRavia": (14, 14),
+            "Jarred Vanderbilt": (11, 11),
+            "Bronny James": (5, 5),
         }
         for p in team.roster:
-            low, high = target_ranges.get(p.name, (4, 10))
+            low, high = target_ranges.get(p.name, (5, 5))
             p.target_minutes = random.randint(low, high)
         return
 
