@@ -8250,7 +8250,7 @@ def _initialize_minute_targets_core(team: Team):
             "Deandre Ayton": (29, 29),
             "Jaxson Hayes": (16, 16),
             "Jake LaRavia": (14, 14),
-            "Jarred Vanderbilt": (11, 11),
+            "Jarred Vanderbilt": (0, 0),
             "Bronny James": (5, 5),
         }
         for p in team.roster:
