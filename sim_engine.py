@@ -7828,7 +7828,7 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name == "Dylan Harper" and team.name == "2026 San Antonio Spurs":
         return True
-    if player.name in ("Luke Kennard", "Jaxson Hayes") and team.name == "2026 Los Angeles Lakers":
+    if player.name == "Luke Kennard" and team.name == "2026 Los Angeles Lakers":
         return True
     return False
 
