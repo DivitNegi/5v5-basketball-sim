@@ -4383,8 +4383,14 @@ def balance_lineup_positions(team: Team):
 
     current = current[:5]
 
+    def _prefer_under_target(candidates):
+        if team.name != "2026 Los Angeles Lakers":
+            return candidates
+        under = [p for p in candidates if p.minutes / 60 < target_minutes(p, team)]
+        return under or candidates
+
     if current and not any(can_play_center_slot(p) for p in current):
-        bench_big = [p for p in bench_pool if can_play_center_slot(p)]
+        bench_big = _prefer_under_target([p for p in bench_pool if can_play_center_slot(p)])
         if bench_big:
             sub_in = max(bench_big, key=overall_rating)
             out_player = min(
@@ -4407,7 +4413,7 @@ def balance_lineup_positions(team: Team):
     # wing/big is available. If a guard checks in for a big, shift the real
     # forwards down and replace the extra guard at the next dead-ball balance.
     while len([p for p in current if natural_frontcourt_player(p)]) < 2:
-        bench_frontcourt = [p for p in bench_pool if natural_frontcourt_player(p)]
+        bench_frontcourt = _prefer_under_target([p for p in bench_pool if natural_frontcourt_player(p)])
         if not bench_frontcourt:
             break
         core = sorted(current, key=overall_rating, reverse=True)[:2]
@@ -4438,7 +4444,7 @@ def balance_lineup_positions(team: Team):
         bench_pool.append(out_player)
 
     if current and not any(lineup_slot_eligible(p, "PF") for p in current):
-        bench_forward = [p for p in bench_pool if lineup_slot_eligible(p, "PF")]
+        bench_forward = _prefer_under_target([p for p in bench_pool if lineup_slot_eligible(p, "PF")])
         if bench_forward:
             sub_in = max(bench_forward, key=lambda p: (starter_minute_need(p, team), overall_rating(p)))
             guard_overload = [p for p in current if p.position.upper() in ("PG", "SG")]
