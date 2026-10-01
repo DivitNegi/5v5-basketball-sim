@@ -9133,11 +9133,25 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     # game. Scale both by the player's own clutch profile so a hot team
     # visibly lifts its clutch players more than it lifts everyone else.
     clutch_affinity = 0.20 + player.clutchness * 1.0 + badge_tier(player, "clutch") * 0.12
-    momentum_boost = getattr(team, "momentum", 0.0) * 0.0055 * clutch_affinity
+    momentum_boost = getattr(team, "momentum", 0.0) * 0.0028 * clutch_affinity
     clutch_boost = clutch_multiplier(player, team, opponent, period, period_time) - 1.0
     series_boost = series_pressure_bonus(player, team, opponent)
     fatigue_drag = max(0.0, (player.minutes / 60 - 40) * 0.002) * stamina_fatigue_multiplier(player)
     home_boost = 0.012 * clutch_affinity if getattr(team, "home_team", False) else 0.0
+
+    # Hot/cold: confidence ticks up on a make and down on a miss
+    # (update_shot_rhythm), with hot/cold streaks adding on top once they
+    # build up. Folding it in here means it both nudges real shot odds
+    # (shot_make_prob derives its skill_rating from effective_rating) and
+    # shows up as a named driver on the live Ratings tab.
+    confidence = getattr(player, "confidence", 0.0)
+    heat_swing = max(-0.05, min(0.05, confidence * 0.016))
+    hot_streak = getattr(player, "hot_streak", 0)
+    cold_streak = getattr(player, "cold_streak", 0)
+    if hot_streak >= 2:
+        heat_swing += min(0.025, hot_streak * 0.006)
+    if cold_streak >= 3:
+        heat_swing -= 0.02
 
     if is_superstar(player, team):
         fatigue_drag *= 0.30
@@ -9151,6 +9165,7 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
         "Series": series_boost,
         "Home": home_boost,
         "Fatigue": -fatigue_drag,
+        "Heat": heat_swing,
     }
 
 
@@ -11592,26 +11607,10 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     if posterizer_bonus and shot_type == "dunk":
         p *= 1.0 + posterizer_bonus
 
-    # Hot/cold streak and confidence are each individually capped and modest
-    # per shot -- but unlike a one-off situational bonus, they PERSIST across
-    # many consecutive shots by the same player once triggered (confidence
-    # saturates near its cap after just 3-4 makes in a row, then every shot
-    # for the rest of the game gets that same bonus until he cools off).
-    # That sustained, correlated advantage across a whole quarter's worth of
-    # shots -- not any single shot's probability -- is what was driving
-    # unrealistically large game-to-game scoring swings between evenly
-    # matched teams. Halving the caps keeps the "hot hand" feel without
-    # letting it compound into a shooting-percentage gap real defenses
-    # couldn't produce.
-    hot = getattr(shooter, "hot_streak", 0)
-    cold = getattr(shooter, "cold_streak", 0)
-    if hot >= 2:
-        p *= 1.0 + min(0.04, hot * 0.0125)
-    if cold >= 3:
-        p *= 0.97
-    confidence = getattr(shooter, "confidence", 0.0)
-    if confidence:
-        p *= 1.0 + max(-0.04, min(0.04, confidence * 0.025))
+    # Hot/cold streak and confidence now flow through effective_rating's
+    # "Heat" component (folded into skill_rating above), so they aren't
+    # applied again here -- that used to double-count hot/cold on top of
+    # itself and is also what lets the Ratings tab show it as a driver.
 
     if is_paint_shot(shot_type):
         p *= paint_spacing_multiplier(team, shooter)
