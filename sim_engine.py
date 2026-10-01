@@ -5341,7 +5341,13 @@ def apply_star_clutchness(*teams: Team):
     for team in teams:
         ratings = star_clutch.get(team.name, {})
         for p in team.roster:
-            p.clutchness = ratings.get(p.name, p.clutchness)
+            # A player whose own roster entry already set an explicit
+            # clutchness (anything other than the Player dataclass default
+            # of 0.50) was deliberately tuned for that specific team/season
+            # -- that authored value should win over this generic flavor
+            # dict instead of being silently clobbered by it.
+            if p.name in ratings and p.clutchness == 0.50:
+                p.clutchness = ratings[p.name]
 
 
 def position_group(pos: str) -> str:
