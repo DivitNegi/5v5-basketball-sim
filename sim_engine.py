@@ -9137,7 +9137,7 @@ def effective_rating(base_rating: float, player: Player, team: Team,
     if getattr(player, "injury_limited", False):
         fatigue_drag += 0.035
 
-    return min(1.0, base_rating * (1.0 + momentum_boost + clutch_boost + series_boost + home_boost - fatigue_drag))
+    return base_rating * (1.0 + momentum_boost + clutch_boost + series_boost + home_boost - fatigue_drag)
 
 
 def effective_ft_rating(player: Player, team: Team, opponent: Team,
@@ -11687,7 +11687,26 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
             situational_ratio = 1.0 + sign * (threshold + excess * 0.5)
             p = base_p * situational_ratio
 
-    return max(0.05, min(0.90, p))
+    # The hard 5-90% band used to be flat for every shooter, no matter how
+    # skilled, clutch, or badge-stacked. An elite shot-creator playing out of
+    # his mind in a huge moment (skill_rating pushed well past 1.0 by the
+    # clutch/series system, high clutchness, HOF-tier clutch badge) should be
+    # able to push past that ordinary ceiling -- and a low-skill, low-clutch
+    # player forced into a tough look under pressure should be able to dip
+    # below the ordinary floor.
+    clutch_tier = badge_tier(shooter, "clutch")
+    ceiling_lift = (
+        max(0.0, skill_rating - 1.0) * 0.08
+        + max(0.0, shooter.clutchness - 0.80) * 0.15
+        + clutch_tier * 0.015
+    )
+    floor_drag = (
+        max(0.0, 0.70 - skill_rating) * 0.02
+        + max(0.0, 0.50 - shooter.clutchness) * 0.03
+    )
+    dynamic_ceiling = min(0.97, 0.90 + ceiling_lift)
+    dynamic_floor = max(0.02, 0.05 - floor_drag)
+    return max(dynamic_floor, min(dynamic_ceiling, p))
 
 
 def defensive_scheme_multiplier(def_team: Team, shot_type: str, shooter: Player) -> float:
