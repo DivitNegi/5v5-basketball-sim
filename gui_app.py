@@ -4194,7 +4194,7 @@ def run_gui_app():
         live = opponent is not None
         ratings_card_name_var.set(player.name)
         ratings_card_team_line_var.set(f"{short_team_name(team)} · {gui_player_position(player)} · {plan_label(getattr(player, 'archetype', 'balanced'))}")
-        base_overall_pct = int(round(overall_rating(player) * 100))
+        base_overall_pct = fantasy_ovr(player)
         if live:
             quarter_label = f"Q{period}" if period <= 4 else "OT"
             minutes_left = period_time // 60
@@ -4209,7 +4209,7 @@ def run_gui_app():
 
         if live:
             components = effective_rating_components(player, team, opponent, period, period_time)
-            live_overall_pct = int(round(live_overall_rating(player, team, opponent, period, period_time) * 100))
+            live_overall_pct = live_fantasy_ovr(player, team, opponent, period, period_time)
             ratings_card_overall_var.set(f"{live_overall_pct}")
             overall_delta = live_overall_pct - base_overall_pct
             if overall_delta > 0:

@@ -9153,7 +9153,8 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     # way) looked like it was drowning it out every time. A flat floor plus
     # a smaller clutch-scaled bonus keeps the "clutch players feel it more"
     # effect while making sure home court is always a real, visible factor.
-    home_boost = (0.018 + clutch_affinity * 0.010) if getattr(team, "home_team", False) else 0.0
+    home_or_away_scale = 0.018 + clutch_affinity * 0.010
+    home_boost = home_or_away_scale if getattr(team, "home_team", False) else -home_or_away_scale
 
     # Hot/cold: confidence ticks up on a make and down on a miss
     # (update_shot_rhythm), with hot/cold streaks adding on top once they
@@ -20487,6 +20488,28 @@ def fantasy_ovr(player: Player) -> int:
 
     ovr = round(raw)
     return max(40, min(99, int(ovr)))
+
+
+def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, period_time: int) -> int:
+    # Same authoritative OVR formula the player pool/picker uses --
+    # computed against a shadow copy with each stat swapped for its live
+    # (momentum/clutch/heat/series/fatigue-adjusted) value, so this is
+    # always exactly what fantasy_ovr() would say about the live version
+    # of this player, not a separate approximation that can drift from it.
+    shadow = copy.copy(player)
+    shadow.three_rating = effective_rating(player.three_rating, player, team, opponent, period, period_time)
+    shadow.mid_rating = effective_rating(player.mid_rating, player, team, opponent, period, period_time)
+    shadow.rim_rating = effective_rating(player.rim_rating, player, team, opponent, period, period_time)
+    shadow.dunk_rating = effective_rating(player.dunk_rating, player, team, opponent, period, period_time)
+    shadow.perimeter_def = effective_rating(player.perimeter_def, player, team, opponent, period, period_time)
+    shadow.interior_def = effective_rating(player.interior_def, player, team, opponent, period, period_time)
+    shadow.playmaking = effective_rating(player.playmaking, player, team, opponent, period, period_time)
+    shadow.ball_handle = effective_rating(player.ball_handle, player, team, opponent, period, period_time)
+    shadow.steal = effective_rating(player.steal, player, team, opponent, period, period_time)
+    shadow.block = effective_rating(player.block, player, team, opponent, period, period_time)
+    shadow.oreb = effective_rating(player.oreb, player, team, opponent, period, period_time)
+    shadow.dreb = effective_rating(player.dreb, player, team, opponent, period, period_time)
+    return fantasy_ovr(shadow)
 
 
 
