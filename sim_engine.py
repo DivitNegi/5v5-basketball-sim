@@ -9160,18 +9160,20 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     # build up. Folding it in here means it both nudges real shot odds
     # (shot_make_prob derives its skill_rating from effective_rating) and
     # shows up as a named driver on the live Ratings tab.
-    # A player's own hot/cold hand is a bigger, more personal deal than the
-    # team's ambient momentum -- its ceiling is set a notch above
-    # Momentum's (~0.056 max) so a genuinely heating-up or ice-cold player
-    # reads as the headline driver over a generic team run.
+    # A player's own hot/cold hand is a bigger, more personal deal than
+    # ambient team factors -- once an actual streak kicks in it's floored
+    # (not just added to) well above Momentum's (~0.056) and Home's
+    # (~0.035) maximums, so a genuinely heating-up or ice-cold player always
+    # reads as the headline driver instead of getting out-magnituded by a
+    # generic team run or home-court bump.
     confidence = getattr(player, "confidence", 0.0)
     heat_swing = max(-0.045, min(0.045, confidence * 0.015))
     hot_streak = getattr(player, "hot_streak", 0)
     cold_streak = getattr(player, "cold_streak", 0)
     if hot_streak >= 2:
-        heat_swing += min(0.02, hot_streak * 0.005)
+        heat_swing = max(heat_swing, 0.04 + min(0.03, (hot_streak - 2) * 0.006))
     if cold_streak >= 3:
-        heat_swing -= 0.02
+        heat_swing = min(heat_swing, -0.04 - min(0.03, (cold_streak - 3) * 0.006))
 
     if superstar:
         fatigue_drag *= 0.30
