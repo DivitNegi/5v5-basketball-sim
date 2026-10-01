@@ -9123,8 +9123,8 @@ def three_attempt_tendency_curve(tendency: float) -> float:
     return high / max(1e-9, high + low)
 
 
-def effective_rating(base_rating: float, player: Player, team: Team,
-                     opponent: Team, period: int, period_time: int) -> float:
+def effective_rating_components(player: Player, team: Team, opponent: Team,
+                                period: int, period_time: int) -> Dict[str, float]:
     # Momentum/home used to be a flat bump applied identically to every
     # player on the team, regardless of who they are -- a role player with
     # no clutch pedigree rode a hot stretch exactly as hard as a HOF-badge
@@ -9145,7 +9145,19 @@ def effective_rating(base_rating: float, player: Player, team: Team,
     if getattr(player, "injury_limited", False):
         fatigue_drag += 0.035
 
-    return base_rating * (1.0 + momentum_boost + clutch_boost + series_boost + home_boost - fatigue_drag)
+    return {
+        "Momentum": momentum_boost,
+        "Clutch": clutch_boost,
+        "Series": series_boost,
+        "Home": home_boost,
+        "Fatigue": -fatigue_drag,
+    }
+
+
+def effective_rating(base_rating: float, player: Player, team: Team,
+                     opponent: Team, period: int, period_time: int) -> float:
+    components = effective_rating_components(player, team, opponent, period, period_time)
+    return base_rating * (1.0 + sum(components.values()))
 
 
 def effective_ft_rating(player: Player, team: Team, opponent: Team,

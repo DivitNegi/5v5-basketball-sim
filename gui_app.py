@@ -4222,11 +4222,14 @@ def run_gui_app():
                 "CLUTCH": pct(player.clutchness),
                 "IQ": pct(player.shot_iq),
             }
-            ratings_card_note_var.set(
-                "These shift live with clutch context, series pressure, fatigue, and momentum -- "
-                "the same formulas the sim itself uses to resolve shots. Can run past 100 for an "
-                "elite, badge-stacked player in a huge moment."
-            )
+            components = effective_rating_components(player, team, opponent, period, period_time)
+            drivers = [(name, value) for name, value in components.items() if abs(value) >= 0.004]
+            drivers.sort(key=lambda item: -abs(item[1]))
+            if drivers:
+                arrow_parts = [f"{name} {'↑' if value > 0 else '↓'}" for name, value in drivers[:4]]
+                ratings_card_note_var.set("Why: " + "   ".join(arrow_parts))
+            else:
+                ratings_card_note_var.set("Why: holding steady — no significant boost or drag right now.")
         else:
             values = {
                 "3PT": pct(player.three_rating), "MID": pct(player.mid_rating),
@@ -4581,7 +4584,7 @@ def run_gui_app():
         speed_var.set(f"Speed {gui_speed['value']:.2f}x")
 
     def change_gui_speed(delta: float):
-        gui_speed["value"] = max(0.50, min(8.00, round(gui_speed["value"] + delta, 2)))
+        gui_speed["value"] = max(0.50, min(20.00, round(gui_speed["value"] + delta, 2)))
         apply_gui_speed()
 
     def clear_log():
