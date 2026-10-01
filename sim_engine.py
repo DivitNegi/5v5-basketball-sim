@@ -18107,7 +18107,12 @@ def simulate_possession(off: Team, dff: Team,
     # isolation is the clearest case), there's no one left to silently swap
     # to; nothing here should override that.
     if combo_chance <= 0.0 and not true_iso_attempt:
-        for possible_creator in (locals().get("current_handler"), ball_owner, handler):
+        # Fall back to whoever most recently actually had the ball, not the
+        # player who originally brought it up the floor -- once the ball has
+        # moved through a real pass sequence (backdoor cut, reroute, etc.),
+        # `handler` can be several passes stale and reaching back to him
+        # described a move for a player who no longer has the ball at all.
+        for possible_creator in (locals().get("current_handler"), ball_owner, last_passer):
             if (
                 possible_creator in off.on_floor
                 and possible_creator is not shooter
