@@ -9136,7 +9136,15 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     # visibly lifts its clutch players more than it lifts everyone else.
     clutch_affinity = 0.20 + player.clutchness * 1.0 + badge_tier(player, "clutch") * 0.12
     momentum_boost = getattr(team, "momentum", 0.0) * 0.0028 * clutch_affinity
-    clutch_boost = clutch_multiplier(player, team, opponent, period, period_time) - 1.0
+    # Clutch swings (up OR down) only apply to players who actually have a
+    # clutch profile -- superstars, high-clutch-rated players, or anyone
+    # with a clutch badge. An average role player with no clutch pedigree
+    # shouldn't see their rating move at all just because it's Q4; it stays
+    # flat instead of getting dragged around by a mechanic that isn't
+    # really about them.
+    superstar = is_superstar(player, team)
+    clutch_eligible = superstar or player.clutchness >= 0.70 or badge_tier(player, "clutch") > 0
+    clutch_boost = (clutch_multiplier(player, team, opponent, period, period_time) - 1.0) if clutch_eligible else 0.0
     series_boost = series_pressure_bonus(player, team, opponent)
     fatigue_drag = max(0.0, (player.minutes / 60 - 40) * 0.002) * stamina_fatigue_multiplier(player)
     home_boost = 0.012 * clutch_affinity if getattr(team, "home_team", False) else 0.0
@@ -9155,7 +9163,7 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     if cold_streak >= 3:
         heat_swing -= 0.02
 
-    if is_superstar(player, team):
+    if superstar:
         fatigue_drag *= 0.30
 
     if getattr(player, "injury_limited", False):

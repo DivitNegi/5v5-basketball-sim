@@ -1616,11 +1616,14 @@ def run_gui_app():
     ratings_card_name_var = tk.StringVar(value="Select a player")
     ratings_card_team_line_var = tk.StringVar(value="")
     ratings_card_overall_var = tk.StringVar(value="")
+    ratings_card_delta_var = tk.StringVar(value="")
     ratings_card_context_var = tk.StringVar(value="")
     tk.Label(ratings_card_header, textvariable=ratings_card_name_var, bg="#000000", fg=TEXT, font=("Segoe UI", 18), anchor="w").grid(row=0, column=1, sticky="ew")
     tk.Label(ratings_card_header, textvariable=ratings_card_team_line_var, bg="#000000", fg=TEXT_SOFT, font=("Segoe UI", 11, "bold"), anchor="w").grid(row=1, column=1, sticky="ew")
     tk.Label(ratings_card_header, textvariable=ratings_card_overall_var, bg="#000000", fg="#f8fafc", font=("Arial Narrow", 30, "bold"), anchor="e").grid(row=0, column=2, sticky="e", padx=(10, 0))
-    tk.Label(ratings_card_header, textvariable=ratings_card_context_var, bg="#000000", fg="#9ca3af", font=("Segoe UI", 13, "bold"), anchor="e").grid(row=1, column=2, sticky="e", padx=(10, 0))
+    ratings_card_delta_label = tk.Label(ratings_card_header, textvariable=ratings_card_delta_var, bg="#000000", fg="#9ca3af", font=("Segoe UI", 12, "bold"), anchor="e")
+    ratings_card_delta_label.grid(row=1, column=2, sticky="e", padx=(10, 0))
+    tk.Label(ratings_card_header, textvariable=ratings_card_context_var, bg="#000000", fg="#9ca3af", font=("Segoe UI", 11), anchor="e").grid(row=2, column=2, sticky="e", padx=(10, 0))
 
     ratings_card_badges_var = tk.StringVar(value="")
     tk.Label(ratings_card_content, textvariable=ratings_card_badges_var, bg="#00030d", fg=TEXT_SOFT, font=("Segoe UI", 12, "bold"), anchor="w", wraplength=760, justify="left").grid(row=2, column=0, sticky="ew", pady=(0, 8))
@@ -4174,6 +4177,7 @@ def run_gui_app():
             ratings_card_name_var.set("Select a player")
             ratings_card_team_line_var.set("Start a game to see live ratings; pick a team and player above.")
             ratings_card_overall_var.set("")
+            ratings_card_delta_var.set("")
             ratings_card_context_var.set("")
             ratings_card_badges_var.set("")
             for var in ratings_card_stat_vars.values():
@@ -4190,7 +4194,7 @@ def run_gui_app():
         live = opponent is not None
         ratings_card_name_var.set(player.name)
         ratings_card_team_line_var.set(f"{short_team_name(team)} · {gui_player_position(player)} · {plan_label(getattr(player, 'archetype', 'balanced'))}")
-        ratings_card_overall_var.set(f"{int(round(overall_rating(player) * 100))}")
+        base_overall_pct = int(round(overall_rating(player) * 100))
         if live:
             quarter_label = f"Q{period}" if period <= 4 else "OT"
             minutes_left = period_time // 60
@@ -4204,6 +4208,20 @@ def run_gui_app():
             return f"{int(round(value * 100))}"
 
         if live:
+            components = effective_rating_components(player, team, opponent, period, period_time)
+            live_factor = 1.0 + sum(components.values())
+            live_overall_pct = int(round(overall_rating(player) * live_factor * 100))
+            ratings_card_overall_var.set(f"{live_overall_pct}")
+            overall_delta = live_overall_pct - base_overall_pct
+            if overall_delta > 0:
+                ratings_card_delta_var.set(f"+{overall_delta}")
+                ratings_card_delta_label.config(fg="#4ade80")
+            elif overall_delta < 0:
+                ratings_card_delta_var.set(f"{overall_delta}")
+                ratings_card_delta_label.config(fg="#f87171")
+            else:
+                ratings_card_delta_var.set("Even")
+                ratings_card_delta_label.config(fg="#9ca3af")
             values = {
                 "3PT": pct(effective_rating(player.three_rating, player, team, opponent, period, period_time)),
                 "MID": pct(effective_rating(player.mid_rating, player, team, opponent, period, period_time)),
@@ -4222,7 +4240,6 @@ def run_gui_app():
                 "CLUTCH": pct(player.clutchness),
                 "IQ": pct(player.shot_iq),
             }
-            components = effective_rating_components(player, team, opponent, period, period_time)
             drivers = [(name, value) for name, value in components.items() if abs(value) >= 0.004]
             drivers.sort(key=lambda item: -abs(item[1]))
             if drivers:
@@ -4231,6 +4248,8 @@ def run_gui_app():
             else:
                 ratings_card_note_var.set("Why: holding steady — no significant boost or drag right now.")
         else:
+            ratings_card_overall_var.set(f"{base_overall_pct}")
+            ratings_card_delta_var.set("")
             values = {
                 "3PT": pct(player.three_rating), "MID": pct(player.mid_rating),
                 "RIM": pct(player.rim_rating), "DUNK": pct(player.dunk_rating),
