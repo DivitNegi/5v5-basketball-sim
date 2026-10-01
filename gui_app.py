@@ -1545,6 +1545,104 @@ def run_gui_app():
         player_card_play_rows.append((row, canvas, title_var, meta_var, score_var))
     series_tabs.add(player_card_frame, text="Cards")
 
+    # ------------------------------------------------------------------
+    # Ratings tab -- same look as Cards (team dropdown, player strip,
+    # headshot header, badges line) but shows live effective ratings
+    # instead of box score stats, so you can watch a player's numbers
+    # shift with clutch/fatigue/momentum as the game actually plays out.
+    # ------------------------------------------------------------------
+    ratings_card_frame = tk.Frame(series_tabs, bg="#00030d", padx=10, pady=10)
+    ratings_card_frame.columnconfigure(0, weight=1)
+    ratings_card_frame.rowconfigure(1, weight=1)
+    ratings_card_team_var = tk.StringVar(value="")
+    ratings_card_player_var = tk.StringVar(value="")
+    ratings_card_strip_buttons = []
+
+    ratings_controls = tk.Frame(ratings_card_frame, bg="#00030d")
+    ratings_controls.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+    tk.Label(ratings_controls, text="Team", bg="#00030d", fg=TEXT_SOFT, font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=(0, 6))
+    ratings_card_team_dropdown = ttk.Combobox(ratings_controls, textvariable=ratings_card_team_var, values=(), state="readonly", width=28, style="PlayerCard.TCombobox")
+    ratings_card_team_dropdown.grid(row=0, column=1, sticky="w", padx=(0, 12))
+    tk.Label(ratings_controls, text="Player", bg="#00030d", fg=TEXT_SOFT, font=("Segoe UI", 10, "bold")).grid(row=0, column=2, sticky="w", padx=(0, 6))
+    ratings_card_player_dropdown = ttk.Combobox(ratings_controls, textvariable=ratings_card_player_var, values=(), state="readonly", width=28, style="PlayerCard.TCombobox")
+    ratings_card_player_dropdown.grid(row=0, column=3, sticky="w")
+
+    ratings_card_scroll_canvas = tk.Canvas(ratings_card_frame, bg="#00030d", highlightthickness=0)
+    ratings_card_scrollbar = ttk.Scrollbar(ratings_card_frame, orient="vertical", command=ratings_card_scroll_canvas.yview)
+    ratings_card_scroll_canvas.configure(yscrollcommand=ratings_card_scrollbar.set)
+    ratings_card_scroll_canvas.grid(row=1, column=0, sticky="nsew")
+    ratings_card_scrollbar.grid(row=1, column=1, sticky="ns")
+    ratings_card_content = tk.Frame(ratings_card_scroll_canvas, bg="#00030d")
+    ratings_card_content_window = ratings_card_scroll_canvas.create_window((0, 0), window=ratings_card_content, anchor="nw")
+    ratings_card_content.columnconfigure(0, weight=1)
+    ratings_card_content.bind(
+        "<Configure>",
+        lambda _event: ratings_card_scroll_canvas.configure(scrollregion=ratings_card_scroll_canvas.bbox("all")),
+    )
+    ratings_card_scroll_canvas.bind(
+        "<Configure>",
+        lambda event: ratings_card_scroll_canvas.itemconfigure(ratings_card_content_window, width=event.width),
+    )
+    ratings_card_scroll_canvas.bind_all(
+        "<MouseWheel>",
+        lambda event: ratings_card_scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        if str(series_tabs.tab(series_tabs.select(), "text")) == "Ratings" else None,
+    )
+
+    ratings_card_strip = tk.Frame(ratings_card_content, bg="#070b16", padx=6, pady=6)
+    ratings_card_strip.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+    for idx in range(8):
+        ratings_card_strip.columnconfigure(idx, weight=1)
+    for idx in range(8):
+        btn = tk.Button(
+            ratings_card_strip,
+            text="-",
+            bg="#9ca3af",
+            fg="#020617",
+            activebackground="#b6b6b6",
+            activeforeground="#020617",
+            relief="flat",
+            font=("Segoe UI", 9, "bold"),
+            cursor="hand2",
+        )
+        btn.grid(row=0, column=idx, sticky="ew", padx=3)
+        ratings_card_strip_buttons.append(btn)
+
+    ratings_card_header = tk.Frame(ratings_card_content, bg="#000000", padx=12, pady=12)
+    ratings_card_header.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+    ratings_card_header.columnconfigure(1, weight=1)
+    ratings_card_canvas = tk.Canvas(ratings_card_header, width=96, height=96, bg="#000000", highlightthickness=0)
+    ratings_card_canvas.grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 14))
+    ratings_card_name_var = tk.StringVar(value="Select a player")
+    ratings_card_team_line_var = tk.StringVar(value="")
+    ratings_card_overall_var = tk.StringVar(value="")
+    ratings_card_context_var = tk.StringVar(value="")
+    tk.Label(ratings_card_header, textvariable=ratings_card_name_var, bg="#000000", fg=TEXT, font=("Segoe UI", 18), anchor="w").grid(row=0, column=1, sticky="ew")
+    tk.Label(ratings_card_header, textvariable=ratings_card_team_line_var, bg="#000000", fg=TEXT_SOFT, font=("Segoe UI", 11, "bold"), anchor="w").grid(row=1, column=1, sticky="ew")
+    tk.Label(ratings_card_header, textvariable=ratings_card_overall_var, bg="#000000", fg="#f8fafc", font=("Arial Narrow", 30, "bold"), anchor="e").grid(row=0, column=2, sticky="e", padx=(10, 0))
+    tk.Label(ratings_card_header, textvariable=ratings_card_context_var, bg="#000000", fg="#9ca3af", font=("Segoe UI", 13, "bold"), anchor="e").grid(row=1, column=2, sticky="e", padx=(10, 0))
+
+    ratings_card_badges_var = tk.StringVar(value="")
+    tk.Label(ratings_card_content, textvariable=ratings_card_badges_var, bg="#00030d", fg=TEXT_SOFT, font=("Segoe UI", 12, "bold"), anchor="w", wraplength=760, justify="left").grid(row=2, column=0, sticky="ew", pady=(0, 8))
+
+    ratings_card_stats_frame = tk.Frame(ratings_card_content, bg="#00030d")
+    ratings_card_stats_frame.grid(row=3, column=0, sticky="ew", pady=(0, 8))
+    for idx in range(8):
+        ratings_card_stats_frame.columnconfigure(idx, weight=0, minsize=94)
+    ratings_card_stat_vars = {}
+    ratings_card_stat_keys = ("3PT", "MID", "RIM", "DUNK", "FT", "PLAY", "HANDLE", "SPEED", "STL", "BLK", "OREB", "DREB", "PDEF", "IDEF", "CLUTCH", "IQ")
+    for idx, key in enumerate(ratings_card_stat_keys):
+        box = tk.Frame(ratings_card_stats_frame, bg="#00030d")
+        box.grid(row=idx // 8, column=idx % 8, sticky="w", padx=2, pady=(0, 6))
+        val = tk.StringVar(value="-")
+        tk.Label(box, textvariable=val, width=7, bg="#00030d", fg="#f8fafc", font=("Arial Narrow", 18, "bold")).pack(anchor="center")
+        tk.Label(box, text=key, bg="#00030d", fg=TEXT_SOFT, font=("Segoe UI", 9, "bold")).pack(anchor="center")
+        ratings_card_stat_vars[key] = val
+
+    ratings_card_note_var = tk.StringVar(value="")
+    tk.Label(ratings_card_content, textvariable=ratings_card_note_var, bg="#00030d", fg=TEXT_SOFT, font=("Segoe UI", 10), anchor="w", justify="left", wraplength=760).grid(row=4, column=0, sticky="ew")
+    series_tabs.add(ratings_card_frame, text="Ratings")
+
     commentator_widget_frame = ttk.Frame(series_tabs, padding=(10, 10))
     commentator_widget_frame.columnconfigure(0, weight=1)
     commentator_widget_frame.rowconfigure(0, weight=1)
@@ -1658,6 +1756,8 @@ def run_gui_app():
     player_card_team_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_player_card_widget())
     player_card_player_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_player_card_widget())
     player_card_game_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_player_card_widget())
+    ratings_card_team_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_ratings_card_widget())
+    ratings_card_player_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_ratings_card_widget())
     diet_mode_dropdown.bind("<<ComboboxSelected>>", lambda _event: (show_shot_defense_tree(), update_shot_defense_widgets(playoff_sections_state.get("sections") or {})))
     shot_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_quarter_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
@@ -4018,6 +4118,130 @@ def run_gui_app():
         if preserve_scroll:
             restore_player_card_scroll(current_scroll)
 
+    def sync_ratings_card_dropdown():
+        team_a = SIM_CONTEXT.get("teamA")
+        team_b = SIM_CONTEXT.get("teamB")
+        team_names_live = tuple(t.name for t in (team_a, team_b) if t is not None)
+        ratings_card_team_dropdown.configure(values=team_names_live)
+        if team_names_live and ratings_card_team_var.get() not in team_names_live:
+            ratings_card_team_var.set(team_names_live[0])
+        elif not team_names_live:
+            ratings_card_team_var.set("")
+        team = active_ratings_card_team()
+        values = tuple(player_stat_key(team, p) for p in team.roster) if team is not None else ()
+        ratings_card_player_dropdown.configure(values=values)
+        if values and ratings_card_player_var.get() not in values:
+            ratings_card_player_var.set(values[0])
+        elif not values:
+            ratings_card_player_var.set("")
+
+    def active_ratings_card_team() -> Team | None:
+        team_a = SIM_CONTEXT.get("teamA")
+        team_b = SIM_CONTEXT.get("teamB")
+        selected = ratings_card_team_var.get()
+        if team_b is not None and selected == team_b.name:
+            return team_b
+        if team_a is not None and selected == team_a.name:
+            return team_a
+        return team_a
+
+    def update_ratings_card_strip(team: Team, selected: Player | None):
+        players = sorted(team.roster, key=overall_rating, reverse=True)[:8]
+        for idx, btn in enumerate(ratings_card_strip_buttons):
+            if idx >= len(players):
+                btn.configure(text="-", command=lambda: None, fg="#020617", bg="#9ca3af", activebackground="#b6b6b6", activeforeground="#020617")
+                continue
+            p = players[idx]
+            label = table_player_name(p.name, 12)
+            is_selected = p is selected
+            btn.configure(
+                text=label,
+                fg="#020617" if is_selected else "#f8fafc",
+                bg="#9ca3af" if is_selected else "#4b5563",
+                activebackground="#b6b6b6",
+                activeforeground="#020617",
+                command=lambda player_name=p.name: (ratings_card_player_var.set(player_name), update_ratings_card_widget()),
+            )
+
+    def update_ratings_card_widget(_event=None):
+        sync_ratings_card_dropdown()
+        team = active_ratings_card_team()
+        player = None
+        if team is not None:
+            player = player_from_stat_key(team, ratings_card_player_var.get())
+        if player is None:
+            draw_card_headshot(ratings_card_canvas, None)
+            ratings_card_name_var.set("Select a player")
+            ratings_card_team_line_var.set("Start a game to see live ratings; pick a team and player above.")
+            ratings_card_overall_var.set("")
+            ratings_card_context_var.set("")
+            ratings_card_badges_var.set("")
+            for var in ratings_card_stat_vars.values():
+                var.set("-")
+            ratings_card_note_var.set("")
+            return
+        draw_card_headshot(ratings_card_canvas, player)
+        update_ratings_card_strip(team, player)
+        team_a = SIM_CONTEXT.get("teamA")
+        team_b = SIM_CONTEXT.get("teamB")
+        opponent = team_b if team is team_a else team_a
+        period = SIM_CONTEXT.get("period", 1)
+        period_time = SIM_CONTEXT.get("period_time", 0)
+        live = opponent is not None
+        ratings_card_name_var.set(player.name)
+        ratings_card_team_line_var.set(f"{short_team_name(team)} · {gui_player_position(player)} · {plan_label(getattr(player, 'archetype', 'balanced'))}")
+        ratings_card_overall_var.set(f"{int(round(overall_rating(player) * 100))}")
+        if live:
+            quarter_label = f"Q{period}" if period <= 4 else "OT"
+            minutes_left = period_time // 60
+            seconds_left = period_time % 60
+            ratings_card_context_var.set(f"{quarter_label} {minutes_left}:{seconds_left:02d} · {team.score}-{opponent.score}")
+        else:
+            ratings_card_context_var.set("No live game — base ratings")
+        ratings_card_badges_var.set(f"Badges: {format_player_badges(player)}")
+
+        def pct(value: float) -> str:
+            return f"{int(round(value * 100))}"
+
+        if live:
+            values = {
+                "3PT": pct(effective_rating(player.three_rating, player, team, opponent, period, period_time)),
+                "MID": pct(effective_rating(player.mid_rating, player, team, opponent, period, period_time)),
+                "RIM": pct(effective_rating(player.rim_rating, player, team, opponent, period, period_time)),
+                "DUNK": pct(effective_rating(player.dunk_rating, player, team, opponent, period, period_time)),
+                "FT": pct(effective_ft_rating(player, team, opponent, period, period_time)),
+                "PLAY": pct(effective_rating(player.playmaking, player, team, opponent, period, period_time)),
+                "HANDLE": pct(effective_rating(player.ball_handle, player, team, opponent, period, period_time)),
+                "SPEED": pct(player.speed),
+                "STL": pct(effective_rating(player.steal, player, team, opponent, period, period_time)),
+                "BLK": pct(effective_rating(player.block, player, team, opponent, period, period_time)),
+                "OREB": pct(effective_rating(player.oreb, player, team, opponent, period, period_time)),
+                "DREB": pct(effective_rating(player.dreb, player, team, opponent, period, period_time)),
+                "PDEF": pct(effective_rating(player.perimeter_def, player, team, opponent, period, period_time)),
+                "IDEF": pct(effective_rating(player.interior_def, player, team, opponent, period, period_time)),
+                "CLUTCH": pct(player.clutchness),
+                "IQ": pct(player.shot_iq),
+            }
+            ratings_card_note_var.set(
+                "These shift live with clutch context, series pressure, fatigue, and momentum -- "
+                "the same formulas the sim itself uses to resolve shots. Can run past 100 for an "
+                "elite, badge-stacked player in a huge moment."
+            )
+        else:
+            values = {
+                "3PT": pct(player.three_rating), "MID": pct(player.mid_rating),
+                "RIM": pct(player.rim_rating), "DUNK": pct(player.dunk_rating),
+                "FT": pct(player.ft_rating), "PLAY": pct(player.playmaking),
+                "HANDLE": pct(player.ball_handle), "SPEED": pct(player.speed),
+                "STL": pct(player.steal), "BLK": pct(player.block),
+                "OREB": pct(player.oreb), "DREB": pct(player.dreb),
+                "PDEF": pct(player.perimeter_def), "IDEF": pct(player.interior_def),
+                "CLUTCH": pct(player.clutchness), "IQ": pct(player.shot_iq),
+            }
+            ratings_card_note_var.set("Base ratings shown -- start a game with this player to see them shift live.")
+        for key, var in ratings_card_stat_vars.items():
+            var.set(values.get(key, "-"))
+
     def update_commentator_widget():
         teams = [SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")]
         if not all(teams):
@@ -4122,6 +4346,8 @@ def run_gui_app():
             update_lineup_widget()
         elif selected_tab == "Cards":
             update_player_card_widget()
+        elif selected_tab == "Ratings":
+            update_ratings_card_widget()
         elif selected_tab == "Qtr":
             update_quarter_tabs()
         elif selected_tab == "Adjustments":
