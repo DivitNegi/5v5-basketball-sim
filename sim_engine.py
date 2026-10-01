@@ -9088,15 +9088,17 @@ def clutch_multiplier(player: Player, team: Team, opponent: Team, period: int, p
         if final_minutes:
             pressure *= 1.20
 
-        # Clutchness is centered around 0.55: great closers lift under pressure,
-        # low-clutch players can tighten up instead of receiving a free boost.
-        clutch_delta = player.clutchness - 0.55
-        rating_effect = 0.055 + clutch_delta * 0.50 + badge_tier(player, "clutch") * 0.060
+        # Clutchness is centered around 0.60: great closers lift under
+        # pressure, but anyone below that line actually tightens up and
+        # gets a genuine penalty -- no flat baseline propping up a
+        # below-average clutch player into a free boost.
+        clutch_delta = player.clutchness - 0.60
+        rating_effect = clutch_delta * 0.55 + badge_tier(player, "clutch") * 0.060
         return max(0.90, min(1.45, 1.0 + pressure * rating_effect))
 
     close_game = abs(margin) <= 5 and late_game
     if close_game:
-        clutch_delta = player.clutchness - 0.55
+        clutch_delta = player.clutchness - 0.60
         badge_effect = badge_tier(player, "clutch") * 0.040
         return max(0.96, min(1.25, 1.0 + clutch_delta * 0.13 + badge_effect))
 
