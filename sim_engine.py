@@ -20487,7 +20487,7 @@ def fantasy_ovr(player: Player) -> int:
         raw = 93 + (raw - 93) * 0.55
 
     ovr = round(raw)
-    return max(40, min(99, int(ovr)))
+    return max(40, int(ovr))
 
 
 def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, period_time: int) -> int:
