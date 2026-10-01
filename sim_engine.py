@@ -14540,12 +14540,18 @@ def should_double_team(shooter: Player, defender: Player, off: Team, dff: Team,
     if is_paint_shot(shot_type):
         chance += 0.04
     if shooter.playmaking < 0.62:
-        chance += 0.055
+        # Scale with how extreme the gap is -- a pure scorer with near-zero
+        # playmaking (e.g. a high-usage iso scorer) should get doubled a lot
+        # more aggressively than someone merely below-average. A truly
+        # extreme case (near-zero playmaking) can get doubled almost every
+        # time down, like a defense committed to sending help from whistle
+        # one for an entire game.
+        chance += (0.62 - shooter.playmaking) * 0.32
     elif shooter.playmaking >= 0.86:
         chance -= 0.035
     if defender.pf >= 4:
         chance += 0.05
-    max_chance = 0.36 if shooter.playmaking < 0.64 else 0.29
+    max_chance = 0.55 if shooter.playmaking < 0.64 else 0.29
     send_double = random.random() < max(0.04, min(max_chance, chance))
     if send_double:
         dff.double_team_cooldown = 3 if coach_iq >= 0.70 else 4
@@ -14555,7 +14561,7 @@ def should_double_team(shooter: Player, defender: Player, off: Team, dff: Team,
 def double_team_turnover_chance(player: Player, defender: Player, dff: Team, coverage: str) -> float:
     styles = getattr(dff, "coach_style", {})
     pressure = 0.015 + styles.get("coach_iq", 0.62) * 0.020 + styles.get("help_aggression", 1.0) * 0.018
-    pressure += max(0.0, 0.70 - player.playmaking) * 0.115
+    pressure += max(0.0, 0.70 - player.playmaking) * 0.20
     pressure += max(0.0, 0.68 - player.ball_handle) * 0.070
     pressure += max(0.0, 0.72 - player.shot_iq) * 0.035
     pressure += max(0.0, effective_perimeter_def(defender) - 0.70) * 0.045
@@ -14565,7 +14571,7 @@ def double_team_turnover_chance(player: Player, defender: Player, dff: Team, cov
         pressure += 0.018
     elif coverage == "late_double_rotate":
         pressure += 0.010
-    return max(0.012, min(0.18, pressure))
+    return max(0.012, min(0.28, pressure))
 
 
 def is_non_spacer(player: Player) -> bool:
