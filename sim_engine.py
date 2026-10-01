@@ -13963,7 +13963,7 @@ def assist_phase_relief(player: Player) -> float:
     return 1.0
 
 
-def choose_play_hub(team: Team, names: Tuple[str, ...] = tuple()) -> Player:
+def choose_play_hub(team: Team, names: Tuple[str, ...] = tuple(), exclude: Player = None) -> Player:
     candidates = [
         p for p in team.on_floor
         if not p.fouled_out and (not names or p.name in names)
@@ -13978,6 +13978,14 @@ def choose_play_hub(team: Team, names: Tuple[str, ...] = tuple()) -> Player:
         candidates.extend(sorted(support, key=playmaking_hub_score, reverse=True)[:3])
     if not candidates:
         candidates = [p for p in team.on_floor if not p.fouled_out] or list(team.on_floor)
+    # A player who already gave the ball up earlier this possession (e.g. an
+    # early hand-off to a secondary initiator) shouldn't be picked back up as
+    # a fresh hub -- the commentary would describe him catching/initiating a
+    # new action he was never shown receiving the ball back for.
+    if exclude is not None and len(candidates) > 1:
+        without_exclude = [p for p in candidates if p is not exclude]
+        if without_exclude:
+            candidates = without_exclude
 
     current_initiator = getattr(team, "current_play_initiator", None)
     if current_initiator in candidates and random.random() < 0.72:
@@ -14020,7 +14028,7 @@ def best_play_target(options: List[Player], score_fn, default: Player) -> Player
     return max(options, key=lambda p: play_target_score(p, score_fn(p)), default=default)
 
 
-def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, current_shooter: Player) -> Tuple[Player, Player | None, str | None]:
+def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, current_shooter: Player, previous_handler: Player = None) -> Tuple[Player, Player | None, str | None]:
     if not play_type:
         return current_shooter, None, None
 
@@ -14315,44 +14323,48 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
             return target, passer if passer is not target else None, play_type
 
     if play_type.startswith(("lakers_", "bucks_", "celtics_", "thunder_", "bulls_", "nets_", "wolves_", "jazz_", "raptors_", "clippers_", "grizzlies_", "heat_", "pelicans_", "mavs_", "hawks_", "wizards_", "magic_", "cavs_", "rockets_")):
-        passer = choose_play_hub(off)
+        passer = choose_play_hub(off, exclude=previous_handler)
         options = designed_shooter_options([p for p in off.on_floor if p is not passer], current_shooter)
         target = best_play_target(options, lambda p: 0.40 * p.rim_rating + 0.35 * p.three_rating + 0.25 * shooter_weight(p), current_shooter)
         print(f"{passer.name} pulls the defense one way as {target.name} breaks into the open space.")
         return target, passer, play_type
 
     if play_type == "floppy":
-        options = designed_shooter_options([p for p in off.on_floor if p is not handler and (p.three_rating >= 0.82 or "movement_shooter" in p.badges)], current_shooter)
+        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and (p.three_rating >= 0.82 or "movement_shooter" in p.badges)], current_shooter)
         target = best_play_target(options, lambda p: p.three_rating, current_shooter)
         print(f"{target.name} works across two screens and pops free on the wing.")
         return target, handler, "floppy"
 
     if play_type == "elevator":
-        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p.three_rating >= 0.80], current_shooter)
+        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and p.three_rating >= 0.80], current_shooter)
         target = best_play_target(options, lambda p: 0.75 * p.three_rating + 0.25 * shooter_weight(p), current_shooter)
         print(f"{target.name} curls between two screeners and flashes to the top.")
         return target, handler, "elevator"
 
     if play_type == "backdoor":
-        options = designed_shooter_options([p for p in off.on_floor if p is not handler and (p.rim_rating >= 0.80 or p.dunk_tendency >= 0.25)], current_shooter)
+        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and (p.rim_rating >= 0.80 or p.dunk_tendency >= 0.25)], current_shooter)
         target = best_play_target(options, lambda p: 0.55 * p.rim_rating + 0.25 * p.dunk_rating + 0.20 * p.dunk_tendency, current_shooter)
         print(f"{handler.name} sees {target.name} fake to the arc and cut backdoor.")
         return target, handler, "backdoor"
 
     if play_type == "drive_kick":
-        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p.three_rating >= 0.78], current_shooter)
+        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and p.three_rating >= 0.78], current_shooter)
         target = best_play_target(options, lambda p: 0.6 * p.three_rating + 0.25 * p.three_tendency + 0.15 * shooter_weight(p), current_shooter)
         print(f"{handler.name} gets downhill and bends the defense toward the paint.")
         return target, handler, "drive_kick"
 
     if play_type == "handoff":
-        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p.ball_handle >= 0.45], current_shooter)
+        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and p.ball_handle >= 0.45], current_shooter)
         target = best_play_target(options, lambda p: 0.5 * p.three_rating + 0.3 * p.rim_rating + 0.2 * p.usage, current_shooter)
         print(f"{handler.name} flows into a dribble handoff with {target.name}.")
         return target, handler, "handoff"
 
     if play_type == "horns":
-        passers = [p for p in off.on_floor if p is not handler and (can_play_position(p, "PF") or can_play_position(p, "C"))]
+        passers = [
+            p for p in off.on_floor
+            if p is not handler and p is not previous_handler
+            and (can_play_position(p, "PF") or can_play_position(p, "C"))
+        ]
         passer = max(passers, key=lambda p: 0.65 * p.playmaking + 0.35 * p.mid_rating, default=handler)
         cutters = [p for p in off.on_floor if p is not passer]
         cutters = designed_shooter_options(cutters, current_shooter)
@@ -14361,7 +14373,10 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
         return target, passer, "horns"
 
     if play_type == "post_split":
-        bigs = [p for p in off.on_floor if can_play_position(p, "PF") or can_play_position(p, "C")]
+        bigs = [
+            p for p in off.on_floor
+            if p is not previous_handler and (can_play_position(p, "PF") or can_play_position(p, "C"))
+        ]
         bigs = designed_shooter_options(bigs, current_shooter)
         target = best_play_target(bigs, lambda p: 0.45 * p.post_tendency + 0.35 * p.mid_rating + 0.20 * p.playmaking, current_shooter)
         print(f"{target.name} catches inside as two teammates cut around him.")
@@ -17401,12 +17416,14 @@ def simulate_possession(off: Team, dff: Team,
     if consume_manual_timeout_stop(off):
         return off, 0
     ball_owner = handler
+    previous_handler = None
     secondary_handler = maybe_secondary_initiator(off, handler)
     if secondary_handler is not handler:
         print(f"{handler.name} gives it up early to {secondary_handler.name} to start the action.")
         time.sleep(SLEEP * 0.5)
         if consume_manual_timeout_stop(off):
             return off, 0
+        previous_handler = handler
         handler = secondary_handler
         ball_owner = handler
     off.current_play_initiator = handler
@@ -17459,7 +17476,7 @@ def simulate_possession(off: Team, dff: Team,
         play_type = clutch_package_play(off, need_three=(off.score - dff.score <= -3 and period_time <= 90))
     else:
         play_type = real_play_type(off, handler)
-    play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter)
+    play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter, previous_handler=previous_handler)
     off.current_play_initiator = None
     if play_passer and play_passer is not play_shooter:
         last_passer = play_passer
