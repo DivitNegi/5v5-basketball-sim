@@ -4209,8 +4209,7 @@ def run_gui_app():
 
         if live:
             components = effective_rating_components(player, team, opponent, period, period_time)
-            live_factor = 1.0 + sum(components.values())
-            live_overall_pct = int(round(overall_rating(player) * live_factor * 100))
+            live_overall_pct = int(round(live_overall_rating(player, team, opponent, period, period_time) * 100))
             ratings_card_overall_var.set(f"{live_overall_pct}")
             overall_delta = live_overall_pct - base_overall_pct
             if overall_delta > 0:

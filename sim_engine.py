@@ -9147,19 +9147,29 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     clutch_boost = (clutch_multiplier(player, team, opponent, period, period_time) - 1.0) if clutch_eligible else 0.0
     series_boost = series_pressure_bonus(player, team, opponent)
     fatigue_drag = max(0.0, (player.minutes / 60 - 40) * 0.002) * stamina_fatigue_multiplier(player)
-    home_boost = 0.012 * clutch_affinity if getattr(team, "home_team", False) else 0.0
+    # Was 0.012 * clutch_affinity -- for a low-clutch role player that's
+    # well under the Ratings tab's 0.004 "worth mentioning" floor, so home
+    # court never showed up as a driver and Heat (not scaled down the same
+    # way) looked like it was drowning it out every time. A flat floor plus
+    # a smaller clutch-scaled bonus keeps the "clutch players feel it more"
+    # effect while making sure home court is always a real, visible factor.
+    home_boost = (0.018 + clutch_affinity * 0.010) if getattr(team, "home_team", False) else 0.0
 
     # Hot/cold: confidence ticks up on a make and down on a miss
     # (update_shot_rhythm), with hot/cold streaks adding on top once they
     # build up. Folding it in here means it both nudges real shot odds
     # (shot_make_prob derives its skill_rating from effective_rating) and
     # shows up as a named driver on the live Ratings tab.
+    # A player's own hot/cold hand is a bigger, more personal deal than the
+    # team's ambient momentum -- its ceiling is set a notch above
+    # Momentum's (~0.056 max) so a genuinely heating-up or ice-cold player
+    # reads as the headline driver over a generic team run.
     confidence = getattr(player, "confidence", 0.0)
-    heat_swing = max(-0.05, min(0.05, confidence * 0.016))
+    heat_swing = max(-0.045, min(0.045, confidence * 0.015))
     hot_streak = getattr(player, "hot_streak", 0)
     cold_streak = getattr(player, "cold_streak", 0)
     if hot_streak >= 2:
-        heat_swing += min(0.025, hot_streak * 0.006)
+        heat_swing += min(0.02, hot_streak * 0.005)
     if cold_streak >= 3:
         heat_swing -= 0.02
 
@@ -9189,15 +9199,67 @@ def effective_ft_rating(player: Player, team: Team, opponent: Team,
                         period: int, period_time: int) -> float:
     rating = player.ft_rating
     rating *= 1.0 + series_pressure_bonus(player, team, opponent) * 0.55
-    if period >= 4 and team.score < opponent.score:
+    clutch_eligible = is_superstar(player, team) or player.clutchness >= 0.70 or badge_tier(player, "clutch") > 0
+    if clutch_eligible and period >= 4 and team.score < opponent.score:
         pressure = min(1.0, abs(team.score - opponent.score) / 10)
         if period_time <= 2 * 60:
             pressure *= 1.25
-        clutch_delta = player.clutchness - 0.55
+        clutch_delta = player.clutchness - 0.60
         rating *= 1.0 + pressure * (clutch_delta * 0.16 + badge_tier(player, "clutch") * 0.032)
-    elif period >= 4 and period_time <= 2 * 60 and abs(team.score - opponent.score) <= 5:
-        rating *= 1.0 + (player.clutchness - 0.55) * 0.05 + badge_tier(player, "clutch") * 0.024
+    elif clutch_eligible and period >= 4 and period_time <= 2 * 60 and abs(team.score - opponent.score) <= 5:
+        rating *= 1.0 + (player.clutchness - 0.60) * 0.05 + badge_tier(player, "clutch") * 0.024
     return max(0.35, min(0.97, rating))
+
+
+def live_overall_rating(p: Player, team: Team, opponent: Team, period: int, period_time: int) -> float:
+    # Mirrors overall_rating()'s exact weights, but feeds it each stat's
+    # live (momentum/clutch/heat/series/fatigue-adjusted) value instead of
+    # the static base rating, so the number shown on the Ratings tab is the
+    # real weighted overall -- not an approximation from a single blanket
+    # multiplier applied to the base overall.
+    three = effective_rating(p.three_rating, p, team, opponent, period, period_time)
+    mid = effective_rating(p.mid_rating, p, team, opponent, period, period_time)
+    rim = effective_rating(p.rim_rating, p, team, opponent, period, period_time)
+    dunk = effective_rating(p.dunk_rating, p, team, opponent, period, period_time)
+    ft = effective_ft_rating(p, team, opponent, period, period_time)
+    playmaking = effective_rating(p.playmaking, p, team, opponent, period, period_time)
+    perimeter_def = effective_rating(p.perimeter_def, p, team, opponent, period, period_time)
+    interior_def = effective_rating(p.interior_def, p, team, opponent, period, period_time)
+    steal = effective_rating(p.steal, p, team, opponent, period, period_time)
+    block = effective_rating(p.block, p, team, opponent, period, period_time)
+    oreb = effective_rating(p.oreb, p, team, opponent, period, period_time)
+    dreb = effective_rating(p.dreb, p, team, opponent, period, period_time)
+
+    scoring = (three + mid + rim + dunk) / 4.0
+    interior_pf_bonus = 0.0
+    if can_play_position(p, "PF") and p.position != "C":
+        interior_pf_score = (
+            0.32 * rim
+            + 0.22 * dunk
+            + 0.20 * interior_def
+            + 0.12 * (0.45 * oreb + 0.55 * dreb)
+            + 0.08 * block
+            + 0.06 * p.clutchness
+        )
+        if three < 0.72 and interior_pf_score >= 0.88:
+            interior_pf_bonus = 0.018
+        elif three < 0.78 and interior_pf_score >= 0.84:
+            interior_pf_bonus = 0.011
+        elif three < 0.82 and interior_pf_score >= 0.80:
+            interior_pf_bonus = 0.006
+    defense = (
+        0.36 * perimeter_def
+        + 0.34 * interior_def
+        + 0.12 * steal
+        + 0.10 * block
+        + 0.04 * oreb
+        + 0.04 * dreb
+    )
+    defensive_role = 0.58 * perimeter_def + 0.28 * interior_def + 0.08 * steal + 0.06 * block
+    defensive_bonus = max(0.0, defensive_role - 0.72) * 0.16
+    rebounding_bonus = max(0.0, (0.45 * oreb + 0.55 * dreb) - 0.76) * 0.06
+    return (0.38 * scoring + 0.18 * ft + 0.19 * playmaking + 0.14 * defense + 0.11 * p.usage
+            + defensive_bonus + rebounding_bonus + interior_pf_bonus)
 
 
 def is_blowout(teamA: Team, teamB: Team, period: int, period_time: int) -> bool:
@@ -12243,6 +12305,16 @@ def in_bonus(team: Team) -> bool:
     return getattr(team, "quarter_fouls", 0) >= rules_bonus_fouls()
 
 
+def _team_and_opponent_for(player: Player) -> Tuple[Team | None, Team | None]:
+    team_a = SIM_CONTEXT.get("teamA")
+    team_b = SIM_CONTEXT.get("teamB")
+    if team_a is not None and player in team_a.roster:
+        return team_a, team_b
+    if team_b is not None and player in team_b.roster:
+        return team_b, team_a
+    return None, None
+
+
 def update_shot_rhythm(player: Player, made: bool, shot_type: str | None = None):
     if made:
         player.hot_streak = getattr(player, "hot_streak", 0) + 1
@@ -12260,6 +12332,15 @@ def update_shot_rhythm(player: Player, made: bool, shot_type: str | None = None)
         if shot_type in ("three", "mid"):
             player.jumper_make_streak = 0
         player.just_caught_fire = False
+
+        # A miss isn't just personal cold-streak -- it's a stop. The
+        # shooting team's team-wide momentum should drop, not just sit
+        # unchanged until someone eventually scores again.
+        team, opponent = _team_and_opponent_for(player)
+        if team is not None:
+            team.momentum = max(-6.0, getattr(team, "momentum", 0.0) - 1.2)
+        if opponent is not None:
+            opponent.momentum = min(12.0, getattr(opponent, "momentum", 0.0) + 0.5)
 
 
 def clear_shot_temp_bonuses(player: Player):
@@ -17310,6 +17391,11 @@ def simulate_possession(off: Team, dff: Team,
                         matchups: Dict[Player, Player]) -> Tuple[Team, int]:
 
     sanitize_live_lineups(off, dff)
+    # Momentum should reflect an active run, not accumulate and sit there
+    # for the rest of the game -- fade it a little every possession so it
+    # only stays up while a team keeps actually building on it.
+    off.momentum = getattr(off, "momentum", 0.0) * 0.96
+    dff.momentum = getattr(dff, "momentum", 0.0) * 0.96
     frontcourt_after_oreb = getattr(off, "frontcourt_after_oreb", False)
     if frontcourt_after_oreb:
         off.frontcourt_after_oreb = False
