@@ -9125,11 +9125,19 @@ def three_attempt_tendency_curve(tendency: float) -> float:
 
 def effective_rating(base_rating: float, player: Player, team: Team,
                      opponent: Team, period: int, period_time: int) -> float:
-    momentum_boost = getattr(team, "momentum", 0.0) * 0.006
+    # Momentum/home used to be a flat bump applied identically to every
+    # player on the team, regardless of who they are -- a role player with
+    # no clutch pedigree rode a hot stretch exactly as hard as a HOF-badge
+    # closer, and since clutch_multiplier only ever kicks in during Q4, that
+    # flat bump was the ONLY thing moving ratings for three quarters of every
+    # game. Scale both by the player's own clutch profile so a hot team
+    # visibly lifts its clutch players more than it lifts everyone else.
+    clutch_affinity = 0.20 + player.clutchness * 1.0 + badge_tier(player, "clutch") * 0.12
+    momentum_boost = getattr(team, "momentum", 0.0) * 0.0055 * clutch_affinity
     clutch_boost = clutch_multiplier(player, team, opponent, period, period_time) - 1.0
     series_boost = series_pressure_bonus(player, team, opponent)
     fatigue_drag = max(0.0, (player.minutes / 60 - 40) * 0.002) * stamina_fatigue_multiplier(player)
-    home_boost = 0.012 if getattr(team, "home_team", False) else 0.0
+    home_boost = 0.012 * clutch_affinity if getattr(team, "home_team", False) else 0.0
 
     if is_superstar(player, team):
         fatigue_drag *= 0.30

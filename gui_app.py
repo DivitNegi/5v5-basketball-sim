@@ -6808,6 +6808,15 @@ def run_gui_app():
     def refresh_live_widgets(include_heavy: bool = False):
         update_on_court_boxscore()
         update_scoreboard_extras()
+        # Ratings are meant to visibly track the live game clock (clutch
+        # context, momentum, fatigue all shift possession to possession) --
+        # tie it to the same fast tier as the on-court box score instead of
+        # the slow ~1.5s heavy-tab cycle, so it doesn't lag behind the time.
+        try:
+            if str(series_tabs.tab(series_tabs.select(), "text")) == "Ratings":
+                update_ratings_card_widget()
+        except Exception:
+            pass
         if include_heavy:
             update_extra_gui_tabs()
             set_adjustments_tab_visibility()
