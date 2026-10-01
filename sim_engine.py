@@ -14505,7 +14505,11 @@ def should_double_team(shooter: Player, defender: Player, off: Team, dff: Team,
     star_coverage = player_coverage or (plan.get("star_coverage", "standard") if focused_star else "standard")
     if shot_type == "three" and shooter.three_rating < 0.88 and not focused_star:
         return False
-    if getattr(dff, "double_team_cooldown", 0) > 0:
+    # A true zero-playmaking high-usage scorer gets hunted on almost every
+    # touch -- the normal team-wide cooldown (meant to stop spam-doubling a
+    # regular player) doesn't apply to him specifically.
+    extreme_iso_scorer = shooter.playmaking < 0.15 and shooter.usage >= 0.26
+    if getattr(dff, "double_team_cooldown", 0) > 0 and not extreme_iso_scorer:
         dff.double_team_cooldown -= 1
         return False
     styles = getattr(dff, "coach_style", {})
@@ -14551,9 +14555,11 @@ def should_double_team(shooter: Player, defender: Player, off: Team, dff: Team,
         chance -= 0.035
     if defender.pf >= 4:
         chance += 0.05
-    max_chance = 0.55 if shooter.playmaking < 0.64 else 0.29
+    if extreme_iso_scorer:
+        chance += 0.40
+    max_chance = 0.90 if extreme_iso_scorer else (0.55 if shooter.playmaking < 0.64 else 0.29)
     send_double = random.random() < max(0.04, min(max_chance, chance))
-    if send_double:
+    if send_double and not extreme_iso_scorer:
         dff.double_team_cooldown = 3 if coach_iq >= 0.70 else 4
     return send_double
 
