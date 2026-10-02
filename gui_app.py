@@ -4222,10 +4222,10 @@ def run_gui_app():
                 ratings_card_delta_var.set("Even")
                 ratings_card_delta_label.config(fg="#9ca3af")
             values = {
-                "3PT": pct(effective_rating(player.three_rating, player, team, opponent, period, period_time)),
-                "MID": pct(effective_rating(player.mid_rating, player, team, opponent, period, period_time)),
-                "RIM": pct(effective_rating(player.rim_rating, player, team, opponent, period, period_time)),
-                "DUNK": pct(effective_rating(player.dunk_rating, player, team, opponent, period, period_time)),
+                "3PT": pct(effective_rating(player.three_rating, player, team, opponent, period, period_time, "three")),
+                "MID": pct(effective_rating(player.mid_rating, player, team, opponent, period, period_time, "mid")),
+                "RIM": pct(effective_rating(player.rim_rating, player, team, opponent, period, period_time, "rim")),
+                "DUNK": pct(effective_rating(player.dunk_rating, player, team, opponent, period, period_time, "dunk")),
                 "FT": pct(effective_ft_rating(player, team, opponent, period, period_time)),
                 "PLAY": pct(effective_rating(player.playmaking, player, team, opponent, period, period_time)),
                 "HANDLE": pct(effective_rating(player.ball_handle, player, team, opponent, period, period_time)),
@@ -4240,9 +4240,13 @@ def run_gui_app():
                 "IQ": pct(player.shot_iq),
             }
             drivers = [(name, value) for name, value in components.items() if abs(value) >= 0.004]
+            heat_labels = {"three": "3PT", "mid": "MID", "rim": "RIM", "dunk": "DUNK"}
+            for heat_attr, heat_value in getattr(player, "heat_adjust", {}).items():
+                if abs(heat_value) >= 0.005:
+                    drivers.append((f"Heat {heat_labels.get(heat_attr, heat_attr)}", heat_value))
             drivers.sort(key=lambda item: -abs(item[1]))
             if drivers:
-                arrow_parts = [f"{name} {'↑' if value > 0 else '↓'}" for name, value in drivers[:4]]
+                arrow_parts = [f"{name} {'↑' if value > 0 else '↓'}" for name, value in drivers[:5]]
                 ratings_card_note_var.set("Why: " + "   ".join(arrow_parts))
             else:
                 ratings_card_note_var.set("Why: holding steady — no significant boost or drag right now.")
@@ -6834,8 +6838,11 @@ def run_gui_app():
         # tie it to the same fast tier as the on-court box score instead of
         # the slow ~1.5s heavy-tab cycle, so it doesn't lag behind the time.
         try:
-            if str(series_tabs.tab(series_tabs.select(), "text")) == "Ratings":
+            fast_tab = str(series_tabs.tab(series_tabs.select(), "text"))
+            if fast_tab == "Ratings":
                 update_ratings_card_widget()
+            elif fast_tab == "Cards":
+                update_player_card_widget()
         except Exception:
             pass
         if include_heavy:

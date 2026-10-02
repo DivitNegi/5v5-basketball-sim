@@ -9067,6 +9067,7 @@ def initialize_game_flow(teamA: Team, teamB: Team):
             p.limitless_range_attempt = False
             p.heat_check_attempt = False
             p.confidence = getattr(t, "series_confidence_adjustments", {}).get(p.name, 0.0)
+            p.heat_adjust = {}
             p.injury_limited = False
             p.current_stint = 0
             p.last_fatigue_notice_stint = 0
@@ -9162,26 +9163,6 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     home_or_away_scale = 0.018 + clutch_affinity * 0.010
     home_boost = home_or_away_scale if getattr(team, "home_team", False) else -home_or_away_scale
 
-    # Hot/cold: confidence ticks up on a make and down on a miss
-    # (update_shot_rhythm), with hot/cold streaks adding on top once they
-    # build up. Folding it in here means it both nudges real shot odds
-    # (shot_make_prob derives its skill_rating from effective_rating) and
-    # shows up as a named driver on the live Ratings tab.
-    # A player's own hot/cold hand is a bigger, more personal deal than
-    # ambient team factors -- once an actual streak kicks in it's floored
-    # (not just added to) well above Momentum's (~0.056) and Home's
-    # (~0.035) maximums, so a genuinely heating-up or ice-cold player always
-    # reads as the headline driver instead of getting out-magnituded by a
-    # generic team run or home-court bump.
-    confidence = getattr(player, "confidence", 0.0)
-    heat_swing = max(-0.045, min(0.045, confidence * 0.015))
-    hot_streak = getattr(player, "hot_streak", 0)
-    cold_streak = getattr(player, "cold_streak", 0)
-    if hot_streak >= 2:
-        heat_swing = max(heat_swing, 0.04 + min(0.03, (hot_streak - 2) * 0.006))
-    if cold_streak >= 3:
-        heat_swing = min(heat_swing, -0.04 - min(0.03, (cold_streak - 3) * 0.006))
-
     if superstar:
         fatigue_drag *= 0.30
 
@@ -9194,14 +9175,62 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
         "Series": series_boost,
         "Home": home_boost,
         "Fatigue": -fatigue_drag,
-        "Heat": heat_swing,
     }
 
 
+HEAT_ATTRS = ("three", "mid", "rim", "dunk")
+HEAT_STEP = 0.01
+HEAT_CAP = 0.08
+
+
+def heat_attr_for_shot(shot_type: str | None) -> str | None:
+    if shot_type == "three":
+        return "three"
+    if shot_type in ("mid", "post_fade"):
+        return "mid"
+    if shot_type == "dunk":
+        return "dunk"
+    if shot_type:
+        return "rim"
+    return None
+
+
+def heat_adjustment(player: Player, attr: str | None) -> float:
+    if attr is None:
+        return 0.0
+    return getattr(player, "heat_adjust", {}).get(attr, 0.0)
+
+
+def bump_player_heat(player: Player, shot_type: str | None, made: bool):
+    attr = heat_attr_for_shot(shot_type)
+    if attr is None:
+        return
+    heat = getattr(player, "heat_adjust", None)
+    if heat is None:
+        heat = {}
+        player.heat_adjust = heat
+    step = HEAT_STEP if made else -HEAT_STEP
+    heat[attr] = max(-HEAT_CAP, min(HEAT_CAP, heat.get(attr, 0.0) + step))
+
+
+def decay_player_heat(player: Player, factor: float = 0.985):
+    heat = getattr(player, "heat_adjust", None)
+    if not heat:
+        return
+    for attr in list(heat):
+        heat[attr] *= factor
+        if abs(heat[attr]) < 0.0005:
+            del heat[attr]
+
+
 def effective_rating(base_rating: float, player: Player, team: Team,
-                     opponent: Team, period: int, period_time: int) -> float:
+                     opponent: Team, period: int, period_time: int,
+                     attr: str | None = None) -> float:
+    # Heat is per-attribute and absolute: a made midrange only nudges mid by
+    # +1 point, a miss only drags that same attribute down. It's added after
+    # the team/situational multiplier so it never scales with those.
     components = effective_rating_components(player, team, opponent, period, period_time)
-    return base_rating * (1.0 + sum(components.values()))
+    return base_rating * (1.0 + sum(components.values())) + heat_adjustment(player, attr)
 
 
 def effective_ft_rating(player: Player, team: Team, opponent: Team,
@@ -9226,10 +9255,10 @@ def live_overall_rating(p: Player, team: Team, opponent: Team, period: int, peri
     # the static base rating, so the number shown on the Ratings tab is the
     # real weighted overall -- not an approximation from a single blanket
     # multiplier applied to the base overall.
-    three = effective_rating(p.three_rating, p, team, opponent, period, period_time)
-    mid = effective_rating(p.mid_rating, p, team, opponent, period, period_time)
-    rim = effective_rating(p.rim_rating, p, team, opponent, period, period_time)
-    dunk = effective_rating(p.dunk_rating, p, team, opponent, period, period_time)
+    three = effective_rating(p.three_rating, p, team, opponent, period, period_time, "three")
+    mid = effective_rating(p.mid_rating, p, team, opponent, period, period_time, "mid")
+    rim = effective_rating(p.rim_rating, p, team, opponent, period, period_time, "rim")
+    dunk = effective_rating(p.dunk_rating, p, team, opponent, period, period_time, "dunk")
     ft = effective_ft_rating(p, team, opponent, period, period_time)
     playmaking = effective_rating(p.playmaking, p, team, opponent, period, period_time)
     perimeter_def = effective_rating(p.perimeter_def, p, team, opponent, period, period_time)
@@ -11525,19 +11554,19 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         opponent = Team("temp opponent", [defender])
     skill_rating = 0.75
     if shot_type == "three":
-        rating = effective_rating(shooter.three_rating, shooter, team, opponent, period, period_time)
+        rating = effective_rating(shooter.three_rating, shooter, team, opponent, period, period_time, "three")
         skill_rating = rating
         p = rating * 0.66
         p *= (1 - 0.58 * effective_perimeter_def(defender))
 
     elif shot_type == "mid":
-        rating = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time)
+        rating = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
         skill_rating = rating
         p = rating * 0.74
         p *= (1 - 0.56 * effective_perimeter_def(defender))
 
     elif shot_type == "rim":
-        rating = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time)
+        rating = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim")
         skill_rating = rating
         elite_big_finish = elite_interior_scorer(shooter)
         elite_slash_finish = shooter.rim_rating >= 0.92 and (shooter.drive_tendency >= 0.18 or shooter.usage >= 0.28)
@@ -11564,7 +11593,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p *= (1 - defense_tax * effective_interior_def(defender))
 
     elif shot_type == "dunk":
-        rating = effective_rating(shooter.dunk_rating, shooter, team, opponent, period, period_time)
+        rating = effective_rating(shooter.dunk_rating, shooter, team, opponent, period, period_time, "dunk")
         skill_rating = rating
         defense_tax = 0.42 if elite_interior_scorer(shooter) else 0.58
         p = rating * (0.94 if elite_interior_scorer(shooter) else 0.88)
@@ -11572,8 +11601,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p = max(0.50 if elite_interior_scorer(shooter) else 0.45, p)
 
     elif shot_type == "post":
-        rim = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time)
-        mid = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time)
+        rim = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim")
+        mid = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
         base = 0.68 * rim + 0.32 * mid
         skill_rating = base
         # Post shots were landing around 29% league-wide -- well below a real
@@ -11584,7 +11613,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p *= (1 - defense_tax * effective_interior_def(defender))
 
     elif shot_type == "post_fade":
-        rating = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time)
+        rating = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
         post_balance = 0.55 * shooter.mid_rating + 0.25 * shooter.post_tendency + 0.20 * shooter.shot_iq
         skill_rating = rating
         p = rating * (0.80 + min(0.08, shooter.post_tendency * 0.12))
@@ -11592,8 +11621,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p *= (1 - 0.40 * effective_interior_def(defender))
 
     else:
-        rim = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time)
-        mid = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time)
+        rim = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim")
+        mid = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
         base = 0.6 * rim + 0.4 * mid
         skill_rating = base
         p = base * 0.76
@@ -12325,6 +12354,7 @@ def _team_and_opponent_for(player: Player) -> Tuple[Team | None, Team | None]:
 
 
 def update_shot_rhythm(player: Player, made: bool, shot_type: str | None = None):
+    bump_player_heat(player, shot_type, made)
     if made:
         player.hot_streak = getattr(player, "hot_streak", 0) + 1
         player.cold_streak = 0
@@ -17405,6 +17435,8 @@ def simulate_possession(off: Team, dff: Team,
     # only stays up while a team keeps actually building on it.
     off.momentum = getattr(off, "momentum", 0.0) * 0.96
     dff.momentum = getattr(dff, "momentum", 0.0) * 0.96
+    for _heat_player in list(off.on_floor) + list(dff.on_floor):
+        decay_player_heat(_heat_player)
     frontcourt_after_oreb = getattr(off, "frontcourt_after_oreb", False)
     if frontcourt_after_oreb:
         off.frontcourt_after_oreb = False
@@ -20503,10 +20535,10 @@ def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, pe
     # always exactly what fantasy_ovr() would say about the live version
     # of this player, not a separate approximation that can drift from it.
     shadow = copy.copy(player)
-    shadow.three_rating = effective_rating(player.three_rating, player, team, opponent, period, period_time)
-    shadow.mid_rating = effective_rating(player.mid_rating, player, team, opponent, period, period_time)
-    shadow.rim_rating = effective_rating(player.rim_rating, player, team, opponent, period, period_time)
-    shadow.dunk_rating = effective_rating(player.dunk_rating, player, team, opponent, period, period_time)
+    shadow.three_rating = effective_rating(player.three_rating, player, team, opponent, period, period_time, "three")
+    shadow.mid_rating = effective_rating(player.mid_rating, player, team, opponent, period, period_time, "mid")
+    shadow.rim_rating = effective_rating(player.rim_rating, player, team, opponent, period, period_time, "rim")
+    shadow.dunk_rating = effective_rating(player.dunk_rating, player, team, opponent, period, period_time, "dunk")
     shadow.perimeter_def = effective_rating(player.perimeter_def, player, team, opponent, period, period_time)
     shadow.interior_def = effective_rating(player.interior_def, player, team, opponent, period, period_time)
     shadow.playmaking = effective_rating(player.playmaking, player, team, opponent, period, period_time)
