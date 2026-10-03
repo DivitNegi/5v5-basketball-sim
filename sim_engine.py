@@ -1642,8 +1642,12 @@ def_per_miss.extend([
     "fights through the screen navigation and still contests the shot.",
     "reads the dribble move early and takes away the rhythm jumper.",
     "keeps active hands through the shot pocket and forces the miss.",
-    "denies the catch-and-shoot rhythm with a hard, disciplined close.",
 ])
+
+# Only valid when the shot really was a catch-and-shoot look.
+def_catch_shoot_miss = [
+    "denies the catch-and-shoot rhythm with a hard, disciplined close.",
+]
 
 def_int_miss.extend([
     "sets a wall at the restricted area and forces the tough miss.",
@@ -2070,6 +2074,8 @@ def context_defense_line(shot_type: str, quality_label: str, made: bool, context
         return random.choice(def_open_make if made else def_open_miss)
 
     pool = list(def_per_make if made else def_per_miss)
+    if not made and context and any(word in context for word in ("catch", "pindown", "kickout", "curl")):
+        pool.extend(def_catch_shoot_miss)
     if not screen_action_context(context):
         screen_words = ("screen", "top-lock", "action")
         filtered = [line for line in pool if not any(word in line for word in screen_words)]
