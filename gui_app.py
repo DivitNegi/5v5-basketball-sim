@@ -5913,7 +5913,7 @@ def run_gui_app():
         swap_team_var = tk.StringVar(value=team_a_var.get() if team_a_var.get() in factories else team_names[0])
         team_box = ttk.Combobox(top, textvariable=swap_team_var, values=team_names, state="readonly", width=34)
         team_box.grid(row=0, column=1, padx=(0, 14), sticky="ew")
-        ttk.Label(top, text="Pick an original roster slot, then choose an all-time player to drop in.", foreground=MUTED).grid(row=0, column=2, sticky="w")
+        ttk.Label(top, text="Pick an original roster slot, then type a player name in \"In\" (or the search box) to find an all-time player.", foreground=MUTED).grid(row=0, column=2, sticky="w")
         outgoing_select_var = tk.StringVar(value="")
         incoming_select_var = tk.StringVar(value="")
         version_var = tk.StringVar(value="")
@@ -5922,8 +5922,9 @@ def run_gui_app():
         outgoing_box = ttk.Combobox(top, textvariable=outgoing_select_var, values=[], state="readonly", width=42)
         outgoing_box.grid(row=1, column=1, padx=(0, 14), pady=(8, 0), sticky="ew")
         ttk.Label(top, text="In").grid(row=2, column=0, padx=(0, 8), pady=(8, 0), sticky="w")
-        incoming_box = ttk.Combobox(top, textvariable=incoming_select_var, values=[], state="readonly", width=72)
+        incoming_box = ttk.Combobox(top, textvariable=incoming_select_var, values=[], state="normal", width=72)
         incoming_box.grid(row=2, column=1, columnspan=2, padx=(0, 14), pady=(8, 0), sticky="ew")
+        typing_state = {"active": False}
         ttk.Label(top, text="Version").grid(row=3, column=0, padx=(0, 8), pady=(8, 0), sticky="w")
         version_box = ttk.Combobox(top, textvariable=version_var, values=[], state="readonly", width=72)
         version_box.grid(row=3, column=1, columnspan=2, padx=(0, 14), pady=(8, 0), sticky="ew")
@@ -6043,6 +6044,7 @@ def run_gui_app():
             set_swap_preview(selected_incoming["player"])
 
         def refresh_incoming(*_args):
+            keep_typed_text = typing_state["active"]
             incoming_list.delete(0, "end")
             incoming_players.clear()
             incoming_label_to_player.clear()
@@ -6061,7 +6063,8 @@ def run_gui_app():
                     incoming_list.insert("end", f"{player.name:<24} OVR {fantasy_ovr(player):>2} | {source}")
                 incoming_box.configure(values=labels)
                 if incoming_players:
-                    incoming_select_var.set(labels[0])
+                    if not keep_typed_text:
+                        incoming_select_var.set(labels[0])
                     incoming_list.selection_clear(0, "end")
                     incoming_list.selection_set(0)
                     incoming_list.activate(0)
@@ -6069,7 +6072,8 @@ def run_gui_app():
                     set_incoming_player(incoming_players[0])
                     status_line.set(f"Loaded {len(incoming_players)} all-time players shown. {roster_swap_summary()}")
                 else:
-                    incoming_select_var.set("")
+                    if not keep_typed_text:
+                        incoming_select_var.set("")
                     version_box.configure(values=[])
                     version_var.set("")
                     selected_incoming["player"] = None
@@ -6087,6 +6091,21 @@ def run_gui_app():
             if not selection:
                 return
             set_incoming_player(incoming_players[selection[0]])
+
+        def type_incoming_name(event=None):
+            if event is not None and event.keysym in ("Up", "Down", "Left", "Right", "Return", "Tab", "Escape", "Shift_L", "Shift_R", "Control_L", "Control_R"):
+                return
+            typed = incoming_select_var.get().strip()
+            if typed in incoming_label_to_player:
+                return
+            typing_state["active"] = True
+            try:
+                if search_var.get() == typed:
+                    refresh_incoming()
+                else:
+                    search_var.set(typed)
+            finally:
+                typing_state["active"] = False
 
         def select_incoming_from_dropdown(_event=None):
             player = incoming_label_to_player.get(incoming_select_var.get())
@@ -6184,6 +6203,7 @@ def run_gui_app():
 
         team_box.bind("<<ComboboxSelected>>", lambda _event: refresh_outgoing())
         incoming_box.bind("<<ComboboxSelected>>", select_incoming_from_dropdown)
+        incoming_box.bind("<KeyRelease>", type_incoming_name)
         search_var.trace_add("write", refresh_incoming)
         incoming_list.bind("<<ListboxSelect>>", select_incoming)
         version_box.bind("<<ComboboxSelected>>", select_version)
@@ -6194,6 +6214,8 @@ def run_gui_app():
         initial_roster_swap_refresh()
         dialog.after_idle(initial_roster_swap_refresh)
         dialog.after(250, initial_roster_swap_refresh)
+        dialog.after(150, lambda: (dialog.focus_force(), incoming_box.focus_set()))
+        search.bind("<Button-1>", lambda _event: search.focus_set())
 
     def open_create_player_dialog(existing_index: int | None = None):
         if running["active"]:
