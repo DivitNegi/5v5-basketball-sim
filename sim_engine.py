@@ -9211,6 +9211,16 @@ def clutch_multiplier(player: Player, team: Team, opponent: Team, period: int, p
         badge_effect = badge_tier(player, "clutch") * 0.040
         return max(0.96, min(1.25, 1.0 + clutch_delta * 0.13 + badge_effect))
 
+    # A team protecting a late lead still needs its closers -- fade the same
+    # close-game effect out as the lead grows instead of cutting it to zero
+    # the moment the margin passes 5 (which made the trailing team's star
+    # show a boost while the leading team's star showed none).
+    if late_game and 5 < margin <= 12:
+        fade = (12 - margin) / 7.0
+        clutch_delta = player.clutchness - 0.60
+        badge_effect = badge_tier(player, "clutch") * 0.040
+        return max(0.98, min(1.15, 1.0 + fade * (clutch_delta * 0.13 + badge_effect)))
+
     return 1.0
 
 
