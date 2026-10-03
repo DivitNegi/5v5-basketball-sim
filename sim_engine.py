@@ -9179,7 +9179,7 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     }
 
 
-HEAT_ATTRS = ("three", "mid", "rim", "dunk", "perimeter_def", "interior_def")
+HEAT_ATTRS = ("three", "mid", "rim", "dunk", "perimeter_def", "interior_def", "steal", "block")
 HEAT_STEP = 0.01
 HEAT_CAP = 0.08
 
@@ -9214,6 +9214,18 @@ def bump_defender_heat(defender: Player, shot_type: str | None, shooter_made: bo
         defender.heat_adjust = heat
     step = -HEAT_STEP if shooter_made else HEAT_STEP
     heat[attr] = max(-HEAT_CAP, min(HEAT_CAP, heat.get(attr, 0.0) + step))
+
+
+def bump_event_heat(player: Player, attr: str):
+    heat = getattr(player, "heat_adjust", None)
+    if heat is None:
+        heat = {}
+        player.heat_adjust = heat
+    heat[attr] = max(-HEAT_CAP, min(HEAT_CAP, heat.get(attr, 0.0) + HEAT_STEP))
+
+
+def heat_stat(player: Player, attr: str) -> float:
+    return getattr(player, attr) + heat_adjustment(player, attr)
 
 
 def heat_adjustment(player: Player, attr: str | None) -> float:
@@ -9284,8 +9296,8 @@ def live_overall_rating(p: Player, team: Team, opponent: Team, period: int, peri
     playmaking = effective_rating(p.playmaking, p, team, opponent, period, period_time)
     perimeter_def = effective_rating(p.perimeter_def, p, team, opponent, period, period_time, "perimeter_def")
     interior_def = effective_rating(p.interior_def, p, team, opponent, period, period_time, "interior_def")
-    steal = effective_rating(p.steal, p, team, opponent, period, period_time)
-    block = effective_rating(p.block, p, team, opponent, period, period_time)
+    steal = effective_rating(p.steal, p, team, opponent, period, period_time, "steal")
+    block = effective_rating(p.block, p, team, opponent, period, period_time, "block")
     oreb = effective_rating(p.oreb, p, team, opponent, period, period_time)
     dreb = effective_rating(p.dreb, p, team, opponent, period, period_time)
 
@@ -11370,7 +11382,7 @@ def charge_chance(shooter: Player, defender: Player, shot_type: str) -> float:
 
 def pass_interception_chance(passer: Player, receiver: Player, defender: Player) -> float:
     passer_security = 0.55 * passer.playmaking + 0.45 * passer.ball_handle
-    lane_read = 0.65 * defender.steal + 0.35 * defender.perimeter_def
+    lane_read = 0.65 * heat_stat(defender, "steal") + 0.35 * defender.perimeter_def
     receiver_pressure = 1.0 - 0.25 * receiver.ball_handle
     chance = 0.004 + lane_read * receiver_pressure * 0.034 - passer_security * 0.010
     return max(0.0025, min(0.040, chance))
@@ -11386,7 +11398,7 @@ def call_foul(team: Team, player: Player, label: str):
 
 
 def attempt_on_ball_steal(handler: Player, defender: Player) -> bool:
-    norm_steal = defender.steal
+    norm_steal = heat_stat(defender, "steal")
     ball_sec = 0.6 * handler.ball_handle + 0.4 * handler.playmaking
     base = 0.052
     p = base * norm_steal / (0.5 + 0.5 * ball_sec)
@@ -12215,10 +12227,10 @@ def defensive_communication_error(off: Team, dff: Team, shooter: Player, shot_ty
 
 def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> float:
     if is_paint_shot(shot_type):
-        p = 0.020 + 0.175 * defender.block * foul_trouble_defense_factor(defender)
+        p = 0.020 + 0.175 * heat_stat(defender, "block") * foul_trouble_defense_factor(defender)
         p *= 1.0 + max(0.0, effective_interior_def(defender) - 0.78) * 0.22
     else:
-        p = 0.006 + 0.050 * defender.block * foul_trouble_defense_factor(defender)
+        p = 0.006 + 0.050 * heat_stat(defender, "block") * foul_trouble_defense_factor(defender)
 
     if shooter is not None:
         if is_paint_shot(shot_type):
@@ -12242,11 +12254,13 @@ def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> floa
 
 
 def process_block(defender: Player, team_def: Team):
+    bump_event_heat(defender, "block")
     defender.blk_stat += 1
     team_def.team_blk += 1
 
 
 def process_steal(defender: Player, team_def: Team, handler: Player, team_off: Team):
+    bump_event_heat(defender, "steal")
     defender.stl += 1
     team_def.team_stl += 1
     team_def.last_stealer = defender
@@ -15391,6 +15405,7 @@ def try_pass_interception(passer: Player, receiver: Player,
     defender = matchups.get(receiver, random.choice(dff.on_floor))
 
     if random.random() < pass_interception_chance(passer, receiver, defender):
+        bump_event_heat(defender, "steal")
         defender.stl += 1
         dff.team_stl += 1
         dff.last_stealer = defender
@@ -16648,7 +16663,7 @@ def chasedown_block_chance(defender: Player, finisher: Player, shot_type: str) -
         return 0.0
     tier = badge_tier(defender, "chasedown")
     speed_edge = max(0.0, effective_speed(defender) - effective_speed(finisher))
-    chance = 0.010 + tier * 0.020 + defender.block * 0.055 + speed_edge * 0.055
+    chance = 0.010 + tier * 0.020 + heat_stat(defender, "block") * 0.055 + speed_edge * 0.055
     if defender.name == "LeBron James":
         chance += 0.020
     if shot_type == "dunk":
@@ -19756,6 +19771,7 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
         if attempt_on_ball_steal(shooter, defender):
             print(_1v1_steal_voice_line(defender, shooter))
             shooter.tov += 1
+            bump_event_heat(defender, "steal")
             defender.stl += 1
             time.sleep(SLEEP * 1.3)
             print_scoreboard(1, 0, team_a, team_b)
@@ -20569,8 +20585,8 @@ def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, pe
     shadow.interior_def = effective_rating(player.interior_def, player, team, opponent, period, period_time, "interior_def")
     shadow.playmaking = effective_rating(player.playmaking, player, team, opponent, period, period_time)
     shadow.ball_handle = effective_rating(player.ball_handle, player, team, opponent, period, period_time)
-    shadow.steal = effective_rating(player.steal, player, team, opponent, period, period_time)
-    shadow.block = effective_rating(player.block, player, team, opponent, period, period_time)
+    shadow.steal = effective_rating(player.steal, player, team, opponent, period, period_time, "steal")
+    shadow.block = effective_rating(player.block, player, team, opponent, period, period_time, "block")
     shadow.oreb = effective_rating(player.oreb, player, team, opponent, period, period_time)
     shadow.dreb = effective_rating(player.dreb, player, team, opponent, period, period_time)
     return fantasy_ovr(shadow)

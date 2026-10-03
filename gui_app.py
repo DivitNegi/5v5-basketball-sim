@@ -4230,8 +4230,8 @@ def run_gui_app():
                 "PLAY": pct(effective_rating(player.playmaking, player, team, opponent, period, period_time)),
                 "HANDLE": pct(effective_rating(player.ball_handle, player, team, opponent, period, period_time)),
                 "SPEED": pct(player.speed),
-                "STL": pct(effective_rating(player.steal, player, team, opponent, period, period_time)),
-                "BLK": pct(effective_rating(player.block, player, team, opponent, period, period_time)),
+                "STL": pct(effective_rating(player.steal, player, team, opponent, period, period_time, "steal")),
+                "BLK": pct(effective_rating(player.block, player, team, opponent, period, period_time, "block")),
                 "OREB": pct(effective_rating(player.oreb, player, team, opponent, period, period_time)),
                 "DREB": pct(effective_rating(player.dreb, player, team, opponent, period, period_time)),
                 "PDEF": pct(effective_rating(player.perimeter_def, player, team, opponent, period, period_time, "perimeter_def")),
@@ -4240,7 +4240,7 @@ def run_gui_app():
                 "IQ": pct(player.shot_iq),
             }
             drivers = [(name, value) for name, value in components.items() if abs(value) >= 0.004]
-            heat_labels = {"three": "3PT", "mid": "MID", "rim": "RIM", "dunk": "DUNK", "perimeter_def": "PDEF", "interior_def": "IDEF"}
+            heat_labels = {"three": "3PT", "mid": "MID", "rim": "RIM", "dunk": "DUNK", "perimeter_def": "PDEF", "interior_def": "IDEF", "steal": "STL", "block": "BLK"}
             for heat_attr, heat_value in getattr(player, "heat_adjust", {}).items():
                 if abs(heat_value) >= 0.005:
                     drivers.append((f"Heat {heat_labels.get(heat_attr, heat_attr)}", heat_value))
