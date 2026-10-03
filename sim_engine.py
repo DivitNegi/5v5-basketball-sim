@@ -7569,11 +7569,12 @@ def fatigue_touch_multiplier(player: Player) -> float:
 
 
 def effective_perimeter_def(defender: Player) -> float:
-    return defender.perimeter_def * foul_trouble_defense_factor(defender) * fatigue_factor(defender)
+    base = defender.perimeter_def + getattr(defender, "heat_adjust", {}).get("perimeter_def", 0.0)
+    return base * foul_trouble_defense_factor(defender) * fatigue_factor(defender)
 
 
 def effective_interior_def(defender: Player) -> float:
-    base = defender.interior_def
+    base = defender.interior_def + getattr(defender, "heat_adjust", {}).get("interior_def", 0.0)
     high_end_bonus = max(0.0, base - 0.72) * 0.55 + max(0.0, base - 0.88) * 0.35
     boosted = min(1.12, base + high_end_bonus)
     return boosted * foul_trouble_defense_factor(defender) * fatigue_factor(defender)
@@ -9178,7 +9179,7 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     }
 
 
-HEAT_ATTRS = ("three", "mid", "rim", "dunk")
+HEAT_ATTRS = ("three", "mid", "rim", "dunk", "perimeter_def", "interior_def")
 HEAT_STEP = 0.01
 HEAT_CAP = 0.08
 
@@ -9193,6 +9194,26 @@ def heat_attr_for_shot(shot_type: str | None) -> str | None:
     if shot_type:
         return "rim"
     return None
+
+
+def heat_defense_attr_for_shot(shot_type: str | None) -> str | None:
+    if shot_type in ("three", "mid", "post_fade"):
+        return "perimeter_def"
+    if shot_type:
+        return "interior_def"
+    return None
+
+
+def bump_defender_heat(defender: Player, shot_type: str | None, shooter_made: bool):
+    attr = heat_defense_attr_for_shot(shot_type)
+    if attr is None:
+        return
+    heat = getattr(defender, "heat_adjust", None)
+    if heat is None:
+        heat = {}
+        defender.heat_adjust = heat
+    step = -HEAT_STEP if shooter_made else HEAT_STEP
+    heat[attr] = max(-HEAT_CAP, min(HEAT_CAP, heat.get(attr, 0.0) + step))
 
 
 def heat_adjustment(player: Player, attr: str | None) -> float:
@@ -9261,8 +9282,8 @@ def live_overall_rating(p: Player, team: Team, opponent: Team, period: int, peri
     dunk = effective_rating(p.dunk_rating, p, team, opponent, period, period_time, "dunk")
     ft = effective_ft_rating(p, team, opponent, period, period_time)
     playmaking = effective_rating(p.playmaking, p, team, opponent, period, period_time)
-    perimeter_def = effective_rating(p.perimeter_def, p, team, opponent, period, period_time)
-    interior_def = effective_rating(p.interior_def, p, team, opponent, period, period_time)
+    perimeter_def = effective_rating(p.perimeter_def, p, team, opponent, period, period_time, "perimeter_def")
+    interior_def = effective_rating(p.interior_def, p, team, opponent, period, period_time, "interior_def")
     steal = effective_rating(p.steal, p, team, opponent, period, period_time)
     block = effective_rating(p.block, p, team, opponent, period, period_time)
     oreb = effective_rating(p.oreb, p, team, opponent, period, period_time)
@@ -11553,6 +11574,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         team = Team("temp", [shooter])
         opponent = Team("temp opponent", [defender])
     skill_rating = 0.75
+    shooter.last_defender = defender
     if shot_type == "three":
         rating = effective_rating(shooter.three_rating, shooter, team, opponent, period, period_time, "three")
         skill_rating = rating
@@ -12355,6 +12377,10 @@ def _team_and_opponent_for(player: Player) -> Tuple[Team | None, Team | None]:
 
 def update_shot_rhythm(player: Player, made: bool, shot_type: str | None = None):
     bump_player_heat(player, shot_type, made)
+    contesting_defender = getattr(player, "last_defender", None)
+    if contesting_defender is not None:
+        bump_defender_heat(contesting_defender, shot_type, made)
+        player.last_defender = None
     if made:
         player.hot_streak = getattr(player, "hot_streak", 0) + 1
         player.cold_streak = 0
@@ -20539,8 +20565,8 @@ def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, pe
     shadow.mid_rating = effective_rating(player.mid_rating, player, team, opponent, period, period_time, "mid")
     shadow.rim_rating = effective_rating(player.rim_rating, player, team, opponent, period, period_time, "rim")
     shadow.dunk_rating = effective_rating(player.dunk_rating, player, team, opponent, period, period_time, "dunk")
-    shadow.perimeter_def = effective_rating(player.perimeter_def, player, team, opponent, period, period_time)
-    shadow.interior_def = effective_rating(player.interior_def, player, team, opponent, period, period_time)
+    shadow.perimeter_def = effective_rating(player.perimeter_def, player, team, opponent, period, period_time, "perimeter_def")
+    shadow.interior_def = effective_rating(player.interior_def, player, team, opponent, period, period_time, "interior_def")
     shadow.playmaking = effective_rating(player.playmaking, player, team, opponent, period, period_time)
     shadow.ball_handle = effective_rating(player.ball_handle, player, team, opponent, period, period_time)
     shadow.steal = effective_rating(player.steal, player, team, opponent, period, period_time)

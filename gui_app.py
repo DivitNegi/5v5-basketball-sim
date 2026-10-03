@@ -4234,13 +4234,13 @@ def run_gui_app():
                 "BLK": pct(effective_rating(player.block, player, team, opponent, period, period_time)),
                 "OREB": pct(effective_rating(player.oreb, player, team, opponent, period, period_time)),
                 "DREB": pct(effective_rating(player.dreb, player, team, opponent, period, period_time)),
-                "PDEF": pct(effective_rating(player.perimeter_def, player, team, opponent, period, period_time)),
-                "IDEF": pct(effective_rating(player.interior_def, player, team, opponent, period, period_time)),
+                "PDEF": pct(effective_rating(player.perimeter_def, player, team, opponent, period, period_time, "perimeter_def")),
+                "IDEF": pct(effective_rating(player.interior_def, player, team, opponent, period, period_time, "interior_def")),
                 "CLUTCH": pct(player.clutchness),
                 "IQ": pct(player.shot_iq),
             }
             drivers = [(name, value) for name, value in components.items() if abs(value) >= 0.004]
-            heat_labels = {"three": "3PT", "mid": "MID", "rim": "RIM", "dunk": "DUNK"}
+            heat_labels = {"three": "3PT", "mid": "MID", "rim": "RIM", "dunk": "DUNK", "perimeter_def": "PDEF", "interior_def": "IDEF"}
             for heat_attr, heat_value in getattr(player, "heat_adjust", {}).items():
                 if abs(heat_value) >= 0.005:
                     drivers.append((f"Heat {heat_labels.get(heat_attr, heat_attr)}", heat_value))
