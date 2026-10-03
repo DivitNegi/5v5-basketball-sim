@@ -9181,6 +9181,19 @@ def initialize_game_flow(teamA: Team, teamB: Team):
 
 
 def clutch_multiplier(player: Player, team: Team, opponent: Team, period: int, period_time: int) -> float:
+    value = situational_clutch_multiplier(player, team, opponent, period, period_time)
+    if period < 4:
+        return value
+    # Being a clutch player means the whole fourth quarter is yours, not just
+    # the stretches where the score is tight: clutch-rated / badged players
+    # get a baseline Q4 lift that the situational boosts can only add to.
+    # Low-clutch players have no floor, so their choke penalty still applies.
+    clutch_delta = player.clutchness - 0.60
+    baseline = 1.0 + max(0.0, clutch_delta * 0.05) + badge_tier(player, "clutch") * 0.015
+    return max(value, baseline) if baseline > 1.0 else value
+
+
+def situational_clutch_multiplier(player: Player, team: Team, opponent: Team, period: int, period_time: int) -> float:
     margin = team.score - opponent.score
     fourth_quarter = period >= 4
     late_game = fourth_quarter and period_time <= 6 * 60
