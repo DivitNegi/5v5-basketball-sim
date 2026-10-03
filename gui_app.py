@@ -5,6 +5,7 @@ from sim_engine import *
 from players_data import *
 from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
 from web_app import run_web_gui_app
+from broadcast import BroadcastBooth
 
 class GuiOutputProxy:
     def __init__(self, output_queue, scoreboard_queue, original_stdout, section_queue=None):
@@ -1825,6 +1826,73 @@ def run_gui_app():
 
     dashboard_play_log.bind("<Shift-MouseWheel>", scroll_play_log_horizontally)
     series_tabs.add(play_tab_frame, text="PBP")
+
+    cast_tab_frame = ttk.Frame(series_tabs, padding=(10, 10))
+    cast_tab_frame.columnconfigure(0, weight=1)
+    cast_tab_frame.rowconfigure(0, weight=1)
+    cast_text = tk.Text(
+        cast_tab_frame,
+        wrap="word",
+        font=("Segoe UI", 14),
+        bg=PANEL_DARK,
+        fg="#f4f7ff",
+        insertbackground="#f4f7ff",
+        selectbackground="#364766",
+        relief="flat",
+        padx=18,
+        pady=14,
+        spacing1=4,
+        spacing3=10,
+        state="disabled",
+    )
+    cast_scroll = ttk.Scrollbar(cast_tab_frame, orient="vertical", command=cast_text.yview)
+    cast_text.configure(yscrollcommand=cast_scroll.set)
+    cast_text.grid(row=0, column=0, sticky="nsew")
+    cast_scroll.grid(row=0, column=1, sticky="ns")
+    cast_text.tag_configure("clock", foreground="#7d8aa5", font=("Segoe UI", 10, "bold"))
+    cast_text.tag_configure("hype", foreground="#ffd76a")
+    series_tabs.add(cast_tab_frame, text="Cast")
+    broadcast_booth = BroadcastBooth()
+    # A play-by-play has a line for every rebound and sub; a broadcaster only
+    # mentions some of them.
+    cast_keep_rate = {"rebound": 0.5, "sub": 0.6, "miss": 0.85}
+
+    def drain_broadcast_events():
+        events = []
+        while True:
+            try:
+                events.append(sim_engine.BROADCAST_EVENTS.popleft())
+            except IndexError:
+                break
+        team_a = SIM_CONTEXT.get("teamA")
+        team_b = SIM_CONTEXT.get("teamB")
+        if not events or team_a is None or team_b is None:
+            return
+        if len(events) > 80:
+            events = events[-80:]
+        calls = broadcast_booth.process(events, (team_a, team_b))
+        calls = [c for c in calls if random.random() < cast_keep_rate.get(c[0], 1.0)]
+        if not calls:
+            return
+        period = SIM_CONTEXT.get("period", 1)
+        period_time = SIM_CONTEXT.get("period_time", 0)
+        stamp = f"{'Q' + str(period) if period <= 4 else 'OT'} {period_time // 60}:{period_time % 60:02d}  "
+        _top, bottom = cast_text.yview()
+        follow = bottom >= 0.98
+        cast_text.configure(state="normal")
+        for kind, text in calls:
+            cast_text.insert("end", stamp, "clock")
+            cast_text.insert("end", text + chr(10), "hype" if kind == "make" and ("!" in text) else "")
+        if follow:
+            cast_text.see("end")
+        cast_text.configure(state="disabled")
+
+    def reset_broadcast_feed():
+        sim_engine.BROADCAST_EVENTS.clear()
+        broadcast_booth.reset()
+        cast_text.configure(state="normal")
+        cast_text.delete("1.0", "end")
+        cast_text.configure(state="disabled")
 
     quarter_columns = ("team", "pos", "player", "min", "pts", "reb", "ast", "stl", "blk", "tov", "orb", "drb", "pf", "pm", "fg", "tp", "ft", "fgp", "tpp", "ftp", "ts")
     quarter_frame = ttk.Frame(series_tabs, padding=(6, 6))
@@ -4618,6 +4686,7 @@ def run_gui_app():
         dashboard_play_log.configure(state="normal")
         dashboard_play_log.delete("1.0", "end")
         dashboard_play_log.configure(state="disabled")
+        reset_broadcast_feed()
         last_basket_var.set("No made basket yet.")
         on_court_box.delete(*on_court_box.get_children())
         on_court_box.insert("", "end", values=("", "Start a game to see the 10 players currently on the floor.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""))
@@ -6853,6 +6922,10 @@ def run_gui_app():
     }
 
     def refresh_live_widgets(include_heavy: bool = False):
+        try:
+            drain_broadcast_events()
+        except Exception:
+            pass
         update_on_court_boxscore()
         update_scoreboard_extras()
         # Ratings are meant to visibly track the live game clock (clutch

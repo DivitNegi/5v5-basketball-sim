@@ -31,6 +31,7 @@ import builtins
 import contextlib
 import copy
 import io
+from collections import deque
 import json
 import math
 import os
@@ -2078,14 +2079,17 @@ def context_defense_line(shot_type: str, quality_label: str, made: bool, context
 
 
 def commentator_rebound(rebounder: str, team: str) -> str:
+    emit_broadcast("rebound", name=rebounder, team=team)
     return random.choice(rebound_broadcast_lines).format(rebounder=rebounder, team=team)
 
 
 def commentator_timeout(team: str, timeouts: int) -> str:
+    emit_broadcast("timeout", team=team)
     return random.choice(timeout_broadcast_lines).format(team=team, timeouts=timeouts)
 
 
 def commentator_sub(team: str, sub_in: str, sub_out: str) -> str:
+    emit_broadcast("sub", team=team, sub_in=sub_in, sub_out=sub_out)
     return random.choice(substitution_broadcast_lines).format(team=team, sub_in=sub_in, sub_out=sub_out)
 
 
@@ -10794,6 +10798,7 @@ def safe_pct(made: int, att: int) -> float:
 
 
 def record_assist(passer: Player, team: Team, points_created: int):
+    emit_broadcast("assist", passer=passer)
     passer.ast += 1
     passer.assist_pts_created = getattr(passer, "assist_pts_created", 0) + points_created
     team.team_ast += 1
@@ -11231,6 +11236,7 @@ def print_box_score(teamA: Team, teamB: Team, label: str):
 # PLAY LOGIC: STEALS, BLOCKS, REBOUNDS, SHOTS
 # ============================================================
 def commit_turnover(player: Player, team: Team):
+    emit_broadcast("turnover", player=player)
     player.tov += 1
     team.team_tov += 1
 
@@ -12378,12 +12384,14 @@ def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> floa
 
 
 def process_block(defender: Player, team_def: Team):
+    emit_broadcast("block", player=defender)
     bump_event_heat(defender, "block")
     defender.blk_stat += 1
     team_def.team_blk += 1
 
 
 def process_steal(defender: Player, team_def: Team, handler: Player, team_off: Team):
+    emit_broadcast("steal", player=defender)
     bump_event_heat(defender, "steal")
     defender.stl += 1
     team_def.team_stl += 1
@@ -12426,6 +12434,7 @@ def steal_voice_line(defender: Player, handler: Player, kind: str = "on_ball",
 
 
 def register_foul(team: Team, player: Player):
+    emit_broadcast("foul", player=player)
     player.pf += 1
     team.team_pf += 1
     team.quarter_fouls = getattr(team, "quarter_fouls", 0) + 1
@@ -12503,6 +12512,13 @@ def in_bonus(team: Team) -> bool:
     return getattr(team, "quarter_fouls", 0) >= rules_bonus_fouls()
 
 
+BROADCAST_EVENTS = deque(maxlen=4000)
+
+
+def emit_broadcast(kind: str, **info):
+    BROADCAST_EVENTS.append({"kind": kind, **info})
+
+
 def _team_and_opponent_for(player: Player) -> Tuple[Team | None, Team | None]:
     team_a = SIM_CONTEXT.get("teamA")
     team_b = SIM_CONTEXT.get("teamB")
@@ -12519,6 +12535,7 @@ def update_shot_rhythm(player: Player, made: bool, shot_type: str | None = None)
     if contesting_defender is not None:
         bump_defender_heat(contesting_defender, shot_type, made)
         player.last_defender = None
+    emit_broadcast("shot", player=player, made=made, shot_type=shot_type, defender=contesting_defender)
     if made:
         player.hot_streak = getattr(player, "hot_streak", 0) + 1
         player.cold_streak = 0
@@ -13128,6 +13145,7 @@ def shoot_free_throws(shooter: Player, team: Team, n: int, period: int, period_t
             team.score += 1
             record_score_event(team, defense, 1, period, period_time, teamA, teamB)
 
+            emit_broadcast("ft", player=shooter, made=True)
             print(f"{shooter.name} is good at the line.")
             time.sleep(SLEEP * 0.4)
             print_scoreboard(period, period_time, teamA, teamB)
@@ -13144,6 +13162,7 @@ def shoot_free_throws(shooter: Player, team: Team, n: int, period: int, period_t
                 return finish_free_throw_trip(defense)
 
         else:
+            emit_broadcast("ft", player=shooter, made=False)
             if intentional_miss:
                 print(f"{shooter.name} intentionally misses the free throw to burn the final seconds.")
             else:
@@ -13179,6 +13198,7 @@ def shoot_retained_free_throw(shooter: Player, team: Team, period: int, period_t
     shooter.fta += 1
     made = random.random() < effective_ft_rating(shooter, team, defense, period, period_time)
 
+    emit_broadcast("ft", player=shooter, made=made)
     if made:
         shooter.ftm += 1
         shooter.pts += 1
@@ -15529,6 +15549,7 @@ def try_pass_interception(passer: Player, receiver: Player,
     defender = matchups.get(receiver, random.choice(dff.on_floor))
 
     if random.random() < pass_interception_chance(passer, receiver, defender):
+        emit_broadcast("steal", player=defender)
         bump_event_heat(defender, "steal")
         defender.stl += 1
         dff.team_stl += 1
@@ -20157,6 +20178,7 @@ def simulate_game(teamA: Team, teamB: Team):
         player_quarter_start_A = player_quarter_snapshot(teamA)
         player_quarter_start_B = player_quarter_snapshot(teamB)
 
+        emit_broadcast("period_start")
         print(f"\n--- Start of { {1:'1st',2:'2nd',3:'3rd',4:'4th'}[q] } quarter ---")
         print_scoreboard(period, q_time, teamA, teamB)
         time.sleep(SLEEP * 0.7)
@@ -20295,6 +20317,7 @@ def simulate_game(teamA: Team, teamB: Team):
             ot_player_start_A = player_quarter_snapshot(teamA)
             ot_player_start_B = player_quarter_snapshot(teamB)
 
+            emit_broadcast("period_start")
             print(f"\n--- Start of OT{ot_num} ---")
             print_scoreboard(period, q_time, teamA, teamB)
             time.sleep(SLEEP * 0.7)
