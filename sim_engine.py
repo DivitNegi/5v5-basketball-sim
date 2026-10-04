@@ -20514,9 +20514,9 @@ def fantasy_ovr(player: Player) -> int:
         # should only help when he can shoot. Shooting is floored at his
         # core level for those bigs, so it can only add.
         core_average = (0.24 * lpt + 0.17 * idef + 0.14 * dk + 0.11 * bl + 0.11 * rebound) / 0.77
-        if lpt >= 85 and idef >= 78 and rebound >= 72:
-            mpt = max(mpt, core_average)
-            tpt = max(tpt, core_average)
+        if lpt >= 88 and idef >= 80 and rebound >= 74:
+            mpt = max(mpt, core_average - 14)
+            tpt = max(tpt, core_average - 14)
         raw = (
             0.24 * lpt + 0.17 * idef + 0.14 * dk + 0.11 * bl +
             0.11 * rebound + 0.08 * cpt + 0.08 * mpt + 0.05 * pl +
