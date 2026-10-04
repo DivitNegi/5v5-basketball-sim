@@ -20729,6 +20729,11 @@ def fantasy_ovr(player: Player) -> int:
         score_first_average = (tpt + mpt + lpt) / 3
         if score_first_average >= 90 and handle >= 90 and pl < 86:
             raw += min(4.5, (score_first_average - 88) * 0.5)
+        # Two-way scoring guards: elite scoring plus lockdown perimeter
+        # defense and active hands (prime Jordan, Kawhi types) are worth
+        # more than the generic guard weights give them.
+        if mpt >= 90 and lpt >= 90 and (mpt + lpt) / 2 >= 92 and pdef >= 90 and stl >= 80:
+            raw += 3
 
     if player.position == "C" and raw > 93:
         raw = 93 + (raw - 93) * 0.38
