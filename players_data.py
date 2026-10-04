@@ -6519,7 +6519,7 @@ PLAYOFF_2016_RATING_ROSTERS = {
 
 def build_2016_player(row: Tuple) -> Player:
     *player_args, shot_iq, height, badges, speed, stamina = row
-    return Player(
+    player = Player(
         *player_args,
         badges=badges,
         height=height,
@@ -6527,6 +6527,9 @@ def build_2016_player(row: Tuple) -> Player:
         speed=speed,
         stamina=stamina,
     )
+    if player.name == "James Harden":
+        player.clutchness = 0.40
+    return player
 
 def normalize_generated_team_roles(team: Team):
     top_tendency = max((p.shot_tendency for p in team.roster), default=0.0)
