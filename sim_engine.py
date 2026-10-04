@@ -20509,6 +20509,14 @@ def fantasy_ovr(player: Player) -> int:
     rebound = (0.45 * player.oreb + 0.55 * player.dreb) * 100
 
     if player.position == "C":
+        # A center who finishes, protects the rim and rebounds is already a
+        # complete big -- not being a shooter shouldn't drag him down, it
+        # should only help when he can shoot. Shooting is floored at his
+        # core level for those bigs, so it can only add.
+        core_average = (0.24 * lpt + 0.17 * idef + 0.14 * dk + 0.11 * bl + 0.11 * rebound) / 0.77
+        if lpt >= 85 and idef >= 78 and rebound >= 72:
+            mpt = max(mpt, core_average)
+            tpt = max(tpt, core_average)
         raw = (
             0.24 * lpt + 0.17 * idef + 0.14 * dk + 0.11 * bl +
             0.11 * rebound + 0.08 * cpt + 0.08 * mpt + 0.05 * pl +
