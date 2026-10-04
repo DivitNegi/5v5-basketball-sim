@@ -5568,8 +5568,20 @@ def run_gui_app():
         ttk.Label(body, text="Your Custom Roster").grid(row=0, column=1, sticky="w", pady=(0, 4))
 
         search_var = tk.StringVar(value="")
-        search = dark_entry(body, textvariable=search_var)
-        search.grid(row=1, column=0, sticky="ew", padx=(0, 8), pady=(0, 8))
+        search_row = tk.Frame(body, bg=APP_BG)
+        search_row.grid(row=1, column=0, sticky="ew", padx=(0, 8), pady=(0, 8))
+        search_row.columnconfigure(0, weight=1)
+        search = dark_entry(search_row, textvariable=search_var)
+        search.grid(row=0, column=0, sticky="ew")
+        custom_visibility = {"hidden": False}
+        custom_toggle_text = tk.StringVar(value="Hide Custom Players")
+
+        def toggle_custom_players():
+            custom_visibility["hidden"] = not custom_visibility["hidden"]
+            custom_toggle_text.set("Show Custom Players" if custom_visibility["hidden"] else "Hide Custom Players")
+            refresh_pool()
+
+        ttk.Button(search_row, textvariable=custom_toggle_text, command=toggle_custom_players).grid(row=0, column=1, padx=(8, 0))
         version_var = tk.StringVar(value="")
         version_box = ttk.Combobox(body, textvariable=version_var, values=[], state="readonly", style="Dark.TCombobox")
         version_box.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(0, 8))
@@ -5620,6 +5632,8 @@ def run_gui_app():
             players = []
             for player in all_pool_players():
                 source = getattr(player, "source_team", "All-Time")
+                if custom_visibility["hidden"] and source == "Custom Player":
+                    continue
                 if term and term not in player.name.lower() and term not in source.lower() and term not in player.position.lower():
                     continue
                 players.append(player)
