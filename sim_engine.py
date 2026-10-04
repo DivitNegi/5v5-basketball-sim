@@ -20742,13 +20742,18 @@ def fantasy_ovr(player: Player) -> int:
             raw += 3
 
     if player.position == "C" and raw > 93:
-        raw = 93 + (raw - 93) * 0.55
+        raw = 93 + (raw - 93) * 0.38
     elif player.position == "PG" and raw > 93:
         raw = 93 + (raw - 93) * 0.68
     elif (can_play_position(player, "SF") or can_play_position(player, "PF")) and raw > 93:
         raw = 93 + (raw - 93) * 0.55
 
     ovr = round(raw)
+    # A center who is maxed out at the rim, on the glass, and as a rim
+    # protector and shot blocker is a 99 no matter how the compression
+    # above treats his raw score.
+    if player.position == "C" and lpt >= 98.5 and idef >= 98.5 and bl >= 98.5 and rebound >= 98.5:
+        ovr = max(ovr, 99)
     return max(40, int(ovr))
 
 
