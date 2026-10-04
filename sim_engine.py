@@ -20720,6 +20720,12 @@ def fantasy_ovr(player: Player) -> int:
         elif pl >= 82 and handle >= 86 and creator_scoring_peak >= 90:
             raw += 0.5
 
+    # Drawing fouls is real value (free points plus opponents in foul
+    # trouble): centered on the typical player so only real foul-drawers
+    # gain and non-drawers lose a little.
+    foul_draw_value = player.foul_draw * 100
+    raw += max(-1.0, min(2.2, 0.05 * (foul_draw_value - 55)))
+
     # Score-first guards (elite scoring at all three levels plus an elite
     # handle) were being marked down just for not being playmakers: the
     # creator bonuses above all require high playmaking, and clutchness is

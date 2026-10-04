@@ -1634,7 +1634,7 @@ def run_gui_app():
     for idx in range(8):
         ratings_card_stats_frame.columnconfigure(idx, weight=0, minsize=94)
     ratings_card_stat_vars = {}
-    ratings_card_stat_keys = ("3PT", "MID", "RIM", "DUNK", "FT", "PLAY", "HANDLE", "SPEED", "STL", "BLK", "OREB", "DREB", "PDEF", "IDEF", "CLUTCH", "IQ")
+    ratings_card_stat_keys = ("3PT", "MID", "RIM", "DUNK", "FT", "PLAY", "HANDLE", "SPEED", "STL", "BLK", "OREB", "DREB", "PDEF", "IDEF", "CLUTCH", "IQ", "DRAW")
     for idx, key in enumerate(ratings_card_stat_keys):
         box = tk.Frame(ratings_card_stats_frame, bg="#00030d")
         box.grid(row=idx // 8, column=idx % 8, sticky="w", padx=2, pady=(0, 6))
@@ -4306,6 +4306,7 @@ def run_gui_app():
                 "IDEF": pct(effective_rating(player.interior_def, player, team, opponent, period, period_time, "interior_def")),
                 "CLUTCH": pct(player.clutchness),
                 "IQ": pct(player.shot_iq),
+                "DRAW": pct(effective_rating(player.foul_draw, player, team, opponent, period, period_time)),
             }
             drivers = [(name, value) for name, value in components.items() if abs(value) >= 0.004]
             heat_labels = {"three": "3PT", "mid": "MID", "rim": "RIM", "dunk": "DUNK", "perimeter_def": "PDEF", "interior_def": "IDEF", "steal": "STL", "block": "BLK"}
@@ -4330,6 +4331,7 @@ def run_gui_app():
                 "OREB": pct(player.oreb), "DREB": pct(player.dreb),
                 "PDEF": pct(player.perimeter_def), "IDEF": pct(player.interior_def),
                 "CLUTCH": pct(player.clutchness), "IQ": pct(player.shot_iq),
+                "DRAW": pct(player.foul_draw),
             }
             ratings_card_note_var.set("Base ratings shown -- start a game with this player to see them shift live.")
         for key, var in ratings_card_stat_vars.items():
