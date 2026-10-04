@@ -9296,7 +9296,11 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     # a smaller clutch-scaled bonus keeps the "clutch players feel it more"
     # effect while making sure home court is always a real, visible factor.
     home_or_away_scale = 0.018 + clutch_affinity * 0.010
-    home_boost = home_or_away_scale if getattr(team, "home_team", False) else -home_or_away_scale
+    if getattr(team, "is_1v1", False):
+        # No crowd or travel in a 1-on-1: neither home nor away applies.
+        home_boost = 0.0
+    else:
+        home_boost = home_or_away_scale if getattr(team, "home_team", False) else -home_or_away_scale
 
     if superstar:
         fatigue_drag *= 0.30
@@ -19559,6 +19563,8 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
     """
     team_a = Team(player_a.name, [player_a])
     team_b = Team(player_b.name, [player_b])
+    team_a.is_1v1 = True
+    team_b.is_1v1 = True
     team_a.init_lineup()
     team_b.init_lineup()
     enable_keyboard_controls(team_a, team_b)
