@@ -20712,6 +20712,16 @@ def fantasy_ovr(player: Player) -> int:
         elif pl >= 82 and handle >= 86 and creator_scoring_peak >= 90:
             raw += 0.5
 
+    # Score-first guards (elite scoring at all three levels plus an elite
+    # handle) were being marked down just for not being playmakers: the
+    # creator bonuses above all require high playmaking, and clutchness is
+    # worth 6-8% of the guard formulas. Give them the credit a scoring
+    # lead guard actually deserves.
+    if player.position in ("PG", "SG"):
+        score_first_average = (tpt + mpt + lpt) / 3
+        if score_first_average >= 90 and handle >= 90 and pl < 86:
+            raw += min(4.5, (score_first_average - 88) * 0.5)
+
     if player.position == "C" and raw > 93:
         raw = 93 + (raw - 93) * 0.38
     elif player.position == "PG" and raw > 93:
