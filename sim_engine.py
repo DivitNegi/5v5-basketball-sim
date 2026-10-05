@@ -8755,8 +8755,8 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 Utah Jazz":
         target_ranges = {
             "Jaren Jackson Jr.": (26, 31), "Lauri Markkanen": (28, 33),
-            "Keyonte George": (22, 28), "Isaiah Collier": (18, 24),
-            "Brice Sensabaugh": (14, 20), "Darryn Peterson": (14, 20),
+            "Keyonte George": (22, 28), "Darryn Peterson": (24, 30),
+            "Brice Sensabaugh": (14, 20), "Isaiah Collier": (14, 20),
             "Ace Bailey": (14, 20), "Kyle Filipowski": (14, 20),
             "Jusuf Nurkic": (12, 18), "Jaxson Hayes": (10, 16),
         }
