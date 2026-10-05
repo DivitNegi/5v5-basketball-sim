@@ -19085,7 +19085,15 @@ def simulate_possession(off: Team, dff: Team,
 
 
     # BLOCK CHECK
-    if random.random() < block_prob(defender, shot_type, shooter):
+    main_block_chance = block_prob(defender, shot_type, shooter)
+    if shot_type in ("rim", "dunk") and (play_context == "handle_combo_pass" or pnr_result == "handle_combo_pass"):
+        # The drive already pulled the rim protector out of position and
+        # dropped it off for the finish -- that is an open rim look, not a
+        # contested one. Only a genuinely elite shot-blocker / rim anchor
+        # still has a real chance to recover and reject it.
+        elite_rim_defender = max(defender.block, defender.interior_def) >= 0.90
+        main_block_chance *= 0.55 if elite_rim_defender else 0.10
+    if random.random() < main_block_chance:
         final_quality_mult = getattr(shooter, "shot_quality_mult", quality_mult)
         clear_shot_temp_bonuses(shooter)
         print(block_voice_line(defender, shooter, shot_type))
