@@ -8063,6 +8063,12 @@ def rotation_star_players(team: Team) -> List[Player]:
     # isn't a true iron-man closer like LeBron -- giving him the same
     # near-impossible-to-rest treatment as a star pushed him well past his
     # own target_minutes every game. Only LeBron gets the star exemption here.
+    if team.name == "2027 Golden State Warriors":
+        # The generic overall_rating ranks Curry ~5th on this roster (his
+        # value is shooting-gravity, not box-score formula weight), which
+        # left him with ordinary-starter rest rules instead of star-level
+        # minutes. The Warriors' stars are Curry and Butler.
+        return [p for p in ranked if p.name in ("Stephen Curry", "Jimmy Butler")]
     star_count = 1 if team.name == "2026 Los Angeles Lakers" else 2
     stars = ranked[:star_count]
     required_names = set(mandatory_closers(team))
@@ -8572,9 +8578,9 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Golden State Warriors":
         target_ranges = {
-            "Stephen Curry": (32, 36), "Jimmy Butler": (28, 33),
+            "Stephen Curry": (42, 44), "Jimmy Butler": (28, 33),
             "Kristaps Porzingis": (24, 29), "Draymond Green": (26, 31),
-            "Brandin Podziemski": (22, 28), "Gui Santos": (14, 20),
+            "Brandin Podziemski": (18, 24), "Gui Santos": (14, 20),
             "Al Horford": (16, 22), "De'Anthony Melton": (14, 20),
             "Moses Moody": (16, 22), "Brandon Williams": (8, 14),
         }
