@@ -8331,16 +8331,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Dallas Mavericks":
         target_ranges = {
-            "Kyrie Irving": (36, 40),
-            "P.J. Washington": (31, 35),
-            "Marcus Sasser": (20, 25),
-            "Daniel Gafford": (22, 26),
-            "Santi Aldama": (24, 29),
-            "Cooper Flagg": (34, 38),
-            "Zaccharie Risacher": (22, 28),
-            "Naji Marshall": (22, 28),
-            "Max Christie": (28, 33),
-            "Dereck Lively II": (18, 24),
+            "Kyrie Irving": (36, 40), "Max Christie": (28, 33),
+            "Cooper Flagg": (34, 38), "P.J. Washington": (31, 35),
+            "Daniel Gafford": (24, 29), "Naji Marshall": (22, 28),
+            "Santi Aldama": (22, 28), "Zaccharie Risacher": (22, 26),
+            "Marcus Sasser": (20, 25), "Dereck Lively II": (18, 24),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8390,17 +8385,12 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Boston Celtics":
         target_ranges = {
-            "Derrick White": (33, 37),
-            "Payton Pritchard": (30, 35),
-            "Jayson Tatum": (38, 42),
-            "Paul George": (34, 38),
-            "Mitchell Robinson": (26, 32),
-            "Neemias Queta": (12, 18),
-            "Sam Hauser": (18, 24),
-            "Baylor Scheierman": (14, 20),
-            "Jordan Walsh": (10, 16),
-            "Hugo Gonzalez": (8, 14),
-            "Ron Harper Jr.": (6, 12),
+            "Derrick White": (34, 38), "Baylor Scheierman": (30, 35),
+            "Jayson Tatum": (38, 42), "Neemias Queta": (26, 32),
+            "Mitchell Robinson": (33, 37), "Payton Pritchard": (14, 20),
+            "Paul George": (18, 24), "Jordan Walsh": (10, 16),
+            "Ron Harper Jr.": (6, 12), "Hugo Gonzalez": (8, 14),
+            "Sam Hauser": (12, 18),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8427,16 +8417,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Denver Nuggets":
         target_ranges = {
-            "Nikola Jokic": (36, 40),
-            "Jamal Murray": (32, 36),
-            "Aaron Gordon": (28, 33),
-            "DeMar DeRozan": (26, 31),
-            "Cameron Johnson": (22, 28),
-            "Christian Braun": (24, 29),
-            "Marvin Bagley III": (16, 22),
-            "Julian Strawther": (16, 22),
-            "Tyus Jones": (14, 20),
-            "Cam Whitmore": (10, 16),
+            "Jamal Murray": (32, 36), "Christian Braun": (26, 31),
+            "Cameron Johnson": (24, 29), "Aaron Gordon": (28, 33),
+            "Nikola Jokic": (36, 40), "DeMar DeRozan": (22, 28),
+            "Marvin Bagley III": (16, 22), "Julian Strawther": (16, 22),
+            "Tyus Jones": (14, 20), "Cam Whitmore": (10, 16),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8445,16 +8430,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Philadelphia 76ers":
         target_ranges = {
-            "Tyrese Maxey": (36, 40),
-            "VJ Edgecombe": (28, 34),
-            "Jaylen Brown": (36, 40),
-            "LeBron James": (34, 38),
-            "Joel Embiid": (36, 40),
-            "Dean Wade": (10, 16),
-            "Anfernee Simons": (20, 26),
-            "Kentavious Caldwell-Pope": (27, 32),
-            "Ariel Hukporti": (10, 16),
-            "Justin Edwards": (14, 20),
+            "Tyrese Maxey": (36, 40), "Anfernee Simons": (28, 34),
+            "Jaylen Brown": (36, 40), "LeBron James": (34, 38),
+            "Joel Embiid": (36, 40), "VJ Edgecombe": (27, 32),
+            "Dean Wade": (10, 16), "Ariel Hukporti": (10, 16),
+            "Kentavious Caldwell-Pope": (20, 26), "Justin Edwards": (14, 20),
             "Adem Bona": (8, 14),
         }
         for p in team.roster:
@@ -8482,16 +8462,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Minnesota Timberwolves":
         target_ranges = {
-            "LaMelo Ball": (37, 41),
-            "Anthony Edwards": (38, 42),
-            "Ayo Dosunmu": (30, 34),
-            "Jonathan Kuminga": (24, 30),
-            "Jaden McDaniels": (32, 36),
-            "Rudy Gobert": (33, 37),
-            "Josh Green": (20, 26),
-            "Mike Conley": (18, 24),
-            "Terrence Shannon Jr.": (16, 22),
-            "Zyon Pullin": (6, 12),
+            "LaMelo Ball": (37, 41), "Anthony Edwards": (38, 42),
+            "Jonathan Kuminga": (30, 34), "Jaden McDaniels": (32, 36),
+            "Rudy Gobert": (33, 37), "Ayo Dosunmu": (24, 30),
+            "Josh Green": (20, 26), "Mike Conley": (18, 24),
+            "Terrence Shannon Jr.": (16, 22), "Zyon Pullin": (6, 12),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8500,9 +8475,9 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Atlanta Hawks":
         target_ranges = {
-            "Jalen Johnson": (34, 38), "Nickeil Alexander-Walker": (28, 33),
-            "C.J. McCollum": (30, 35), "Dyson Daniels": (30, 34),
-            "Onyeka Okongwu": (24, 30), "Luguentz Dort": (24, 29),
+            "C.J. McCollum": (30, 35), "Luguentz Dort": (24, 30),
+            "Dyson Daniels": (30, 34), "Jalen Johnson": (34, 38),
+            "Onyeka Okongwu": (28, 33), "Nickeil Alexander-Walker": (24, 29),
             "Aaron Wiggins": (18, 24), "Jock Landale": (14, 20),
             "Buddy Hield": (16, 22), "Kingston Flemings": (8, 14),
         }
@@ -8513,11 +8488,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Brooklyn Nets":
         target_ranges = {
+            "Mikel Brown Jr.": (18, 24), "Egor Demin": (20, 26),
             "Michael Porter Jr.": (32, 36), "Julius Randle": (32, 36),
-            "Keon Ellis": (20, 26), "Noah Clowney": (20, 26),
-            "Nolan Traore": (18, 24), "Egor Demin": (18, 24),
-            "Day'Ron Sharpe": (16, 22), "Danny Wolf": (14, 20),
-            "Terance Mann": (16, 22), "Mikel Brown Jr.": (8, 14),
+            "Day'Ron Sharpe": (20, 26), "Keon Ellis": (18, 24),
+            "Noah Clowney": (16, 22), "Nolan Traore": (16, 22),
+            "Danny Wolf": (8, 14), "Terance Mann": (14, 20),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8526,11 +8501,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Charlotte Hornets":
         target_ranges = {
-            "Brandon Miller": (34, 38), "Kon Knueppel": (28, 33),
-            "Naz Reid": (28, 33), "Coby White": (26, 31),
-            "Grayson Allen": (24, 29), "Moussa Diabate": (18, 24),
-            "Ryan Kalkbrenner": (16, 22), "Dennis Schroder": (22, 28),
-            "Royce O'Neale": (18, 24), "Dorian Finney-Smith": (14, 20),
+            "Coby White": (28, 33), "Grayson Allen": (26, 31),
+            "Brandon Miller": (34, 38), "Royce O'Neale": (24, 29),
+            "Naz Reid": (28, 33), "Kon Knueppel": (22, 28),
+            "Moussa Diabate": (18, 24), "Ryan Kalkbrenner": (16, 22),
+            "Dennis Schroder": (18, 24), "Dorian Finney-Smith": (14, 20),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8539,10 +8514,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Chicago Bulls":
         target_ranges = {
-            "Norman Powell": (30, 35), "Josh Giddey": (30, 35),
-            "Matas Buzelis": (28, 33), "Nicolas Claxton": (24, 29),
-            "Tre Jones": (24, 29), "Caleb Wilson": (16, 22),
-            "Jalen Smith": (16, 22), "Isaac Okoro": (20, 26),
+            "Josh Giddey": (30, 35), "Norman Powell": (30, 35),
+            "Isaac Okoro": (24, 29), "Caleb Wilson": (24, 29),
+            "Nicolas Claxton": (28, 33), "Matas Buzelis": (20, 26),
+            "Tre Jones": (16, 22), "Jalen Smith": (16, 22),
             "Zach Collins": (16, 22), "Patrick Williams": (14, 20),
         }
         for p in team.roster:
@@ -8565,9 +8540,9 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Detroit Pistons":
         target_ranges = {
-            "Cade Cunningham": (34, 38), "Ausar Thompson": (28, 33),
-            "Jalen Duren": (26, 31), "John Collins": (24, 29),
-            "Daniss Jenkins": (18, 24), "Duncan Robinson": (18, 24),
+            "Cade Cunningham": (34, 38), "Duncan Robinson": (18, 24),
+            "Ausar Thompson": (28, 33), "John Collins": (24, 29),
+            "Jalen Duren": (26, 31), "Daniss Jenkins": (18, 24),
             "Isaiah Joe": (18, 24), "Paul Reed": (14, 20),
             "Ron Holland": (14, 20), "Kevin Huerter": (14, 20),
         }
@@ -8578,11 +8553,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Golden State Warriors":
         target_ranges = {
-            "Stephen Curry": (42, 44), "Jimmy Butler": (28, 33),
-            "Kristaps Porzingis": (24, 29), "Draymond Green": (26, 31),
-            "Brandin Podziemski": (18, 24), "Gui Santos": (14, 20),
+            "Stephen Curry": (42, 44), "Brandin Podziemski": (24, 29),
+            "Gui Santos": (18, 24), "Draymond Green": (28, 33),
+            "Kristaps Porzingis": (26, 31), "Jimmy Butler": (16, 22),
             "Al Horford": (16, 22), "De'Anthony Melton": (14, 20),
-            "Moses Moody": (16, 22), "Brandon Williams": (8, 14),
+            "Moses Moody": (14, 20), "Brandon Williams": (8, 14),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8591,10 +8566,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Houston Rockets":
         target_ranges = {
-            "Kevin Durant": (32, 36), "Alperen Sengun": (28, 33),
-            "Amen Thompson": (26, 31), "Jabari Smith Jr.": (22, 28),
-            "Reed Sheppard": (18, 24), "Fred VanVleet": (22, 28),
-            "Marcus Smart": (18, 24), "Tari Eason": (20, 26),
+            "Fred VanVleet": (26, 31), "Marcus Smart": (22, 28),
+            "Kevin Durant": (32, 36), "Jabari Smith Jr.": (22, 28),
+            "Alperen Sengun": (28, 33), "Amen Thompson": (20, 26),
+            "Reed Sheppard": (18, 24), "Tari Eason": (18, 24),
             "Steven Adams": (12, 18), "Clint Capela": (14, 20),
         }
         for p in team.roster:
@@ -8604,10 +8579,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Indiana Pacers":
         target_ranges = {
-            "Tyrese Haliburton": (32, 36), "Pascal Siakam": (30, 34),
-            "Ivica Zubac": (24, 29), "Andrew Nembhard": (24, 29),
-            "T.J. McConnell": (18, 24), "Kelly Oubre Jr.": (18, 24),
-            "Aaron Nesmith": (20, 26), "Obi Toppin": (16, 22),
+            "Tyrese Haliburton": (32, 36), "Andrew Nembhard": (24, 29),
+            "Aaron Nesmith": (20, 26), "Pascal Siakam": (30, 34),
+            "Ivica Zubac": (24, 29), "T.J. McConnell": (18, 24),
+            "Kelly Oubre Jr.": (18, 24), "Obi Toppin": (16, 22),
             "Jarace Walker": (16, 22), "Jay Huff": (10, 16),
         }
         for p in team.roster:
@@ -8617,10 +8592,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Los Angeles Clippers":
         target_ranges = {
-            "Darius Garland": (30, 34), "Brandon Ingram": (30, 34),
-            "Rui Hachimura": (22, 28), "Max Strus": (18, 24),
-            "Derrick Jones Jr.": (18, 24), "Brook Lopez": (16, 22),
-            "Bradley Beal": (18, 24), "Keaton Wagler": (8, 14),
+            "Darius Garland": (30, 34), "Bradley Beal": (22, 28),
+            "Derrick Jones Jr.": (18, 24), "Rui Hachimura": (30, 34),
+            "Brook Lopez": (18, 24), "Brandon Ingram": (18, 24),
+            "Max Strus": (16, 22), "Keaton Wagler": (8, 14),
             "Kris Dunn": (14, 20), "Isaiah Jackson": (10, 16),
         }
         for p in team.roster:
@@ -8630,11 +8605,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Memphis Grizzlies":
         target_ranges = {
-            "Ty Jerome": (22, 28), "Zach Edey": (18, 24),
-            "Cedric Coward": (18, 24), "Jerami Grant": (22, 28),
-            "Cameron Boozer": (18, 24), "Jaylen Wells": (18, 24),
-            "Isaiah Stewart": (14, 20), "GG Jackson": (14, 20),
-            "Cam Spencer": (12, 18), "Scotty Pippen Jr.": (14, 20),
+            "Ty Jerome": (22, 28), "Cam Spencer": (18, 24),
+            "Jaylen Wells": (22, 28), "GG Jackson": (18, 24),
+            "Zach Edey": (18, 24), "Cedric Coward": (14, 20),
+            "Jerami Grant": (18, 24), "Cameron Boozer": (14, 20),
+            "Isaiah Stewart": (14, 20), "Scotty Pippen Jr.": (12, 18),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8643,10 +8618,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Milwaukee Bucks":
         target_ranges = {
-            "Tyler Herro": (32, 36), "Ryan Rollins": (22, 28),
-            "Kevin Porter Jr.": (18, 24), "Myles Turner": (24, 29),
-            "Kel'el Ware": (18, 24), "Caris LeVert": (18, 24),
-            "Jaime Jaquez Jr.": (16, 22), "Kyle Kuzma": (16, 22),
+            "Ryan Rollins": (22, 28), "Tyler Herro": (32, 36),
+            "Jaime Jaquez Jr.": (18, 24), "Kyle Kuzma": (18, 24),
+            "Myles Turner": (24, 29), "Kevin Porter Jr.": (18, 24),
+            "Kel'el Ware": (16, 22), "Caris LeVert": (16, 22),
             "Ousmane Dieng": (12, 18), "A.J. Green": (10, 16),
         }
         for p in team.roster:
@@ -8656,11 +8631,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 New Orleans Pelicans":
         target_ranges = {
-            "Zion Williamson": (28, 33), "Trey Murphy III": (26, 31),
-            "Dejounte Murray": (24, 29), "Saddiq Bey": (18, 24),
-            "Derik Queen": (16, 22), "Herbert Jones": (24, 29),
-            "Jeremiah Fears": (16, 22), "Bennedict Mathurin": (16, 22),
-            "Yves Missi": (14, 20), "Jordan Poole": (12, 18),
+            "Dejounte Murray": (24, 29), "Jordan Poole": (18, 24),
+            "Trey Murphy III": (26, 31), "Zion Williamson": (28, 33),
+            "Yves Missi": (24, 29), "Saddiq Bey": (16, 22),
+            "Derik Queen": (16, 22), "Herbert Jones": (16, 22),
+            "Jeremiah Fears": (14, 20), "Bennedict Mathurin": (12, 18),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8682,10 +8657,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Oklahoma City Thunder":
         target_ranges = {
-            "Shai Gilgeous-Alexander": (34, 38), "Chet Holmgren": (28, 33),
-            "Jalen Williams": (28, 33), "Isaiah Hartenstein": (20, 26),
-            "Ajay Mitchell": (18, 24), "Alex Caruso": (18, 24),
-            "Cason Wallace": (18, 24), "Jared McCain": (14, 20),
+            "Shai G-Alexander": (34, 38), "Jared McCain": (18, 24),
+            "Jalen Williams": (28, 33), "Chet Holmgren": (28, 33),
+            "Isaiah Hartenstein": (20, 26), "Alex Caruso": (18, 24),
+            "Ajay Mitchell": (18, 24), "Cason Wallace": (14, 20),
             "Jaylin Williams": (14, 20), "Kenrich Williams": (10, 16),
         }
         for p in team.roster:
@@ -8695,9 +8670,9 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Orlando Magic":
         target_ranges = {
-            "Paolo Banchero": (32, 36), "Franz Wagner": (28, 33),
-            "Desmond Bane": (26, 31), "Jalen Suggs": (20, 26),
-            "Anthony Black": (18, 24), "Wendell Carter Jr.": (18, 24),
+            "Jalen Suggs": (20, 26), "Desmond Bane": (26, 31),
+            "Franz Wagner": (28, 33), "Paolo Banchero": (32, 36),
+            "Wendell Carter Jr.": (18, 24), "Anthony Black": (18, 24),
             "Nikola Vucevic": (16, 22), "Tristan da Silva": (14, 20),
             "Goga Bitadze": (10, 16), "Jevon Carter": (10, 16),
         }
@@ -8708,10 +8683,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Phoenix Suns":
         target_ranges = {
-            "Devin Booker": (32, 36), "Dillon Brooks": (24, 29),
-            "Jalen Green": (20, 26), "Miles Bridges": (20, 26),
-            "Collin Gillespie": (14, 20), "Mark Williams": (16, 22),
-            "Luke Kennard": (14, 20), "Oso Ighodaro": (12, 18),
+            "Devin Booker": (32, 36), "Jalen Green": (20, 26),
+            "Dillon Brooks": (24, 29), "Miles Bridges": (20, 26),
+            "Oso Ighodaro": (16, 22), "Collin Gillespie": (14, 20),
+            "Mark Williams": (14, 20), "Luke Kennard": (12, 18),
             "Pat Spencer": (10, 16), "Jordan Goodwin": (10, 16),
         }
         for p in team.roster:
@@ -8734,11 +8709,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Sacramento Kings":
         target_ranges = {
-            "Domantas Sabonis": (28, 33), "Zach LaVine": (26, 31),
-            "Malik Monk": (20, 26), "Keegan Murray": (20, 26),
-            "Maxime Raynaud": (16, 22), "De'Andre Hunter": (18, 24),
-            "Precious Achiuwa": (14, 20), "Nique Clifford": (12, 18),
-            "Darius Acuff Jr.": (10, 16), "Ben Simmons": (10, 16),
+            "Darius Acuff Jr.": (18, 24), "Zach LaVine": (26, 31),
+            "De'Andre Hunter": (20, 26), "Keegan Murray": (20, 26),
+            "Domantas Sabonis": (28, 33), "Malik Monk": (16, 22),
+            "Maxime Raynaud": (14, 20), "Precious Achiuwa": (12, 18),
+            "Nique Clifford": (10, 16), "Ben Simmons": (10, 16),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8747,10 +8722,10 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 San Antonio Spurs":
         target_ranges = {
-            "Victor Wembanyama": (32, 36), "Stephon Castle": (26, 31),
-            "Dylan Harper": (22, 28), "De'Aaron Fox": (24, 29),
-            "Tobias Harris": (18, 24), "Devin Vassell": (18, 24),
-            "Keldon Johnson": (14, 20), "Julian Champagnie": (12, 18),
+            "De'Aaron Fox": (24, 29), "Stephon Castle": (26, 31),
+            "Devin Vassell": (22, 28), "Julian Champagnie": (18, 24),
+            "Victor Wembanyama": (32, 36), "Dylan Harper": (18, 24),
+            "Tobias Harris": (14, 20), "Keldon Johnson": (12, 18),
             "Harrison Barnes": (12, 18), "Luke Kornet": (8, 14),
         }
         for p in team.roster:
@@ -8760,11 +8735,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Utah Jazz":
         target_ranges = {
-            "Jaren Jackson Jr.": (26, 31), "Lauri Markkanen": (28, 33),
             "Keyonte George": (22, 28), "Darryn Peterson": (24, 30),
-            "Brice Sensabaugh": (14, 20), "Isaiah Collier": (14, 20),
-            "Ace Bailey": (14, 20), "Kyle Filipowski": (14, 20),
-            "Jusuf Nurkic": (12, 18), "Jaxson Hayes": (10, 16),
+            "Lauri Markkanen": (28, 33), "Jaren Jackson Jr.": (26, 31),
+            "Jusuf Nurkic": (14, 20), "Brice Sensabaugh": (14, 20),
+            "Isaiah Collier": (14, 20), "Ace Bailey": (14, 20),
+            "Kyle Filipowski": (12, 18), "Jaxson Hayes": (10, 16),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
