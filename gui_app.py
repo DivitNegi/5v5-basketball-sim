@@ -6837,6 +6837,7 @@ def run_gui_app():
             status_var.set("Pick two different teams.")
             return
         clear_log()
+        season_view["quiet"] = mode in ("2027 season (82 games)", "Season mode")
         running["active"] = True
         pause_button.configure(text="Pause")
         status_var.set("Running...")
@@ -6969,6 +6970,32 @@ def run_gui_app():
             update_extra_gui_tabs()
             set_adjustments_tab_visibility()
 
+    # While a whole season is being simmed there is no live game to show, so
+    # the box score and every tab are covered with a plain notice instead of
+    # flashing the stats of whichever silent game happens to be running.
+    season_view = {"quiet": False, "shown": False}
+    season_notice_tabs = tk.Label(
+        series_tabs, text="Simulating season...", bg=APP_BG, fg=TEXT,
+        font=("Segoe UI", 20, "bold"), anchor="center",
+    )
+    season_notice_box = tk.Label(
+        on_court_frame, text="Simulating season...", bg=APP_BG, fg=TEXT,
+        font=("Segoe UI", 20, "bold"), anchor="center",
+    )
+
+    def sync_season_notice():
+        want = bool(season_view["quiet"] and running["active"])
+        if want and not season_view["shown"]:
+            season_notice_tabs.place(x=0, y=40, relwidth=1.0, relheight=1.0, height=-40)
+            season_notice_tabs.lift()
+            season_notice_box.place(x=0, y=0, relwidth=1.0, relheight=1.0)
+            season_notice_box.lift()
+            season_view["shown"] = True
+        elif not want and season_view["shown"]:
+            season_notice_tabs.place_forget()
+            season_notice_box.place_forget()
+            season_view["shown"] = False
+
     def poll_queues():
         # A single unhandled exception anywhere below used to stop this
         # function from ever rescheduling itself (root.after was the very
@@ -6976,6 +7003,7 @@ def run_gui_app():
         # box score for the rest of the session. Guarantee the reschedule no
         # matter what happens above it.
         try:
+            sync_season_notice()
             lines_processed = 0
             try:
                 while lines_processed < 80:
@@ -7007,7 +7035,7 @@ def run_gui_app():
             elif not running["active"] and str(pause_button.cget("text")) != "Pause":
                 pause_button.configure(text="Pause")
             now = time.monotonic()
-            if running["active"] and not sim_engine.SIM_PAUSED:
+            if running["active"] and not sim_engine.SIM_PAUSED and not season_view["quiet"]:
                 gui_refresh_state["finish_refreshed"] = False
                 if gui_refresh_state["live_dirty"] and now - gui_refresh_state["live_at"] >= 0.15:
                     refresh_live_widgets(include_heavy=False)
