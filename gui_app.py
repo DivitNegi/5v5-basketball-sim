@@ -1241,7 +1241,8 @@ def run_gui_app():
     series_avg_quarter_dropdown = ttk.Combobox(series_avg_top, textvariable=series_avg_quarter_var, values=("All", "Q1", "Q2", "Q3", "Q4", "OT"), state="readonly", width=10)
     series_avg_quarter_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 16))
     ttk.Label(series_avg_top, text="Rank by").grid(row=0, column=4, sticky="w", padx=(0, 8))
-    AVG_RANK_OPTIONS = ("Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-")
+    AVG_RANK_OPTIONS = ("Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-",
+                        "AST/TOV", "STL/TOV", "PTS/48", "REB/48", "AST/48", "STL/48", "BLK/48")
     series_avg_rank_var = tk.StringVar(value="Team order")
     series_avg_rank_dropdown = ttk.Combobox(series_avg_top, textvariable=series_avg_rank_var, values=AVG_RANK_OPTIONS, state="readonly", width=12)
     series_avg_rank_dropdown.grid(row=0, column=5, sticky="w")
@@ -2415,6 +2416,12 @@ def run_gui_app():
         "Off Impact": 22, "Def Impact": 23, "Total Impact": 24, "+/-": 25, "Double Teams": 26,
     }
 
+    ADVANCED_RATE_SORTS = {
+        "PER", "TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "AST%", "STL%", "BLK%", "TOV%", "USG%",
+        "BPM", "Off Impact", "Def Impact", "Total Impact",
+    }
+    NBA_RANK_MINIMUM_MINUTES = 2000
+
     def advanced_sort_key(row: Dict) -> float:
         sort_mode = advanced_sort_var.get()
         index = ADVANCED_SORT_INDEX.get(sort_mode)
@@ -2498,6 +2505,7 @@ def run_gui_app():
             if advanced_flat_var.get():
                 for row in rows:
                     row["team_display"] = team_display
+                    row["team_games"] = team.get("games", 0)
                 flat_advanced_rows.extend(rows)
                 continue
             for row in sorted(rows, key=advanced_sort_key, reverse=True):
@@ -2537,6 +2545,18 @@ def run_gui_app():
                 )
 
         if advanced_flat_var.get():
+            if advanced_sort_var.get() in ADVANCED_RATE_SORTS:
+                # Rate stats (per-minute / per-possession) carry the 2,000-minute
+                # leaderboard minimum, scaled to games played.
+                before_count = len(flat_advanced_rows)
+                flat_advanced_rows = [
+                    row for row in flat_advanced_rows
+                    if row["minutes"] / 60 >= NBA_RANK_MINIMUM_MINUTES * min(1.0, max(1, row.get("team_games", 0)) / NBA_MINIMUM_GAMES)
+                ]
+                advanced_tree.insert(
+                    "", "end",
+                    values=("", f"Qualifiers only: {NBA_RANK_MINIMUM_MINUTES} min (scaled to games played). {before_count - len(flat_advanced_rows)} below the minimum.") + ("",) * 22,
+                )
             for rank, row in enumerate(sorted(flat_advanced_rows, key=advanced_sort_key, reverse=True), start=1):
                 adv = row["adv"]
                 points_created = row["points_created"]
@@ -2954,7 +2974,50 @@ def run_gui_app():
         "FT%": lambda s, gp: stat_pct_value(s, "ftm", "fta"),
         "TS%": lambda s, gp: series_ts_value(s),
         "+/-": lambda s, gp: s.get("plus_minus", 0) / gp,
+        "AST/TOV": lambda s, gp: s.get("ast", 0) / max(1, s.get("tov", 0)),
+        "STL/TOV": lambda s, gp: s.get("stl", 0) / max(1, s.get("tov", 0)),
+        "PTS/48": lambda s, gp: per_48_value(s, "pts"),
+        "REB/48": lambda s, gp: per_48_value(s, "reb"),
+        "AST/48": lambda s, gp: per_48_value(s, "ast"),
+        "STL/48": lambda s, gp: per_48_value(s, "stl"),
+        "BLK/48": lambda s, gp: per_48_value(s, "blk"),
     }
+
+    # NBA leaderboard minimums for an 82-game season. They scale down with the
+    # team's games played so series / playoff leaderboards still list players.
+    NBA_RANK_MINIMUMS = {
+        "FG%": ("fgm", 300, "field goals made"),
+        "FT%": ("ftm", 125, "free throws made"),
+        "3P%": ("tpm", 82, "three-pointers made"),
+        "AST/TOV": ("ast", 200, "assists"),
+        "STL/TOV": ("stl", 82, "steals"),
+        "PTS/48": ("minutes", 2000, "minutes"),
+        "REB/48": ("minutes", 2000, "minutes"),
+        "AST/48": ("minutes", 2000, "minutes"),
+        "STL/48": ("minutes", 2000, "minutes"),
+        "BLK/48": ("minutes", 2000, "minutes"),
+    }
+    NBA_MINIMUM_GAMES = 82
+
+    def per_48_value(stats: Dict, key: str) -> float:
+        minutes = stats.get("minutes", 0) / 60
+        return 0.0 if minutes <= 0 else stats.get(key, 0) * 48 / minutes
+
+    def rank_minimum_for(rank_by: str, team_games: int):
+        """(stat_key, required_amount, label) for a ranking, scaled to games played, or None."""
+        rule = NBA_RANK_MINIMUMS.get(rank_by)
+        if not rule:
+            return None
+        key, base, label = rule
+        return key, base * min(1.0, max(1, team_games) / NBA_MINIMUM_GAMES), label
+
+    def meets_rank_minimum(stats: Dict, rank_by: str, team_games: int) -> bool:
+        rule = rank_minimum_for(rank_by, team_games)
+        if rule is None:
+            return True
+        key, needed, _label = rule
+        have = stats.get("minutes", 0) / 60 if key == "minutes" else stats.get(key, 0)
+        return have >= needed
 
     def average_period_stats(stats: Dict, period: int | None) -> Dict:
         if period is None:
@@ -2970,13 +3033,24 @@ def run_gui_app():
     def insert_ranked_average_rows(tree, series_totals: Dict, teams_in_view: List[str], period: int | None, rank_by: str):
         value_of = AVG_RANK_VALUE[rank_by]
         entries = []
+        excluded = 0
         for team_name in teams_in_view:
-            for name, stats in (series_totals.get(team_name, {}) or {}).items():
+            team_players = series_totals.get(team_name, {}) or {}
+            team_games = max((s.get("games", 0) for s in team_players.values()), default=0)
+            for name, stats in team_players.items():
                 row_stats = average_period_stats(stats, period)
                 if row_stats:
+                    if period is None and not meets_rank_minimum(row_stats, rank_by, team_games):
+                        excluded += 1
+                        continue
                     gp = max(1, row_stats.get("games", 0))
                     entries.append((value_of(row_stats, gp), team_name, name, row_stats, gp))
         entries.sort(key=lambda e: e[0], reverse=True)
+        if period is None and rank_by in NBA_RANK_MINIMUMS:
+            all_games = max((s.get("games", 0) for t_players in series_totals.values() for s in (t_players or {}).values()), default=0)
+            _key, needed, label = rank_minimum_for(rank_by, all_games)
+            note = f"Qualifiers only: at least {needed:.0f} {label} (NBA minimum scaled to {all_games} games). {excluded} below the minimum."
+            tree.insert("", "end", values=("", note, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""))
         for rank, (_value, team_name, name, stats, gp) in enumerate(entries, start=1):
             tree.insert(
                 "",
