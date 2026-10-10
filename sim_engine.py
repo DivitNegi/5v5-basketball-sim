@@ -8113,6 +8113,10 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name == "Kentavious Caldwell-Pope" and team.name == "2027 Philadelphia 76ers":
         return True
+    if player.name == "DeMar DeRozan" and team.name == "2027 Denver Nuggets":
+        return True
+    if player.name in ("Mitchell Robinson", "Payton Pritchard") and team.name == "2027 Boston Celtics":
+        return True
     if player.name == "Mitchell Robinson" and team.name == "2026 New York Knicks":
         return True
     if player.name == "Miles McBride" and team.name == "2026 New York Knicks":
@@ -8270,6 +8274,8 @@ SEASON_STAR_MINUTES_CAP = None
 QUARTER_STARTER_SWAPS = {
     "2027 Dallas Mavericks": ("Dereck Lively II", "Daniel Gafford", (2, 3, 4)),
     "2027 New York Knicks": ("Karl-Anthony Towns", "Andre Drummond", (2, 4)),
+    "2027 Denver Nuggets": ("Christian Braun", "DeMar DeRozan", (2, 4)),
+    "2027 Boston Celtics": ("Baylor Scheierman", "Payton Pritchard", (2, 4)),
 }
 
 
@@ -8589,12 +8595,12 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Boston Celtics":
         target_ranges = {
-            "Derrick White": (34, 38), "Baylor Scheierman": (33, 37),
-            "Paul George": (26, 32), "Jayson Tatum": (38, 42),
-            "Neemias Queta": (30, 35), "Mitchell Robinson": (18, 24),
-            "Payton Pritchard": (14, 20), "Jordan Walsh": (10, 16),
-            "Ron Harper Jr.": (6, 12), "Hugo Gonzalez": (8, 14),
-            "Sam Hauser": (12, 18),
+            "Derrick White": (30, 34), "Baylor Scheierman": (20, 24),
+            "Paul George": (30, 34), "Jayson Tatum": (36, 40),
+            "Neemias Queta": (22, 26), "Mitchell Robinson": (22, 27),
+            "Payton Pritchard": (26, 30), "Jordan Walsh": (12, 18),
+            "Ron Harper Jr.": (4, 8), "Hugo Gonzalez": (6, 10),
+            "Sam Hauser": (10, 14),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8621,11 +8627,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Denver Nuggets":
         target_ranges = {
-            "Jamal Murray": (32, 36), "Christian Braun": (26, 31),
-            "Cameron Johnson": (24, 29), "Aaron Gordon": (28, 33),
-            "Nikola Jokic": (36, 40), "DeMar DeRozan": (22, 28),
-            "Marvin Bagley III": (16, 22), "Julian Strawther": (16, 22),
-            "Tyus Jones": (14, 20), "Cam Whitmore": (10, 16),
+            "Jamal Murray": (32, 36), "Christian Braun": (22, 26),
+            "Cameron Johnson": (20, 25), "Aaron Gordon": (28, 33),
+            "Nikola Jokic": (36, 40), "DeMar DeRozan": (30, 34),
+            "Marvin Bagley III": (14, 20), "Julian Strawther": (14, 20),
+            "Tyus Jones": (12, 18), "Cam Whitmore": (8, 14),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
