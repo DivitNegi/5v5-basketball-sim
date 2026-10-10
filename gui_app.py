@@ -1089,7 +1089,7 @@ def run_gui_app():
     shot_rank_stat_var = tk.StringVar(value="Made")
     shot_rank_stat_dropdown = ttk.Combobox(
         shot_defense_filter_frame, textvariable=shot_rank_stat_var,
-        values=("Made", "Attempted"), state="readonly", width=11,
+        values=("Made", "Attempted", "Percentage"), state="readonly", width=11,
     )
     shot_rank_stat_dropdown.grid(row=0, column=14, sticky="w")
     shot_columns = ("team", "player", "3p", "open3", "cont3", "mid", "openmid", "contmid", "rim", "openrim", "contrim", "post", "dunk", "cs", "iso", "putb", "open", "cont", "sq", "total")
@@ -2698,11 +2698,34 @@ def run_gui_app():
         shot_rank_choice = shot_rank_var.get()
         shot_rank_active = shot_rank_choice in SHOT_RANK_KEYS
 
+        shot_rank_pct = shot_rank_stat_var.get() == "Percentage"
+
         def shot_rank_value(diet: Dict) -> float:
             keys = SHOT_RANK_KEYS[shot_rank_choice]
-            if shot_rank_stat_var.get() == "Attempted":
-                return sum(diet.get(k, 0) for k in keys)
-            return sum(diet.get(f"{k}_made", 0) for k in keys)
+            attempted = sum(diet.get(k, 0) for k in keys)
+            made = sum(diet.get(f"{k}_made", 0) for k in keys)
+            if shot_rank_pct:
+                return 100.0 * made / attempted if attempted else 0.0
+            return attempted if shot_rank_stat_var.get() == "Attempted" else made
+
+        def shot_rank_qualifies(diet: Dict, team_games: int) -> bool:
+            # Percentage leaderboards use the NBA minimums scaled to games played:
+            # 82 made for 3P%, 300 made for total FG%, and a volume floor of
+            # attempts for the individual zones so 1-for-1 shooters do not top it.
+            if not shot_rank_pct:
+                return True
+            keys = SHOT_RANK_KEYS[shot_rank_choice]
+            attempted = sum(diet.get(k, 0) for k in keys)
+            made = sum(diet.get(f"{k}_made", 0) for k in keys)
+            scale = min(1.0, max(1, team_games) / 82)
+            if shot_rank_choice == "3P":
+                return made >= 82 * scale
+            if shot_rank_choice == "TOTAL":
+                return made >= 300 * scale
+            return attempted >= max(5.0, 100 * scale)
+
+        def shot_rank_note(excluded: int) -> str:
+            return f"Percentage: qualifiers only (NBA minimums scaled to games played). {excluded} below the minimum."
 
         def shot_row_values(team_display, name, diet):
             return (
@@ -2730,11 +2753,18 @@ def run_gui_app():
 
         if shot_rank_active:
             ranked_shots = []
+            excluded_shots = 0
             for team_name, players in shot_totals.items():
+                team_games = max((s.get("games", 0) for s in players.values()), default=0)
                 for name, stats in players.items():
                     diet = stats.get("shot_diet", {}) or {}
+                    if not shot_rank_qualifies(diet, team_games):
+                        excluded_shots += 1
+                        continue
                     ranked_shots.append((shot_rank_value(diet), team_name, name, diet))
             ranked_shots.sort(key=lambda item: item[0], reverse=True)
+            if shot_rank_pct and shot_totals:
+                shot_tree.insert("", "end", values=("", shot_rank_note(excluded_shots)) + ("",) * 18)
             for rank, (_value, team_name, name, diet) in enumerate(ranked_shots, start=1):
                 shot_tree.insert(
                     "", "end",
@@ -2784,11 +2814,19 @@ def run_gui_app():
 
         if shot_rank_active:
             ranked_defense = []
+            excluded_defense = 0
             for team_name, players in defense_totals.items():
+                team_games = max((s.get("games", 0) for s in players.values()), default=0)
                 for name, stats in players.items():
                     defended = stats.get("defended_diet", {}) or {}
+                    if not shot_rank_qualifies(defended, team_games):
+                        excluded_defense += 1
+                        continue
                     ranked_defense.append((shot_rank_value(defended), team_name, name, defended))
-            ranked_defense.sort(key=lambda item: item[0], reverse=True)
+            # Lower allowed % is better on defense; counts still rank high-to-low.
+            ranked_defense.sort(key=lambda item: item[0], reverse=not shot_rank_pct)
+            if shot_rank_pct and defense_totals:
+                defense_tree.insert("", "end", values=("", shot_rank_note(excluded_defense) + " Lowest allowed % first.") + ("",) * 12)
             for rank, (_value, team_name, name, defended) in enumerate(ranked_defense, start=1):
                 defense_tree.insert(
                     "", "end",
