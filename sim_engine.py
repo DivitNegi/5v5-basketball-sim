@@ -3192,6 +3192,18 @@ shot_sequence_lines["post_fade"] = [
 
 from dataclasses import dataclass, field
 
+FEATURED_ROOKIE_ROLES_2027: Dict[str, Tuple[float, float, float]] = {
+    "Darryn Peterson": (0.30, 0.44, 12.5),
+    "Darius Acuff Jr.": (0.30, 0.44, 16.0),
+    "AJ Dybantsa": (0.32, 0.50, 19.0),
+    "Kingston Flemings": (0.24, 0.34, 11.0),
+    "Cameron Boozer": (0.27, 0.40, 14.0),
+    "Caleb Wilson": (0.26, 0.38, 15.0),
+    "Keaton Wagler": (0.28, 0.42, 15.0),
+    "Mikel Brown Jr.": (0.27, 0.40, 14.0),
+}
+
+
 @dataclass(eq=True, unsafe_hash=True)
 class Player:
     name: str
@@ -3306,6 +3318,14 @@ class Player:
             self.archetype = infer_player_archetype(self)
         if not self.go_to_shot:
             self.go_to_shot = default_player_go_to_shot(self)
+
+        role = FEATURED_ROOKIE_ROLES_2027.get(self.name)
+        if role:
+            # (usage, shot_tendency, FGA goal): the top 2026 rookies carry real
+            # offensive roles so the All-Rookie teams land around 16-20 PPG.
+            self.usage = max(self.usage, role[0])
+            self.shot_tendency = max(self.shot_tendency, role[1])
+            self.target_fga_soft_cap = role[2]
 
 
 def foul_draw_sim(player: "Player | None") -> float:
@@ -8574,7 +8594,7 @@ def _initialize_minute_targets_core(team: Team):
             "Dyson Daniels": (30, 34), "Jalen Johnson": (34, 38),
             "Onyeka Okongwu": (28, 33), "Luguentz Dort": (24, 29),
             "Aaron Wiggins": (18, 24), "Jock Landale": (14, 20),
-            "Buddy Hield": (16, 22), "Kingston Flemings": (8, 14),
+            "Buddy Hield": (16, 22), "Kingston Flemings": (22, 28),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8583,7 +8603,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Brooklyn Nets":
         target_ranges = {
-            "Mikel Brown Jr.": (18, 24), "Egor Demin": (20, 26),
+            "Mikel Brown Jr.": (28, 32), "Egor Demin": (20, 26),
             "Michael Porter Jr.": (32, 36), "Julius Randle": (32, 36),
             "Day'Ron Sharpe": (20, 26), "Keon Ellis": (18, 24),
             "Noah Clowney": (16, 22), "Nolan Traore": (16, 22),
@@ -8613,7 +8633,7 @@ def _initialize_minute_targets_core(team: Team):
         target_ranges = {
             "Dailyn Swain": (10, 16),
             "Josh Giddey": (30, 35), "Norman Powell": (30, 35),
-            "Matas Buzelis": (24, 29), "Caleb Wilson": (24, 29),
+            "Matas Buzelis": (24, 29), "Caleb Wilson": (28, 33),
             "Nicolas Claxton": (28, 33), "Isaac Okoro": (20, 26),
             "Tre Jones": (16, 22), "Jalen Smith": (16, 22),
             "Zach Collins": (16, 22), "Patrick Williams": (14, 20),
@@ -8692,7 +8712,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Los Angeles Clippers":
         target_ranges = {
-            "Darius Garland": (30, 34), "Keaton Wagler": (18, 24),
+            "Darius Garland": (30, 34), "Keaton Wagler": (28, 32),
             "Brandon Ingram": (30, 34), "Derrick Jones Jr.": (22, 28),
             "Brook Lopez": (18, 24), "Bradley Beal": (16, 22),
             "Rui Hachimura": (18, 24), "Max Strus": (14, 20),
@@ -8707,7 +8727,7 @@ def _initialize_minute_targets_core(team: Team):
         target_ranges = {
             "Karim Lopez": (10, 16),
             "Scotty Pippen Jr.": (18, 24), "Cedric Coward": (18, 24),
-            "Jerami Grant": (22, 28), "Cameron Boozer": (18, 24),
+            "Jerami Grant": (22, 28), "Cameron Boozer": (28, 33),
             "Zach Edey": (22, 28), "Ty Jerome": (18, 24),
             "Cam Spencer": (14, 20), "Jaylen Wells": (14, 20),
             "GG Jackson": (14, 20), "Isaiah Stewart": (12, 18),
@@ -8814,7 +8834,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Sacramento Kings":
         target_ranges = {
-            "Darius Acuff Jr.": (18, 24), "Zach LaVine": (26, 31),
+            "Darius Acuff Jr.": (30, 34), "Zach LaVine": (26, 31),
             "De'Andre Hunter": (20, 26), "Keegan Murray": (20, 26),
             "Domantas Sabonis": (28, 33), "Malik Monk": (16, 22),
             "Maxime Raynaud": (14, 20), "Precious Achiuwa": (12, 18),
@@ -8841,7 +8861,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Utah Jazz":
         target_ranges = {
-            "Keyonte George": (22, 28), "Darryn Peterson": (24, 30),
+            "Keyonte George": (22, 28), "Darryn Peterson": (30, 34),
             "Lauri Markkanen": (28, 33), "Jaren Jackson Jr.": (26, 31),
             "Jusuf Nurkic": (14, 20), "Brice Sensabaugh": (14, 20),
             "Isaiah Collier": (14, 20), "Ace Bailey": (14, 20),
@@ -22087,11 +22107,18 @@ def build_season_sections(entries: List[Dict],
                 - profile_floor_penalty
             )
 
-        mvp = max(all_players, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
+        # Team success counts a bit: a 60-win team's star gets ~+2 points on the
+        # award score, a 25-win team's star ~-2, so standings break close races.
+        team_win_pct = {row["team"]: row["pct"] for row in standings}
+
+        def standings_bonus(team_name: str, weight: float) -> float:
+            return (team_win_pct.get(team_name, 0.5) - 0.5) * weight
+
+        mvp = max(all_players, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0))
         scorer = max(all_players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
         passer = max(all_players, key=lambda item: item[2].get("ast", 0) / max(1, item[2].get("games", 1)))
         defenders = sorted(all_players, key=defensive_score, reverse=True)
-        all_nba = sorted(all_players, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03, reverse=True)
+        all_nba = sorted(all_players, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0), reverse=True)
         dpoy = defenders[0]
         awards.append(("Season MVP", mvp[1], f"{mvp[0]} | {mvp[2].get('pts', 0) / max(1, mvp[2].get('games', 1)):.1f} PPG, {mvp[2].get('reb', 0) / max(1, mvp[2].get('games', 1)):.1f} RPG, {mvp[2].get('ast', 0) / max(1, mvp[2].get('games', 1)):.1f} APG"))
         awards.append(("DPOY", dpoy[1], f"{dpoy[0]} | {defense_stat_line(dpoy[0], dpoy[2])}"))
@@ -22101,6 +22128,7 @@ def build_season_sections(entries: List[Dict],
         awards_table.append({"award": "MVP", "player": mvp[1], "team": mvp[0], "stats": stat_line(mvp[0], mvp[2])})
         awards_table.append({"award": "DPOY", "player": dpoy[1], "team": dpoy[0], "stats": defense_stat_line(dpoy[0], dpoy[2])})
         rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026]
+        all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams
         if rookies:
             roy = max(rookies, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
             awards.append(("Rookie of the Year", roy[1], f"{roy[0]} | {roy[2].get('pts', 0) / max(1, roy[2].get('games', 1)):.1f} PPG, {roy[2].get('reb', 0) / max(1, roy[2].get('games', 1)):.1f} RPG, {roy[2].get('ast', 0) / max(1, roy[2].get('games', 1)):.1f} APG"))
@@ -22113,7 +22141,7 @@ def build_season_sections(entries: List[Dict],
             for team_no, start in enumerate((0, 5), start=1):
                 label = "All-Rookie First Team" if team_no == 1 else "All-Rookie Second Team"
                 for idx, (team_name, name, stats) in enumerate(ranked_rookies[start:start + 5], start=1):
-                    awards_table.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": stat_line(team_name, stats)})
+                    all_rookie_rows.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": stat_line(team_name, stats)})
 
         for team_no, start in enumerate((0, 5, 10), start=1):
             label = {1: "All-NBA First Team", 2: "All-NBA Second Team", 3: "All-NBA Third Team"}[team_no]
@@ -22124,6 +22152,7 @@ def build_season_sections(entries: List[Dict],
             label = "All-Defensive First Team" if team_no == 1 else "All-Defensive Second Team"
             for idx, (team_name, name, stats) in enumerate(defenders[start:start + 5], start=1):
                 awards_table.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": defense_stat_line(team_name, stats)})
+        awards_table.extend(all_rookie_rows)
     top_lines = ["82-GAME SEASON COMPLETE", "", "Standings"]
     for row in standings:
         top_lines.append(f"{row['seed']:>2}. {row['team']:<34} {row['wins']:>2}-{row['losses']:<2}  {row['pct']:.3f}  DIFF {row['diff']:+.1f}")
