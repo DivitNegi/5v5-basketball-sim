@@ -6838,6 +6838,8 @@ def run_gui_app():
             return
         clear_log()
         season_view["quiet"] = mode in ("2027 season (82 games)", "Season mode")
+        if season_view["quiet"]:
+            update_season_progress(0, 1230 if mode == "2027 season (82 games)" else 82 * 15)
         running["active"] = True
         pause_button.configure(text="Pause")
         status_var.set("Running...")
@@ -6974,14 +6976,32 @@ def run_gui_app():
     # the box score and every tab are covered with a plain notice instead of
     # flashing the stats of whichever silent game happens to be running.
     season_view = {"quiet": False, "shown": False}
-    season_notice_tabs = tk.Label(
-        series_tabs, text="Simulating season...", bg=APP_BG, fg=TEXT,
-        font=("Segoe UI", 20, "bold"), anchor="center",
-    )
-    season_notice_box = tk.Label(
-        on_court_frame, text="Simulating season...", bg=APP_BG, fg=TEXT,
-        font=("Segoe UI", 20, "bold"), anchor="center",
-    )
+    season_notice_tabs = tk.Frame(series_tabs, bg=APP_BG)
+    season_notice_box = tk.Frame(on_court_frame, bg=APP_BG)
+    season_progress_vars = []
+    season_progress_bars = []
+    for notice in (season_notice_tabs, season_notice_box):
+        notice.columnconfigure(0, weight=1)
+        notice.rowconfigure(0, weight=1)
+        notice.rowconfigure(4, weight=1)
+        tk.Label(notice, text="Simulating season...", bg=APP_BG, fg=TEXT,
+                 font=("Segoe UI", 20, "bold")).grid(row=1, column=0, pady=(0, 10))
+        count_var = tk.StringVar(value="0 of 1230 games simulated")
+        tk.Label(notice, textvariable=count_var, bg=APP_BG, fg=TEXT_SOFT,
+                 font=("Segoe UI", 14)).grid(row=2, column=0, pady=(0, 10))
+        bar = ttk.Progressbar(notice, orient="horizontal", mode="determinate", length=420, maximum=1230)
+        bar.grid(row=3, column=0)
+        season_progress_vars.append(count_var)
+        season_progress_bars.append(bar)
+
+    def update_season_progress(completed: int, total: int):
+        total = max(1, int(total))
+        completed = max(0, min(int(completed), total))
+        text = f"{completed} of {total} games simulated"
+        for var, bar in zip(season_progress_vars, season_progress_bars):
+            var.set(text)
+            bar.configure(maximum=total)
+            bar["value"] = completed
 
     def sync_season_notice():
         want = bool(season_view["quiet"] and running["active"])
@@ -7018,6 +7038,8 @@ def run_gui_app():
             try:
                 while True:
                     latest_scoreboard = scoreboard_queue.get_nowait()
+                    if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("season_progress"):
+                        update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
             except queue.Empty:
                 pass
             if latest_scoreboard is not None:

@@ -6997,7 +6997,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
             b["wins"] += 1
             a["losses"] += 1
             team_totals[team_b.name]["wins"] += 1
-        if progress_queue is not None and (done % 10 == 0 or done == total_games):
+        if progress_queue is not None:
             progress_queue.put({"season_progress": True, "completed": done, "total": total_games})
         if done % 300 == 0:
             print(f"Season sim progress: {done}/{total_games} games.")
