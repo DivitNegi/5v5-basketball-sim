@@ -6937,9 +6937,10 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, c
     push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"], winner_name=champion)
 
 
-def record_2027_play_in(conference, slot, high_name, low_name, score_high=None, score_low=None, winner=None):
+def record_2027_play_in(conference, slot, high_name, low_name, score_high=None, score_low=None, winner=None, boxes=None):
     play_in = BRACKET_STATE.setdefault("play_in", {}).setdefault(conference, {})
-    play_in[slot] = {"a": high_name, "b": low_name, "score_a": score_high, "score_b": score_low, "winner": winner}
+    play_in[slot] = {"a": high_name, "b": low_name, "score_a": score_high, "score_b": score_low, "winner": winner,
+                     "boxes": boxes}
     publish_bracket_state()
 
 
@@ -6962,7 +6963,8 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
         winner, loser = low_name, high_name
     print(f"\nPlay-in result: {winner} advance ({team_a.name} {team_a.score} - {team_b.score} {team_b.name}).")
     if conference is not None:
-        record_2027_play_in(conference, slot, high_name, low_name, team_a.score, team_b.score, winner)
+        record_2027_play_in(conference, slot, high_name, low_name, team_a.score, team_b.score, winner,
+                            boxes=[box_score_snapshot(team_a), box_score_snapshot(team_b)])
     if stage is not None:
         add_player_to_series_totals(stage["players"], team_a)
         add_player_to_series_totals(stage["players"], team_b)
@@ -7163,7 +7165,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
 
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = None
-    sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows)
+    sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows, game_extras=game_log.extras)
     if section_queue is not None:
         section_queue.put(sections)
 

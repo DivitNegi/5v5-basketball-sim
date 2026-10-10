@@ -6635,6 +6635,27 @@ def push_gui_playoff_update(playoff_player_totals: Dict, playoff_team_totals: Di
     GUI_SERIES_UPDATE_QUEUE.put(sections)
 
 
+def box_score_snapshot(team: Team) -> Dict:
+    """Compact full box score of a finished game: every player's line plus team extras."""
+    players = []
+    for p in box_score_player_order(team, final=True):
+        if p.minutes <= 0 and p.pts == 0 and p.fga == 0:
+            continue
+        players.append({
+            "name": player_stat_key(team, p), "pos": p.position, "st": bool(getattr(p, "is_starter", False)),
+            "min": round(p.minutes / 60, 1), "pts": p.pts, "reb": p.reb, "ast": p.ast, "stl": p.stl,
+            "blk": p.blk_stat, "tov": p.tov, "oreb": p.oreb_stat, "dreb": p.dreb_stat, "pf": p.pf,
+            "pm": p.plus_minus, "fgm": p.fgm, "fga": p.fga, "tpm": p.tpm, "tpa": p.tpa, "ftm": p.ftm, "fta": p.fta,
+        })
+    return {
+        "name": team.name, "score": team.score, "players": players,
+        "extras": {
+            "Paint": getattr(team, "points_paint", 0), "Fastbreak": getattr(team, "fastbreak_pts", 0),
+            "Second chance": getattr(team, "second_chance_pts", 0), "Fouls drawn": getattr(team, "fouls_drawn", 0),
+        },
+    }
+
+
 # Live playoff-tree data for the GUI bracket: teams (seed/conference), play-in
 # games, round matchups, and every series' game-by-game results.
 BRACKET_STATE: Dict = {}
@@ -6648,12 +6669,14 @@ def publish_bracket_state(**updates):
 
 
 def record_bracket_series_game(team_a: str, team_b: str, game_no: int, score_a: int, score_b: int,
-                               wins_a: int, wins_b: int, home: str):
+                               wins_a: int, wins_b: int, home: str, boxes=None):
     series = BRACKET_STATE.setdefault("series", {})
     entry = series.setdefault(f"{team_a}|{team_b}", {"a": team_a, "b": team_b, "games": [], "winner": None})
     entry["wins_a"], entry["wins_b"] = wins_a, wins_b
     if game_no > len(entry["games"]):
         entry["games"].append((game_no, score_a, score_b, home))
+    if boxes:
+        entry.setdefault("boxes", {})[game_no] = boxes
     publish_bracket_state()
 
 
@@ -6788,6 +6811,7 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
         record_bracket_series_game(
             teamA.name, teamB.name, game_num, teamA.score, teamB.score,
             series_wins[teamA.name], series_wins[teamB.name], home_team.name,
+            boxes=[box_score_snapshot(teamA), box_score_snapshot(teamB)],
         )
         push_gui_series_update(series_totals, series_team_totals, game_logs, playoff_bracket_lines=playoff_bracket_lines)
 
@@ -6822,6 +6846,17 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
         if playoff_bracket_lines is not None:
             push_gui_playoff_update(playoff_player_totals, playoff_team_totals, playoff_bracket_lines, game_logs, winner_name)
     return winner_name
+
+
+def push_gui_final_score(team_a: Team, team_b: Team):
+    """Final buzzer: put the real final score on the dashboard scoreboard even when
+    fast-forward skipped the last printed scoreboard line."""
+    if GUI_SCOREBOARD_QUEUE is not None:
+        GUI_SCOREBOARD_QUEUE.put({
+            "period": "Final", "clock": "0:00",
+            "team_a": team_a.name, "score_a": str(team_a.score),
+            "team_b": team_b.name, "score_b": str(team_b.score),
+        })
 
 
 def push_gui_series_score_reset(status: str = "Series reset: 0-0"):
@@ -11901,6 +11936,20 @@ def wide_open_jumper_floor(shooter: Player, shot_type: str, defender: Player | N
     return 0.0
 
 
+# Season mode only: stars' shooting ratings are compressed toward the pack above the pivot, so the
+# gap between a 0.99 and a 0.85 shooter in make probability is a bit smaller.
+STAR_RATING_PIVOT = 0.80
+STAR_RATING_COMPRESSION = 0.74
+
+
+def compress_star_rating(rating: float) -> float:
+    # Regular season only (SEASON_STAR_MINUTES_CAP is set just for season games);
+    # playoffs, single games and series keep the full star gap.
+    if not SEASON_STAR_MINUTES_CAP or rating <= STAR_RATING_PIVOT:
+        return rating
+    return STAR_RATING_PIVOT + (rating - STAR_RATING_PIVOT) * STAR_RATING_COMPRESSION
+
+
 def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
                    team: Team = None, opponent: Team = None,
                    period: int = 1, period_time: int = 720) -> float:
@@ -11910,19 +11959,19 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     skill_rating = 0.75
     shooter.last_defender = defender
     if shot_type == "three":
-        rating = effective_rating(shooter.three_rating, shooter, team, opponent, period, period_time, "three")
+        rating = compress_star_rating(effective_rating(shooter.three_rating, shooter, team, opponent, period, period_time, "three"))
         skill_rating = rating
         p = rating * 0.66
         p *= (1 - 0.58 * effective_perimeter_def(defender))
 
     elif shot_type == "mid":
-        rating = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
+        rating = compress_star_rating(effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid"))
         skill_rating = rating
         p = rating * 0.74
         p *= (1 - 0.56 * effective_perimeter_def(defender))
 
     elif shot_type == "rim":
-        rating = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim")
+        rating = compress_star_rating(effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim"))
         skill_rating = rating
         elite_big_finish = elite_interior_scorer(shooter)
         elite_slash_finish = shooter.rim_rating >= 0.92 and (shooter.drive_tendency >= 0.18 or shooter.usage >= 0.28)
@@ -11949,7 +11998,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p *= (1 - defense_tax * effective_interior_def(defender))
 
     elif shot_type == "dunk":
-        rating = effective_rating(shooter.dunk_rating, shooter, team, opponent, period, period_time, "dunk")
+        rating = compress_star_rating(effective_rating(shooter.dunk_rating, shooter, team, opponent, period, period_time, "dunk"))
         skill_rating = rating
         defense_tax = 0.42 if elite_interior_scorer(shooter) else 0.58
         p = rating * (0.94 if elite_interior_scorer(shooter) else 0.88)
@@ -11957,8 +12006,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p = max(0.50 if elite_interior_scorer(shooter) else 0.45, p)
 
     elif shot_type == "post":
-        rim = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim")
-        mid = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
+        rim = compress_star_rating(effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim"))
+        mid = compress_star_rating(effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid"))
         base = 0.68 * rim + 0.32 * mid
         skill_rating = base
         # Post shots were landing around 29% league-wide -- well below a real
@@ -11969,7 +12018,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p *= (1 - defense_tax * effective_interior_def(defender))
 
     elif shot_type == "post_fade":
-        rating = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
+        rating = compress_star_rating(effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid"))
         post_balance = 0.55 * shooter.mid_rating + 0.25 * shooter.post_tendency + 0.20 * shooter.shot_iq
         skill_rating = rating
         p = rating * (0.80 + min(0.08, shooter.post_tendency * 0.12))
@@ -11977,8 +12026,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p *= (1 - 0.40 * effective_interior_def(defender))
 
     else:
-        rim = effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim")
-        mid = effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid")
+        rim = compress_star_rating(effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim"))
+        mid = compress_star_rating(effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid"))
         base = 0.6 * rim + 0.4 * mid
         skill_rating = base
         p = base * 0.76
@@ -20630,6 +20679,7 @@ def simulate_game(teamA: Team, teamB: Team):
 
             ot_num += 1
 
+    push_gui_final_score(teamA, teamB)
     print_box_score(teamA, teamB, "FINAL")
     print_game_recap(teamA, teamB)
 
@@ -22026,7 +22076,7 @@ ROOKIE_KEYS_2026 = frozenset(rookie_name_key(n) for n in ROOKIE_CLASS_2026)
 
 SEASON_GAME_LOG_FIELDS = (
     "player", "team", "opp", "game", "home", "result", "min", "pts", "reb", "oreb", "dreb",
-    "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm", "gid",
+    "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm", "gid", "pos", "st",
 )
 
 
@@ -22037,10 +22087,18 @@ class SeasonGameLog:
         self.rows: List[Tuple] = []
         self.team_games: Dict[str, int] = {}
         self.game_count = 0
+        self.extras: Dict[int, Dict[str, Dict]] = {}
 
     def add(self, team_a: Team, team_b: Team):
         self.game_count += 1
         gid = self.game_count
+        self.extras[gid] = {
+            team.name: {
+                "Paint": getattr(team, "points_paint", 0), "Fastbreak": getattr(team, "fastbreak_pts", 0),
+                "Second chance": getattr(team, "second_chance_pts", 0), "Fouls drawn": getattr(team, "fouls_drawn", 0),
+            }
+            for team in (team_a, team_b)
+        }
         for team, opp, home in ((team_a, team_b, True), (team_b, team_a, False)):
             game_no = self.team_games.get(team.name, 0) + 1
             self.team_games[team.name] = game_no
@@ -22052,14 +22110,15 @@ class SeasonGameLog:
                     player_stat_key(team, p), team.name, opp.name, game_no, home, result,
                     round(p.minutes / 60, 1), p.pts, p.reb, p.oreb_stat, p.dreb_stat,
                     p.ast, p.stl, p.blk_stat, p.tov, p.pf, p.fgm, p.fga, p.tpm, p.tpa,
-                    p.ftm, p.fta, p.plus_minus, gid,
+                    p.ftm, p.fta, p.plus_minus, gid, p.position, bool(getattr(p, "is_starter", False)),
                 ))
 
 
 def build_season_sections(entries: List[Dict],
                           series_totals: Dict | None = None,
                           series_team_totals: Dict | None = None,
-                          game_log: List[Tuple] | None = None) -> Dict:
+                          game_log: List[Tuple] | None = None,
+                          game_extras: Dict | None = None) -> Dict:
     def season_ts(stats: Dict) -> float:
         denom = 2 * (stats.get("fga", 0) + 0.44 * stats.get("fta", 0))
         return 0.0 if denom == 0 else 100 * stats.get("pts", 0) / denom
@@ -22267,6 +22326,7 @@ def build_season_sections(entries: List[Dict],
         "series_memory": "Regular-season awards and averages are generated from the same player ratings, tendencies, defense, rebounding, and shot diet categories.",
         "_season_game_log": list(game_log or []),
         "_season_game_log_fields": SEASON_GAME_LOG_FIELDS,
+        "_season_game_extras": dict(game_extras or {}),
         "_season_standings": standings,
         "_season_awards": awards,
         "_season_awards_table": awards_table,
@@ -22386,7 +22446,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
         if (game_no + 1) in (20, 41, 62, 82):
             print(f"Season sim progress: {game_no + 1}/82 games per team.")
-    sections = build_season_sections(entries, season_player_totals, season_team_totals, game_log=season_game_log.rows)
+    sections = build_season_sections(entries, season_player_totals, season_team_totals,
+                                     game_log=season_game_log.rows, game_extras=season_game_log.extras)
     if section_queue is not None:
         section_queue.put(sections)
     print("\nSeason complete. Standings, averages, advanced stats, shot diet, and awards are ready in the GUI.")

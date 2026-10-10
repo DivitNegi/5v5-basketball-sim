@@ -22,14 +22,19 @@ class GuiOutputProxy:
         if not text:
             return
         self.full_output.append(text)
-        _REAL_SLEEP(0.001)
+        # "Sim Series" / "Sim All Playoffs": no per-line pacing and no play-by-play
+        # flood into the GUI log -- series scores and results still come through.
+        quick = bool(getattr(sim_engine, "SIM_STICKY_FAST", None))
+        if not quick:
+            _REAL_SLEEP(0.001)
         self.buffer += text
         while "\n" in self.buffer:
             line, self.buffer = self.buffer.split("\n", 1)
             clean = line.strip()
-            self._maybe_scoreboard(clean)
+            if not quick:
+                self._maybe_scoreboard(clean)
             self._maybe_series_record(clean)
-            if self._should_show_in_play_log(clean):
+            if not quick and self._should_show_in_play_log(clean):
                 self.output_queue.put(line + "\n")
 
     def flush(self):
@@ -928,6 +933,76 @@ def run_gui_app():
         series_tabs.add(frame, text=title)
         series_texts[key] = text_box
 
+    FULL_BOX_COLUMNS = (
+        ("player", "Player", 230, "w"), ("pos", "POS", 52, "center"), ("st", "ST", 42, "center"),
+        ("min", "MIN", 64, "center"), ("pts", "PTS", 58, "center"), ("reb", "REB", 58, "center"),
+        ("ast", "AST", 58, "center"), ("stl", "STL", 58, "center"), ("blk", "BLK", 58, "center"),
+        ("tov", "TOV", 58, "center"), ("orb", "ORB", 58, "center"), ("drb", "DRB", 58, "center"),
+        ("pf", "PF", 50, "center"), ("pm", "+/-", 62, "center"), ("fg", "FG", 82, "center"),
+        ("fgp", "FG%", 68, "center"), ("tp", "3P", 82, "center"), ("tpp", "3P%", 68, "center"),
+        ("ft", "FT", 82, "center"), ("ftp", "FT%", 68, "center"), ("ts", "TS%", 68, "center"),
+    )
+
+    def configure_full_box_tree(tree):
+        for col, label, width, anchor in FULL_BOX_COLUMNS:
+            tree.heading(col, text=label)
+            width = int(round(width * 1.15))
+            tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=False)
+        tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
+        tree.tag_configure("totals", background=CARD_ALT, foreground=TEXT, font=("Segoe UI", 11, "bold"))
+        tree.tag_configure("focus", foreground=GOLD, font=("Segoe UI", 11, "bold"))
+
+    def fill_full_box_tree(tree, teams, focus_player=None, focus_team=None):
+        """teams: [{"name", "score", "players": [{name,pos,st,min,pts,reb,ast,stl,blk,tov,oreb,dreb,pf,pm,
+        fgm,fga,tpm,tpa,ftm,fta}], "extras": {label: value}}] -- the normal full box score."""
+        tree.delete(*tree.get_children())
+        blank = ("",) * (len(FULL_BOX_COLUMNS) - 1)
+
+        def pct(made, att):
+            return f"{100 * made / att:.1f}" if att else "0.0"
+
+        def ts_pct(pts, fga, fta):
+            denom = 2 * (fga + 0.44 * fta)
+            return f"{100 * pts / denom:.1f}" if denom else "0.0"
+
+        for team in teams:
+            tree.insert("", "end", values=(f"{team.get('name', '')}    {team.get('score', '')}",) + blank, tags=("section",))
+            totals = {key: 0 for key in ("pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta")}
+            minutes_total = 0.0
+            for p in team.get("players", []):
+                for key in totals:
+                    totals[key] += p.get(key, 0)
+                minutes_total += p.get("min", 0)
+                focused = focus_player is not None and p.get("name") == focus_player and team.get("name") == focus_team
+                tree.insert(
+                    "", "end",
+                    values=(
+                        table_player_name(p.get("name", ""), 26), p.get("pos", ""), "S" if p.get("st") else "",
+                        f"{p.get('min', 0):.1f}", p.get("pts", 0), p.get("reb", 0), p.get("ast", 0), p.get("stl", 0),
+                        p.get("blk", 0), p.get("tov", 0), p.get("oreb", 0), p.get("dreb", 0), p.get("pf", 0),
+                        f"{p.get('pm', 0):+d}", f"{p.get('fgm', 0)}/{p.get('fga', 0)}", pct(p.get("fgm", 0), p.get("fga", 0)),
+                        f"{p.get('tpm', 0)}/{p.get('tpa', 0)}", pct(p.get("tpm", 0), p.get("tpa", 0)),
+                        f"{p.get('ftm', 0)}/{p.get('fta', 0)}", pct(p.get("ftm", 0), p.get("fta", 0)),
+                        ts_pct(p.get("pts", 0), p.get("fga", 0), p.get("fta", 0)),
+                    ),
+                    tags=("focus",) if focused else (),
+                )
+            tree.insert(
+                "", "end",
+                values=(
+                    "TEAM TOTALS", "", "", f"{minutes_total:.0f}", totals["pts"], totals["reb"], totals["ast"], totals["stl"],
+                    totals["blk"], totals["tov"], totals["oreb"], totals["dreb"], totals["pf"], "",
+                    f"{totals['fgm']}/{totals['fga']}", pct(totals["fgm"], totals["fga"]),
+                    f"{totals['tpm']}/{totals['tpa']}", pct(totals["tpm"], totals["tpa"]),
+                    f"{totals['ftm']}/{totals['fta']}", pct(totals["ftm"], totals["fta"]),
+                    ts_pct(totals["pts"], totals["fga"], totals["fta"]),
+                ),
+                tags=("totals",),
+            )
+            extras = team.get("extras") or {}
+            if extras:
+                tree.insert("", "end", values=("   " + " | ".join(f"{k} {v}" for k, v in extras.items()),) + blank)
+
     bracket_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
     bracket_widget_frame.columnconfigure(0, weight=1)
     bracket_widget_frame.rowconfigure(1, weight=1)
@@ -940,7 +1015,7 @@ def run_gui_app():
         font=("Segoe UI", 11, "bold"),
         anchor="w",
     ).grid(row=0, column=0, sticky="ew", pady=(0, 6))
-    bracket_ui = {"state": None, "view": "tree", "auto": True, "selected": None, "dirty": False}
+    bracket_ui = {"state": None, "view": "tree", "auto": True, "selected": None, "dirty": False, "box_open": False}
     bracket_mode_bar = ttk.Frame(bracket_widget_frame)
     bracket_tree_button = ttk.Button(bracket_mode_bar, text="Playoff Tree")
     bracket_tree_button.grid(row=0, column=0, padx=(0, 6))
@@ -952,6 +1027,32 @@ def run_gui_app():
         bracket_widget_frame, textvariable=bracket_detail_var, bg=APP_BG, fg=TEXT,
         font=("Segoe UI", 11), anchor="nw", justify="left",
     )
+    bracket_games_tree = ttk.Treeview(
+        bracket_widget_frame, columns=("game", "score", "result", "where"), show="headings", height=7, style="Series.Treeview",
+    )
+    for col, label, width in (("game", "Game", 110), ("score", "Score", 300), ("result", "Result", 220), ("where", "Hosted by", 220)):
+        bracket_games_tree.heading(col, text=label)
+        bracket_games_tree.column(col, width=width, minwidth=width, anchor="w", stretch=False)
+    bracket_game_boxes: Dict[str, Tuple] = {}
+    bracket_box_frame = ttk.Frame(bracket_widget_frame)
+    bracket_box_frame.columnconfigure(0, weight=1)
+    bracket_box_frame.rowconfigure(1, weight=1)
+    bracket_box_bar = ttk.Frame(bracket_box_frame)
+    bracket_box_bar.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+    bracket_box_back = ttk.Button(bracket_box_bar, text="<  Back to bracket")
+    bracket_box_back.grid(row=0, column=0, sticky="w", padx=(0, 16))
+    bracket_box_title_var = tk.StringVar(value="")
+    ttk.Label(bracket_box_bar, textvariable=bracket_box_title_var, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w")
+    bracket_box_tree = ttk.Treeview(
+        bracket_box_frame, columns=tuple(col for col, _l, _w, _a in FULL_BOX_COLUMNS), show="headings", height=10, style="Series.Treeview",
+    )
+    bracket_box_scroll_y = ttk.Scrollbar(bracket_box_frame, orient="vertical", command=bracket_box_tree.yview)
+    bracket_box_scroll_x = ttk.Scrollbar(bracket_box_frame, orient="horizontal", command=bracket_box_tree.xview)
+    bracket_box_tree.configure(yscrollcommand=bracket_box_scroll_y.set, xscrollcommand=bracket_box_scroll_x.set)
+    configure_full_box_tree(bracket_box_tree)
+    bracket_box_tree.grid(row=1, column=0, sticky="nsew")
+    bracket_box_scroll_y.grid(row=1, column=1, sticky="ns")
+    bracket_box_scroll_x.grid(row=2, column=0, sticky="ew")
     bracket_columns = ("round", "series", "matchup", "winner", "status")
     bracket_tree = ttk.Treeview(
         bracket_widget_frame,
@@ -1440,25 +1541,15 @@ def run_gui_app():
     highs_back_button = ttk.Button(highs_box_bar, text="<  Back to highs")
     highs_back_button.grid(row=0, column=0, sticky="w", padx=(0, 16))
     ttk.Label(highs_box_bar, textvariable=highs_box_title_var, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w")
-    highs_box_columns = ("player", "min", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fg", "tp", "ft", "pm")
+    highs_box_columns = tuple(col for col, _label, _width, _anchor in FULL_BOX_COLUMNS)
     highs_box_tree = ttk.Treeview(highs_box_frame, columns=highs_box_columns, show="headings", height=10, style="Series.Treeview")
     highs_box_scroll_y = ttk.Scrollbar(highs_box_frame, orient="vertical", command=highs_box_tree.yview)
-    highs_box_tree.configure(yscrollcommand=highs_box_scroll_y.set)
-    for col, label, width, anchor in (
-        ("player", "Player", 260, "w"), ("min", "MIN", 70, "center"), ("pts", "PTS", 60, "center"),
-        ("reb", "REB", 60, "center"), ("oreb", "OREB", 66, "center"), ("dreb", "DREB", 66, "center"),
-        ("ast", "AST", 60, "center"), ("stl", "STL", 60, "center"), ("blk", "BLK", 60, "center"),
-        ("tov", "TOV", 60, "center"), ("pf", "PF", 54, "center"), ("fg", "FG", 84, "center"),
-        ("tp", "3P", 84, "center"), ("ft", "FT", 84, "center"), ("pm", "+/-", 66, "center"),
-    ):
-        highs_box_tree.heading(col, text=label)
-        width = int(round(width * 1.15))
-        highs_box_tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=False)
+    highs_box_scroll_x = ttk.Scrollbar(highs_box_frame, orient="horizontal", command=highs_box_tree.xview)
+    highs_box_tree.configure(yscrollcommand=highs_box_scroll_y.set, xscrollcommand=highs_box_scroll_x.set)
+    configure_full_box_tree(highs_box_tree)
     highs_box_tree.grid(row=1, column=0, sticky="nsew")
     highs_box_scroll_y.grid(row=1, column=1, sticky="ns")
-    highs_box_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
-    highs_box_tree.tag_configure("totals", background=CARD_ALT, foreground=TEXT, font=("Segoe UI", 11, "bold"))
-    highs_box_tree.tag_configure("focus", foreground=GOLD, font=("Segoe UI", 11, "bold"))
+    highs_box_scroll_x.grid(row=2, column=0, sticky="ew")
     highs_row_game: Dict[str, Tuple] = {}
     series_tabs.add(highs_frame, text="Highs")
 
@@ -2495,10 +2586,23 @@ def run_gui_app():
     def select_bracket_item(key: str):
         bracket_ui["selected"] = key
         state = bracket_ui["state"] or {}
+        bracket_games_tree.delete(*bracket_games_tree.get_children())
+        bracket_game_boxes.clear()
+        header = ""
         if key.startswith("s::"):
             entry = (state.get("series") or {}).get(key[3:])
             a, _, b = key[3:].partition("|")
-            bracket_detail_var.set(bracket_series_summary(a, b, entry))
+            header = bracket_series_summary(a, b, entry).split(chr(10))[0]
+            abbr_a, abbr_b = bracket_team_style(a)[0], bracket_team_style(b)[0]
+            for game_no, score_a, score_b, home in (entry or {}).get("games", []):
+                winner_abbr = abbr_a if score_a > score_b else abbr_b
+                iid = bracket_games_tree.insert(
+                    "", "end",
+                    values=(f"Game {game_no}", f"{abbr_a} {score_a} - {score_b} {abbr_b}", f"{winner_abbr} win",
+                            f"{bracket_team_style(home)[0] if home else ''}"),
+                )
+                boxes = ((entry or {}).get("boxes") or {}).get(game_no)
+                bracket_game_boxes[iid] = (boxes, f"Game {game_no}")
         elif key.startswith("p::"):
             _tag, conference, slot = key.split("::")
             game = ((state.get("play_in") or {}).get(conference) or {}).get(slot) or {}
@@ -2506,10 +2610,40 @@ def run_gui_app():
             if a and b and game.get("score_a") is not None:
                 abbr_a, abbr_b = bracket_team_style(a)[0], bracket_team_style(b)[0]
                 winner_abbr = bracket_team_style(game.get("winner") or a)[0]
-                bracket_detail_var.set(f"{conference} play-in: {abbr_a} {game['score_a']} - {game['score_b']} {abbr_b}   ({winner_abbr} advance)")
+                header = f"{conference} play-in: {a} vs {b}"
+                iid = bracket_games_tree.insert(
+                    "", "end",
+                    values=("Play-in", f"{abbr_a} {game['score_a']} - {game['score_b']} {abbr_b}", f"{winner_abbr} advance", abbr_a),
+                )
+                bracket_game_boxes[iid] = (game.get("boxes"), f"{conference} play-in")
             elif a and b:
-                bracket_detail_var.set(f"{conference} play-in: {a} vs {b} has not been played yet.")
+                header = f"{conference} play-in: {a} vs {b} has not been played yet."
+        bracket_detail_var.set(header + ("   (click a game to open its full box score)" if bracket_game_boxes else ""))
         draw_bracket_canvas()
+
+    def open_bracket_game_box(_event=None):
+        selection = bracket_games_tree.selection()
+        if not selection:
+            return
+        info = bracket_game_boxes.get(selection[0])
+        if not info or not info[0]:
+            bracket_detail_var.set("The box score for that game was not saved.")
+            return
+        boxes, label = info
+        fill_full_box_tree(bracket_box_tree, boxes)
+        bracket_box_title_var.set(
+            f"{label}:  {boxes[0]['name']} {boxes[0]['score']}  -  {boxes[1]['score']} {boxes[1]['name']}"
+        )
+        bracket_ui["box_open"] = True
+        bracket_canvas.grid_remove()
+        bracket_detail_label.grid_remove()
+        bracket_games_tree.grid_remove()
+        bracket_box_frame.grid(row=1, column=0, rowspan=3, columnspan=2, sticky="nsew")
+
+    def close_bracket_game_box():
+        bracket_ui["box_open"] = False
+        bracket_box_frame.grid_remove()
+        refresh_bracket_tab()
 
     def draw_bracket_team_row(x, y, w, h, name, seed, score, state_tag, tag, side, dim=False, selected=False):
         abbr, color = bracket_team_style(name) if name else ("TBD", "#1d4ed8")
@@ -2667,6 +2801,8 @@ def run_gui_app():
     def refresh_bracket_tab():
         state = bracket_ui["state"]
         bracket_ui["dirty"] = False
+        if bracket_ui.get("box_open"):
+            return
         if state and (state.get("rounds") or state.get("play_in")):
             if bracket_ui["auto"]:
                 bracket_ui["view"] = "tree" if state.get("rounds") else "playin"
@@ -2675,6 +2811,7 @@ def run_gui_app():
             bracket_canvas.grid(row=1, column=0, columnspan=2, sticky="nsew")
             bracket_mode_bar.grid(row=0, column=1, sticky="e", pady=(0, 6))
             bracket_detail_label.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+            bracket_games_tree.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
             if not bracket_detail_var.get():
                 bracket_info_var.set("Click any series to see the game-by-game results. Use Play-In to see the play-in games behind the tree.")
             draw_bracket_canvas()
@@ -2682,17 +2819,22 @@ def run_gui_app():
             bracket_canvas.grid_remove()
             bracket_mode_bar.grid_remove()
             bracket_detail_label.grid_remove()
+            bracket_games_tree.grid_remove()
             bracket_tree.grid()
             bracket_scroll.grid()
             update_bracket_widget((playoff_sections_state.get("sections") or {}).get("_playoff_bracket", ""))
 
     def set_bracket_view(view: str):
+        bracket_ui["box_open"] = False
+        bracket_box_frame.grid_remove()
         bracket_ui["view"] = view
         bracket_ui["auto"] = False
         bracket_ui["selected"] = None
         bracket_detail_var.set("")
         draw_bracket_canvas()
 
+    bracket_games_tree.bind("<<TreeviewSelect>>", lambda _event: open_bracket_game_box())
+    bracket_box_back.configure(command=lambda: close_bracket_game_box())
     bracket_tree_button.configure(command=lambda: set_bracket_view("tree"))
     bracket_playin_button.configure(command=lambda: set_bracket_view("playin"))
     bracket_canvas.bind("<Configure>", lambda _e: draw_bracket_canvas() if bracket_ui["state"] else None)
@@ -3700,54 +3842,35 @@ def run_gui_app():
         game_rows = [row for row in rows if row[idx["gid"]] == gid]
         if not game_rows:
             return
-        highs_box_tree.delete(*highs_box_tree.get_children())
-        teams = []
+        names = []
         for row in game_rows:
-            if row[idx["team"]] not in teams:
-                teams.append(row[idx["team"]])
-        teams.sort(key=lambda name: 0 if any(r[idx["team"]] == name and r[idx["home"]] for r in game_rows) else 1)
-        scores = {}
-        for name in teams:
-            first = next(r for r in game_rows if r[idx["team"]] == name)
-            match = re.search(r"(\d+)-(\d+)", str(first[idx["result"]]))
-            scores[name] = (int(match.group(1)), first) if match else (0, first)
-        title_parts = [f"{table_player_name(name, 30)} {scores[name][0]}" for name in teams]
-        game_no = scores[teams[0]][1][idx["game"]]
-        highs_box_title_var.set("  -  ".join(title_parts) + f"    (team game {game_no})")
-        for name in teams:
-            result_text = str(scores[name][1][idx["result"]])
-            highs_box_tree.insert(
-                "", "end",
-                values=(f"{name}  ({result_text})",) + ("",) * 14, tags=("section",),
-            )
-            team_rows = sorted((r for r in game_rows if r[idx["team"]] == name), key=lambda r: r[idx["min"]], reverse=True)
-            totals = {key: 0 for key in ("pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm")}
-            minutes_total = 0.0
-            for r in team_rows:
-                for key in totals:
-                    totals[key] += r[idx[key]]
-                minutes_total += r[idx["min"]]
-                tags = ("focus",) if (r[idx["player"]] == focus_player and name == focus_team) else ()
-                highs_box_tree.insert(
-                    "", "end",
-                    values=(
-                        table_player_name(r[idx["player"]], 28), f"{r[idx['min']]:.1f}", r[idx["pts"]], r[idx["reb"]],
-                        r[idx["oreb"]], r[idx["dreb"]], r[idx["ast"]], r[idx["stl"]], r[idx["blk"]], r[idx["tov"]],
-                        r[idx["pf"]], f"{r[idx['fgm']]}/{r[idx['fga']]}", f"{r[idx['tpm']]}/{r[idx['tpa']]}",
-                        f"{r[idx['ftm']]}/{r[idx['fta']]}", f"{r[idx['pm']]:+d}",
-                    ),
-                    tags=tags,
-                )
-            highs_box_tree.insert(
-                "", "end",
-                values=(
-                    "TEAM", f"{minutes_total:.0f}", totals["pts"], totals["reb"], totals["oreb"], totals["dreb"],
-                    totals["ast"], totals["stl"], totals["blk"], totals["tov"], totals["pf"],
-                    f"{totals['fgm']}/{totals['fga']}", f"{totals['tpm']}/{totals['tpa']}",
-                    f"{totals['ftm']}/{totals['fta']}", "",
-                ),
-                tags=("totals",),
-            )
+            if row[idx["team"]] not in names:
+                names.append(row[idx["team"]])
+        names.sort(key=lambda name: 0 if any(r[idx["team"]] == name and r[idx["home"]] for r in game_rows) else 1)
+        extras_map = (sections.get("_season_game_extras") or {}).get(gid, {})
+        teams = []
+        for name in names:
+            team_rows = [r for r in game_rows if r[idx["team"]] == name]
+            match = re.search(r"(\d+)-(\d+)", str(team_rows[0][idx["result"]]))
+            score = int(match.group(1)) if match else 0
+            team_rows.sort(key=lambda r: (0 if ("st" in idx and r[idx["st"]]) else 1, -r[idx["pts"]], -r[idx["min"]]))
+            players = [
+                {
+                    "name": r[idx["player"]], "pos": r[idx["pos"]] if "pos" in idx else "",
+                    "st": bool(r[idx["st"]]) if "st" in idx else False, "min": r[idx["min"]],
+                    "pts": r[idx["pts"]], "reb": r[idx["reb"]], "ast": r[idx["ast"]], "stl": r[idx["stl"]],
+                    "blk": r[idx["blk"]], "tov": r[idx["tov"]], "oreb": r[idx["oreb"]], "dreb": r[idx["dreb"]],
+                    "pf": r[idx["pf"]], "pm": r[idx["pm"]], "fgm": r[idx["fgm"]], "fga": r[idx["fga"]],
+                    "tpm": r[idx["tpm"]], "tpa": r[idx["tpa"]], "ftm": r[idx["ftm"]], "fta": r[idx["fta"]],
+                }
+                for r in team_rows
+            ]
+            teams.append({"name": name, "score": score, "players": players, "extras": extras_map.get(name, {})})
+        game_no = game_rows[0][idx["game"]]
+        highs_box_title_var.set(
+            "  -  ".join(f"{table_player_name(tm['name'], 30)} {tm['score']}" for tm in teams) + f"    (team game {game_no})"
+        )
+        fill_full_box_tree(highs_box_tree, teams, focus_player, focus_team)
         highs_top.grid_remove()
         highs_tree.grid_remove()
         highs_scroll_y.grid_remove()
@@ -7713,7 +7836,9 @@ def run_gui_app():
             status_var.set("Simulate the 2027 season first.")
             return
         next_button.configure(state="disabled")
-        bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False)
+        bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False, box_open=False)
+        bracket_box_frame.grid_remove()
+        bracket_games_tree.delete(*bracket_games_tree.get_children())
         bracket_detail_var.set("")
         sim_engine.BRACKET_STATE.clear()
         if mode == "1-on-1":
@@ -7935,15 +8060,27 @@ def run_gui_app():
             latest_scoreboard = None
             try:
                 while True:
-                    latest_scoreboard = scoreboard_queue.get_nowait()
-                    if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("season_progress"):
-                        update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
-                    if isinstance(latest_scoreboard, dict) and "bracket_state" in latest_scoreboard:
-                        bracket_ui["state"] = latest_scoreboard["bracket_state"]
+                    message = scoreboard_queue.get_nowait()
+                    if isinstance(message, dict) and "bracket_state" in message:
+                        # Bracket snapshots arrive after every game; they must not
+                        # displace the series score / reset messages that came before.
+                        bracket_ui["state"] = message["bracket_state"]
                         bracket_ui["dirty"] = True
-                    if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("postseason_ready"):
+                        continue
+                    if isinstance(message, dict) and message.get("postseason_ready"):
                         next_button.configure(state="normal")
                         status_var.set("Season complete. Press Next for the play-in and playoffs.")
+                        continue
+                    if isinstance(message, dict) and message.get("reset_series_score"):
+                        latest_scoreboard = None  # anything queued before the reset is stale
+                        update_scoreboard(message)
+                        continue
+                    if isinstance(message, dict) and "game_result" in message:
+                        update_scoreboard(message)
+                        continue
+                    latest_scoreboard = message
+                    if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("season_progress"):
+                        update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
             except queue.Empty:
                 pass
             if bracket_ui["dirty"]:
