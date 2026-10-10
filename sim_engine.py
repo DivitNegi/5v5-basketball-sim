@@ -11667,8 +11667,8 @@ def pass_interception_chance(passer: Player, receiver: Player, defender: Player)
     passer_security = 0.55 * passer.playmaking + 0.45 * passer.ball_handle
     lane_read = 0.65 * heat_stat(defender, "steal") + 0.35 * defender.perimeter_def
     receiver_pressure = 1.0 - 0.25 * receiver.ball_handle
-    chance = 0.004 + lane_read * receiver_pressure * 0.034 - passer_security * 0.010
-    return max(0.0025, min(0.040, chance))
+    chance = 0.006 + lane_read * receiver_pressure * 0.054 - passer_security * 0.014
+    return max(0.0035, min(0.062, chance))
 
 
 def call_foul(team: Team, player: Player, label: str):
@@ -11683,7 +11683,7 @@ def call_foul(team: Team, player: Player, label: str):
 def attempt_on_ball_steal(handler: Player, defender: Player) -> bool:
     norm_steal = heat_stat(defender, "steal")
     ball_sec = 0.6 * handler.ball_handle + 0.4 * handler.playmaking
-    base = 0.052
+    base = 0.083
     p = base * norm_steal / (0.5 + 0.5 * ball_sec)
     p *= max(0.75, 1.0 - max(0.0, (defender.minutes / 60 - 36) * 0.006))
     return random.random() < p
@@ -12509,11 +12509,17 @@ def defensive_communication_error(off: Team, dff: Team, shooter: Player, shot_ty
 
 
 def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> float:
+    # Convex in the block rating: an elite rim protector (0.95+) rejects far
+    # more shots than a 0.75 big, and guards with ordinary block ratings almost
+    # never do (a linear curve let guards pile up 7-8 block games).
+    block_skill = max(0.0, heat_stat(defender, "block")) ** 3.0
     if is_paint_shot(shot_type):
-        p = 0.020 + 0.175 * heat_stat(defender, "block") * foul_trouble_defense_factor(defender)
+        p = 0.012 + 0.34 * block_skill * foul_trouble_defense_factor(defender)
         p *= 1.0 + max(0.0, effective_interior_def(defender) - 0.78) * 0.22
+        if defender.block >= 0.97:
+            p *= 1.12  # generational rim protector (99-block tier) separates from the 90s
     else:
-        p = 0.006 + 0.050 * heat_stat(defender, "block") * foul_trouble_defense_factor(defender)
+        p = 0.003 + 0.080 * block_skill * foul_trouble_defense_factor(defender)
 
     if shooter is not None:
         if is_paint_shot(shot_type):
