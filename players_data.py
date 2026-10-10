@@ -15144,7 +15144,7 @@ def make_rockets_2027() -> Team:
                0.14, 0.10, 0.34, 0.08, 0.46, 0.22,
                0.560, 0.660, 0.890, 0.960, 0.780,
                0.18, 0.767, 0.860,
-               0.590, 0.550, 0.670, 0.610, 0.440, 0.533,
+               0.800, 0.550, 0.670, 0.610, 0.440, 0.533,
                0.930, 0.780,
                clutchness=0.650, secondary_positions=('PG',), height=79, speed=0.960,
                shot_iq=0.650, archetype='athletic playmaker', badges=('lockdown', 'posterizer'), stamina=0.87),
