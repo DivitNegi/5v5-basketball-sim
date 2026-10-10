@@ -6982,6 +6982,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         entries.append(entry)
     entry_by_name = {entry["name"]: entry for entry in entries}
     player_totals, team_totals = {}, {}
+    game_log = SeasonGameLog()
     total_games = len(games)
     print("\n=== 2027 SEASON (82 games per team, NBA schedule) ===")
     print(f"Quiet-simming {total_games} games. No play-by-play during the regular season.")
@@ -7016,6 +7017,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         add_player_to_series_totals(player_totals, team_b)
         add_team_to_series_totals(team_totals, team_a)
         add_team_to_series_totals(team_totals, team_b)
+        game_log.add(team_a, team_b)
         a, b = entry_by_name[team_a.name], entry_by_name[team_b.name]
         a["pf"] += team_a.score
         a["pa"] += team_b.score
@@ -7036,7 +7038,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
 
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = None
-    sections = build_season_sections(entries, player_totals, team_totals)
+    sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows)
     if section_queue is not None:
         section_queue.put(sections)
 

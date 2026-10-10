@@ -21970,9 +21970,39 @@ def rookie_name_key(name: str) -> str:
 ROOKIE_KEYS_2026 = frozenset(rookie_name_key(n) for n in ROOKIE_CLASS_2026)
 
 
+SEASON_GAME_LOG_FIELDS = (
+    "player", "team", "opp", "game", "home", "result", "min", "pts", "reb", "oreb", "dreb",
+    "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm",
+)
+
+
+class SeasonGameLog:
+    """Every player's box-score line for every season game (feeds the Highs tab)."""
+
+    def __init__(self):
+        self.rows: List[Tuple] = []
+        self.team_games: Dict[str, int] = {}
+
+    def add(self, team_a: Team, team_b: Team):
+        for team, opp, home in ((team_a, team_b, True), (team_b, team_a, False)):
+            game_no = self.team_games.get(team.name, 0) + 1
+            self.team_games[team.name] = game_no
+            result = f"{'W' if team.score > opp.score else 'L'} {team.score}-{opp.score}"
+            for p in team.roster:
+                if p.minutes <= 0:
+                    continue
+                self.rows.append((
+                    player_stat_key(team, p), team.name, opp.name, game_no, home, result,
+                    round(p.minutes / 60, 1), p.pts, p.reb, p.oreb_stat, p.dreb_stat,
+                    p.ast, p.stl, p.blk_stat, p.tov, p.pf, p.fgm, p.fga, p.tpm, p.tpa,
+                    p.ftm, p.fta, p.plus_minus,
+                ))
+
+
 def build_season_sections(entries: List[Dict],
                           series_totals: Dict | None = None,
-                          series_team_totals: Dict | None = None) -> Dict:
+                          series_team_totals: Dict | None = None,
+                          game_log: List[Tuple] | None = None) -> Dict:
     def season_ts(stats: Dict) -> float:
         denom = 2 * (stats.get("fga", 0) + 0.44 * stats.get("fta", 0))
         return 0.0 if denom == 0 else 100 * stats.get("pts", 0) / denom
@@ -22178,6 +22208,8 @@ def build_season_sections(entries: List[Dict],
         "game_box_scores": "\n".join(top_lines),
         "postgame_recaps": "Season mode uses quiet simulation: no possession-by-possession play-by-play for the 82-game schedule.",
         "series_memory": "Regular-season awards and averages are generated from the same player ratings, tendencies, defense, rebounding, and shot diet categories.",
+        "_season_game_log": list(game_log or []),
+        "_season_game_log_fields": SEASON_GAME_LOG_FIELDS,
         "_season_standings": standings,
         "_season_awards": awards,
         "_season_awards_table": awards_table,
@@ -22252,6 +22284,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     entry_by_name = {entry["name"]: entry for entry in entries}
     season_player_totals = {}
     season_team_totals = {}
+    season_game_log = SeasonGameLog()
     completed_games = 0
     total_games = 82 * (len(entries) // 2)
     print("\n=== SEASON MODE ===")
@@ -22272,6 +22305,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             add_player_to_series_totals(season_player_totals, team_b)
             add_team_to_series_totals(season_team_totals, team_a)
             add_team_to_series_totals(season_team_totals, team_b)
+            season_game_log.add(team_a, team_b)
 
             actual_a = entry_by_name.get(team_a.name, entry_a)
             actual_b = entry_by_name.get(team_b.name, entry_b)
@@ -22295,7 +22329,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
         if (game_no + 1) in (20, 41, 62, 82):
             print(f"Season sim progress: {game_no + 1}/82 games per team.")
-    sections = build_season_sections(entries, season_player_totals, season_team_totals)
+    sections = build_season_sections(entries, season_player_totals, season_team_totals, game_log=season_game_log.rows)
     if section_queue is not None:
         section_queue.put(sections)
     print("\nSeason complete. Standings, averages, advanced stats, shot diet, and awards are ready in the GUI.")

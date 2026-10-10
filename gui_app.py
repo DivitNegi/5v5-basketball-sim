@@ -1374,6 +1374,51 @@ def run_gui_app():
     season_awards_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
     series_tabs.add(season_awards_frame, text="Season")
 
+    highs_frame = ttk.Frame(series_tabs, padding=(6, 6))
+    highs_frame.columnconfigure(0, weight=1)
+    highs_frame.rowconfigure(1, weight=1)
+    highs_top = ttk.Frame(highs_frame)
+    highs_top.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+    HIGHS_STATS = {
+        "PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk",
+        "3PM": "tpm", "3PA": "tpa", "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta",
+        "TOV": "tov", "PF": "pf", "MIN": "min", "+/-": "pm",
+    }
+    HIGHS_VIEWS = ("Season highs (every stat)", "Top games for stat", "Each player's best game")
+    ttk.Label(highs_top, text="View").grid(row=0, column=0, sticky="w", padx=(0, 8))
+    highs_view_var = tk.StringVar(value=HIGHS_VIEWS[0])
+    highs_view_dropdown = ttk.Combobox(highs_top, textvariable=highs_view_var, values=HIGHS_VIEWS, state="readonly", width=26)
+    highs_view_dropdown.grid(row=0, column=1, sticky="w", padx=(0, 16))
+    ttk.Label(highs_top, text="Stat").grid(row=0, column=2, sticky="w", padx=(0, 8))
+    highs_stat_var = tk.StringVar(value="PTS")
+    highs_stat_dropdown = ttk.Combobox(highs_top, textvariable=highs_stat_var, values=tuple(HIGHS_STATS), state="readonly", width=8)
+    highs_stat_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 16))
+    ttk.Label(highs_top, text="Team").grid(row=0, column=4, sticky="w", padx=(0, 8))
+    highs_team_var = tk.StringVar(value="All Teams")
+    highs_team_dropdown = ttk.Combobox(highs_top, textvariable=highs_team_var, values=("All Teams",), state="readonly", width=26)
+    highs_team_dropdown.grid(row=0, column=5, sticky="w")
+    highs_columns = ("label", "player", "team", "opp", "game", "result", "min", "pts", "reb", "ast", "stl", "blk", "tov", "pf", "fg", "tp", "ft", "pm")
+    highs_tree = ttk.Treeview(highs_frame, columns=highs_columns, show="headings", height=10, style="Series.Treeview")
+    highs_scroll_y = ttk.Scrollbar(highs_frame, orient="vertical", command=highs_tree.yview)
+    highs_scroll_x = ttk.Scrollbar(highs_frame, orient="horizontal", command=highs_tree.xview)
+    highs_tree.configure(yscrollcommand=highs_scroll_y.set, xscrollcommand=highs_scroll_x.set)
+    for col, label, width, anchor in (
+        ("label", "Record", 150, "w"), ("player", "Player", 210, "w"), ("team", "Team", 230, "w"),
+        ("opp", "Opponent", 230, "w"), ("game", "Gm", 56, "center"), ("result", "Result", 100, "center"),
+        ("min", "MIN", 62, "center"), ("pts", "PTS", 56, "center"), ("reb", "REB", 56, "center"),
+        ("ast", "AST", 56, "center"), ("stl", "STL", 56, "center"), ("blk", "BLK", 56, "center"),
+        ("tov", "TOV", 56, "center"), ("pf", "PF", 50, "center"), ("fg", "FG", 76, "center"),
+        ("tp", "3P", 76, "center"), ("ft", "FT", 76, "center"), ("pm", "+/-", 62, "center"),
+    ):
+        highs_tree.heading(col, text=label)
+        width = int(round(width * 1.15))
+        highs_tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=False)
+    highs_tree.grid(row=1, column=0, sticky="nsew")
+    highs_scroll_y.grid(row=1, column=1, sticky="ns")
+    highs_scroll_x.grid(row=2, column=0, sticky="ew")
+    highs_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
+    series_tabs.add(highs_frame, text="Highs")
+
     rotation_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
     rotation_widget_frame.columnconfigure(0, weight=1)
     rotation_widget_frame.rowconfigure(0, weight=1)
@@ -1817,6 +1862,8 @@ def run_gui_app():
     shot_team_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_stat_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    for _highs_dropdown in (highs_view_dropdown, highs_stat_dropdown, highs_team_dropdown):
+        _highs_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_season_highs_table(playoff_sections_state.get("sections") or {}))
     shot_rank_min_entry.bind("<Return>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_min_entry.bind("<FocusOut>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_def_min_entry.bind("<Return>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
@@ -3328,6 +3375,57 @@ def run_gui_app():
                 name_var.set("Waiting for series...")
                 stat_var.set("")
 
+    def update_season_highs_table(sections: Dict):
+        highs_tree.delete(*highs_tree.get_children())
+        rows = sections.get("_season_game_log") or []
+        fields = sections.get("_season_game_log_fields") or ()
+        if not rows or not fields:
+            highs_tree.insert("", "end", values=("Season highs will appear here after Season mode.",) + ("",) * 17)
+            return
+        idx = {name: i for i, name in enumerate(fields)}
+        teams = sorted({row[idx["team"]] for row in rows})
+        highs_team_dropdown.configure(values=("All Teams",) + tuple(teams))
+        if highs_team_var.get() not in ("All Teams",) + tuple(teams):
+            highs_team_var.set("All Teams")
+        team_filter = highs_team_var.get()
+        if team_filter != "All Teams":
+            rows = [row for row in rows if row[idx["team"]] == team_filter]
+
+        def line_values(label: str, row) -> tuple:
+            return (
+                label, table_player_name(row[idx["player"]], 26), table_player_name(row[idx["team"]], 28),
+                ("vs " if row[idx["home"]] else "@ ") + table_player_name(row[idx["opp"]], 26),
+                row[idx["game"]], row[idx["result"]], f"{row[idx['min']]:.1f}",
+                row[idx["pts"]], row[idx["reb"]], row[idx["ast"]], row[idx["stl"]], row[idx["blk"]],
+                row[idx["tov"]], row[idx["pf"]],
+                f"{row[idx['fgm']]}/{row[idx['fga']]}", f"{row[idx['tpm']]}/{row[idx['tpa']]}",
+                f"{row[idx['ftm']]}/{row[idx['fta']]}", f"{row[idx['pm']]:+d}",
+            )
+
+        def tiebreak(row):
+            return (row[idx["pts"]], row[idx["reb"]] + row[idx["ast"]], row[idx["min"]])
+
+        view = highs_view_var.get()
+        stat_label = highs_stat_var.get()
+        if view == HIGHS_VIEWS[0]:
+            for label, field in HIGHS_STATS.items():
+                best = max(rows, key=lambda row: (row[idx[field]],) + tiebreak(row))
+                highs_tree.insert("", "end", values=line_values(f"{label}: {best[idx[field]]}", best))
+            return
+        field = HIGHS_STATS.get(stat_label, "pts")
+        if view == HIGHS_VIEWS[1]:
+            ranked = sorted(rows, key=lambda row: (row[idx[field]],) + tiebreak(row), reverse=True)[:60]
+        else:
+            best_by_player = {}
+            for row in rows:
+                key = (row[idx["team"]], row[idx["player"]])
+                cur = best_by_player.get(key)
+                if cur is None or (row[idx[field]],) + tiebreak(row) > (cur[idx[field]],) + tiebreak(cur):
+                    best_by_player[key] = row
+            ranked = sorted(best_by_player.values(), key=lambda row: (row[idx[field]],) + tiebreak(row), reverse=True)[:150]
+        for rank, row in enumerate(ranked, start=1):
+            highs_tree.insert("", "end", values=line_values(f"{rank}. {stat_label} {row[idx[field]]}", row))
+
     def update_season_awards_table(sections: Dict):
         season_awards_tree.delete(*season_awards_tree.get_children())
         rows = sections.get("_season_awards_table") or []
@@ -4797,7 +4895,7 @@ def run_gui_app():
         except Exception:
             return
         sections = playoff_sections_state.get("sections") or {}
-        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "Shots", "Avg", "Award", "Season"}
+        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "Shots", "Avg", "Award", "Season", "Highs"}
         section_signature = (selected_tab, playoff_sections_state.get("revision", 0))
         if selected_tab in stored_section_tabs and getattr(update_extra_gui_tabs, "_last_section_signature", None) == section_signature:
             return
@@ -4821,6 +4919,8 @@ def run_gui_app():
             update_series_award_widgets(sections)
         elif selected_tab == "Season":
             update_season_awards_table(sections)
+        elif selected_tab == "Highs":
+            update_season_highs_table(sections)
         elif selected_tab == "Stand":
             update_rotation_widget()
         elif selected_tab == "Line":
