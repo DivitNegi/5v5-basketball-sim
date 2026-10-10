@@ -5230,6 +5230,8 @@ def run_gui_app():
             draw_logo(team_b_logo, team_b)
 
     def update_scoreboard(data):
+        if data.get("postseason_ready"):
+            return
         if data.get("season_progress"):
             completed = int(data.get("completed", 0))
             total = max(1, int(data.get("total", 1)))
@@ -7297,8 +7299,10 @@ def run_gui_app():
     sim_engine.GUI_POSITION_PICKER = gui_position_picker
     sim_engine.GUI_OPTION_PICKER = gui_option_picker
 
-    def run_selected_sim():
-        mode = mode_var.get()
+    postseason_state = {"standings": None}
+
+    def run_selected_sim(mode_override=None):
+        mode = mode_override or mode_var.get()
         original_stdout = sys.stdout
         original_input = builtins.input
         original_gui_series_queue = sim_engine.GUI_SERIES_UPDATE_QUEUE
@@ -7396,8 +7400,13 @@ def run_gui_app():
             elif mode == "2027 season (82 games)":
                 status_var.set("2027 season running...")
                 scoreboard_status_var.set("2027 season running in the background (82 games per team)...")
-                run_2027_season(section_queue, scoreboard_queue)
-                scoreboard_status_var.set("Season complete. Open standings, averages, advanced, shots/defense, or awards.")
+                season_sections = run_2027_season(section_queue, scoreboard_queue)
+                postseason_state["standings"] = (season_sections or {}).get("_season_standings")
+                scoreboard_status_var.set("Season complete. Press Next for the play-in and playoffs, or browse standings, averages, advanced, shots/defense, awards and highs.")
+                scoreboard_queue.put({"postseason_ready": True})
+            elif mode == "2027 play-in & playoffs":
+                status_var.set("2027 play-in and playoffs running...")
+                run_2027_postseason(postseason_state["standings"])
             else:
                 run_2016_playoffs()
             sim_completed = True
@@ -7418,7 +7427,7 @@ def run_gui_app():
             builtins.input = original_input
             sys.stdout = original_stdout
             running["active"] = False
-            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2016 playoffs", "Full 2027 playoffs", "Fantasy draft playoffs", "Olympic tournament"):
+            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2016 playoffs", "Full 2027 playoffs", "2027 play-in & playoffs", "Fantasy draft playoffs", "Olympic tournament"):
                 scoreboard_queue.put({"reset_series_score": True, "series_status": "Series reset: 0-0"})
             if sim_completed:
                 pass
@@ -7427,15 +7436,19 @@ def run_gui_app():
                 if sim_error:
                     status_var.set("Error")
 
-    def start_sim():
+    def start_sim(mode_override=None):
         if running["active"]:
             return
-        mode = mode_var.get()
+        mode = mode_override or mode_var.get()
+        if mode == "2027 play-in & playoffs" and not postseason_state["standings"]:
+            status_var.set("Simulate the 2027 season first.")
+            return
+        next_button.configure(state="disabled")
         if mode == "1-on-1":
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()
@@ -7450,7 +7463,7 @@ def run_gui_app():
         else:
             set_scoreboard_teams(team_a_var.get(), team_b_var.get())
         scoreboard_status_var.set("Starting simulation...")
-        thread = threading.Thread(target=run_selected_sim, daemon=True)
+        thread = threading.Thread(target=run_selected_sim, args=(mode_override,), daemon=True)
         thread.start()
 
     def send_gui_input():
@@ -7642,6 +7655,9 @@ def run_gui_app():
                     latest_scoreboard = scoreboard_queue.get_nowait()
                     if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("season_progress"):
                         update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
+                    if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("postseason_ready"):
+                        next_button.configure(state="normal")
+                        status_var.set("Season complete. Press Next for the play-in and playoffs.")
             except queue.Empty:
                 pass
             if latest_scoreboard is not None:
@@ -7697,6 +7713,8 @@ def run_gui_app():
     ttk.Button(controls, text="Create Player", command=open_create_player_dialog).grid(row=3, column=0, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Edit Player", command=open_edit_player_picker).grid(row=3, column=2, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Play 1-on-1", command=open_1v1_player_picker).grid(row=3, column=4, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
+    next_button = ttk.Button(controls, text="Next: Play-in & Playoffs", state="disabled", command=lambda: start_sim("2027 play-in & playoffs"))
+    next_button.grid(row=3, column=6, columnspan=4, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(adjustments_frame, text="Call Timeout", command=queue_gui_timeout).grid(row=1, column=0, sticky="ew", padx=(0, 5), pady=3)
     ttk.Button(adjustments_frame, text="Queue Subs", command=queue_gui_subs).grid(row=1, column=1, sticky="ew", padx=(5, 0), pady=3)
     ttk.Button(adjustments_frame, text="Cycle Offense", command=cycle_gui_offense).grid(row=2, column=0, sticky="ew", padx=(0, 5), pady=3)
