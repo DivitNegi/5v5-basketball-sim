@@ -770,6 +770,7 @@ def run_gui_app():
             "Full playoffs",
             "Full 2016 playoffs",
             "Full 2027 playoffs",
+            "2027 season (82 games)",
             "Fantasy draft season",
             "2026 fantasy draft season",
             "Fantasy draft playoffs",
@@ -4712,7 +4713,7 @@ def run_gui_app():
 
     def set_team_dropdown_state():
         mode = mode_var.get()
-        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
+        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
         team_a_dropdown.configure(values=team_names, state=state)
         team_b_dropdown.configure(values=team_names, state=state)
         if team_a_var.get() not in factories and team_names:
@@ -6790,6 +6791,11 @@ def run_gui_app():
                 run_olympic_tournament(sim_factories)
             elif mode == "Full 2027 playoffs":
                 run_2027_playoffs()
+            elif mode == "2027 season (82 games)":
+                status_var.set("2027 season running...")
+                scoreboard_status_var.set("2027 season running in the background (82 games per team)...")
+                run_2027_season(section_queue, scoreboard_queue)
+                scoreboard_status_var.set("Season complete. Open standings, averages, advanced, shots/defense, or awards.")
             else:
                 run_2016_playoffs()
             sim_completed = True
@@ -6827,7 +6833,7 @@ def run_gui_app():
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()

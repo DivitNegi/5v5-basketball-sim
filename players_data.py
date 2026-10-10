@@ -6909,6 +6909,120 @@ def run_2027_playoffs():
 
 
 # ============================================================
+# 2027 REGULAR SEASON (82 games, NBA schedule structure)
+# 4 games vs division rivals, 4 or 3 vs the rest of the conference,
+# 2 vs every team in the other conference.
+# ============================================================
+
+SEASON_2027_DIVISIONS = {
+    "East": {
+        "Atlantic": ["celtics", "nets", "knicks", "sixers", "raptors"],
+        "Central": ["bulls", "cavs", "pistons", "pacers", "bucks"],
+        "Southeast": ["hawks", "hornets", "heat", "magic", "wizards"],
+    },
+    "West": {
+        "Northwest": ["nuggets", "timberwolves", "thunder", "blazers", "jazz"],
+        "Pacific": ["warriors", "clippers", "lakers", "suns", "kings"],
+        "Southwest": ["mavs", "rockets", "grizzlies", "pelicans", "spurs"],
+    },
+}
+
+
+def build_2027_season_schedule():
+    """Return (games, conference_of) where games is a shuffled list of (home_key, away_key)."""
+    conf_of, div_of = {}, {}
+    for conf, divs in SEASON_2027_DIVISIONS.items():
+        for division, members in divs.items():
+            for key in members:
+                conf_of[key] = conf
+                div_of[key] = division
+    keys = list(conf_of)
+    games_between = {}
+    for i, a in enumerate(keys):
+        for b in keys[i + 1:]:
+            pair = tuple(sorted((a, b)))
+            if conf_of[a] != conf_of[b]:
+                games_between[pair] = 2
+            elif div_of[a] == div_of[b]:
+                games_between[pair] = 4
+    for conf, divs in SEASON_2027_DIVISIONS.items():
+        names = list(divs)
+        for i in range(3):
+            for j in range(i + 1, 3):
+                for ia, a in enumerate(divs[names[i]]):
+                    for ib, b in enumerate(divs[names[j]]):
+                        games_between[tuple(sorted((a, b)))] = 4 if (ib - ia) % 5 < 3 else 3
+    games = []
+    for (a, b), count in games_between.items():
+        for g in range(count):
+            games.append((a, b) if g % 2 == 0 else (b, a))
+    random.shuffle(games)
+    return games, conf_of
+
+
+def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
+    games, conf_of = build_2027_season_schedule()
+    entries = []
+    for key, conference in conf_of.items():
+        factory = globals()[f"make_{key}_2027"]
+        entry = season_entry_from_factory(factory().name, factory)
+        entry["conference"] = conference
+        entries.append(entry)
+    entry_by_name = {entry["name"]: entry for entry in entries}
+    player_totals, team_totals = {}, {}
+    total_games = len(games)
+    print("\n=== 2027 SEASON (82 games per team, NBA schedule) ===")
+    print(f"Quiet-simming {total_games} games. No play-by-play during the regular season.")
+    if progress_queue is not None:
+        progress_queue.put({"season_progress": True, "completed": 0, "total": total_games})
+    factories = {entry["name"]: entry["factory"] for entry in entries}
+    names_by_key = {key: globals()[f"make_{key}_2027"]().name for key in conf_of}
+    for done, (home_key, away_key) in enumerate(games, start=1):
+        home_name, away_name = names_by_key[home_key], names_by_key[away_key]
+        team_a, team_b = simulate_silent_season_game(factories[home_name], factories[away_name])
+        add_player_to_series_totals(player_totals, team_a)
+        add_player_to_series_totals(player_totals, team_b)
+        add_team_to_series_totals(team_totals, team_a)
+        add_team_to_series_totals(team_totals, team_b)
+        a, b = entry_by_name[team_a.name], entry_by_name[team_b.name]
+        a["pf"] += team_a.score
+        a["pa"] += team_b.score
+        b["pf"] += team_b.score
+        b["pa"] += team_a.score
+        if team_a.score > team_b.score:
+            a["wins"] += 1
+            b["losses"] += 1
+            team_totals[team_a.name]["wins"] += 1
+        else:
+            b["wins"] += 1
+            a["losses"] += 1
+            team_totals[team_b.name]["wins"] += 1
+        if progress_queue is not None and (done % 10 == 0 or done == total_games):
+            progress_queue.put({"season_progress": True, "completed": done, "total": total_games})
+        if done % 300 == 0:
+            print(f"Season sim progress: {done}/{total_games} games.")
+
+    sections = build_season_sections(entries, player_totals, team_totals)
+    if section_queue is not None:
+        section_queue.put(sections)
+
+    print("\n2027 SEASON FINAL STANDINGS")
+    for conference in ("East", "West"):
+        print(f"\n{conference}ern Conference" if conference == "East" else "\nWestern Conference")
+        ranked = sorted(
+            (e for e in entries if e["conference"] == conference),
+            key=lambda e: (-e["wins"], -(e["pf"] - e["pa"])),
+        )
+        for seed, e in enumerate(ranked, start=1):
+            games_played = e["wins"] + e["losses"]
+            diff = (e["pf"] - e["pa"]) / max(1, games_played)
+            mark = "*" if seed <= 8 else " "
+            print(f" {seed:>2}{mark} {e['name']:<32}{e['wins']:>3}-{e['losses']:<3}  {diff:+5.1f}")
+    print("\n* = top 8, playoff team. Standings, averages, advanced stats, shot diet and awards are in the tabs.")
+    return sections
+
+
+# ============================================================
 # 2024 PARIS OLYMPIC MEN'S 5x5 TEAMS
 # Regular team factories using direct Player(...) entries.
 # ============================================================
