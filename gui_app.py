@@ -1382,7 +1382,7 @@ def run_gui_app():
     HIGHS_STATS = {
         "PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk",
         "3PM": "tpm", "3PA": "tpa", "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta",
-        "TOV": "tov", "PF": "pf", "MIN": "min", "+/-": "pm",
+        "TOV": "tov", "MIN": "min", "+/-": "pm",
     }
     HIGHS_VIEWS = ("Season highs (every stat)", "Top games for stat", "Each player's best game")
     ttk.Label(highs_top, text="View").grid(row=0, column=0, sticky="w", padx=(0, 8))
@@ -1417,6 +1417,37 @@ def run_gui_app():
     highs_scroll_y.grid(row=1, column=1, sticky="ns")
     highs_scroll_x.grid(row=2, column=0, sticky="ew")
     highs_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
+
+    # Full box score of one game (opened by double-clicking a Highs row).
+    highs_box_frame = ttk.Frame(highs_frame)
+    highs_box_frame.columnconfigure(0, weight=1)
+    highs_box_frame.rowconfigure(1, weight=1)
+    highs_box_bar = ttk.Frame(highs_box_frame)
+    highs_box_bar.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+    highs_box_title_var = tk.StringVar(value="")
+    highs_back_button = ttk.Button(highs_box_bar, text="<  Back to highs")
+    highs_back_button.grid(row=0, column=0, sticky="w", padx=(0, 16))
+    ttk.Label(highs_box_bar, textvariable=highs_box_title_var, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w")
+    highs_box_columns = ("player", "min", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fg", "tp", "ft", "pm")
+    highs_box_tree = ttk.Treeview(highs_box_frame, columns=highs_box_columns, show="headings", height=10, style="Series.Treeview")
+    highs_box_scroll_y = ttk.Scrollbar(highs_box_frame, orient="vertical", command=highs_box_tree.yview)
+    highs_box_tree.configure(yscrollcommand=highs_box_scroll_y.set)
+    for col, label, width, anchor in (
+        ("player", "Player", 260, "w"), ("min", "MIN", 70, "center"), ("pts", "PTS", 60, "center"),
+        ("reb", "REB", 60, "center"), ("oreb", "OREB", 66, "center"), ("dreb", "DREB", 66, "center"),
+        ("ast", "AST", 60, "center"), ("stl", "STL", 60, "center"), ("blk", "BLK", 60, "center"),
+        ("tov", "TOV", 60, "center"), ("pf", "PF", 54, "center"), ("fg", "FG", 84, "center"),
+        ("tp", "3P", 84, "center"), ("ft", "FT", 84, "center"), ("pm", "+/-", 66, "center"),
+    ):
+        highs_box_tree.heading(col, text=label)
+        width = int(round(width * 1.15))
+        highs_box_tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=False)
+    highs_box_tree.grid(row=1, column=0, sticky="nsew")
+    highs_box_scroll_y.grid(row=1, column=1, sticky="ns")
+    highs_box_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
+    highs_box_tree.tag_configure("totals", background=CARD_ALT, foreground=TEXT, font=("Segoe UI", 11, "bold"))
+    highs_box_tree.tag_configure("focus", foreground=GOLD, font=("Segoe UI", 11, "bold"))
+    highs_row_game: Dict[str, Tuple] = {}
     series_tabs.add(highs_frame, text="Highs")
 
     rotation_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
@@ -1862,6 +1893,10 @@ def run_gui_app():
     shot_team_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_stat_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    highs_tree.bind("<Double-1>", lambda event: show_highs_box_score(event))
+    highs_tree.bind("<Return>", lambda _event: show_highs_box_score(None))
+    highs_back_button.configure(command=lambda: close_highs_box_score())
+    highs_box_frame.bind_all("<Escape>", lambda _event: close_highs_box_score() if highs_box_frame.winfo_ismapped() else None, add="+")
     for _highs_dropdown in (highs_view_dropdown, highs_stat_dropdown, highs_team_dropdown):
         _highs_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_season_highs_table(playoff_sections_state.get("sections") or {}))
     shot_rank_min_entry.bind("<Return>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
@@ -3375,8 +3410,86 @@ def run_gui_app():
                 name_var.set("Waiting for series...")
                 stat_var.set("")
 
+    def close_highs_box_score():
+        highs_box_frame.grid_remove()
+        highs_top.grid()
+        highs_tree.grid()
+        highs_scroll_y.grid()
+        highs_scroll_x.grid()
+
+    def show_highs_box_score(event=None):
+        item = highs_tree.identify_row(event.y) if event is not None else (highs_tree.selection() or [""])[0]
+        info = highs_row_game.get(item)
+        if not info:
+            return
+        gid, focus_player, focus_team = info
+        sections = playoff_sections_state.get("sections") or {}
+        rows = sections.get("_season_game_log") or []
+        fields = sections.get("_season_game_log_fields") or ()
+        if not rows or "gid" not in fields:
+            return
+        idx = {name: i for i, name in enumerate(fields)}
+        game_rows = [row for row in rows if row[idx["gid"]] == gid]
+        if not game_rows:
+            return
+        highs_box_tree.delete(*highs_box_tree.get_children())
+        teams = []
+        for row in game_rows:
+            if row[idx["team"]] not in teams:
+                teams.append(row[idx["team"]])
+        teams.sort(key=lambda name: 0 if any(r[idx["team"]] == name and r[idx["home"]] for r in game_rows) else 1)
+        scores = {}
+        for name in teams:
+            first = next(r for r in game_rows if r[idx["team"]] == name)
+            match = re.search(r"(\d+)-(\d+)", str(first[idx["result"]]))
+            scores[name] = (int(match.group(1)), first) if match else (0, first)
+        title_parts = [f"{table_player_name(name, 30)} {scores[name][0]}" for name in teams]
+        game_no = scores[teams[0]][1][idx["game"]]
+        highs_box_title_var.set("  -  ".join(title_parts) + f"    (team game {game_no})")
+        for name in teams:
+            result_text = str(scores[name][1][idx["result"]])
+            highs_box_tree.insert(
+                "", "end",
+                values=(f"{name}  ({result_text})",) + ("",) * 14, tags=("section",),
+            )
+            team_rows = sorted((r for r in game_rows if r[idx["team"]] == name), key=lambda r: r[idx["min"]], reverse=True)
+            totals = {key: 0 for key in ("pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm")}
+            minutes_total = 0.0
+            for r in team_rows:
+                for key in totals:
+                    totals[key] += r[idx[key]]
+                minutes_total += r[idx["min"]]
+                tags = ("focus",) if (r[idx["player"]] == focus_player and name == focus_team) else ()
+                highs_box_tree.insert(
+                    "", "end",
+                    values=(
+                        table_player_name(r[idx["player"]], 28), f"{r[idx['min']]:.1f}", r[idx["pts"]], r[idx["reb"]],
+                        r[idx["oreb"]], r[idx["dreb"]], r[idx["ast"]], r[idx["stl"]], r[idx["blk"]], r[idx["tov"]],
+                        r[idx["pf"]], f"{r[idx['fgm']]}/{r[idx['fga']]}", f"{r[idx['tpm']]}/{r[idx['tpa']]}",
+                        f"{r[idx['ftm']]}/{r[idx['fta']]}", f"{r[idx['pm']]:+d}",
+                    ),
+                    tags=tags,
+                )
+            highs_box_tree.insert(
+                "", "end",
+                values=(
+                    "TEAM", f"{minutes_total:.0f}", totals["pts"], totals["reb"], totals["oreb"], totals["dreb"],
+                    totals["ast"], totals["stl"], totals["blk"], totals["tov"], totals["pf"],
+                    f"{totals['fgm']}/{totals['fga']}", f"{totals['tpm']}/{totals['tpa']}",
+                    f"{totals['ftm']}/{totals['fta']}", "",
+                ),
+                tags=("totals",),
+            )
+        highs_top.grid_remove()
+        highs_tree.grid_remove()
+        highs_scroll_y.grid_remove()
+        highs_scroll_x.grid_remove()
+        highs_box_frame.grid(row=0, column=0, rowspan=3, columnspan=2, sticky="nsew")
+
     def update_season_highs_table(sections: Dict):
+        close_highs_box_score()
         highs_tree.delete(*highs_tree.get_children())
+        highs_row_game.clear()
         rows = sections.get("_season_game_log") or []
         fields = sections.get("_season_game_log_fields") or ()
         if not rows or not fields:
@@ -3390,6 +3503,11 @@ def run_gui_app():
         team_filter = highs_team_var.get()
         if team_filter != "All Teams":
             rows = [row for row in rows if row[idx["team"]] == team_filter]
+
+        def insert_line(label: str, row):
+            item = highs_tree.insert("", "end", values=line_values(label, row))
+            if "gid" in idx:
+                highs_row_game[item] = (row[idx["gid"]], row[idx["player"]], row[idx["team"]])
 
         def line_values(label: str, row) -> tuple:
             return (
@@ -3410,7 +3528,7 @@ def run_gui_app():
         if view == HIGHS_VIEWS[0]:
             for label, field in HIGHS_STATS.items():
                 best = max(rows, key=lambda row: (row[idx[field]],) + tiebreak(row))
-                highs_tree.insert("", "end", values=line_values(f"{label}: {best[idx[field]]}", best))
+                insert_line(f"{label}: {best[idx[field]]}", best)
             return
         field = HIGHS_STATS.get(stat_label, "pts")
         if view == HIGHS_VIEWS[1]:
@@ -3424,7 +3542,7 @@ def run_gui_app():
                     best_by_player[key] = row
             ranked = sorted(best_by_player.values(), key=lambda row: (row[idx[field]],) + tiebreak(row), reverse=True)[:150]
         for rank, row in enumerate(ranked, start=1):
-            highs_tree.insert("", "end", values=line_values(f"{rank}. {stat_label} {row[idx[field]]}", row))
+            insert_line(f"{rank}. {stat_label} {row[idx[field]]}", row)
 
     def update_season_awards_table(sections: Dict):
         season_awards_tree.delete(*season_awards_tree.get_children())

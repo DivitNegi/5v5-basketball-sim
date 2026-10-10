@@ -21972,7 +21972,7 @@ ROOKIE_KEYS_2026 = frozenset(rookie_name_key(n) for n in ROOKIE_CLASS_2026)
 
 SEASON_GAME_LOG_FIELDS = (
     "player", "team", "opp", "game", "home", "result", "min", "pts", "reb", "oreb", "dreb",
-    "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm",
+    "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm", "gid",
 )
 
 
@@ -21982,8 +21982,11 @@ class SeasonGameLog:
     def __init__(self):
         self.rows: List[Tuple] = []
         self.team_games: Dict[str, int] = {}
+        self.game_count = 0
 
     def add(self, team_a: Team, team_b: Team):
+        self.game_count += 1
+        gid = self.game_count
         for team, opp, home in ((team_a, team_b, True), (team_b, team_a, False)):
             game_no = self.team_games.get(team.name, 0) + 1
             self.team_games[team.name] = game_no
@@ -21995,7 +21998,7 @@ class SeasonGameLog:
                     player_stat_key(team, p), team.name, opp.name, game_no, home, result,
                     round(p.minutes / 60, 1), p.pts, p.reb, p.oreb_stat, p.dreb_stat,
                     p.ast, p.stl, p.blk_stat, p.tov, p.pf, p.fgm, p.fga, p.tpm, p.tpa,
-                    p.ftm, p.fta, p.plus_minus,
+                    p.ftm, p.fta, p.plus_minus, gid,
                 ))
 
 
