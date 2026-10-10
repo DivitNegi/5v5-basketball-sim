@@ -1098,7 +1098,14 @@ def run_gui_app():
         shot_defense_filter_frame, textvariable=shot_rank_min_var, width=6,
         bg=CARD_ALT, fg=TEXT, insertbackground=TEXT, relief="flat", font=("Segoe UI", 12),
     )
-    shot_rank_min_entry.grid(row=0, column=16, sticky="w")
+    shot_rank_min_entry.grid(row=0, column=16, sticky="w", padx=(0, 16))
+    tk.Label(shot_defense_filter_frame, text="Min defended (blank = auto)", bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 12, "bold")).grid(row=0, column=17, sticky="w", padx=(0, 8))
+    shot_rank_def_min_var = tk.StringVar(value="")
+    shot_rank_def_min_entry = tk.Entry(
+        shot_defense_filter_frame, textvariable=shot_rank_def_min_var, width=6,
+        bg=CARD_ALT, fg=TEXT, insertbackground=TEXT, relief="flat", font=("Segoe UI", 12),
+    )
+    shot_rank_def_min_entry.grid(row=0, column=18, sticky="w")
     shot_columns = ("team", "player", "3p", "open3", "cont3", "mid", "openmid", "contmid", "rim", "openrim", "contrim", "post", "dunk", "cs", "iso", "putb", "open", "cont", "sq", "total")
     shot_tree = ttk.Treeview(
         shot_defense_widget_frame,
@@ -1812,6 +1819,8 @@ def run_gui_app():
     shot_rank_stat_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_min_entry.bind("<Return>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_min_entry.bind("<FocusOut>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    shot_rank_def_min_entry.bind("<Return>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    shot_rank_def_min_entry.bind("<FocusOut>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     SHOT_HEADING_TO_RANK = {
         "3p": "3P", "open3": "3P OPEN", "cont3": "3P CONT", "mid": "MID", "openmid": "MID OPEN", "contmid": "MID CONT",
         "rim": "RIM", "openrim": "RIM OPEN", "contrim": "RIM CONT", "post": "POST", "dunk": "DUNK", "cs": "C&S",
@@ -2557,15 +2566,10 @@ def run_gui_app():
             if advanced_sort_var.get() in ADVANCED_RATE_SORTS:
                 # Rate stats (per-minute / per-possession) carry the 2,000-minute
                 # leaderboard minimum, scaled to games played.
-                before_count = len(flat_advanced_rows)
                 flat_advanced_rows = [
                     row for row in flat_advanced_rows
                     if row["minutes"] / 60 >= NBA_RANK_MINIMUM_MINUTES * min(1.0, max(1, row.get("team_games", 0)) / NBA_MINIMUM_GAMES)
                 ]
-                advanced_tree.insert(
-                    "", "end",
-                    values=("", f"Qualifiers only: {NBA_RANK_MINIMUM_MINUTES} min (scaled to games played). {before_count - len(flat_advanced_rows)} below the minimum.") + ("",) * 22,
-                )
             for rank, row in enumerate(sorted(flat_advanced_rows, key=advanced_sort_key, reverse=True), start=1):
                 adv = row["adv"]
                 points_created = row["points_created"]
@@ -2717,7 +2721,7 @@ def run_gui_app():
                 return 100.0 * made / attempted if attempted else 0.0
             return attempted if shot_rank_stat_var.get() == "Attempted" else made
 
-        def shot_rank_qualifies(diet: Dict, team_games: int) -> bool:
+        def shot_rank_qualifies(diet: Dict, team_games: int, defense: bool = False) -> bool:
             # Percentage leaderboards use the NBA minimums scaled to games played:
             # 82 made for 3P%, 300 made for total FG%, and a volume floor of
             # attempts for the individual zones so 1-for-1 shooters do not top it.
@@ -2726,28 +2730,33 @@ def run_gui_app():
             keys = SHOT_RANK_KEYS[shot_rank_choice]
             attempted = sum(diet.get(k, 0) for k in keys)
             made = sum(diet.get(f"{k}_made", 0) for k in keys)
-            kind, needed = shot_rank_requirement(team_games)
+            kind, needed = shot_rank_requirement(team_games, defense)
             return (made if kind == "made" else attempted) >= needed
 
-        def shot_rank_requirement(team_games: int):
-            # A number typed into "Min att" overrides the NBA-based default.
+        def shot_rank_requirement(team_games: int, defense: bool = False):
+            # A number typed into "Min att" (shots) or "Min defended" (defense)
+            # overrides the default.
             try:
-                typed = float(shot_rank_min_var.get().strip())
+                typed = float((shot_rank_def_min_var if defense else shot_rank_min_var).get().strip())
             except ValueError:
                 typed = None
             if typed is not None and typed >= 0:
                 return "attempted", typed
             scale = min(1.0, max(1, team_games) / 82)
+            if defense:
+                # Defended shots: a minimum number of shots defended (allowed
+                # makes would reward bad defenders, so it is attempts-based).
+                if shot_rank_choice == "3P":
+                    return "attempted", 200 * scale
+                if shot_rank_choice == "TOTAL":
+                    return "attempted", 500 * scale
+                return "attempted", max(5.0, 100 * scale)
             if shot_rank_choice == "3P":
                 return "made", 82 * scale
             if shot_rank_choice == "TOTAL":
                 return "made", 300 * scale
             return "attempted", max(5.0, 100 * scale)
 
-        def shot_rank_note(excluded: int, team_games: int) -> str:
-            kind, needed = shot_rank_requirement(team_games)
-            return (f"Percentage: need at least {needed:.0f} {kind} "
-                    f"(type a number in Min att to change). {excluded} below the minimum.")
 
         def shot_row_values(team_display, name, diet):
             return (
@@ -2785,8 +2794,6 @@ def run_gui_app():
                         continue
                     ranked_shots.append((shot_rank_value(diet), team_name, name, diet))
             ranked_shots.sort(key=lambda item: item[0], reverse=True)
-            if shot_rank_pct and shot_totals:
-                shot_tree.insert("", "end", values=("", shot_rank_note(excluded_shots, max((s.get("games", 0) for pl in shot_totals.values() for s in pl.values()), default=0))) + ("",) * 18)
             for rank, (_value, team_name, name, diet) in enumerate(ranked_shots, start=1):
                 shot_tree.insert(
                     "", "end",
@@ -2841,14 +2848,12 @@ def run_gui_app():
                 team_games = max((s.get("games", 0) for s in players.values()), default=0)
                 for name, stats in players.items():
                     defended = stats.get("defended_diet", {}) or {}
-                    if not shot_rank_qualifies(defended, team_games):
+                    if not shot_rank_qualifies(defended, team_games, defense=True):
                         excluded_defense += 1
                         continue
                     ranked_defense.append((shot_rank_value(defended), team_name, name, defended))
             # Lower allowed % is better on defense; counts still rank high-to-low.
             ranked_defense.sort(key=lambda item: item[0], reverse=not shot_rank_pct)
-            if shot_rank_pct and defense_totals:
-                defense_tree.insert("", "end", values=("", shot_rank_note(excluded_defense, max((s.get("games", 0) for pl in defense_totals.values() for s in pl.values()), default=0)) + " Lowest allowed % first.") + ("",) * 12)
             for rank, (_value, team_name, name, defended) in enumerate(ranked_defense, start=1):
                 defense_tree.insert(
                     "", "end",
@@ -3106,11 +3111,6 @@ def run_gui_app():
                     gp = max(1, row_stats.get("games", 0))
                     entries.append((value_of(row_stats, gp), team_name, name, row_stats, gp))
         entries.sort(key=lambda e: e[0], reverse=True)
-        if period is None and rank_by in NBA_RANK_MINIMUMS:
-            all_games = max((s.get("games", 0) for t_players in series_totals.values() for s in (t_players or {}).values()), default=0)
-            _key, needed, label = rank_minimum_for(rank_by, all_games)
-            note = f"Qualifiers only: at least {needed:.0f} {label} (NBA minimum scaled to {all_games} games). {excluded} below the minimum."
-            tree.insert("", "end", values=("", note, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""))
         for rank, (_value, team_name, name, stats, gp) in enumerate(entries, start=1):
             tree.insert(
                 "",

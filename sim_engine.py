@@ -3197,6 +3197,11 @@ FEATURED_ROOKIE_ROLES_2027: Dict[str, Tuple[float, float, float]] = {
     "Darius Acuff Jr.": (0.30, 0.44, 16.0),
     "AJ Dybantsa": (0.32, 0.50, 19.0),
     "Kingston Flemings": (0.24, 0.34, 11.0),
+    "Brayden Burries": (0.26, 0.38, 12.0),
+    "Morez Johnson Jr.": (0.24, 0.34, 11.0),
+    "Yaxel Lendeborg": (0.24, 0.34, 11.0),
+    "Nate Ament": (0.24, 0.34, 11.0),
+    "Aday Mara": (0.20, 0.30, 9.0),
     "Cameron Boozer": (0.27, 0.40, 14.0),
     "Caleb Wilson": (0.26, 0.38, 15.0),
     "Keaton Wagler": (0.28, 0.42, 15.0),
@@ -8178,6 +8183,7 @@ SEASON_STAR_MINUTES_CAP = None
 # only the stints the starter sits.
 QUARTER_STARTER_SWAPS = {
     "2027 Dallas Mavericks": ("Dereck Lively II", "Daniel Gafford", (2, 3, 4)),
+    "2027 New York Knicks": ("Karl-Anthony Towns", "Andre Drummond", (2, 4)),
 }
 
 
@@ -8442,7 +8448,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Dallas Mavericks":
         target_ranges = {
-            "Morez Johnson Jr.": (12, 18),
+            "Morez Johnson Jr.": (24, 29),
             "Kyrie Irving": (36, 40), "Max Christie": (28, 33),
             "Cooper Flagg": (34, 38), "P.J. Washington": (31, 35),
             "Dereck Lively II": (14, 17), "Daniel Gafford": (30, 34),
@@ -8672,7 +8678,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Golden State Warriors":
         target_ranges = {
-            "Yaxel Lendeborg": (12, 18),
+            "Yaxel Lendeborg": (24, 29),
             "Stephen Curry": (42, 44), "Brandin Podziemski": (24, 29),
             "Gui Santos": (18, 24), "Draymond Green": (28, 33),
             "Kristaps Porzingis": (26, 31), "Jimmy Butler": (16, 22),
@@ -8739,8 +8745,8 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Milwaukee Bucks":
         target_ranges = {
-            "Brayden Burries": (14, 20),
-            "Nate Ament": (10, 16),
+            "Brayden Burries": (26, 31),
+            "Nate Ament": (24, 29),
             "Ryan Rollins": (22, 28), "Tyler Herro": (32, 36),
             "Jaime Jaquez Jr.": (18, 24), "Kyle Kuzma": (18, 24),
             "Myles Turner": (24, 29), "Kevin Porter Jr.": (18, 24),
@@ -8767,11 +8773,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 New York Knicks":
         target_ranges = {
-            "Jalen Brunson": (34, 38), "Karl-Anthony Towns": (30, 34),
+            "Jalen Brunson": (34, 38), "Karl-Anthony Towns": (30, 33),
             "OG Anunoby": (26, 31), "Mikal Bridges": (28, 33),
             "Josh Hart": (24, 29), "Miles McBride": (18, 24),
             "Landry Shamet": (14, 20), "Jose Alvarado": (16, 22),
-            "Andre Drummond": (14, 20), "Jordan Clarkson": (12, 18),
+            "Andre Drummond": (22, 27), "Jordan Clarkson": (12, 18),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -8780,7 +8786,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Oklahoma City Thunder":
         target_ranges = {
-            "Aday Mara": (10, 16),
+            "Aday Mara": (20, 26),
             "Bennett Stirtz": (8, 14),
             "Shai G-Alexander": (34, 38), "Cason Wallace": (18, 24),
             "Jalen Williams": (28, 33), "Chet Holmgren": (28, 33),
