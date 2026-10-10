@@ -1345,10 +1345,10 @@ def run_gui_app():
     season_awards_scroll_x = ttk.Scrollbar(season_awards_frame, orient="horizontal", command=season_awards_tree.xview)
     season_awards_tree.configure(yscrollcommand=season_awards_scroll_y.set, xscrollcommand=season_awards_scroll_x.set)
     for col, label, width in (
-        ("award", "Award", 190),
-        ("player", "Player", 190),
-        ("team", "Team", 210),
-        ("stats", "Stats", 520),
+        ("award", "Award", 200),
+        ("player", "Player", 230),
+        ("team", "Team", 270),
+        ("stats", "Stats", 900),
     ):
         season_awards_tree.heading(col, text=label)
         width = int(round(width * 1.35))
@@ -3825,23 +3825,38 @@ def run_gui_app():
         rotation_tree.delete(*rotation_tree.get_children())
         standings = (playoff_sections_state.get("sections") or {}).get("_season_standings") or []
         if standings:
-            for row in standings:
-                rotation_tree.insert(
-                    "",
-                    "end",
-                    values=(
-                        row.get("seed", ""),
-                        row.get("conference", ""),
-                        table_player_name(row.get("team", ""), 32),
-                        row.get("wins", 0),
-                        row.get("losses", 0),
-                        f"{row.get('pct', 0):.3f}",
-                        f"{row.get('pf', 0):.1f}",
-                        f"{row.get('pa', 0):.1f}",
-                        f"{row.get('diff', 0):+.1f}",
-                        f"{row.get('strength', 0):.1f}",
-                    ),
+            def standings_values(seed, row):
+                return (
+                    seed,
+                    row.get("conference", ""),
+                    table_player_name(row.get("team", ""), 32),
+                    row.get("wins", 0),
+                    row.get("losses", 0),
+                    f"{row.get('pct', 0):.3f}",
+                    f"{row.get('pf', 0):.1f}",
+                    f"{row.get('pa', 0):.1f}",
+                    f"{row.get('diff', 0):+.1f}",
+                    f"{row.get('strength', 0):.1f}",
                 )
+
+            conferences = [c for c in ("East", "West") if any(r.get("conference") == c for r in standings)]
+            if conferences:
+                rotation_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
+                for conference in conferences:
+                    label = "EASTERN CONFERENCE" if conference == "East" else "WESTERN CONFERENCE"
+                    rotation_tree.insert("", "end", values=("", "", label, "W", "L", "PCT", "PF", "PA", "DIFF", "STR"), tags=("section",))
+                    rows = sorted(
+                        (r for r in standings if r.get("conference") == conference),
+                        key=lambda r: (r.get("wins", 0), r.get("diff", 0), r.get("strength", 0)),
+                        reverse=True,
+                    )
+                    for seed, row in enumerate(rows, start=1):
+                        rotation_tree.insert("", "end", values=standings_values(seed, row))
+                        if seed == 8 and len(rows) > 8:
+                            rotation_tree.insert("", "end", values=("", "", "---- playoff line ----", "", "", "", "", "", "", ""))
+                return
+            for row in standings:
+                rotation_tree.insert("", "end", values=standings_values(row.get("seed", ""), row))
             return
         teams = [SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")]
         if not all(teams):

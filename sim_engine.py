@@ -21889,6 +21889,34 @@ def simulate_quiet_season_game(entry_a: Dict, entry_b: Dict):
     simulate_quiet_season_team_game(entry_b, entry_a, score_b, score_a, not a_wins)
 
 
+# The 2026 NBA draft class (2026-27 rookies): both rounds, per the draft results.
+ROOKIE_CLASS_2026 = (
+    # Round 1
+    "AJ Dybantsa", "Darryn Peterson", "Cameron Boozer", "Caleb Wilson", "Keaton Wagler", "Mikel Brown Jr.",
+    "Darius Acuff Jr.", "Kingston Flemings", "Morez Johnson Jr.", "Brayden Burries", "Yaxel Lendeborg", "Aday Mara",
+    "Nate Ament", "Hannes Steinbach", "Dailyn Swain", "Bennett Stirtz", "Ebuka Okorie", "Christian Anderson Jr.",
+    "Allen Graves", "Jayden Quaintance", "Karim Lopez", "Labaron Philon Jr.", "Zuby Ejiofor", "Cameron Carr",
+    "Sergio De Larrea", "Tarris Reed Jr.", "Chris Cenac Jr.", "Joshua Jefferson", "Alex Karaban", "Koa Peat",
+    # Round 2
+    "Bruce Thornton", "Richie Saunders", "Isaiah Evans", "Meleek Thomas", "Trevon Brazile", "Baba Miller",
+    "Ryan Conwell", "Braden Smith", "Jack Kayil", "Dillon Mitchell", "Otega Oweh", "Ja'Kobi Gillespie",
+    "Tyler Bilodeau", "Maliq Brown", "Emanuel Sharp", "Felix Okpara", "Tyler Nickel", "Tobi Lawal",
+    "Bryce Hopkins", "Jaden Bradley", "Izaiyah Nelson", "Henri Veesaar", "Ugonna Onyenso", "Lajae Jones",
+    "Nick Martinelli", "Vsevolod Ishchenko", "Narcisse Ngoy", "Jaron Pierre Jr.", "Trey Kaufman-Renn", "Malique Lewis",
+)
+
+
+def rookie_name_key(name: str) -> str:
+    import unicodedata
+    text = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode().lower()
+    text = re.sub(r"[.'\-]", "", text)
+    text = re.sub(r"\b(jr|sr|ii|iii|iv)\b", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+ROOKIE_KEYS_2026 = frozenset(rookie_name_key(n) for n in ROOKIE_CLASS_2026)
+
+
 def build_season_sections(entries: List[Dict],
                           series_totals: Dict | None = None,
                           series_team_totals: Dict | None = None) -> Dict:
@@ -21944,7 +21972,11 @@ def build_season_sections(entries: List[Dict],
                 f"{stats.get('pts', 0) / gp:.1f} PPG, "
                 f"{stats.get('reb', 0) / gp:.1f} RPG, "
                 f"{stats.get('ast', 0) / gp:.1f} APG, "
-                f"{(stats.get('stl', 0) + stats.get('blk', 0)) / gp:.1f} stocks, "
+                f"{stats.get('stl', 0) / gp:.1f} SPG, "
+                f"{stats.get('blk', 0) / gp:.1f} BPG, "
+                f"{100 * safe_div(stats.get('fgm', 0), stats.get('fga', 0)):.1f} FG%, "
+                f"{100 * safe_div(stats.get('tpm', 0), stats.get('tpa', 0)):.1f} 3P%, "
+                f"{100 * safe_div(stats.get('ftm', 0), stats.get('fta', 0)):.1f} FT%, "
                 f"{season_ts(stats):.1f} TS%"
             )
 
@@ -21966,12 +21998,11 @@ def build_season_sections(entries: List[Dict],
         def defense_stat_line(team_name: str, stats: Dict) -> str:
             gp = max(1, stats.get("games", 1))
             mpg = stats.get("minutes", 0) / 60 / gp
-            stocks = (stats.get("stl", 0) + stats.get("blk", 0)) / gp
             made, attempts = defended_core_totals(stats)
             allowed_pct = 100 * safe_div(made, attempts)
             adv = season_advanced_for(team_name, stats)
             return (
-                f"{mpg:.1f} MPG, {stocks:.1f} stocks, "
+                f"{mpg:.1f} MPG, {stats.get('stl', 0) / gp:.1f} SPG, {stats.get('blk', 0) / gp:.1f} BPG, "
                 f"{attempts / gp:.1f} shots defended, {allowed_pct:.1f}% allowed, "
                 f"{adv[23]:+.1f} DEF IMP"
             )
@@ -22054,6 +22085,20 @@ def build_season_sections(entries: List[Dict],
 
         awards_table.append({"award": "MVP", "player": mvp[1], "team": mvp[0], "stats": stat_line(mvp[0], mvp[2])})
         awards_table.append({"award": "DPOY", "player": dpoy[1], "team": dpoy[0], "stats": defense_stat_line(dpoy[0], dpoy[2])})
+        rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026]
+        if rookies:
+            roy = max(rookies, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
+            awards.append(("Rookie of the Year", roy[1], f"{roy[0]} | {roy[2].get('pts', 0) / max(1, roy[2].get('games', 1)):.1f} PPG, {roy[2].get('reb', 0) / max(1, roy[2].get('games', 1)):.1f} RPG, {roy[2].get('ast', 0) / max(1, roy[2].get('games', 1)):.1f} APG"))
+            awards_table.append({"award": "Rookie of the Year", "player": roy[1], "team": roy[0], "stats": stat_line(roy[0], roy[2])})
+            ranked_rookies = sorted(
+                rookies,
+                key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05,
+                reverse=True,
+            )
+            for team_no, start in enumerate((0, 5), start=1):
+                label = "All-Rookie First Team" if team_no == 1 else "All-Rookie Second Team"
+                for idx, (team_name, name, stats) in enumerate(ranked_rookies[start:start + 5], start=1):
+                    awards_table.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": stat_line(team_name, stats)})
 
         for team_no, start in enumerate((0, 5, 10), start=1):
             label = {1: "All-NBA First Team", 2: "All-NBA Second Team", 3: "All-NBA Third Team"}[team_no]
