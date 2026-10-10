@@ -8148,8 +8148,18 @@ def rotation_star_players(team: Team) -> List[Player]:
     return stars
 
 
+# Regular-season mode: a first option plays ~34-36 minutes a night, not the
+# 38-44 the playoff-style targets give. Set by the season runner only.
+SEASON_STAR_MINUTES_CAP = None
+
+
 def initialize_minute_targets(team: Team):
     _initialize_minute_targets_core(team)
+    if SEASON_STAR_MINUTES_CAP:
+        cap = int(SEASON_STAR_MINUTES_CAP)
+        for p in team.roster:
+            if getattr(p, "target_minutes", 0) > cap:
+                p.target_minutes = random.randint(max(30, cap - 2), cap)
     apply_gui_minutes_overrides(team)
 
 
@@ -9990,6 +10000,15 @@ def should_rest_for_stint(player: Player, team: Team, period: int, period_time: 
 
     if player in stars:
         target = target_minutes(player, team)
+        if SEASON_STAR_MINUTES_CAP:
+            # Regular season: stars are paced to their target over the whole
+            # game instead of being left on the floor until the 4th quarter.
+            if period >= 4 and period_time <= 6 * 60:
+                return False
+            game_elapsed = min(period, 4) - 1
+            game_elapsed = game_elapsed * (period_length_seconds(1) / 60) + elapsed_period_minutes
+            allowed = target * min(1.0, game_elapsed / 48.0) + 1.5
+            return elapsed_period_minutes >= 3.0 and played_minutes > allowed
         if period < 4:
             return elapsed_period_minutes >= 8.0 and played_minutes >= target * 0.72
         if period >= 4 and period_time > 6 * 60:

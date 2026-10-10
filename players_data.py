@@ -6963,6 +6963,9 @@ def build_2027_season_schedule():
 def _run_2027_season_game(task):
     """Worker entry point: simulate one silent season game and return the finished teams."""
     home_key, away_key = task
+    # Regular season: first options play ~34-36 minutes, not playoff minutes.
+    import sim_engine as _sim_engine
+    _sim_engine.SEASON_STAR_MINUTES_CAP = 34
     team_a, team_b = simulate_silent_season_game(
         globals()[f"make_{home_key}_2027"], globals()[f"make_{away_key}_2027"]
     )
@@ -7031,6 +7034,8 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         if done % 300 == 0:
             print(f"Season sim progress: {done}/{total_games} games.")
 
+    import sim_engine as _sim_engine
+    _sim_engine.SEASON_STAR_MINUTES_CAP = None
     sections = build_season_sections(entries, player_totals, team_totals)
     if section_queue is not None:
         section_queue.put(sections)
