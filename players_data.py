@@ -6960,6 +6960,15 @@ def build_2027_season_schedule():
     return games, conf_of
 
 
+def _run_2027_season_game(task):
+    """Worker entry point: simulate one silent season game and return the finished teams."""
+    home_key, away_key = task
+    team_a, team_b = simulate_silent_season_game(
+        globals()[f"make_{home_key}_2027"], globals()[f"make_{away_key}_2027"]
+    )
+    return home_key, away_key, team_a, team_b
+
+
 def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     games, conf_of = build_2027_season_schedule()
     entries = []
@@ -6975,11 +6984,31 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     print(f"Quiet-simming {total_games} games. No play-by-play during the regular season.")
     if progress_queue is not None:
         progress_queue.put({"season_progress": True, "completed": 0, "total": total_games})
-    factories = {entry["name"]: entry["factory"] for entry in entries}
-    names_by_key = {key: globals()[f"make_{key}_2027"]().name for key in conf_of}
-    for done, (home_key, away_key) in enumerate(games, start=1):
-        home_name, away_name = names_by_key[home_key], names_by_key[away_key]
-        team_a, team_b = simulate_silent_season_game(factories[home_name], factories[away_name])
+    def parallel_results():
+        # Games are independent, so they are spread over worker processes
+        # (each returns the finished Team objects) and aggregated here.
+        import multiprocessing
+        import os
+        workers = max(1, min(12, (os.cpu_count() or 4) - 2))
+        pool = multiprocessing.get_context("spawn").Pool(processes=workers)
+        try:
+            for result in pool.imap_unordered(_run_2027_season_game, games, chunksize=4):
+                yield result
+        finally:
+            pool.terminate()
+            pool.join()
+
+    def sequential_results():
+        for home_key, away_key in games:
+            yield _run_2027_season_game((home_key, away_key))
+
+    try:
+        import os as _os
+        use_parallel = (_os.cpu_count() or 1) >= 4
+    except Exception:
+        use_parallel = False
+    results = parallel_results() if use_parallel else sequential_results()
+    for done, (home_key, away_key, team_a, team_b) in enumerate(results, start=1):
         add_player_to_series_totals(player_totals, team_a)
         add_player_to_series_totals(player_totals, team_b)
         add_team_to_series_totals(team_totals, team_a)

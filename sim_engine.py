@@ -4221,12 +4221,24 @@ def height_advantage(defender: Player, shooter: Player) -> float:
     return max(-8, min(8, defender.height - shooter.height)) / 8.0
 
 
+_POSITIONS_CACHE: Dict = {}
+
+
 def player_positions(player: Player) -> Tuple[str, ...]:
+    # Called ~170k times per game; the answer only depends on these inputs.
+    raw_secondary = getattr(player, "secondary_positions", ()) or ()
+    key = (player.name == "LeBron James", getattr(player, "position", "SF"), tuple(raw_secondary))
+    cached = _POSITIONS_CACHE.get(key)
+    if cached is not None:
+        return cached
     primary = str(getattr(player, "position", "SF") or "SF").upper()
-    secondary = tuple(str(pos).upper() for pos in getattr(player, "secondary_positions", ()) or ())
+    secondary = tuple(str(pos).upper() for pos in raw_secondary)
     if player.name == "LeBron James":
-        return tuple(dict.fromkeys((primary, "PG", "SG", "SF", "PF", *secondary)))
-    return tuple(dict.fromkeys((primary, *secondary)))
+        result = tuple(dict.fromkeys((primary, "PG", "SG", "SF", "PF", *secondary)))
+    else:
+        result = tuple(dict.fromkeys((primary, *secondary)))
+    _POSITIONS_CACHE[key] = result
+    return result
 
 
 def can_play_position(player: Player, pos: str) -> bool:
@@ -4365,6 +4377,39 @@ def balanced_lineup_order(players: List[Player]) -> List[Player]:
 
 
 def balance_lineup_positions(team: Team):
+    # This runs after nearly every possession/substitution but the lineup
+    # almost never changes between calls. If the floor, bench and foul
+    # state are exactly what the last pass left behind, it is a no-op.
+    roster = getattr(team, "roster", None)
+    if not roster:
+        return
+    try:
+        key = (
+            tuple(id(p) for p in team.on_floor),
+            tuple(id(p) for p in getattr(team, "bench", ()) or ()),
+            tuple(p.fouled_out for p in roster),
+            getattr(team, "current_period", 0),
+            tuple(int(p.minutes // 60) for p in roster) if team.name == "2026 Los Angeles Lakers" else None,
+        )
+    except Exception:
+        key = None
+    if key is not None and getattr(team, "_lineup_balanced_key", None) == key:
+        return
+    _balance_lineup_positions_impl(team)
+    if key is not None:
+        try:
+            team._lineup_balanced_key = (
+                tuple(id(p) for p in team.on_floor),
+                tuple(id(p) for p in getattr(team, "bench", ()) or ()),
+                tuple(p.fouled_out for p in roster),
+                getattr(team, "current_period", 0),
+                tuple(int(p.minutes // 60) for p in roster) if team.name == "2026 Los Angeles Lakers" else None,
+            )
+        except Exception:
+            team._lineup_balanced_key = None
+
+
+def _balance_lineup_positions_impl(team: Team):
     if not getattr(team, "roster", None):
         return
 
@@ -4533,19 +4578,32 @@ BADGE_ALIASES = {
 }
 
 
+_BADGE_PARTS_CACHE: Dict = {}
+
+
 def badge_parts(badge: str) -> Tuple[str, str | None]:
+    cached = _BADGE_PARTS_CACHE.get(badge)
+    if cached is not None:
+        return cached
+    original = badge
     badge = str(badge).strip().lower().replace(" ", "_")
     if not badge:
-        return "", None
-    parts = badge.rsplit("_", 1)
-    if len(parts) == 2 and parts[1] in BADGE_TIER_VALUE:
-        base = parts[0]
-        tier = parts[1]
+        result = ("", None)
     else:
-        base = badge
-        tier = None
-    base = BADGE_ALIASES.get(base, base)
-    return base, tier
+        parts = badge.rsplit("_", 1)
+        if len(parts) == 2 and parts[1] in BADGE_TIER_VALUE:
+            base = parts[0]
+            tier = parts[1]
+        else:
+            base = badge
+            tier = None
+        base = BADGE_ALIASES.get(base, base)
+        result = (base, tier)
+    try:
+        _BADGE_PARTS_CACHE[original] = result
+    except TypeError:
+        pass
+    return result
 
 
 def badge_level_from_rating(value: float, bronze: float, silver: float, gold: float, hof: float | None = None) -> str | None:
@@ -9851,8 +9909,17 @@ def record_score_event(scoring_team: Team, defending_team: Team, points: int,
 
 
 def is_superstar(player: Player, team: Team) -> bool:
-    ranked = sorted(team.roster, key=overall_rating, reverse=True)
-    return player in ranked[:2] or player.usage >= 0.30
+    # The top two by overall rating is recomputed constantly; ratings don't
+    # move mid-game, so remember it per roster (keyed on clutchness too,
+    # since the star-clutch pass edits that before tip-off).
+    roster = team.roster
+    key = (tuple(id(p) for p in roster), tuple(p.clutchness for p in roster))
+    cached = getattr(team, "_top_two_cache", None)
+    if cached is None or cached[0] != key:
+        ranked = sorted(roster, key=overall_rating, reverse=True)
+        cached = (key, ranked[:2])
+        team._top_two_cache = cached
+    return player in cached[1] or player.usage >= 0.30
 
 
 def force_best_available_lineup(team: Team):
