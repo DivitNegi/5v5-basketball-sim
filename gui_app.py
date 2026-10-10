@@ -939,7 +939,19 @@ def run_gui_app():
         fg=TEXT_SOFT,
         font=("Segoe UI", 11, "bold"),
         anchor="w",
-    ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+    ).grid(row=0, column=0, sticky="ew", pady=(0, 6))
+    bracket_ui = {"state": None, "view": "tree", "auto": True, "selected": None, "dirty": False}
+    bracket_mode_bar = ttk.Frame(bracket_widget_frame)
+    bracket_tree_button = ttk.Button(bracket_mode_bar, text="Playoff Tree")
+    bracket_tree_button.grid(row=0, column=0, padx=(0, 6))
+    bracket_playin_button = ttk.Button(bracket_mode_bar, text="Play-In")
+    bracket_playin_button.grid(row=0, column=1)
+    bracket_canvas = tk.Canvas(bracket_widget_frame, bg="#0b1426", highlightthickness=0, height=520)
+    bracket_detail_var = tk.StringVar(value="")
+    bracket_detail_label = tk.Label(
+        bracket_widget_frame, textvariable=bracket_detail_var, bg=APP_BG, fg=TEXT,
+        font=("Segoe UI", 11), anchor="nw", justify="left",
+    )
     bracket_columns = ("round", "series", "matchup", "winner", "status")
     bracket_tree = ttk.Treeview(
         bracket_widget_frame,
@@ -2434,6 +2446,257 @@ def run_gui_app():
             )
         bracket_info_var.set("Select a matchup row to inspect the series. Winners fill in as the sim advances.")
 
+    NBA_TEAM_STYLE = {
+        "Hawks": ("ATL", "#c8102e"), "Celtics": ("BOS", "#007a33"), "Nets": ("BKN", "#4b5563"),
+        "Hornets": ("CHA", "#00788c"), "Bulls": ("CHI", "#ce1141"), "Cavaliers": ("CLE", "#860038"),
+        "Mavericks": ("DAL", "#00538c"), "Nuggets": ("DEN", "#1d428a"), "Pistons": ("DET", "#c8102e"),
+        "Warriors": ("GS", "#1d428a"), "Rockets": ("HOU", "#ce1141"), "Pacers": ("IND", "#fdbb30"),
+        "Clippers": ("LAC", "#c8102e"), "Lakers": ("LAL", "#552583"), "Grizzlies": ("MEM", "#5d76a9"),
+        "Heat": ("MIA", "#98002e"), "Bucks": ("MIL", "#00471b"), "Timberwolves": ("MIN", "#236192"),
+        "Pelicans": ("NO", "#1f3b73"), "Knicks": ("NY", "#f58426"), "Thunder": ("OKC", "#007ac1"),
+        "Magic": ("ORL", "#0077c0"), "76ers": ("PHI", "#006bb6"), "Suns": ("PHX", "#e56020"),
+        "Trail Blazers": ("POR", "#e03a3e"), "Kings": ("SAC", "#5a2d81"), "Spurs": ("SA", "#b4bcc6"),
+        "Raptors": ("TOR", "#ce1141"), "Jazz": ("UTA", "#4e2a84"), "Wizards": ("WAS", "#e31837"),
+    }
+
+    def bracket_team_style(name: str):
+        for nickname, (abbr, color) in NBA_TEAM_STYLE.items():
+            if name.endswith(nickname):
+                return abbr, color
+        return team_initials(name), team_logo_colors(name)[0]
+
+    def bracket_text_color(fill: str) -> str:
+        try:
+            r, g, b = int(fill[1:3], 16), int(fill[3:5], 16), int(fill[5:7], 16)
+            return "#111827" if (0.299 * r + 0.587 * g + 0.114 * b) > 170 else "#ffffff"
+        except Exception:
+            return "#ffffff"
+
+    def bracket_series_summary(a: str, b: str, entry: Dict | None) -> str:
+        abbr_a, abbr_b = bracket_team_style(a)[0], bracket_team_style(b)[0]
+        if not entry or not entry.get("games"):
+            return f"{abbr_a} vs {abbr_b}: series has not started."
+        wins_a, wins_b = entry.get("wins_a", 0), entry.get("wins_b", 0)
+        if entry.get("winner"):
+            win_abbr = bracket_team_style(entry["winner"])[0]
+            head = f"{win_abbr} won the series {max(wins_a, wins_b)}-{min(wins_a, wins_b)}"
+        elif wins_a == wins_b:
+            head = f"Series tied {wins_a}-{wins_b}"
+        else:
+            lead = abbr_a if wins_a > wins_b else abbr_b
+            head = f"{lead} lead {max(wins_a, wins_b)}-{min(wins_a, wins_b)}"
+        lines = [f"{a} vs {b}  |  {head}"]
+        for game_no, score_a, score_b, home in entry["games"]:
+            winner_abbr = abbr_a if score_a > score_b else abbr_b
+            where = bracket_team_style(home)[0] if home else ""
+            lines.append(f"   Game {game_no}: {abbr_a} {score_a} - {score_b} {abbr_b}   ({winner_abbr} win, at {where})")
+        return chr(10).join(lines)
+
+    def select_bracket_item(key: str):
+        bracket_ui["selected"] = key
+        state = bracket_ui["state"] or {}
+        if key.startswith("s::"):
+            entry = (state.get("series") or {}).get(key[3:])
+            a, _, b = key[3:].partition("|")
+            bracket_detail_var.set(bracket_series_summary(a, b, entry))
+        elif key.startswith("p::"):
+            _tag, conference, slot = key.split("::")
+            game = ((state.get("play_in") or {}).get(conference) or {}).get(slot) or {}
+            a, b = game.get("a"), game.get("b")
+            if a and b and game.get("score_a") is not None:
+                abbr_a, abbr_b = bracket_team_style(a)[0], bracket_team_style(b)[0]
+                winner_abbr = bracket_team_style(game.get("winner") or a)[0]
+                bracket_detail_var.set(f"{conference} play-in: {abbr_a} {game['score_a']} - {game['score_b']} {abbr_b}   ({winner_abbr} advance)")
+            elif a and b:
+                bracket_detail_var.set(f"{conference} play-in: {a} vs {b} has not been played yet.")
+        draw_bracket_canvas()
+
+    def draw_bracket_team_row(x, y, w, h, name, seed, score, state_tag, tag, side, dim=False, selected=False):
+        abbr, color = bracket_team_style(name) if name else ("TBD", "#1d4ed8")
+        fill = "#334155" if dim else color
+        text_color = "#94a3b8" if dim else bracket_text_color(fill)
+        c = bracket_canvas
+        c.create_rectangle(x, y, x + w, y + h, fill=fill, outline="#0b1426", width=1, tags=(tag,))
+        score_w = h * (1.6 if (score is not None and score >= 100) else 0.95)
+        score_x = x if side == "left" else x + w - score_w
+        c.create_rectangle(score_x, y, score_x + score_w, y + h, fill="#0f172a", outline="#0b1426", tags=(tag,))
+        c.create_text(score_x + score_w / 2, y + h / 2, text=str(score) if score is not None else "0",
+                      fill="#f8fafc" if not dim else "#64748b", font=("Segoe UI", max(10, int(h * 0.40)), "bold"), tags=(tag,))
+        label = f"({seed}) {abbr}" if seed not in ("", None) and name else abbr
+        text_x = (x + score_w + 10) if side == "left" else (x + w - score_w - 10)
+        c.create_text(text_x, y + h / 2, text=label, fill=text_color, anchor="w" if side == "left" else "e",
+                      font=("Segoe UI", max(10, int(h * 0.40)), "bold"), tags=(tag,))
+
+    def draw_bracket_series_box(x, yc, w, a, b, side, tag, state):
+        rh = bracket_ui.get("row_h", 32)
+        series = state.get("series") or {}
+        teams = state.get("teams") or {}
+        entry = series.get(f"{a}|{b}") if a and b else None
+        winner = entry.get("winner") if entry else None
+        top = yc - rh
+        for idx, name in enumerate((a, b)):
+            info = teams.get(name, {}) if name else {}
+            seed = info.get("playoff_seed") or info.get("seed") or ""
+            wins = None
+            if entry:
+                wins = entry.get("wins_a", 0) if idx == 0 else entry.get("wins_b", 0)
+            elif name:
+                wins = 0
+            draw_bracket_team_row(x, top + idx * rh, w, rh, name, seed, wins, None, tag, side,
+                                  dim=bool(winner and name and name != winner))
+        if bracket_ui["selected"] == f"s::{a}|{b}" and a and b:
+            bracket_canvas.create_rectangle(x - 2, top - 2, x + w + 2, top + 2 * rh + 2, outline="#facc15", width=3)
+
+    def draw_playoff_tree(W, H, state):
+        c = bracket_canvas
+        rounds = state.get("rounds") or {}
+        margin = 18
+        pitch = (W - 2 * margin) / 7
+        bw = pitch * 0.82
+        top, bottom = 84, H - 36
+        slot_h = (bottom - top) / 4
+        rh = max(22, min(36, slot_h * 0.34))
+        bracket_ui["row_h"] = rh
+        r1 = [top + slot_h * (i + 0.5) for i in range(4)]
+        sf = [(r1[0] + r1[1]) / 2, (r1[2] + r1[3]) / 2]
+        cf = [(sf[0] + sf[1]) / 2]
+        fin = (cf[0])
+
+        def col_x(col):
+            return margin + col * pitch + (pitch - bw) / 2
+
+        line = "#3b6bb5"
+        for conf, side in (("West", "left"), ("East", "right")):
+            cols = (0, 1, 2) if side == "left" else (6, 5, 4)
+            ys = (r1, sf, cf)
+            for step in range(2):
+                x_from = col_x(cols[step]) + (bw if side == "left" else 0)
+                x_to = col_x(cols[step + 1]) + (0 if side == "left" else bw)
+                mid = (x_from + x_to) / 2
+                for i, y in enumerate(ys[step]):
+                    target = ys[step + 1][i // 2]
+                    c.create_line(x_from, y, mid, y, mid, target, x_to, target, fill=line, width=2)
+            fx_from = col_x(cols[2]) + (bw if side == "left" else 0)
+            fx_to = col_x(3) + (0 if side == "left" else bw)
+            c.create_line(fx_from, cf[0], fx_to, fin, fill=line, width=2)
+
+        for conf, side in (("West", "left"), ("East", "right")):
+            cols = (0, 1, 2) if side == "left" else (6, 5, 4)
+            conf_rounds = rounds.get(conf) or {}
+            for round_idx, (label, ys) in enumerate((("First Round", r1), ("Semifinals", sf), ("Conference Finals", cf))):
+                matchups = conf_rounds.get(label) or []
+                for i, yc in enumerate(ys):
+                    matchup = matchups[i] if i < len(matchups) else None
+                    a = matchup[0] if matchup else None
+                    b = matchup[1] if matchup else None
+                    tag = f"s::{a}|{b}" if a and b else "s::none"
+                    draw_bracket_series_box(col_x(cols[round_idx]), yc, bw, a, b, side, tag, state)
+                    if a and b:
+                        c.tag_bind(tag, "<Button-1>", lambda _e, key=tag: select_bracket_item(key))
+        finals = ((rounds.get("Finals") or {}).get("NBA Finals") or [None])[0]
+        a = finals[0] if finals else None
+        b = finals[1] if finals else None
+        tag = f"s::{a}|{b}" if a and b else "s::none"
+        draw_bracket_series_box(col_x(3), fin, bw, a, b, "left", tag, state)
+        if a and b:
+            c.tag_bind(tag, "<Button-1>", lambda _e, key=tag: select_bracket_item(key))
+        c.create_text(W / 2, 30, text="PLAYOFFS", fill="#f8fafc", font=("Segoe UI", 28, "bold italic"))
+        c.create_text(margin + bw / 2, 62, text="WEST", fill="#93c5fd", font=("Segoe UI", 12, "bold"))
+        c.create_text(W - margin - bw / 2, 62, text="EAST", fill="#93c5fd", font=("Segoe UI", 12, "bold"))
+        champion = state.get("champion")
+        if champion:
+            champion_label = champion.split(" ", 1)[1] if champion[:4].isdigit() else champion
+            c.create_text(W / 2, fin + rh * 2 + 30, text=f"CHAMPIONS: {champion_label}", fill="#facc15", font=("Segoe UI", 16, "bold"))
+        for lbl, x in (("First Round", col_x(0)), ("Semifinals", col_x(1)), ("Conf. Finals", col_x(2)), ("NBA Finals", col_x(3)),
+                       ("Conf. Finals", col_x(4)), ("Semifinals", col_x(5)), ("First Round", col_x(6))):
+            c.create_text(x + bw / 2, H - 14, text=lbl, fill="#64748b", font=("Segoe UI", 10))
+
+    def draw_play_in_view(W, H, state):
+        c = bracket_canvas
+        play_in = state.get("play_in") or {}
+        teams = state.get("teams") or {}
+        rh = max(26, min(40, (H - 300) / 8))
+        bracket_ui["row_h"] = rh
+        panel_w = (W - 60) / 2
+        bw = min(panel_w * 0.40, 300)
+        c.create_text(W / 2, 32, text="PLAY-IN TOURNAMENT", fill="#f8fafc", font=("Segoe UI", 26, "bold italic"))
+        slots = (("7v8", "7 vs 8  (winner = 7 seed)"), ("9v10", "9 vs 10  (loser eliminated)"), ("8seed", "8-seed game"))
+        for panel, (conf, title) in enumerate((("West", "WESTERN CONFERENCE"), ("East", "EASTERN CONFERENCE"))):
+            px = 20 + panel * (panel_w + 20)
+            c.create_text(px + panel_w / 2, 84, text=title, fill="#93c5fd", font=("Segoe UI", 13, "bold"))
+            c.create_text(px + panel_w / 2, 110, text="Seeds 1-6 advance directly", fill="#64748b", font=("Segoe UI", 10))
+            games = play_in.get(conf) or {}
+            gy = {"7v8": 190, "9v10": 190 + rh * 2 + 80, "8seed": 190 + rh + 40 + (rh * 2 + 80) / 2 - rh}
+            gx = {"7v8": px + 10, "9v10": px + 10, "8seed": px + 10 + bw + (panel_w - 2 * bw - 20) * 0.8 + 20}
+            if gx["8seed"] + bw > px + panel_w:
+                gx["8seed"] = px + panel_w - bw
+            # connector lines first so boxes sit on top
+            line = "#3b6bb5"
+            c.create_line(gx["7v8"] + bw, gy["7v8"] + rh * 2 - 4, gx["8seed"] - 24, gy["7v8"] + rh * 2 - 4,
+                          gx["8seed"] - 24, gy["8seed"] + 6, gx["8seed"], gy["8seed"] + 6, fill=line, width=2)
+            c.create_line(gx["9v10"] + bw, gy["9v10"] + 4, gx["8seed"] - 24, gy["9v10"] + 4,
+                          gx["8seed"] - 24, gy["8seed"] + 2 * rh - 6, gx["8seed"], gy["8seed"] + 2 * rh - 6, fill=line, width=2)
+            for slot, caption in slots:
+                game = games.get(slot) or {}
+                a, b = game.get("a"), game.get("b")
+                x, y = gx[slot], gy[slot]
+                c.create_text(x, y - 16, text=caption, fill="#94a3b8", anchor="w", font=("Segoe UI", 10, "bold"))
+                tag = f"p::{conf}::{slot}"
+                for idx, name in enumerate((a, b)):
+                    info = teams.get(name, {}) if name else {}
+                    seed = info.get("seed") or ""
+                    score = game.get("score_a") if idx == 0 else game.get("score_b")
+                    dim = bool(game.get("winner") and name and name != game.get("winner"))
+                    draw_bracket_team_row(x, y + idx * rh, bw, rh, name, seed, score, None, tag, "left", dim=dim)
+                if a and b:
+                    c.tag_bind(tag, "<Button-1>", lambda _e, key=tag: select_bracket_item(key))
+                if bracket_ui["selected"] == tag and a and b:
+                    c.create_rectangle(x - 2, y - 2, x + bw + 2, y + 2 * rh + 2, outline="#facc15", width=3)
+
+    def draw_bracket_canvas():
+        c = bracket_canvas
+        c.delete("all")
+        state = bracket_ui["state"] or {}
+        W = max(900, c.winfo_width())
+        H = max(480, c.winfo_height())
+        if bracket_ui["view"] == "playin":
+            draw_play_in_view(W, H, state)
+        else:
+            draw_playoff_tree(W, H, state)
+
+    def refresh_bracket_tab():
+        state = bracket_ui["state"]
+        bracket_ui["dirty"] = False
+        if state and (state.get("rounds") or state.get("play_in")):
+            if bracket_ui["auto"]:
+                bracket_ui["view"] = "tree" if state.get("rounds") else "playin"
+            bracket_tree.grid_remove()
+            bracket_scroll.grid_remove()
+            bracket_canvas.grid(row=1, column=0, columnspan=2, sticky="nsew")
+            bracket_mode_bar.grid(row=0, column=1, sticky="e", pady=(0, 6))
+            bracket_detail_label.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+            if not bracket_detail_var.get():
+                bracket_info_var.set("Click any series to see the game-by-game results. Use Play-In to see the play-in games behind the tree.")
+            draw_bracket_canvas()
+        else:
+            bracket_canvas.grid_remove()
+            bracket_mode_bar.grid_remove()
+            bracket_detail_label.grid_remove()
+            bracket_tree.grid()
+            bracket_scroll.grid()
+            update_bracket_widget((playoff_sections_state.get("sections") or {}).get("_playoff_bracket", ""))
+
+    def set_bracket_view(view: str):
+        bracket_ui["view"] = view
+        bracket_ui["auto"] = False
+        bracket_ui["selected"] = None
+        bracket_detail_var.set("")
+        draw_bracket_canvas()
+
+    bracket_tree_button.configure(command=lambda: set_bracket_view("tree"))
+    bracket_playin_button.configure(command=lambda: set_bracket_view("playin"))
+    bracket_canvas.bind("<Configure>", lambda _e: draw_bracket_canvas() if bracket_ui["state"] else None)
+
     def on_bracket_select(_event=None):
         selection = bracket_tree.selection()
         if not selection:
@@ -2499,6 +2762,11 @@ def run_gui_app():
         # Store the new completed-game data, then refresh only the tab that is
         # actually visible. Rebuilding every hidden table caused the entire GUI
         # to flash/reflow between games in a playoff series.
+        previous = playoff_sections_state.get("sections") or {}
+        if "_season_standings" in previous and "_season_standings" not in sections and "_season_player_totals" not in sections:
+            for season_key in ("_season_standings", "_season_awards_table", "_season_awards", "_season_game_log", "_season_game_log_fields"):
+                if season_key in previous:
+                    sections[season_key] = previous[season_key]
         playoff_sections_state["sections"] = sections
         playoff_sections_state["revision"] += 1
         update_extra_gui_tabs()
@@ -5026,7 +5294,7 @@ def run_gui_app():
         elif selected_tab == "Tree":
             set_series_text("playoff_tree", sections.get("_playoff_bracket", ""))
         elif selected_tab == "Brkt":
-            update_bracket_widget(sections.get("_playoff_bracket", ""))
+            refresh_bracket_tab()
         elif selected_tab == "Adv":
             update_advanced_widgets(sections)
         elif selected_tab == "Shots":
@@ -5230,7 +5498,7 @@ def run_gui_app():
             draw_logo(team_b_logo, team_b)
 
     def update_scoreboard(data):
-        if data.get("postseason_ready"):
+        if data.get("postseason_ready") or "bracket_state" in data:
             return
         if data.get("season_progress"):
             completed = int(data.get("completed", 0))
@@ -7331,7 +7599,7 @@ def run_gui_app():
 
         sys.stdout = proxy
         builtins.input = gui_input
-        sim_engine.GUI_SERIES_UPDATE_QUEUE = section_queue if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Olympic tournament") else None
+        sim_engine.GUI_SERIES_UPDATE_QUEUE = section_queue if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Olympic tournament", "Full 2027 playoffs", "2027 play-in & playoffs") else None
         sim_engine.GUI_SCOREBOARD_QUEUE = scoreboard_queue
         sim_engine.SIM_FAST_FORWARD = False
         sim_engine.SIM_JUMP_TARGET = None
@@ -7416,6 +7684,7 @@ def run_gui_app():
         finally:
             sim_engine.SIM_FAST_FORWARD = False
             sim_engine.SIM_JUMP_TARGET = None
+            sim_engine.SIM_STICKY_FAST = None
             sim_engine.SIM_PAUSED = False
             sim_engine.SIM_SLEEP_SCALE = original_sleep_scale
             set_ruleset(original_ruleset)
@@ -7444,6 +7713,9 @@ def run_gui_app():
             status_var.set("Simulate the 2027 season first.")
             return
         next_button.configure(state="disabled")
+        bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False)
+        bracket_detail_var.set("")
+        sim_engine.BRACKET_STATE.clear()
         if mode == "1-on-1":
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
@@ -7478,6 +7750,17 @@ def run_gui_app():
             return
         sim_engine.SIM_FAST_FORWARD = True
         sim_engine.SIM_JUMP_TARGET = target
+        status_var.set(label)
+        output_queue.put(f"\n[GUI] {label}\n")
+
+    def gui_sim_stage(kind: str):
+        if not running["active"]:
+            status_var.set("Start a simulation first.")
+            return
+        sim_engine.SIM_STICKY_FAST = kind
+        sim_engine.SIM_FAST_FORWARD = True
+        sim_engine.SIM_JUMP_TARGET = None
+        label = "Fast-sim enabled for the rest of this series." if kind == "series" else "Fast-sim enabled for the rest of the playoffs."
         status_var.set(label)
         output_queue.put(f"\n[GUI] {label}\n")
 
@@ -7655,11 +7938,20 @@ def run_gui_app():
                     latest_scoreboard = scoreboard_queue.get_nowait()
                     if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("season_progress"):
                         update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
+                    if isinstance(latest_scoreboard, dict) and "bracket_state" in latest_scoreboard:
+                        bracket_ui["state"] = latest_scoreboard["bracket_state"]
+                        bracket_ui["dirty"] = True
                     if isinstance(latest_scoreboard, dict) and latest_scoreboard.get("postseason_ready"):
                         next_button.configure(state="normal")
                         status_var.set("Season complete. Press Next for the play-in and playoffs.")
             except queue.Empty:
                 pass
+            if bracket_ui["dirty"]:
+                try:
+                    if str(series_tabs.tab(series_tabs.select(), "text")) == "Brkt":
+                        refresh_bracket_tab()
+                except Exception:
+                    pass
             if latest_scoreboard is not None:
                 update_scoreboard(latest_scoreboard)
                 gui_refresh_state["live_dirty"] = True
@@ -7713,6 +8005,8 @@ def run_gui_app():
     ttk.Button(controls, text="Create Player", command=open_create_player_dialog).grid(row=3, column=0, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Edit Player", command=open_edit_player_picker).grid(row=3, column=2, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Play 1-on-1", command=open_1v1_player_picker).grid(row=3, column=4, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
+    ttk.Button(controls, text="Sim Series", command=lambda: gui_sim_stage("series")).grid(row=4, column=0, columnspan=3, padx=(0, 6), pady=(6, 0), sticky="ew")
+    ttk.Button(controls, text="Sim All Playoffs", command=lambda: gui_sim_stage("playoffs")).grid(row=4, column=3, columnspan=3, padx=(0, 6), pady=(6, 0), sticky="ew")
     next_button = ttk.Button(controls, text="Next: Play-in & Playoffs", state="disabled", command=lambda: start_sim("2027 play-in & playoffs"))
     next_button.grid(row=3, column=6, columnspan=4, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(adjustments_frame, text="Call Timeout", command=queue_gui_timeout).grid(row=1, column=0, sticky="ew", padx=(0, 5), pady=3)

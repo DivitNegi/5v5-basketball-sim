@@ -135,6 +135,10 @@ def is_olympic_team(team) -> bool:
 _REAL_SLEEP = time.sleep
 SIM_FAST_FORWARD = False
 SIM_JUMP_TARGET = None
+# Sticky fast-sim set by the GUI's "Sim Series" / "Sim Playoffs" buttons:
+# "series" stays on until the current series (or play-in game) ends, "playoffs"
+# stays on for the whole run. simulate_game() re-arms fast-forward from it.
+SIM_STICKY_FAST = None
 SIM_SLEEP_SCALE = 1.0
 SIM_PAUSED = False
 SIM_CONTROL_ENABLED = False
@@ -6631,6 +6635,35 @@ def push_gui_playoff_update(playoff_player_totals: Dict, playoff_team_totals: Di
     GUI_SERIES_UPDATE_QUEUE.put(sections)
 
 
+# Live playoff-tree data for the GUI bracket: teams (seed/conference), play-in
+# games, round matchups, and every series' game-by-game results.
+BRACKET_STATE: Dict = {}
+
+
+def publish_bracket_state(**updates):
+    import copy
+    BRACKET_STATE.update(updates)
+    if GUI_SCOREBOARD_QUEUE is not None:
+        GUI_SCOREBOARD_QUEUE.put({"bracket_state": copy.deepcopy(BRACKET_STATE)})
+
+
+def record_bracket_series_game(team_a: str, team_b: str, game_no: int, score_a: int, score_b: int,
+                               wins_a: int, wins_b: int, home: str):
+    series = BRACKET_STATE.setdefault("series", {})
+    entry = series.setdefault(f"{team_a}|{team_b}", {"a": team_a, "b": team_b, "games": [], "winner": None})
+    entry["wins_a"], entry["wins_b"] = wins_a, wins_b
+    if game_no > len(entry["games"]):
+        entry["games"].append((game_no, score_a, score_b, home))
+    publish_bracket_state()
+
+
+def finish_bracket_series(team_a: str, team_b: str, winner: str):
+    series = BRACKET_STATE.setdefault("series", {})
+    entry = series.setdefault(f"{team_a}|{team_b}", {"a": team_a, "b": team_b, "games": [], "winner": None})
+    entry["winner"] = winner
+    publish_bracket_state()
+
+
 def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bool = False,
                          playoff_player_totals: Dict = None, playoff_team_totals: Dict = None,
                          playoff_bracket_lines: List[str] = None):
@@ -6752,6 +6785,10 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
             print(f"Series adjustment: {losing_team.name} will simplify with more movement next game.")
 
         print(f"Series now: {teamA.name} {series_wins[teamA.name]} - {series_wins[teamB.name]} {teamB.name}")
+        record_bracket_series_game(
+            teamA.name, teamB.name, game_num, teamA.score, teamB.score,
+            series_wins[teamA.name], series_wins[teamB.name], home_team.name,
+        )
         push_gui_series_update(series_totals, series_team_totals, game_logs, playoff_bracket_lines=playoff_bracket_lines)
 
         if PAUSE_AFTER_SERIES_GAMES:
@@ -6769,6 +6806,8 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
     print("#" * 80)
 
     winner_name = teamA.name if series_wins[teamA.name] > series_wins[teamB.name] else teamB.name
+    finish_bracket_series(teamA.name, teamB.name, winner_name)
+    finish_sticky_fast_stage()
     push_gui_series_update(series_totals, series_team_totals, game_logs, winner_name, playoff_bracket_lines=playoff_bracket_lines)
     print_series_game_box_scores(game_logs)
     print_series_averages(series_totals, series_team_totals)
@@ -20274,10 +20313,19 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
     return team_a, team_b
 
 
+def finish_sticky_fast_stage():
+    """A series (or play-in game) just ended: a "Sim Series" request is done."""
+    global SIM_STICKY_FAST
+    if SIM_STICKY_FAST == "series":
+        SIM_STICKY_FAST = None
+
+
 def simulate_game(teamA: Team, teamB: Team):
     global SIM_FAST_FORWARD, SIM_JUMP_TARGET
     SIM_FAST_FORWARD = False
     SIM_JUMP_TARGET = None
+    if SIM_STICKY_FAST:
+        SIM_FAST_FORWARD = True
     enable_keyboard_controls(teamA, teamB)
     SIM_CONTEXT["fantasy_control_enabled"] = bool(
         getattr(teamA, "fantasy_control_enabled", False)

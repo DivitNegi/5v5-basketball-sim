@@ -6796,11 +6796,22 @@ def playoff_2027_field() -> Dict[str, List[Tuple[str, int, float, str]]]:
     return field
 
 
-def run_2027_playoff_series(team_a_name: str, team_b_name: str, factories: Dict) -> str:
+def run_2027_playoff_series(team_a_name: str, team_b_name: str, factories: Dict, stage: Dict = None) -> str:
     print("\n" + "=" * 100)
     print(f"2027 PLAYOFF SERIES: {team_a_name} vs {team_b_name}")
     print("=" * 100)
-    return run_best_of_7_series(factories[team_a_name], factories[team_b_name])
+    if stage is None:
+        return run_best_of_7_series(factories[team_a_name], factories[team_b_name])
+    winner = run_best_of_7_series(
+        factories[team_a_name], factories[team_b_name],
+        playoff_player_totals=stage["players"], playoff_team_totals=stage["teams"],
+        playoff_bracket_lines=stage["lines"],
+    )
+    loser = team_b_name if winner == team_a_name else team_a_name
+    stage["lines"].append(f"  {team_a_name} vs {team_b_name}: {winner} beat {loser}")
+    push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"], winner_name=winner)
+    push_gui_series_score_reset(f"Ready for next series: {winner} advanced")
+    return winner
 
 
 def print_2027_playoff_standings(field, ranked_by: str = "roster strength"):
@@ -6812,6 +6823,8 @@ def print_2027_playoff_standings(field, ranked_by: str = "roster strength"):
 
 
 def print_2027_bracket_state(rounds):
+    import copy
+    publish_bracket_state(rounds=copy.deepcopy(rounds))
     print("\n" + "=" * 100)
     print("2027 PLAYOFF BRACKET")
     print("=" * 100)
@@ -6842,9 +6855,19 @@ def print_2027_bracket_state(rounds):
     print("=" * 100)
 
 
-def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True):
+def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, clear_state: bool = True, stage: Dict = None):
+    if clear_state:
+        BRACKET_STATE.clear()
+    if stage is None:
+        stage = {"players": {}, "teams": {}, "lines": ["2027 PLAYOFFS", "=" * 60]}
+        push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"])
     if field is None:
         field = playoff_2027_field()
+    bracket_teams = BRACKET_STATE.setdefault("teams", {})
+    for conference_name, field_rows in field.items():
+        for team_name, team_seed, _strength, _factory in field_rows:
+            bracket_teams.setdefault(team_name, {}).update({"conf": conference_name, "playoff_seed": team_seed})
+    publish_bracket_state()
     if factories is None:
         factories = {name: globals()[factory] for rows in field.values() for name, _s, _st, factory in rows}
     if announce_seeds:
@@ -6873,7 +6896,7 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True):
         print("#" * 100)
         round_winners = []
         for a, b in first_round:
-            round_winners.append(run_2027_playoff_series(a, b, factories))
+            round_winners.append(run_2027_playoff_series(a, b, factories, stage))
             rounds[conference]["First Round"] = [
                 (*matchup, round_winners[i]) if i < len(round_winners) else matchup
                 for i, matchup in enumerate(first_round)
@@ -6887,7 +6910,7 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True):
         print_2027_bracket_state(rounds)
         semi_winners = []
         for a, b in semifinals:
-            semi_winners.append(run_2027_playoff_series(a, b, factories))
+            semi_winners.append(run_2027_playoff_series(a, b, factories, stage))
             rounds[conference]["Semifinals"] = [
                 (*matchup, semi_winners[i]) if i < len(semi_winners) else matchup
                 for i, matchup in enumerate(semifinals)
@@ -6895,7 +6918,7 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True):
             print_2027_bracket_state(rounds)
         rounds[conference]["Conference Finals"] = [(semi_winners[0], semi_winners[1])]
         print_2027_bracket_state(rounds)
-        conference_champion = run_2027_playoff_series(semi_winners[0], semi_winners[1], factories)
+        conference_champion = run_2027_playoff_series(semi_winners[0], semi_winners[1], factories, stage)
         rounds[conference]["Conference Finals"] = [(semi_winners[0], semi_winners[1], conference_champion)]
         print_2027_bracket_state(rounds)
         conference_champions.append(conference_champion)
@@ -6903,16 +6926,27 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True):
 
     rounds["Finals"]["NBA Finals"] = [(conference_champions[0], conference_champions[1])]
     print_2027_bracket_state(rounds)
-    champion = run_2027_playoff_series(conference_champions[0], conference_champions[1], factories)
+    champion = run_2027_playoff_series(conference_champions[0], conference_champions[1], factories, stage)
     rounds["Finals"]["NBA Finals"] = [(conference_champions[0], conference_champions[1], champion)]
     print_2027_bracket_state(rounds)
     print("\n" + "#" * 100)
     print(f"2027 PLAYOFF SIM CHAMPION: {champion}")
     print("#" * 100)
+    publish_bracket_state(champion=champion)
+    stage["lines"].append(f"CHAMPION: {champion}")
+    push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"], winner_name=champion)
 
 
-def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label: str):
+def record_2027_play_in(conference, slot, high_name, low_name, score_high=None, score_low=None, winner=None):
+    play_in = BRACKET_STATE.setdefault("play_in", {}).setdefault(conference, {})
+    play_in[slot] = {"a": high_name, "b": low_name, "score_a": score_high, "score_b": score_low, "winner": winner}
+    publish_bracket_state()
+
+
+def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label: str, conference=None, slot=None, stage: Dict = None):
     """One play-in game; the higher seed hosts. Returns (winner_name, loser_name)."""
+    if conference is not None:
+        record_2027_play_in(conference, slot, high_name, low_name)
     print("\n" + "=" * 100)
     print(f"2027 PLAY-IN: {label} | {high_name} (home) vs {low_name}")
     print("=" * 100)
@@ -6927,6 +6961,20 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
     else:
         winner, loser = low_name, high_name
     print(f"\nPlay-in result: {winner} advance ({team_a.name} {team_a.score} - {team_b.score} {team_b.name}).")
+    if conference is not None:
+        record_2027_play_in(conference, slot, high_name, low_name, team_a.score, team_b.score, winner)
+    if stage is not None:
+        add_player_to_series_totals(stage["players"], team_a)
+        add_player_to_series_totals(stage["players"], team_b)
+        add_team_to_series_totals(stage["teams"], team_a)
+        add_team_to_series_totals(stage["teams"], team_b)
+        stage["teams"][winner]["wins"] = stage["teams"][winner].get("wins", 0) + 1
+        stage["lines"].append(
+            f"  Play-in {conference} {label}: {team_a.name} {team_a.score} - {team_b.score} {team_b.name} ({winner} advance)"
+        )
+        push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"], winner_name=winner)
+        push_gui_series_score_reset(f"Play-in complete: {winner} advance")
+    finish_sticky_fast_stage()
     return winner, loser
 
 
@@ -6949,6 +6997,12 @@ def run_2027_postseason(standings):
     print("\n" + "#" * 100)
     print("2027 PLAY-IN TOURNAMENT")
     print("#" * 100)
+    BRACKET_STATE.clear()
+    stage = {"players": {}, "teams": {}, "lines": ["2027 PLAY-IN AND PLAYOFFS", "=" * 60, "PLAY-IN"]}
+    push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"])  # tabs reset to play-in/playoff stats
+    bracket_teams = BRACKET_STATE.setdefault("teams", {})
+    for row in standings:
+        bracket_teams[row["team"]] = {"conf": row.get("conference"), "record": f"{row['wins']}-{row['losses']}"}
     field = {}
     for conference in ("East", "West"):
         rows = sorted(
@@ -6962,16 +7016,21 @@ def run_2027_postseason(standings):
         for seed, name in enumerate(ranked[:10], start=1):
             tag = "  <- play-in" if seed >= 7 else ""
             print(f"  {seed:>2}. {name} ({record[name]}){tag}")
+        for seed, name in enumerate(ranked, start=1):
+            bracket_teams[name]["seed"] = seed
         seven, eight, nine, ten = ranked[6], ranked[7], ranked[8], ranked[9]
-        winner_78, loser_78 = run_2027_play_in_game(seven, eight, factories, f"{conference} 7 vs 8 (winner is the 7 seed)")
-        winner_910, _eliminated = run_2027_play_in_game(nine, ten, factories, f"{conference} 9 vs 10 (loser is out)")
-        winner_final, _out = run_2027_play_in_game(loser_78, winner_910, factories, f"{conference} 8-seed game")
+        record_2027_play_in(conference, "7v8", seven, eight)
+        record_2027_play_in(conference, "9v10", nine, ten)
+        winner_78, loser_78 = run_2027_play_in_game(seven, eight, factories, f"{conference} 7 vs 8 (winner is the 7 seed)", conference, "7v8", stage)
+        winner_910, _eliminated = run_2027_play_in_game(nine, ten, factories, f"{conference} 9 vs 10 (loser is out)", conference, "9v10", stage)
+        winner_final, _out = run_2027_play_in_game(loser_78, winner_910, factories, f"{conference} 8-seed game", conference, "8seed", stage)
         seeds = ranked[:6] + [winner_78, winner_final]
         field[conference] = [(name, seed, strengths[name], factory_names[name]) for seed, name in enumerate(seeds, start=1)]
         print(f"\n{conference} playoff seeds: " + ", ".join(f"{seed}. {name}" for seed, name in enumerate(seeds, start=1)))
 
     print("\n2027 PLAYOFFS (seeded from the regular season and play-in)")
-    run_2027_playoffs(field, factories, announce_seeds=False)
+    stage["lines"].extend(["", "PLAYOFFS"])
+    run_2027_playoffs(field, factories, announce_seeds=False, clear_state=False, stage=stage)
 
 
 # ============================================================
