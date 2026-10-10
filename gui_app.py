@@ -5648,12 +5648,19 @@ def run_gui_app():
                 wins_b = data["series_wins_b"]
                 current_a = team_a_name_var.get()
                 current_b = team_b_name_var.get()
-                if current_a == series_team_a and current_b == series_team_b:
-                    team_a_series_var.set(f"({wins_a}-{wins_b})")
-                    team_b_series_var.set(f"({wins_b}-{wins_a})")
-                elif current_a == series_team_b and current_b == series_team_a:
+                if current_a == series_team_b and current_b == series_team_a:
                     team_a_series_var.set(f"({wins_b}-{wins_a})")
                     team_b_series_var.set(f"({wins_a}-{wins_b})")
+                else:
+                    if current_a != series_team_a or current_b != series_team_b:
+                        # Fast-sim skips live scoreboard lines, so the names can lag
+                        # behind: take them from the series record itself.
+                        team_a_name_var.set(series_team_a)
+                        team_b_name_var.set(series_team_b)
+                        draw_logo(team_a_logo, series_team_a)
+                        draw_logo(team_b_logo, series_team_b)
+                    team_a_series_var.set(f"({wins_a}-{wins_b})")
+                    team_b_series_var.set(f"({wins_b}-{wins_a})")
             return
         teams_changed = team_a_name_var.get() != data["team_a"] or team_b_name_var.get() != data["team_b"]
         team_a_name_var.set(data["team_a"])
@@ -8076,6 +8083,13 @@ def run_gui_app():
                         update_scoreboard(message)
                         continue
                     if isinstance(message, dict) and "game_result" in message:
+                        update_scoreboard(message)
+                        continue
+                    if isinstance(message, dict) and (message.get("period") == "Final" or "series_status" in message):
+                        # Final buzzer + series record: apply in order so the series
+                        # score is matched against the right teams.
+                        if message.get("period") == "Final":
+                            latest_scoreboard = None
                         update_scoreboard(message)
                         continue
                     latest_scoreboard = message
