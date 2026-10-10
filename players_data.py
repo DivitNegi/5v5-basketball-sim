@@ -13008,6 +13008,14 @@ def make_sixers_2027() -> Team:
                0.37, 0.70,
                clutchness=0.59, height=82, speed=0.52,
                shot_iq=0.63, archetype='rim protector', stamina=0.72),
+        Player('Labaron Philon Jr.', 'PG',
+               0.36, 0.17, 0.26, 0.04, 0.07, 0.19,
+               0.800, 0.730, 0.770, 0.600, 0.800,
+               0.15, 0.783, 0.864,
+               0.590, 0.300, 0.360, 0.490, 0.600, 0.500,
+               0.670, 0.420,
+               clutchness=0.400, secondary_positions=('SG',), height=76, speed=0.867,
+               shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Philadelphia 76ers', players)
     # Brown is a scoring wing here, not a secondary point guard. Brown and
@@ -13110,6 +13118,14 @@ def make_raptors_2027() -> Team:
                0.78, 0.36,
                clutchness=0.59, height=73, speed=0.82,
                shot_iq=0.58, archetype='defender', stamina=0.7),
+        Player('Allen Graves', 'PF',
+               0.35, 0.19, 0.36, 0.08, 0.29, 0.23,
+               0.790, 0.790, 0.766, 0.750, 0.750,
+               0.13, 0.653, 0.650,
+               0.490, 0.400, 0.380, 0.510, 0.440, 0.600,
+               0.570, 0.480,
+               clutchness=0.400, secondary_positions=('SF',), height=81, speed=0.680,
+               shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Toronto Raptors', players)
     t.init_lineup()
@@ -13725,6 +13741,14 @@ def make_mavs_2027() -> Team:
                badges=("catch and shoot silver", "floor general bronze"),
                height=74, speed=0.80, shot_iq=0.76, iso_tendency=0.28,
                archetype="two-way combo guard", stamina=0.77),
+        Player('Morez Johnson Jr.', 'PF',
+               0.24, 0.15, 0.34, 0.14, 0.36, 0.21,
+               0.670, 0.690, 0.713, 0.850, 0.780,
+               0.15, 0.477, 0.560,
+               0.390, 0.670, 0.690, 0.660, 0.370, 0.600,
+               0.670, 0.700,
+               clutchness=0.400, secondary_positions=('C',), height=81, speed=0.818,
+               shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Dallas Mavericks', players)
     t.init_lineup()
@@ -14522,6 +14546,14 @@ def make_hawks_2027() -> Team:
                0.740, 0.440,
                clutchness=0.400, secondary_positions=('SG',), height=76, speed=0.910,
                shot_iq=0.500, archetype='balanced', stamina=0.79),
+        Player('Zuby Ejiofor', 'C',
+               0.20, 0.13, 0.36, 0.20, 0.43, 0.20,
+               0.620, 0.640, 0.726, 0.800, 0.720,
+               0.13, 0.573, 0.664,
+               0.570, 0.790, 0.720, 0.660, 0.520, 0.600,
+               0.670, 0.720,
+               clutchness=0.400, secondary_positions=('PF',), height=81, speed=0.740,
+               shot_iq=0.500, stamina=0.74),
     ]
     t = Team('2027 Atlanta Hawks', players)
     t.init_lineup()
@@ -14698,6 +14730,22 @@ def make_hornets_2027() -> Team:
                0.830, 0.720,
                clutchness=0.650, secondary_positions=('SF',), height=79, speed=0.670,
                shot_iq=0.700, archetype='3-and-D wing', stamina=0.77),
+        Player('Hannes Steinbach', 'C',
+               0.27, 0.15, 0.33, 0.27, 0.39, 0.21,
+               0.700, 0.700, 0.748, 0.750, 0.760,
+               0.13, 0.523, 0.472,
+               0.440, 0.620, 0.780, 0.800, 0.420, 0.600,
+               0.450, 0.670,
+               clutchness=0.400, secondary_positions=('PF',), height=83, speed=0.569,
+               shot_iq=0.500, stamina=0.79),
+        Player('Christian Anderson Jr.', 'PG',
+               0.38, 0.18, 0.25, 0.02, 0.04, 0.19,
+               0.820, 0.770, 0.733, 0.450, 0.810,
+               0.14, 0.783, 0.856,
+               0.640, 0.300, 0.310, 0.410, 0.400, 0.500,
+               0.600, 0.370,
+               clutchness=0.400, secondary_positions=('SG',), height=75, speed=0.850,
+               shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Charlotte Hornets', players)
     t.init_lineup()
@@ -14786,6 +14834,14 @@ def make_bulls_2027() -> Team:
                0.760, 0.700,
                clutchness=0.700, secondary_positions=('SF',), height=78, speed=0.700,
                shot_iq=0.600, archetype='balanced', stamina=0.74),
+        Player('Dailyn Swain', 'SF',
+               0.29, 0.15, 0.25, 0.08, 0.19, 0.18,
+               0.720, 0.700, 0.750, 0.750, 0.810,
+               0.13, 0.617, 0.724,
+               0.600, 0.300, 0.470, 0.600, 0.440, 0.530,
+               0.770, 0.580,
+               clutchness=0.400, secondary_positions=('SG',), height=80, speed=0.815,
+               shot_iq=0.450, stamina=0.82),
     ]
     t = Team('2027 Chicago Bulls', players)
     t.init_lineup()
@@ -14962,6 +15018,14 @@ def make_pistons_2027() -> Team:
                0.640, 0.440,
                clutchness=0.700, secondary_positions=('SF',), height=78, speed=0.840,
                shot_iq=0.450, archetype='3-and-D wing', stamina=0.75),
+        Player('Ebuka Okorie', 'PG',
+               0.33, 0.18, 0.26, 0.02, 0.04, 0.19,
+               0.770, 0.770, 0.756, 0.450, 0.830,
+               0.15, 0.733, 0.860,
+               0.700, 0.290, 0.310, 0.510, 0.670, 0.500,
+               0.670, 0.340,
+               clutchness=0.400, secondary_positions=('SG',), height=74, speed=0.860,
+               shot_iq=0.650, stamina=0.82),
     ]
     t = Team('2027 Detroit Pistons', players)
     t.init_lineup()
@@ -15050,6 +15114,14 @@ def make_warriors_2027() -> Team:
                0.620, 0.330,
                clutchness=0.600, secondary_positions=('SG',), height=73, speed=0.790,
                shot_iq=0.600, archetype='backup guard', stamina=0.77),
+        Player('Yaxel Lendeborg', 'PF',
+               0.34, 0.17, 0.37, 0.18, 0.36, 0.23,
+               0.780, 0.740, 0.770, 0.850, 0.820,
+               0.15, 0.687, 0.736,
+               0.600, 0.600, 0.540, 0.600, 0.420, 0.600,
+               0.700, 0.700,
+               clutchness=0.400, secondary_positions=('SF',), height=81, speed=0.735,
+               shot_iq=0.600, stamina=0.84),
     ]
     t = Team('2027 Golden State Warriors', players)
     t.init_lineup()
@@ -15402,6 +15474,14 @@ def make_grizzlies_2027() -> Team:
                0.780, 0.870,
                clutchness=0.300, height=80, speed=0.630,
                shot_iq=0.550, archetype='physical big', stamina=0.75),
+        Player('Karim Lopez', 'SF',
+               0.30, 0.17, 0.24, 0.10, 0.19, 0.18,
+               0.730, 0.740, 0.760, 0.750, 0.730,
+               0.14, 0.650, 0.682,
+               0.410, 0.550, 0.420, 0.660, 0.410, 0.530,
+               0.640, 0.660,
+               clutchness=0.400, secondary_positions=('PF',), height=80, speed=0.689,
+               shot_iq=0.600, stamina=0.79),
     ]
     t = Team('2027 Memphis Grizzlies', players)
     t.init_lineup()
@@ -15490,6 +15570,22 @@ def make_bucks_2027() -> Team:
                0.630, 0.400,
                clutchness=0.550, secondary_positions=('SF',), height=76, speed=0.690,
                shot_iq=0.700, archetype='shooter', badges=('catch_shoot',), stamina=0.72),
+        Player('Brayden Burries', 'SG',
+               0.35, 0.19, 0.26, 0.02, 0.15, 0.20,
+               0.790, 0.800, 0.813, 0.700, 0.800,
+               0.15, 0.633, 0.762,
+               0.620, 0.370, 0.440, 0.510, 0.440, 0.500,
+               0.690, 0.460,
+               clutchness=0.400, secondary_positions=('PG',), height=76, speed=0.794,
+               shot_iq=0.600, stamina=0.79),
+        Player('Nate Ament', 'SF',
+               0.32, 0.18, 0.24, 0.10, 0.15, 0.18,
+               0.760, 0.760, 0.730, 0.700, 0.790,
+               0.14, 0.623, 0.734,
+               0.470, 0.410, 0.460, 0.500, 0.620, 0.530,
+               0.600, 0.490,
+               clutchness=0.400, secondary_positions=('PF',), height=82, speed=0.758,
+               shot_iq=0.600, stamina=0.79),
     ]
     t = Team('2027 Milwaukee Bucks', players)
     t.init_lineup()
@@ -15754,6 +15850,22 @@ def make_thunder_2027() -> Team:
                0.750, 0.680,
                clutchness=0.550, secondary_positions=('C',), height=79, speed=0.660,
                shot_iq=0.700, archetype='glue guy', stamina=0.76),
+        Player('Aday Mara', 'C',
+               0.06, 0.14, 0.31, 0.26, 0.39, 0.19,
+               0.470, 0.660, 0.723, 0.750, 0.560,
+               0.15, 0.637, 0.430,
+               0.410, 0.860, 0.620, 0.730, 0.520, 0.600,
+               0.440, 0.730,
+               clutchness=0.400, secondary_positions=('PF',), height=87, speed=0.460,
+               shot_iq=0.650, stamina=0.83),
+        Player('Bennett Stirtz', 'PG',
+               0.37, 0.19, 0.24, 0.02, 0.04, 0.19,
+               0.810, 0.800, 0.700, 0.450, 0.850,
+               0.14, 0.860, 0.788,
+               0.560, 0.300, 0.340, 0.400, 0.440, 0.500,
+               0.600, 0.340,
+               clutchness=0.400, secondary_positions=('SG',), height=76, speed=0.700,
+               shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Oklahoma City Thunder', players)
     t.init_lineup()
@@ -16194,6 +16306,14 @@ def make_spurs_2027() -> Team:
                0.320, 0.740,
                clutchness=0.400, height=85, speed=0.380,
                shot_iq=0.800, archetype='backup rim protector', stamina=0.62),
+        Player('Jayden Quaintance', 'C',
+               0.02, 0.08, 0.35, 0.17, 0.46, 0.16,
+               0.380, 0.480, 0.690, 0.850, 0.450,
+               0.12, 0.513, 0.644,
+               0.590, 0.820, 0.650, 0.690, 0.470, 0.600,
+               0.670, 0.710,
+               clutchness=0.400, secondary_positions=('PF',), height=83, speed=0.783,
+               shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 San Antonio Spurs', players)
     t.init_lineup()

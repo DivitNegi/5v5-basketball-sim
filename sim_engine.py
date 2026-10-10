@@ -8422,6 +8422,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Dallas Mavericks":
         target_ranges = {
+            "Morez Johnson Jr.": (12, 18),
             "Kyrie Irving": (36, 40), "Max Christie": (28, 33),
             "Cooper Flagg": (34, 38), "P.J. Washington": (31, 35),
             "Dereck Lively II": (14, 17), "Daniel Gafford": (30, 34),
@@ -8521,6 +8522,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Philadelphia 76ers":
         target_ranges = {
+            "Labaron Philon Jr.": (8, 14),
             "Tyrese Maxey": (36, 40), "VJ Edgecombe": (28, 34),
             "Jaylen Brown": (36, 40), "LeBron James": (34, 38),
             "Joel Embiid": (36, 40), "Anfernee Simons": (27, 32),
@@ -8535,6 +8537,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Toronto Raptors":
         target_ranges = {
+            "Allen Graves": (8, 14),
             "Immanuel Quickley": (30, 35),
             "RJ Barrett": (32, 36),
             "Kawhi Leonard": (34, 38),
@@ -8566,6 +8569,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Atlanta Hawks":
         target_ranges = {
+            "Zuby Ejiofor": (8, 14),
             "C.J. McCollum": (30, 35), "Nickeil Alexander-Walker": (24, 30),
             "Dyson Daniels": (30, 34), "Jalen Johnson": (34, 38),
             "Onyeka Okongwu": (28, 33), "Luguentz Dort": (24, 29),
@@ -8592,6 +8596,8 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Charlotte Hornets":
         target_ranges = {
+            "Hannes Steinbach": (10, 16),
+            "Christian Anderson Jr.": (8, 14),
             "Coby White": (28, 33), "Kon Knueppel": (26, 31),
             "Brandon Miller": (34, 38), "Naz Reid": (28, 33),
             "Moussa Diabate": (24, 29), "Grayson Allen": (22, 28),
@@ -8605,6 +8611,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Chicago Bulls":
         target_ranges = {
+            "Dailyn Swain": (10, 16),
             "Josh Giddey": (30, 35), "Norman Powell": (30, 35),
             "Matas Buzelis": (24, 29), "Caleb Wilson": (24, 29),
             "Nicolas Claxton": (28, 33), "Isaac Okoro": (20, 26),
@@ -8631,6 +8638,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Detroit Pistons":
         target_ranges = {
+            "Ebuka Okorie": (8, 14),
             "Cade Cunningham": (34, 38), "Duncan Robinson": (18, 24),
             "Ausar Thompson": (28, 33), "John Collins": (24, 29),
             "Jalen Duren": (26, 31), "Daniss Jenkins": (18, 24),
@@ -8644,6 +8652,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Golden State Warriors":
         target_ranges = {
+            "Yaxel Lendeborg": (12, 18),
             "Stephen Curry": (42, 44), "Brandin Podziemski": (24, 29),
             "Gui Santos": (18, 24), "Draymond Green": (28, 33),
             "Kristaps Porzingis": (26, 31), "Jimmy Butler": (16, 22),
@@ -8696,6 +8705,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Memphis Grizzlies":
         target_ranges = {
+            "Karim Lopez": (10, 16),
             "Scotty Pippen Jr.": (18, 24), "Cedric Coward": (18, 24),
             "Jerami Grant": (22, 28), "Cameron Boozer": (18, 24),
             "Zach Edey": (22, 28), "Ty Jerome": (18, 24),
@@ -8709,6 +8719,8 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Milwaukee Bucks":
         target_ranges = {
+            "Brayden Burries": (14, 20),
+            "Nate Ament": (10, 16),
             "Ryan Rollins": (22, 28), "Tyler Herro": (32, 36),
             "Jaime Jaquez Jr.": (18, 24), "Kyle Kuzma": (18, 24),
             "Myles Turner": (24, 29), "Kevin Porter Jr.": (18, 24),
@@ -8748,6 +8760,8 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Oklahoma City Thunder":
         target_ranges = {
+            "Aday Mara": (10, 16),
+            "Bennett Stirtz": (8, 14),
             "Shai G-Alexander": (34, 38), "Cason Wallace": (18, 24),
             "Jalen Williams": (28, 33), "Chet Holmgren": (28, 33),
             "Isaiah Hartenstein": (20, 26), "Jared McCain": (18, 24),
@@ -8813,6 +8827,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 San Antonio Spurs":
         target_ranges = {
+            "Jayden Quaintance": (8, 14),
             "De'Aaron Fox": (24, 29), "Stephon Castle": (26, 31),
             "Devin Vassell": (22, 28), "Tobias Harris": (18, 24),
             "Victor Wembanyama": (32, 36), "Julian Champagnie": (18, 24),
