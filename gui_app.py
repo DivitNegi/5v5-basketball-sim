@@ -767,12 +767,8 @@ def run_gui_app():
             "1-on-1",
             "Playoff series",
             "Custom 16-team playoffs",
-            "Full playoffs",
-            "Full 2016 playoffs",
             "Full 2027 playoffs",
             "2027 season (82 games)",
-            "Fantasy draft season",
-            "2026 fantasy draft season",
             "Fantasy draft playoffs",
             "Olympic tournament",
         ),
@@ -981,11 +977,17 @@ def run_gui_app():
     advanced_sort_dropdown = ttk.Combobox(
         advanced_filter_frame,
         textvariable=advanced_sort_var,
-        values=("Minutes", "PER", "TS%", "PTS Created", "USG%", "BPM", "VORP", "Off Impact", "Def Impact", "Total Impact", "+/-", "Double Teams"),
+        values=("Minutes", "MPG", "PER", "TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "AST%", "PTS Created", "STL%", "BLK%", "TOV%",
+                "USG%", "WS", "BPM", "VORP", "Off Impact", "Def Impact", "Total Impact", "+/-", "Double Teams"),
         state="readonly",
         width=16,
     )
-    advanced_sort_dropdown.grid(row=0, column=3, sticky="ew")
+    advanced_sort_dropdown.grid(row=0, column=3, sticky="ew", padx=(0, 16))
+    advanced_flat_var = tk.BooleanVar(value=False)
+    ttk.Checkbutton(
+        advanced_filter_frame, text="Rank all players (no team headers)", variable=advanced_flat_var,
+        command=lambda: refresh_advanced_dropdown(),
+    ).grid(row=0, column=4, sticky="w")
     advanced_columns = ("team", "player", "mpg", "per", "ts", "efg", "3par", "ftr", "orb", "drb", "astp", "astpts", "stlp", "blkp", "tovp", "usg", "ws", "bpm", "vorp", "offimpact", "defimpact", "totalimpact", "plusminus", "dbltm")
     advanced_tree = ttk.Treeview(
         advanced_widget_frame,
@@ -1068,7 +1070,28 @@ def run_gui_app():
     tk.Label(shot_defense_filter_frame, text="Guarded", bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 12, "bold")).grid(row=0, column=10, sticky="w", padx=(0, 8))
     matchup_guarded_var = tk.StringVar(value="All Guarded")
     matchup_guarded_dropdown = ttk.Combobox(shot_defense_filter_frame, textvariable=matchup_guarded_var, values=("All Guarded",), state="readonly", width=30)
-    matchup_guarded_dropdown.grid(row=0, column=11, sticky="w")
+    matchup_guarded_dropdown.grid(row=0, column=11, sticky="w", padx=(0, 24))
+    SHOT_RANK_KEYS = {
+        "3P": ("three",), "3P OPEN": ("three_open",), "3P CONT": ("three_contested",),
+        "MID": ("mid",), "MID OPEN": ("mid_open",), "MID CONT": ("mid_contested",),
+        "RIM": ("rim",), "RIM OPEN": ("rim_open",), "RIM CONT": ("rim_contested",),
+        "POST": ("post",), "DUNK": ("dunk",), "C&S": ("catch_shoot",), "ISO": ("iso",), "PUTB": ("putback",),
+        "OPEN": ("wide_open",), "CONT": ("contested",),
+        "TOTAL": ("three", "mid", "rim", "post", "dunk"),
+    }
+    tk.Label(shot_defense_filter_frame, text="Rank by", bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 12, "bold")).grid(row=0, column=12, sticky="w", padx=(0, 8))
+    shot_rank_var = tk.StringVar(value="Team order")
+    shot_rank_dropdown = ttk.Combobox(
+        shot_defense_filter_frame, textvariable=shot_rank_var,
+        values=("Team order",) + tuple(SHOT_RANK_KEYS), state="readonly", width=14,
+    )
+    shot_rank_dropdown.grid(row=0, column=13, sticky="w", padx=(0, 16))
+    shot_rank_stat_var = tk.StringVar(value="Made")
+    shot_rank_stat_dropdown = ttk.Combobox(
+        shot_defense_filter_frame, textvariable=shot_rank_stat_var,
+        values=("Made", "Attempted"), state="readonly", width=11,
+    )
+    shot_rank_stat_dropdown.grid(row=0, column=14, sticky="w")
     shot_columns = ("team", "player", "3p", "open3", "cont3", "mid", "openmid", "contmid", "rim", "openrim", "contrim", "post", "dunk", "cs", "iso", "putb", "open", "cont", "sq", "total")
     shot_tree = ttk.Treeview(
         shot_defense_widget_frame,
@@ -1216,7 +1239,12 @@ def run_gui_app():
     ttk.Label(series_avg_top, text="Quarter").grid(row=0, column=2, sticky="w", padx=(0, 8))
     series_avg_quarter_var = tk.StringVar(value="All")
     series_avg_quarter_dropdown = ttk.Combobox(series_avg_top, textvariable=series_avg_quarter_var, values=("All", "Q1", "Q2", "Q3", "Q4", "OT"), state="readonly", width=10)
-    series_avg_quarter_dropdown.grid(row=0, column=3, sticky="w")
+    series_avg_quarter_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 16))
+    ttk.Label(series_avg_top, text="Rank by").grid(row=0, column=4, sticky="w", padx=(0, 8))
+    AVG_RANK_OPTIONS = ("Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-")
+    series_avg_rank_var = tk.StringVar(value="Team order")
+    series_avg_rank_dropdown = ttk.Combobox(series_avg_top, textvariable=series_avg_rank_var, values=AVG_RANK_OPTIONS, state="readonly", width=12)
+    series_avg_rank_dropdown.grid(row=0, column=5, sticky="w")
     series_avg_columns = ("team", "player", "gp", "min", "pts", "reb", "orb", "ast", "stl", "blk", "tov", "fg", "fgp", "tp", "tpp", "ft", "ftp", "ts", "plusminus")
     series_avg_tree = ttk.Treeview(
         series_avg_widget_frame,
@@ -1253,7 +1281,11 @@ def run_gui_app():
     ttk.Label(playoff_avg_top, text="Team").grid(row=0, column=0, sticky="w", padx=(0, 8))
     playoff_avg_team_var = tk.StringVar(value="All Teams")
     playoff_avg_team_dropdown = ttk.Combobox(playoff_avg_top, textvariable=playoff_avg_team_var, values=("All Teams",), state="readonly")
-    playoff_avg_team_dropdown.grid(row=0, column=1, sticky="ew")
+    playoff_avg_team_dropdown.grid(row=0, column=1, sticky="ew", padx=(0, 16))
+    ttk.Label(playoff_avg_top, text="Rank by").grid(row=0, column=2, sticky="w", padx=(0, 8))
+    playoff_avg_rank_var = tk.StringVar(value="Team order")
+    playoff_avg_rank_dropdown = ttk.Combobox(playoff_avg_top, textvariable=playoff_avg_rank_var, values=AVG_RANK_OPTIONS, state="readonly", width=12)
+    playoff_avg_rank_dropdown.grid(row=0, column=3, sticky="w")
     playoff_avg_tree = ttk.Treeview(
         playoff_avg_frame,
         columns=series_avg_columns,
@@ -1768,6 +1800,26 @@ def run_gui_app():
     shot_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_quarter_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_team_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    shot_rank_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    shot_rank_stat_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    SHOT_HEADING_TO_RANK = {
+        "3p": "3P", "open3": "3P OPEN", "cont3": "3P CONT", "mid": "MID", "openmid": "MID OPEN", "contmid": "MID CONT",
+        "rim": "RIM", "openrim": "RIM OPEN", "contrim": "RIM CONT", "post": "POST", "dunk": "DUNK", "cs": "C&S",
+        "iso": "ISO", "putb": "PUTB", "open": "OPEN", "cont": "CONT", "total": "TOTAL",
+    }
+
+    def rank_shots_by_heading(label: str):
+        # Clicking the same column again flips between made and attempted.
+        if shot_rank_var.get() == label:
+            shot_rank_stat_var.set("Attempted" if shot_rank_stat_var.get() == "Made" else "Made")
+        shot_rank_var.set(label)
+        update_shot_defense_widgets(playoff_sections_state.get("sections") or {})
+
+    for _tree in (shot_tree, defense_tree):
+        for _col, _label in SHOT_HEADING_TO_RANK.items():
+            if _col in _tree["columns"]:
+                _tree.heading(_col, command=lambda l=_label: rank_shots_by_heading(l))
+        _tree.heading("team", command=lambda: (shot_rank_var.set("Team order"), update_shot_defense_widgets(playoff_sections_state.get("sections") or {})))
     matchup_defender_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     matchup_guarded_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     # The separate Live dashboard duplicated the main scoreboard and consumed
@@ -2357,8 +2409,17 @@ def run_gui_app():
     def stat_pct_value(stats: Dict, made_key: str, att_key: str) -> float:
         return safe_pct(stats.get(made_key, 0), stats.get(att_key, 0))
 
+    ADVANCED_SORT_INDEX = {
+        "MPG": 0, "PER": 1, "TS%": 2, "eFG%": 3, "3PAr": 4, "FTr": 5, "ORB%": 6, "DRB%": 7, "AST%": 9,
+        "STL%": 10, "BLK%": 11, "TOV%": 12, "USG%": 13, "WS": 16, "BPM": 20, "VORP": 21,
+        "Off Impact": 22, "Def Impact": 23, "Total Impact": 24, "+/-": 25, "Double Teams": 26,
+    }
+
     def advanced_sort_key(row: Dict) -> float:
         sort_mode = advanced_sort_var.get()
+        index = ADVANCED_SORT_INDEX.get(sort_mode)
+        if index is not None and row.get("adv") is not None:
+            return row["adv"][index]
         if sort_mode == "PER":
             return row.get("per", 0.0)
         if sort_mode == "TS%":
@@ -2400,6 +2461,7 @@ def run_gui_app():
 
         team_names = list(series_totals.keys())
         team_names_for_view = team_names if current_team == "All Teams" else [current_team]
+        flat_advanced_rows = []
         for team_name in team_names_for_view:
             players = series_totals.get(team_name, {})
             if not players:
@@ -2409,7 +2471,8 @@ def run_gui_app():
             opp = series_team_totals.get(opp_name, {}) if opp_name else {}
             team_display = table_player_name(team_name, 24)
             team_points = max(1, team.get("pts", 0))
-            advanced_tree.insert("", "end", values=(team_display, f"ADVANCED - {advanced_sort_var.get()}", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""), tags=("team",))
+            if not advanced_flat_var.get():
+                advanced_tree.insert("", "end", values=(team_display, f"ADVANCED - {advanced_sort_var.get()}", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""), tags=("team",))
             rows = []
             for name, stats in players.items():
                 adv = calc_series_advanced(stats, team, opp)
@@ -2432,6 +2495,11 @@ def run_gui_app():
                     "double_teams_pg": adv[26],
                     "team_points": team_points,
                 })
+            if advanced_flat_var.get():
+                for row in rows:
+                    row["team_display"] = team_display
+                flat_advanced_rows.extend(rows)
+                continue
             for row in sorted(rows, key=advanced_sort_key, reverse=True):
                 name = row["name"]
                 stats = row["stats"]
@@ -2465,6 +2533,26 @@ def run_gui_app():
                         f"{adv[24]:+.1f}",
                         f"{adv[25]:+.1f}",
                         f"{adv[26]:.1f}",
+                    ),
+                )
+
+        if advanced_flat_var.get():
+            for rank, row in enumerate(sorted(flat_advanced_rows, key=advanced_sort_key, reverse=True), start=1):
+                adv = row["adv"]
+                points_created = row["points_created"]
+                team_points = row["team_points"]
+                advanced_tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        row["team_display"],
+                        f"{rank}. {table_player_name(row['name'], 22)}",
+                        f"{adv[0]:.1f}", f"{adv[1]:.1f}", f"{adv[2]:.1f}", f"{adv[3]:.1f}",
+                        f"{adv[4]:.3f}", f"{adv[5]:.3f}", f"{adv[6]:.1f}", f"{adv[7]:.1f}", f"{adv[9]:.1f}",
+                        f"{points_created:.0f}/{team_points:.0f} {100 * points_created / team_points:.0f}%",
+                        f"{adv[10]:.1f}", f"{adv[11]:.1f}", f"{adv[12]:.1f}", f"{adv[13]:.1f}",
+                        f"{adv[16]:.1f}", f"{adv[20]:.1f}", f"{adv[21]:.1f}",
+                        f"{adv[22]:+.1f}", f"{adv[23]:+.1f}", f"{adv[24]:+.1f}", f"{adv[25]:+.1f}", f"{adv[26]:.1f}",
                     ),
                 )
 
@@ -2587,6 +2675,15 @@ def run_gui_app():
         matchup_tree.delete(*matchup_tree.get_children())
         if not shot_totals:
             shot_tree.insert("", "end", values=("", "Shot diet will start at 0/0 when a game begins.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""))
+        shot_rank_choice = shot_rank_var.get()
+        shot_rank_active = shot_rank_choice in SHOT_RANK_KEYS
+
+        def shot_rank_value(diet: Dict) -> float:
+            keys = SHOT_RANK_KEYS[shot_rank_choice]
+            if shot_rank_stat_var.get() == "Attempted":
+                return sum(diet.get(k, 0) for k in keys)
+            return sum(diet.get(f"{k}_made", 0) for k in keys)
+
         def shot_row_values(team_display, name, diet):
             return (
                 team_display,
@@ -2611,7 +2708,19 @@ def run_gui_app():
                 diet_total_text(diet),
             )
 
-        for team_name, players in shot_totals.items():
+        if shot_rank_active:
+            ranked_shots = []
+            for team_name, players in shot_totals.items():
+                for name, stats in players.items():
+                    diet = stats.get("shot_diet", {}) or {}
+                    ranked_shots.append((shot_rank_value(diet), team_name, name, diet))
+            ranked_shots.sort(key=lambda item: item[0], reverse=True)
+            for rank, (_value, team_name, name, diet) in enumerate(ranked_shots, start=1):
+                shot_tree.insert(
+                    "", "end",
+                    values=shot_row_values(table_player_name(team_name, 24), f"{rank}. {table_player_name(name, 22)}", diet),
+                )
+        for team_name, players in ({} if shot_rank_active else shot_totals).items():
             team_display = table_player_name(team_name, 24)
             team_diet: Dict[str, float] = {}
             for stats in players.values():
@@ -2635,16 +2744,47 @@ def run_gui_app():
         matchup_rows = []
         selected_defender = matchup_defender_var.get()
         selected_guarded = matchup_guarded_var.get()
+        def defense_row_values(team_display, display_name, defended):
+            return (
+                team_display,
+                display_name,
+                format_diet_pair_compact(defended, "three"),
+                format_diet_pair_compact(defended, "mid"),
+                format_diet_pair_compact(defended, "rim"),
+                format_diet_pair_compact(defended, "post"),
+                format_diet_pair_compact(defended, "dunk"),
+                format_diet_pair_compact(defended, "catch_shoot"),
+                format_diet_pair_compact(defended, "iso"),
+                format_diet_pair_compact(defended, "putback"),
+                format_diet_pair_compact(defended, "wide_open"),
+                format_diet_pair_compact(defended, "contested"),
+                defended.get("turnover", 0),
+                diet_total_text(defended),
+            )
+
+        if shot_rank_active:
+            ranked_defense = []
+            for team_name, players in defense_totals.items():
+                for name, stats in players.items():
+                    defended = stats.get("defended_diet", {}) or {}
+                    ranked_defense.append((shot_rank_value(defended), team_name, name, defended))
+            ranked_defense.sort(key=lambda item: item[0], reverse=True)
+            for rank, (_value, team_name, name, defended) in enumerate(ranked_defense, start=1):
+                defense_tree.insert(
+                    "", "end",
+                    values=defense_row_values(table_player_name(team_name, 24), f"{rank}. {table_player_name(name, 22)}", defended),
+                )
         for team_name, players in defense_totals.items():
             team_display = table_player_name(team_name, 24)
-            defense_tree.insert("", "end", values=(team_display, "DEFENDED SHOTS", "", "", "", "", "", "", "", "", "", "", ""), tags=("team",))
+            if not shot_rank_active:
+                defense_tree.insert("", "end", values=(team_display, "DEFENDED SHOTS", "", "", "", "", "", "", "", "", "", "", ""), tags=("team",))
             inserted_team_header = False
             for name, stats in sorted(players.items(), key=lambda item: item[1].get("minutes", 0), reverse=True):
                 defended = stats.get("defended_diet", {}) or {}
-                defense_tree.insert(
-                    "",
-                    "end",
-                    values=(
+                if shot_rank_active:
+                    defended_row_values = None
+                else:
+                    defended_row_values = (
                         team_display,
                         table_player_name(name, 24),
                         format_diet_pair_compact(defended, "three"),
@@ -2659,8 +2799,8 @@ def run_gui_app():
                         format_diet_pair_compact(defended, "contested"),
                         defended.get("turnover", 0),
                         diet_total_text(defended),
-                    ),
-                )
+                    )
+                    defense_tree.insert("", "end", values=defended_row_values)
                 matchup_diet = stats.get("defended_matchup_diet", {}) or {}
                 for guarded_name, guarded_diet in matchup_diet.items():
                     if selected_defender != "All Defenders" and name != selected_defender:
@@ -2793,12 +2933,86 @@ def run_gui_app():
             series_team_totals,
             series_avg_team_var.get(),
             selected_average_period(),
+            series_avg_rank_var.get(),
         )
 
-    def insert_average_rows(tree, series_totals: Dict, series_team_totals: Dict, selected_team: str = "All Teams", period: int | None = None):
+    AVG_RANK_VALUE = {
+        "GP": lambda s, gp: s.get("games", 0),
+        "MIN": lambda s, gp: s.get("minutes", 0) / 60 / gp,
+        "PTS": lambda s, gp: s.get("pts", 0) / gp,
+        "REB": lambda s, gp: s.get("reb", 0) / gp,
+        "ORB": lambda s, gp: s.get("oreb", 0) / gp,
+        "AST": lambda s, gp: s.get("ast", 0) / gp,
+        "STL": lambda s, gp: s.get("stl", 0) / gp,
+        "BLK": lambda s, gp: s.get("blk", 0) / gp,
+        "TOV": lambda s, gp: s.get("tov", 0) / gp,
+        "FG": lambda s, gp: s.get("fgm", 0) / gp,
+        "FG%": lambda s, gp: stat_pct_value(s, "fgm", "fga"),
+        "3P": lambda s, gp: s.get("tpm", 0) / gp,
+        "3P%": lambda s, gp: stat_pct_value(s, "tpm", "tpa"),
+        "FT": lambda s, gp: s.get("ftm", 0) / gp,
+        "FT%": lambda s, gp: stat_pct_value(s, "ftm", "fta"),
+        "TS%": lambda s, gp: series_ts_value(s),
+        "+/-": lambda s, gp: s.get("plus_minus", 0) / gp,
+    }
+
+    def average_period_stats(stats: Dict, period: int | None) -> Dict:
+        if period is None:
+            return stats
+        if period == 5:
+            q_rows = [row for q_num, row in (stats.get("quarter_stats") or {}).items() if q_num >= 5]
+            row_stats = merge_period_rows(q_rows) if q_rows else {}
+            if row_stats:
+                row_stats["games"] = max((row.get("games", 0) for row in q_rows), default=0)
+            return row_stats
+        return (stats.get("quarter_stats") or {}).get(period, {})
+
+    def insert_ranked_average_rows(tree, series_totals: Dict, teams_in_view: List[str], period: int | None, rank_by: str):
+        value_of = AVG_RANK_VALUE[rank_by]
+        entries = []
+        for team_name in teams_in_view:
+            for name, stats in (series_totals.get(team_name, {}) or {}).items():
+                row_stats = average_period_stats(stats, period)
+                if row_stats:
+                    gp = max(1, row_stats.get("games", 0))
+                    entries.append((value_of(row_stats, gp), team_name, name, row_stats, gp))
+        entries.sort(key=lambda e: e[0], reverse=True)
+        for rank, (_value, team_name, name, stats, gp) in enumerate(entries, start=1):
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    table_player_name(team_name, 24),
+                    f"{rank}. {table_player_name(name, 22)}",
+                    gp,
+                    f"{stats.get('minutes', 0) / 60 / gp:.1f}",
+                    f"{stats.get('pts', 0) / gp:.1f}",
+                    f"{stats.get('reb', 0) / gp:.1f}",
+                    f"{stats.get('oreb', 0) / gp:.1f}",
+                    f"{stats.get('ast', 0) / gp:.1f}",
+                    f"{stats.get('stl', 0) / gp:.1f}",
+                    f"{stats.get('blk', 0) / gp:.1f}",
+                    f"{stats.get('tov', 0) / gp:.1f}",
+                    f"{stats.get('fgm', 0) / gp:.1f}/{stats.get('fga', 0) / gp:.1f}",
+                    f"{stat_pct_value(stats, 'fgm', 'fga'):.1f}",
+                    f"{stats.get('tpm', 0) / gp:.1f}/{stats.get('tpa', 0) / gp:.1f}",
+                    f"{stat_pct_value(stats, 'tpm', 'tpa'):.1f}",
+                    f"{stats.get('ftm', 0) / gp:.1f}/{stats.get('fta', 0) / gp:.1f}",
+                    f"{stat_pct_value(stats, 'ftm', 'fta'):.1f}",
+                    f"{series_ts_value(stats):.1f}",
+                    f"{stats.get('plus_minus', 0) / gp:+.1f}",
+                ),
+            )
+
+    def insert_average_rows(tree, series_totals: Dict, series_team_totals: Dict, selected_team: str = "All Teams", period: int | None = None, rank_by: str = "Team order"):
         tree.delete(*tree.get_children())
         if not series_totals and not series_team_totals:
             tree.insert("", "end", values=("", "Averages will appear here after games are played.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""))
+            return
+        if rank_by in AVG_RANK_VALUE:
+            source = series_team_totals if period is None else series_totals
+            teams_in_view = list(series_totals.keys()) if selected_team == "All Teams" else ([selected_team] if selected_team in source else [])
+            insert_ranked_average_rows(tree, series_totals, teams_in_view, period, rank_by)
             return
         team_names_for_view = list(series_team_totals.keys() if period is None else series_totals.keys())
         if selected_team != "All Teams":
@@ -2884,21 +3098,41 @@ def run_gui_app():
         sections = playoff_sections_state.get("sections") or {}
         series_totals = sections.get("_playoff_player_totals") or sections.get("_series_totals") or {}
         series_team_totals = sections.get("_playoff_team_totals") or sections.get("_series_team_totals") or {}
-        insert_average_rows(playoff_avg_tree, series_totals, series_team_totals, playoff_avg_team_var.get())
+        insert_average_rows(playoff_avg_tree, series_totals, series_team_totals, playoff_avg_team_var.get(), None, playoff_avg_rank_var.get())
 
     def refresh_series_average_dropdown(_event=None):
         sections = playoff_sections_state.get("sections") or {}
         series_totals = sections.get("_season_player_totals") or sections.get("_series_totals") or {}
         series_team_totals = sections.get("_season_team_totals") or sections.get("_series_team_totals") or {}
-        insert_average_rows(series_avg_tree, series_totals, series_team_totals, series_avg_team_var.get(), selected_average_period())
+        insert_average_rows(series_avg_tree, series_totals, series_team_totals, series_avg_team_var.get(), selected_average_period(), series_avg_rank_var.get())
 
     def refresh_advanced_dropdown(_event=None):
         update_advanced_widgets(playoff_sections_state.get("sections") or {})
 
     advanced_team_dropdown.bind("<<ComboboxSelected>>", refresh_advanced_dropdown)
     advanced_sort_dropdown.bind("<<ComboboxSelected>>", refresh_advanced_dropdown)
+    ADVANCED_HEADING_TO_SORT = {
+        "mpg": "MPG", "per": "PER", "ts": "TS%", "efg": "eFG%", "3par": "3PAr", "ftr": "FTr", "orb": "ORB%", "drb": "DRB%",
+        "astp": "AST%", "astpts": "PTS Created", "stlp": "STL%", "blkp": "BLK%", "tovp": "TOV%", "usg": "USG%", "ws": "WS",
+        "bpm": "BPM", "vorp": "VORP", "offimpact": "Off Impact", "defimpact": "Def Impact", "totalimpact": "Total Impact",
+        "plusminus": "+/-", "dbltm": "Double Teams",
+    }
+    for _col, _label in ADVANCED_HEADING_TO_SORT.items():
+        advanced_tree.heading(_col, command=lambda l=_label: (advanced_sort_var.set(l), advanced_flat_var.set(True), refresh_advanced_dropdown()))
+    advanced_tree.heading("team", command=lambda: (advanced_flat_var.set(False), refresh_advanced_dropdown()))
     series_avg_team_dropdown.bind("<<ComboboxSelected>>", refresh_series_average_dropdown)
     series_avg_quarter_dropdown.bind("<<ComboboxSelected>>", refresh_series_average_dropdown)
+    series_avg_rank_dropdown.bind("<<ComboboxSelected>>", refresh_series_average_dropdown)
+    playoff_avg_rank_dropdown.bind("<<ComboboxSelected>>", refresh_playoff_average_dropdown)
+
+    AVG_HEADING_TO_RANK = {"gp": "GP", "min": "MIN", "pts": "PTS", "reb": "REB", "orb": "ORB", "ast": "AST", "stl": "STL",
+                           "blk": "BLK", "tov": "TOV", "fg": "FG", "fgp": "FG%", "tp": "3P", "tpp": "3P%", "ft": "FT",
+                           "ftp": "FT%", "ts": "TS%", "plusminus": "+/-"}
+    for _col, _rank in AVG_HEADING_TO_RANK.items():
+        series_avg_tree.heading(_col, command=lambda r=_rank: (series_avg_rank_var.set(r), refresh_series_average_dropdown()))
+        playoff_avg_tree.heading(_col, command=lambda r=_rank: (playoff_avg_rank_var.set(r), refresh_playoff_average_dropdown()))
+    series_avg_tree.heading("team", command=lambda: (series_avg_rank_var.set("Team order"), refresh_series_average_dropdown()))
+    playoff_avg_tree.heading("team", command=lambda: (playoff_avg_rank_var.set("Team order"), refresh_playoff_average_dropdown()))
     playoff_avg_team_dropdown.bind("<<ComboboxSelected>>", refresh_playoff_average_dropdown)
 
     def update_playoff_average_widgets(sections: Dict):
@@ -2910,7 +3144,7 @@ def run_gui_app():
         playoff_avg_team_dropdown.configure(values=teams)
         if current not in teams:
             playoff_avg_team_var.set("All Teams")
-        insert_average_rows(playoff_avg_tree, series_totals, series_team_totals, playoff_avg_team_var.get())
+        insert_average_rows(playoff_avg_tree, series_totals, series_team_totals, playoff_avg_team_var.get(), None, playoff_avg_rank_var.get())
 
     def award_widget_rows(sections: Dict) -> List[Tuple[str, str, str]]:
         season_awards = sections.get("_season_awards")

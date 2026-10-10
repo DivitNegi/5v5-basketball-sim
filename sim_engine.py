@@ -7998,7 +7998,7 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name == "Dereck Lively II" and team.name == "2026 Dallas Mavericks":
         return True
-    if player.name in ("Max Christie", "Dereck Lively II", "Santi Aldama", "Naji Marshall") and team.name == "2027 Dallas Mavericks":
+    if player.name in ("Max Christie", "Dereck Lively II", "Daniel Gafford", "Naji Marshall") and team.name == "2027 Dallas Mavericks":
         return True
     if player.name == "Kentavious Caldwell-Pope" and team.name == "2027 Philadelphia 76ers":
         return True
@@ -8151,6 +8151,29 @@ def rotation_star_players(team: Team) -> List[Player]:
 # Regular-season mode: a first option plays ~34-36 minutes a night, not the
 # 38-44 the playoff-style targets give. Set by the season runner only.
 SEASON_STAR_MINUTES_CAP = None
+
+
+# (starter, backup, quarters the backup opens): the backup big takes the
+# starter's spot at those quarter tip-offs so he gets real minutes instead of
+# only the stints the starter sits.
+QUARTER_STARTER_SWAPS = {
+    "2027 Dallas Mavericks": ("Dereck Lively II", "Daniel Gafford", (2, 3, 4)),
+}
+
+
+def apply_quarter_starter_swaps(team: Team, period: int):
+    swap = QUARTER_STARTER_SWAPS.get(team.name)
+    if not swap:
+        return
+    starter_name, backup_name, quarters = swap
+    starter = next((p for p in team.roster if p.name == starter_name), None)
+    backup = next((p for p in team.roster if p.name == backup_name), None)
+    if starter is None or backup is None:
+        return
+    if period in quarters:
+        starter.is_starter, backup.is_starter = False, True
+    else:
+        starter.is_starter, backup.is_starter = True, False
 
 
 def initialize_minute_targets(team: Team):
@@ -8401,8 +8424,8 @@ def _initialize_minute_targets_core(team: Team):
         target_ranges = {
             "Kyrie Irving": (36, 40), "Max Christie": (28, 33),
             "Cooper Flagg": (34, 38), "P.J. Washington": (31, 35),
-            "Dereck Lively II": (24, 29), "Daniel Gafford": (22, 28),
-            "Naji Marshall": (22, 28), "Santi Aldama": (22, 26),
+            "Dereck Lively II": (14, 17), "Daniel Gafford": (30, 34),
+            "Naji Marshall": (22, 28), "Santi Aldama": (0, 4),
             "Zaccharie Risacher": (20, 25), "Marcus Sasser": (18, 24),
         }
         for p in team.roster:
@@ -20254,6 +20277,8 @@ def simulate_game(teamA: Team, teamB: Team):
         teamB.current_period = period
         apply_mavs_2024_quarter_scoring_roles(teamA, period)
         apply_mavs_2024_quarter_scoring_roles(teamB, period)
+        apply_quarter_starter_swaps(teamA, period)
+        apply_quarter_starter_swaps(teamB, period)
         teamA.quarter_fouls = 0
         teamB.quarter_fouls = 0
         enforce_timeout_limits(teamA, period, q_time)
