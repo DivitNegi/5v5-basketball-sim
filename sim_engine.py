@@ -16764,6 +16764,26 @@ def choose_ballhandler(team: Team) -> Player:
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
 
+    if team.name == "2027 Miami Heat":
+        mitchell = player_by_name(team.on_floor, ("Davion Mitchell",))
+        # Davion Mitchell is Miami's lead guard and a 0.96 playmaker, but his
+        # usage is tiny, so the generic initiator weighting kept handing the
+        # offense to Giannis/Bam and left Miami last in assists. His rating is
+        # already at the ceiling -- this is purely about the touches.
+        if mitchell is not None and not mitchell.fouled_out and random.random() < 0.62:
+            return mitchell
+        preferred = [p for p in team.on_floor if p.name in ("Davion Mitchell", "Giannis Antetokounmpo", "Bam Adebayo", "Pelle Larsson")]
+        if preferred:
+            weights = [
+                max(0.01, playmaking_hub_score(p) ** 1.50)
+                * assist_load_factor(p, team)
+                * coach_handler_multiplier(team, p)
+                * fatigue_touch_multiplier(p)
+                * (1.8 if p.name == "Davion Mitchell" else 1.0)
+                for p in preferred
+            ]
+            return random.choices(preferred, weights=weights, k=1)[0]
+
     if team.name == "2024 Dallas Mavericks":
         # Luka runs the offense in the 1st and 3rd; Kyrie takes the reins
         # in the 2nd and 4th -- an explicit quarter-by-quarter alternation
