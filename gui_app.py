@@ -3098,15 +3098,16 @@ def run_gui_app():
     def insert_ranked_average_rows(tree, series_totals: Dict, teams_in_view: List[str], period: int | None, rank_by: str):
         value_of = AVG_RANK_VALUE[rank_by]
         entries = []
-        excluded = 0
+        # A single quarter only holds a fraction of the game's minutes, so the
+        # NBA minimums shrink to that share (12 of 48 for Q1-Q4, 5 of 48 for OT).
+        period_share = 1.0 if period is None else (5 / 48 if period == 5 else 12 / 48)
         for team_name in teams_in_view:
             team_players = series_totals.get(team_name, {}) or {}
             team_games = max((s.get("games", 0) for s in team_players.values()), default=0)
             for name, stats in team_players.items():
                 row_stats = average_period_stats(stats, period)
                 if row_stats:
-                    if period is None and not meets_rank_minimum(row_stats, rank_by, team_games):
-                        excluded += 1
+                    if not meets_rank_minimum(row_stats, rank_by, team_games * period_share):
                         continue
                     gp = max(1, row_stats.get("games", 0))
                     entries.append((value_of(row_stats, gp), team_name, name, row_stats, gp))

@@ -3192,21 +3192,31 @@ shot_sequence_lines["post_fade"] = [
 
 from dataclasses import dataclass, field
 
-FEATURED_ROOKIE_ROLES_2027: Dict[str, Tuple[float, float, float]] = {
-    "Darryn Peterson": (0.30, 0.44, 12.5),
-    "Darius Acuff Jr.": (0.30, 0.44, 16.0),
-    "AJ Dybantsa": (0.32, 0.50, 19.0),
-    "Kingston Flemings": (0.24, 0.34, 11.0),
-    "Brayden Burries": (0.26, 0.38, 12.0),
-    "Morez Johnson Jr.": (0.24, 0.34, 11.0),
-    "Yaxel Lendeborg": (0.24, 0.34, 11.0),
-    "Nate Ament": (0.24, 0.34, 11.0),
-    "Aday Mara": (0.20, 0.30, 9.0),
-    "Cameron Boozer": (0.27, 0.40, 14.0),
-    "Caleb Wilson": (0.26, 0.38, 15.0),
-    "Keaton Wagler": (0.28, 0.42, 15.0),
-    "Mikel Brown Jr.": (0.27, 0.40, 14.0),
+FEATURED_ROOKIE_ROLES_2027: Dict[str, Tuple[float, float]] = {
+    # (usage, shot_tendency) floors. Volume comes from these tendencies and the
+    # player's ratings through the normal shooter weighting -- no FGA cap.
+    "Darryn Peterson": (0.29, 0.42),
+    "Darius Acuff Jr.": (0.28, 0.40),
+    "AJ Dybantsa": (0.29, 0.44),
+    "Cameron Boozer": (0.26, 0.38),
+    "Caleb Wilson": (0.24, 0.34),
+    "Keaton Wagler": (0.24, 0.35),
+    "Mikel Brown Jr.": (0.24, 0.34),
+    "Kingston Flemings": (0.20, 0.30),
+    "Brayden Burries": (0.21, 0.31),
+    "Morez Johnson Jr.": (0.20, 0.28),
+    "Yaxel Lendeborg": (0.20, 0.28),
+    "Nate Ament": (0.20, 0.28),
+    "Aday Mara": (0.17, 0.24),
 }
+
+# 2026 rookies are rated a touch below their draft-night scouting numbers: the
+# class should not be full of immediate 15-20 PPG scorers.
+ROOKIE_RATING_HAIRCUT = 0.035
+_ROOKIE_HAIRCUT_FIELDS = (
+    "three_rating", "mid_rating", "rim_rating", "dunk_rating", "ft_rating", "playmaking",
+    "ball_handle", "perimeter_def", "interior_def", "steal", "block", "oreb", "dreb",
+)
 
 
 @dataclass(eq=True, unsafe_hash=True)
@@ -3324,13 +3334,15 @@ class Player:
         if not self.go_to_shot:
             self.go_to_shot = default_player_go_to_shot(self)
 
-        role = FEATURED_ROOKIE_ROLES_2027.get(self.name)
-        if role:
-            # (usage, shot_tendency, FGA goal): the top 2026 rookies carry real
-            # offensive roles so the All-Rookie teams land around 16-20 PPG.
-            self.usage = max(self.usage, role[0])
-            self.shot_tendency = max(self.shot_tendency, role[1])
-            self.target_fga_soft_cap = role[2]
+        if not getattr(self, "_rookie_adjusted", False) and rookie_name_key(self.name) in ROOKIE_KEYS_2026:
+            self._rookie_adjusted = True
+            for attr in _ROOKIE_HAIRCUT_FIELDS:
+                setattr(self, attr, max(0.05, getattr(self, attr) - ROOKIE_RATING_HAIRCUT))
+            role = FEATURED_ROOKIE_ROLES_2027.get(self.name)
+            if role:
+                # The top 2026 rookies carry real offensive roles.
+                self.usage = max(self.usage, role[0])
+                self.shot_tendency = max(self.shot_tendency, role[1])
 
 
 def foul_draw_sim(player: "Player | None") -> float:
