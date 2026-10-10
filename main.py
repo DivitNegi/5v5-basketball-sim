@@ -135,13 +135,17 @@ if __name__ == "__main__":
     elif mode == "4":
         print("\nSelect playoff year:")
         print("  1. 2016")
+        print("  2. 2027 (top 8 East / top 8 West by strength)")
         year_choice = input("Enter year option: ").strip()
-        if year_choice not in ("1", "2016"):
-            print("Only 2016 is available right now.")
+        if year_choice not in ("1", "2016", "2", "2027"):
+            print("Pick 1 (2016) or 2 (2027).")
         else:
             old_pause_after_series_games = sim_engine.PAUSE_AFTER_SERIES_GAMES
             sim_engine.PAUSE_AFTER_SERIES_GAMES = True
-            run_2016_playoffs()
+            if year_choice in ("2", "2027"):
+                run_2027_playoffs()
+            else:
+                run_2016_playoffs()
             sim_engine.PAUSE_AFTER_SERIES_GAMES = old_pause_after_series_games
 
     elif mode == "3":

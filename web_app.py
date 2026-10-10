@@ -76,6 +76,8 @@ def run_web_gui_app(tk_error: Exception = None):
                 simulate_game(team_a, team_b)
             elif mode == "Playoff series":
                 run_best_of_7_series(factories[team_a_name], factories[team_b_name])
+            elif mode == "Full 2027 playoffs":
+                run_2027_playoffs()
             else:
                 run_2016_playoffs()
         except Exception:
@@ -116,6 +118,7 @@ def run_web_gui_app(tk_error: Exception = None):
       <option>Game</option>
       <option>Playoff series</option>
       <option>Full 2016 playoffs</option>
+      <option>Full 2027 playoffs</option>
     </select>
     <select id="teamA"></select>
     <select id="teamB"></select>
@@ -142,7 +145,7 @@ def run_web_gui_app(tk_error: Exception = None):
     }}
 
     function syncMode() {{
-      const disabled = mode.value === "Full 2016 playoffs";
+      const disabled = mode.value === "Full 2016 playoffs" || mode.value === "Full 2027 playoffs";
       teamA.disabled = disabled;
       teamB.disabled = disabled;
     }}
@@ -160,7 +163,7 @@ def run_web_gui_app(tk_error: Exception = None):
     }};
 
     document.getElementById("start").onclick = async () => {{
-      if (mode.value !== "Full 2016 playoffs" && teamA.value === teamB.value) {{
+      if (mode.value !== "Full 2016 playoffs" && mode.value !== "Full 2027 playoffs" && teamA.value === teamB.value) {{
         status.textContent = "Pick two different teams.";
         return;
       }}
@@ -237,7 +240,7 @@ def run_web_gui_app(tk_error: Exception = None):
                     self.end_headers()
                     self.wfile.write(b"A simulation is already running.")
                     return
-                if mode != "Full 2016 playoffs" and team_a_name == team_b_name:
+                if mode not in ("Full 2016 playoffs", "Full 2027 playoffs") and team_a_name == team_b_name:
                     self.send_response(400)
                     self.end_headers()
                     self.wfile.write(b"Pick two different teams.")

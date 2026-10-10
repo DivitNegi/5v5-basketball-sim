@@ -6753,6 +6753,162 @@ def run_2016_playoffs():
 
 
 # ============================================================
+# 2027 PLAYOFFS
+# Top 8 teams per conference by roster strength, 1v8 / 4v5 / 3v6 / 2v7,
+# same bracket flow as the 2016 playoffs.
+# ============================================================
+
+PLAYOFF_2027_CONFERENCES = {
+    "East": [
+        "make_hawks_2027", "make_celtics_2027", "make_nets_2027", "make_hornets_2027", "make_bulls_2027",
+        "make_cavs_2027", "make_pistons_2027", "make_pacers_2027", "make_heat_2027", "make_bucks_2027",
+        "make_knicks_2027", "make_magic_2027", "make_sixers_2027", "make_raptors_2027", "make_wizards_2027",
+    ],
+    "West": [
+        "make_mavs_2027", "make_nuggets_2027", "make_warriors_2027", "make_rockets_2027", "make_clippers_2027",
+        "make_lakers_2027", "make_grizzlies_2027", "make_timberwolves_2027", "make_pelicans_2027",
+        "make_thunder_2027", "make_suns_2027", "make_blazers_2027", "make_kings_2027", "make_spurs_2027",
+        "make_jazz_2027",
+    ],
+}
+
+PLAYOFF_2027_STRENGTH_WEIGHTS = (1.0, 0.95, 0.90, 0.80, 0.70, 0.50, 0.40, 0.30, 0.20)
+
+
+def team_strength_2027(team: Team) -> float:
+    ranked = sorted((fantasy_ovr(p) for p in team.roster), reverse=True)
+    weights = PLAYOFF_2027_STRENGTH_WEIGHTS
+    used = ranked[:len(weights)]
+    return sum(v * w for v, w in zip(used, weights)) / sum(weights[:len(used)])
+
+
+def playoff_2027_field() -> Dict[str, List[Tuple[str, int, float, str]]]:
+    """{conference: [(team_name, seed, strength, factory_name), ...]} for the 8 strongest per conference."""
+    field = {}
+    for conference, factory_names in PLAYOFF_2027_CONFERENCES.items():
+        rated = []
+        for factory_name in factory_names:
+            team = globals()[factory_name]()
+            rated.append((team.name, team_strength_2027(team), factory_name))
+        rated.sort(key=lambda item: -item[1])
+        field[conference] = [(name, seed, strength, factory_name)
+                             for seed, (name, strength, factory_name) in enumerate(rated[:8], start=1)]
+    return field
+
+
+def run_2027_playoff_series(team_a_name: str, team_b_name: str, factories: Dict) -> str:
+    print("\n" + "=" * 100)
+    print(f"2027 PLAYOFF SERIES: {team_a_name} vs {team_b_name}")
+    print("=" * 100)
+    return run_best_of_7_series(factories[team_a_name], factories[team_b_name])
+
+
+def print_2027_playoff_standings(field):
+    print("\n2026-27 PLAYOFF SEEDS (ranked by roster strength)")
+    for conference, rows in field.items():
+        print(f"\n{conference}")
+        for name, seed, strength, _factory in rows:
+            print(f"  {seed}. {name} (strength {strength:.1f})")
+
+
+def print_2027_bracket_state(rounds):
+    print("\n" + "=" * 100)
+    print("2027 PLAYOFF BRACKET")
+    print("=" * 100)
+    for conference in ("East", "West"):
+        print(f"\n{conference}")
+        for label in ("First Round", "Semifinals", "Conference Finals"):
+            entries = rounds.get(conference, {}).get(label, [])
+            if not entries:
+                continue
+            print(f"  {label}:")
+            for entry in entries:
+                if len(entry) == 3:
+                    a, b, winner = entry
+                    print(f"    {a} vs {b} -> {winner}")
+                else:
+                    a, b = entry
+                    print(f"    {a} vs {b}")
+    finals = rounds.get("Finals", {}).get("NBA Finals", [])
+    if finals:
+        print("\nNBA Finals:")
+        for entry in finals:
+            if len(entry) == 3:
+                a, b, winner = entry
+                print(f"  {a} vs {b} -> {winner}")
+            else:
+                a, b = entry
+                print(f"  {a} vs {b}")
+    print("=" * 100)
+
+
+def run_2027_playoffs():
+    field = playoff_2027_field()
+    factories = {name: globals()[factory] for rows in field.values() for name, _s, _st, factory in rows}
+    print_2027_playoff_standings(field)
+
+    bracket_state = {}
+    for conference, rows in field.items():
+        by_seed = {seed: name for name, seed, _strength, _factory in rows}
+        bracket_state[conference] = [
+            (by_seed[1], by_seed[8]),
+            (by_seed[4], by_seed[5]),
+            (by_seed[3], by_seed[6]),
+            (by_seed[2], by_seed[7]),
+        ]
+    rounds = {
+        "East": {"First Round": list(bracket_state["East"])},
+        "West": {"First Round": list(bracket_state["West"])},
+        "Finals": {},
+    }
+    print_2027_bracket_state(rounds)
+
+    conference_champions = []
+    for conference, first_round in bracket_state.items():
+        print("\n" + "#" * 100)
+        print(f"{conference.upper()} PLAYOFFS")
+        print("#" * 100)
+        round_winners = []
+        for a, b in first_round:
+            round_winners.append(run_2027_playoff_series(a, b, factories))
+            rounds[conference]["First Round"] = [
+                (*matchup, round_winners[i]) if i < len(round_winners) else matchup
+                for i, matchup in enumerate(first_round)
+            ]
+            print_2027_bracket_state(rounds)
+        semifinals = [
+            (round_winners[0], round_winners[1]),
+            (round_winners[2], round_winners[3]),
+        ]
+        rounds[conference]["Semifinals"] = semifinals
+        print_2027_bracket_state(rounds)
+        semi_winners = []
+        for a, b in semifinals:
+            semi_winners.append(run_2027_playoff_series(a, b, factories))
+            rounds[conference]["Semifinals"] = [
+                (*matchup, semi_winners[i]) if i < len(semi_winners) else matchup
+                for i, matchup in enumerate(semifinals)
+            ]
+            print_2027_bracket_state(rounds)
+        rounds[conference]["Conference Finals"] = [(semi_winners[0], semi_winners[1])]
+        print_2027_bracket_state(rounds)
+        conference_champion = run_2027_playoff_series(semi_winners[0], semi_winners[1], factories)
+        rounds[conference]["Conference Finals"] = [(semi_winners[0], semi_winners[1], conference_champion)]
+        print_2027_bracket_state(rounds)
+        conference_champions.append(conference_champion)
+        print(f"{conference} champion: {conference_champion}")
+
+    rounds["Finals"]["NBA Finals"] = [(conference_champions[0], conference_champions[1])]
+    print_2027_bracket_state(rounds)
+    champion = run_2027_playoff_series(conference_champions[0], conference_champions[1], factories)
+    rounds["Finals"]["NBA Finals"] = [(conference_champions[0], conference_champions[1], champion)]
+    print_2027_bracket_state(rounds)
+    print("\n" + "#" * 100)
+    print(f"2027 PLAYOFF SIM CHAMPION: {champion}")
+    print("#" * 100)
+
+
+# ============================================================
 # 2024 PARIS OLYMPIC MEN'S 5x5 TEAMS
 # Regular team factories using direct Player(...) entries.
 # ============================================================

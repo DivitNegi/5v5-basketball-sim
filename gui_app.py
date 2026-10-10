@@ -769,6 +769,7 @@ def run_gui_app():
             "Custom 16-team playoffs",
             "Full playoffs",
             "Full 2016 playoffs",
+            "Full 2027 playoffs",
             "Fantasy draft season",
             "2026 fantasy draft season",
             "Fantasy draft playoffs",
@@ -4711,7 +4712,7 @@ def run_gui_app():
 
     def set_team_dropdown_state():
         mode = mode_var.get()
-        state = "disabled" if mode in ("Full 2016 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
+        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
         team_a_dropdown.configure(values=team_names, state=state)
         team_b_dropdown.configure(values=team_names, state=state)
         if team_a_var.get() not in factories and team_names:
@@ -6787,6 +6788,8 @@ def run_gui_app():
                 run_fantasy_draft_playoffs()
             elif mode == "Olympic tournament":
                 run_olympic_tournament(sim_factories)
+            elif mode == "Full 2027 playoffs":
+                run_2027_playoffs()
             else:
                 run_2016_playoffs()
             sim_completed = True
@@ -6807,7 +6810,7 @@ def run_gui_app():
             builtins.input = original_input
             sys.stdout = original_stdout
             running["active"] = False
-            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2016 playoffs", "Fantasy draft playoffs", "Olympic tournament"):
+            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2016 playoffs", "Full 2027 playoffs", "Fantasy draft playoffs", "Olympic tournament"):
                 scoreboard_queue.put({"reset_series_score": True, "series_status": "Series reset: 0-0"})
             if sim_completed:
                 pass
@@ -6824,7 +6827,7 @@ def run_gui_app():
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2016 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()
