@@ -3214,13 +3214,11 @@ FEATURED_ROOKIE_ROLES_2027: Dict[str, Tuple[float, float]] = {
     "Aday Mara": (0.17, 0.24),
 }
 
-# 2026 rookies are rated a touch below their draft-night scouting numbers: the
-# class should not be full of immediate 15-20 PPG scorers.
-ROOKIE_RATING_HAIRCUT = 0.035
-_ROOKIE_HAIRCUT_FIELDS = (
-    "three_rating", "mid_rating", "rim_rating", "dunk_rating", "ft_rating", "playmaking",
-    "ball_handle", "perimeter_def", "interior_def", "steal", "block", "oreb", "dreb",
-)
+# 2026 rookies' shot IQ is lifted: the 0.50-0.65 values they came with triggered
+# the sim's low-shot-IQ efficiency penalties and left the class shooting ~40% FG.
+ROOKIE_SHOT_IQ_BOOST = 0.10
+ROOKIE_SHOT_IQ_FLOOR = 0.66
+ROOKIE_SHOT_IQ_CEILING = 0.85
 
 
 @dataclass(eq=True, unsafe_hash=True)
@@ -3340,8 +3338,10 @@ class Player:
 
         if not getattr(self, "_rookie_adjusted", False) and rookie_name_key(self.name) in ROOKIE_KEYS_2026:
             self._rookie_adjusted = True
-            for attr in _ROOKIE_HAIRCUT_FIELDS:
-                setattr(self, attr, max(0.05, getattr(self, attr) - ROOKIE_RATING_HAIRCUT))
+            self.shot_iq = max(
+                self.shot_iq,
+                min(ROOKIE_SHOT_IQ_CEILING, max(ROOKIE_SHOT_IQ_FLOOR, self.shot_iq + ROOKIE_SHOT_IQ_BOOST)),
+            )
             role = FEATURED_ROOKIE_ROLES_2027.get(self.name)
             if role:
                 # The top 2026 rookies carry real offensive roles.
