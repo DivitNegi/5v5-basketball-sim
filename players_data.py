@@ -14005,8 +14005,8 @@ def make_lakers_2027() -> Team:
                height=81, speed=0.62, shot_iq=0.70, iso_tendency=0.10,
                secondary_positions=('C',), archetype='crafty stretch four cleaner', stamina=0.68),
         Player('Walker Kessler', 'C',
-               0.15, 0.0, 0.32, 0.54, 0.62, 0.107,
-               0.750, 0.680, 0.880, 0.880, 0.620,
+               0.02, 0.0, 0.38, 0.18, 0.70, 0.107,
+               0.500, 0.680, 0.950, 0.950, 0.620,
                0.180, 0.300, 0.260,
                0.48, 0.93, 0.75, 0.93, 0.667, 0.900,
                0.72, 0.91,
@@ -14077,7 +14077,7 @@ def make_lakers_2027() -> Team:
     # which came out of Reaves' and Sexton's much more efficient looks.
     kessler = next((p for p in t.roster if p.name == 'Walker Kessler'), None)
     if kessler is not None:
-        kessler.target_fga_soft_cap = 8.0
+        kessler.target_fga_soft_cap = 10.0
     reaves = next((p for p in t.roster if p.name == 'Austin Reaves'), None)
     if reaves is not None:
         reaves.target_fga_soft_cap = 15.0
