@@ -13976,11 +13976,11 @@ def make_lakers_2027() -> Team:
                        0.400, 0.960, 0.920,
                        0.66, 0.53, 0.55, 0.82, 0.990, 0.800,
                        0.59, 0.58,
-                       clutchness=0.940, iso_tendency = .99, stamina=0.73),
+                       clutchness=0.940, iso_tendency = .99, stamina=0.73, shot_iq=0.84),
         Player('Austin Reaves', 'SG',
-               0.42, 0.30, 0.22, 0.06, 0.08, 0.287,
+               0.42, 0.30, 0.22, 0.06, 0.08, 0.360,
                0.880, 0.900, 0.920, 0.700, 0.860,
-               0.250, 0.880, 0.850,
+               0.300, 0.880, 0.850,
                0.43, 0.51, 0.36, 0.59, 0.933, 0.667,
                0.68, 0.42,
                clutchness=0.820, badges=('crafty_finisher', 'connector'),
@@ -13993,7 +13993,7 @@ def make_lakers_2027() -> Team:
                0.50, 0.50, 0.42, 0.55, 0.600, 0.600,
                0.82, 0.50,
                clutchness=0.660, badges=('catch_shoot', 'three_and_d'),
-               height=76, speed=0.78, shot_iq=0.66, iso_tendency=0.12,
+               height=76, speed=0.78, shot_iq=0.80, iso_tendency=0.12,
                secondary_positions=('SG',), archetype='physical perimeter lock', stamina=0.74),
         Player('Sandro Mamukelashvili', 'PF',
                0.42, 0.12, 0.12, 0.34, 0.44, 0.161,
@@ -14029,7 +14029,7 @@ def make_lakers_2027() -> Team:
                0.68, 0.58, 0.42, 0.58, 0.533, 0.667,
                0.76, 0.66,
                clutchness=0.580, badges=('transition_engine',),
-               height=81, speed=0.78, shot_iq=0.60, iso_tendency=0.16,
+               height=81, speed=0.78, shot_iq=0.76, iso_tendency=0.16,
                secondary_positions=('SG', 'PF'), archetype='ball-hawking blow-by ace', stamina=0.75),
         Player('Jarred Vanderbilt', 'PF',
                0.12, 0.12, 0.36, 0.40, 0.34, 0.092,
@@ -14073,6 +14073,14 @@ def make_lakers_2027() -> Team:
         sandro.shot_tendency = min(sandro.shot_tendency, 0.14)
         sandro.usage = min(sandro.usage, 0.11)
         sandro.target_fga_soft_cap = 7.0
+    # Kessler is a rim-runner, not a scorer: he was taking 11 shots at ~48 TS%,
+    # which came out of Reaves' and Sexton's much more efficient looks.
+    kessler = next((p for p in t.roster if p.name == 'Walker Kessler'), None)
+    if kessler is not None:
+        kessler.target_fga_soft_cap = 8.0
+    reaves = next((p for p in t.roster if p.name == 'Austin Reaves'), None)
+    if reaves is not None:
+        reaves.target_fga_soft_cap = 15.0
     t.init_lineup()
     return t
 

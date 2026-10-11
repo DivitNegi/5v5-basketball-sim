@@ -8643,6 +8643,19 @@ def _initialize_minute_targets_core(team: Team):
             p.target_minutes = random.randint(low, high)
         return
 
+    if team.name == "2027 Los Angeles Lakers":
+        target_ranges = {
+            "Luka Doncic": (34, 38), "Austin Reaves": (32, 36),
+            "Walker Kessler": (30, 34), "Quentin Grimes": (26, 30),
+            "Sandro Mamukelashvili": (24, 28), "Collin Sexton": (24, 28),
+            "Jarred Vanderbilt": (14, 20), "Ziaire Williams": (10, 16),
+            "Jaden Hardy": (6, 10), "Bronny James": (4, 8),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 14))
+            p.target_minutes = random.randint(low, high)
+        return
+
     if team.name == "2027 Denver Nuggets":
         target_ranges = {
             "Jamal Murray": (32, 36), "Christian Braun": (22, 26),
@@ -12071,6 +12084,19 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
 
     creation_boost = 1 + (shooter.playmaking - 0.5) * 0.12
     p *= creation_boost
+
+    # Good playmakers on the floor make everyone else's looks easier: the best
+    # passer among the shooter's teammates (and, less so, the second best) lifts
+    # his make probability. A 0.96 playmaker is worth about +3.6%, a second 0.88
+    # passer about +1.4% more; nobody under 0.60 moves it.
+    teammates_pm = sorted(
+        (mate.playmaking for mate in getattr(team, "on_floor", ()) if mate is not shooter),
+        reverse=True,
+    )
+    if teammates_pm:
+        p *= 1.0 + 0.10 * max(0.0, teammates_pm[0] - 0.60)
+        if len(teammates_pm) > 1:
+            p *= 1.0 + 0.05 * max(0.0, teammates_pm[1] - 0.60)
 
     comfort = 1 + (shooter.shot_tendency - 0.5) * 0.08
     p *= comfort
