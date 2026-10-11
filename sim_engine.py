@@ -6668,11 +6668,28 @@ def publish_bracket_state(**updates):
         GUI_SCOREBOARD_QUEUE.put({"bracket_state": copy.deepcopy(BRACKET_STATE)})
 
 
+SERIES_TOTAL_KEYS = ("games", "minutes", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf",
+                     "plus_minus", "fgm", "fga", "tpm", "tpa", "ftm", "fta")
+
+
+def compact_series_totals(series_totals: Dict) -> Dict:
+    """Light copy of a series' per-player totals (no shot diets) for the bracket summary."""
+    return {
+        team: {
+            name: {**{key: stats.get(key, 0) for key in SERIES_TOTAL_KEYS}, "position": stats.get("position", "")}
+            for name, stats in players.items()
+        }
+        for team, players in series_totals.items()
+    }
+
+
 def record_bracket_series_game(team_a: str, team_b: str, game_no: int, score_a: int, score_b: int,
-                               wins_a: int, wins_b: int, home: str, boxes=None):
+                               wins_a: int, wins_b: int, home: str, boxes=None, totals=None):
     series = BRACKET_STATE.setdefault("series", {})
     entry = series.setdefault(f"{team_a}|{team_b}", {"a": team_a, "b": team_b, "games": [], "winner": None})
     entry["wins_a"], entry["wins_b"] = wins_a, wins_b
+    if totals is not None:
+        entry["totals"] = totals
     if game_no > len(entry["games"]):
         entry["games"].append((game_no, score_a, score_b, home))
     if boxes:
@@ -6812,6 +6829,7 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
             teamA.name, teamB.name, game_num, teamA.score, teamB.score,
             series_wins[teamA.name], series_wins[teamB.name], home_team.name,
             boxes=[box_score_snapshot(teamA), box_score_snapshot(teamB)],
+            totals=compact_series_totals(series_totals),
         )
         push_gui_series_update(series_totals, series_team_totals, game_logs, playoff_bracket_lines=playoff_bracket_lines)
 

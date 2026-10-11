@@ -1027,13 +1027,68 @@ def run_gui_app():
         bracket_widget_frame, textvariable=bracket_detail_var, bg=APP_BG, fg=TEXT,
         font=("Segoe UI", 11), anchor="nw", justify="left",
     )
-    bracket_games_tree = ttk.Treeview(
-        bracket_widget_frame, columns=("game", "score", "result", "where"), show="headings", height=7, style="Series.Treeview",
+    bracket_summary_row = ttk.Frame(bracket_widget_frame)
+    bracket_summary_row.columnconfigure(1, weight=1)
+    bracket_games_frame = ttk.Frame(bracket_summary_row)
+    bracket_games_frame.grid(row=0, column=0, sticky="nw")
+    bracket_awards_frame = ttk.Frame(bracket_summary_row)
+    bracket_awards_frame.grid(row=0, column=1, sticky="nsew", padx=(14, 0))
+    for _c in range(2):
+        bracket_awards_frame.columnconfigure(_c, weight=1)
+    bracket_award_cards = []
+    for _idx, _award in enumerate(("Series MVP", "Scoring Leader", "Playmaking Leader", "Defensive Playmaker")):
+        _card = tk.Frame(bracket_awards_frame, bg=CARD, bd=0, highlightthickness=1, highlightbackground=BORDER, padx=8, pady=6)
+        _card.grid(row=_idx // 2, column=_idx % 2, sticky="nsew", padx=4, pady=4)
+        _card.columnconfigure(1, weight=1)
+        _canvas = tk.Canvas(_card, width=HEADSHOT_CANVAS_SIZE, height=HEADSHOT_CANVAS_SIZE, bg=CARD, highlightthickness=0)
+        _canvas.grid(row=0, column=0, rowspan=3, padx=(0, 10))
+        _title = tk.StringVar(value=_award)
+        _name = tk.StringVar(value="Waiting for series...")
+        _stat = tk.StringVar(value="")
+        tk.Label(_card, textvariable=_title, bg=CARD, fg=GOLD, font=("Segoe UI", 11, "bold"), anchor="w").grid(row=0, column=1, sticky="ew")
+        tk.Label(_card, textvariable=_name, bg=CARD, fg=TEXT, font=("Segoe UI", 12, "bold"), anchor="w").grid(row=1, column=1, sticky="ew")
+        tk.Label(_card, textvariable=_stat, bg=CARD, fg="#cbd5e1", font=("Segoe UI", 10), anchor="nw", justify="left", wraplength=300).grid(row=2, column=1, sticky="ew")
+        bracket_award_cards.append((_canvas, _title, _name, _stat))
+    bracket_avg_link = tk.Label(
+        bracket_games_frame, text="View series averages  >", bg=APP_BG, fg=CYAN, cursor="hand2",
+        font=("Segoe UI", 12, "bold underline"), anchor="w",
     )
+    bracket_games_tree = ttk.Treeview(
+        bracket_games_frame, columns=("game", "score", "result", "where"), show="headings", height=6, style="Series.Treeview",
+    )
+    bracket_games_tree.grid(row=0, column=0, sticky="nw")
+    bracket_avg_link.grid(row=1, column=0, sticky="w", pady=(6, 0))
+    bracket_avg_key = {"value": None}
     for col, label, width in (("game", "Game", 110), ("score", "Score", 300), ("result", "Result", 220), ("where", "Hosted by", 220)):
         bracket_games_tree.heading(col, text=label)
         bracket_games_tree.column(col, width=width, minwidth=width, anchor="w", stretch=False)
     bracket_game_boxes: Dict[str, Tuple] = {}
+    bracket_avg_frame = ttk.Frame(bracket_widget_frame)
+    bracket_avg_frame.columnconfigure(0, weight=1)
+    bracket_avg_frame.rowconfigure(1, weight=1)
+    bracket_avg_bar = ttk.Frame(bracket_avg_frame)
+    bracket_avg_bar.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+    bracket_avg_back = ttk.Button(bracket_avg_bar, text="<  Back to bracket")
+    bracket_avg_back.grid(row=0, column=0, sticky="w", padx=(0, 16))
+    bracket_avg_title_var = tk.StringVar(value="")
+    ttk.Label(bracket_avg_bar, textvariable=bracket_avg_title_var, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w")
+    bracket_avg_columns = ("player", "pos", "gp", "min", "pts", "reb", "ast", "stl", "blk", "tov", "fg", "fgp", "tp", "tpp", "ft", "ftp", "ts", "pm")
+    bracket_avg_tree = ttk.Treeview(bracket_avg_frame, columns=bracket_avg_columns, show="headings", height=10, style="Series.Treeview")
+    bracket_avg_scroll_y = ttk.Scrollbar(bracket_avg_frame, orient="vertical", command=bracket_avg_tree.yview)
+    bracket_avg_tree.configure(yscrollcommand=bracket_avg_scroll_y.set)
+    for _col, _label, _width, _anchor in (
+        ("player", "Player", 240, "w"), ("pos", "POS", 52, "center"), ("gp", "GP", 52, "center"), ("min", "MIN", 62, "center"),
+        ("pts", "PTS", 58, "center"), ("reb", "REB", 58, "center"), ("ast", "AST", 58, "center"), ("stl", "STL", 58, "center"),
+        ("blk", "BLK", 58, "center"), ("tov", "TOV", 58, "center"), ("fg", "FG", 86, "center"), ("fgp", "FG%", 66, "center"),
+        ("tp", "3P", 86, "center"), ("tpp", "3P%", 66, "center"), ("ft", "FT", 86, "center"), ("ftp", "FT%", 66, "center"),
+        ("ts", "TS%", 66, "center"), ("pm", "+/-", 62, "center"),
+    ):
+        bracket_avg_tree.heading(_col, text=_label)
+        _w = int(round(_width * 1.15))
+        bracket_avg_tree.column(_col, width=_w, minwidth=_w, anchor=_anchor, stretch=False)
+    bracket_avg_tree.grid(row=1, column=0, sticky="nsew")
+    bracket_avg_scroll_y.grid(row=1, column=1, sticky="ns")
+    bracket_avg_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
     bracket_box_frame = ttk.Frame(bracket_widget_frame)
     bracket_box_frame.columnconfigure(0, weight=1)
     bracket_box_frame.rowconfigure(1, weight=1)
@@ -2619,7 +2674,88 @@ def run_gui_app():
             elif a and b:
                 header = f"{conference} play-in: {a} vs {b} has not been played yet."
         bracket_detail_var.set(header + ("   (click a game to open its full box score)" if bracket_game_boxes else ""))
+        totals = ((state.get("series") or {}).get(key[3:]) or {}).get("totals") if key.startswith("s::") else None
+        bracket_avg_key["value"] = key[3:] if (key.startswith("s::") and totals) else None
+        update_bracket_award_cards(totals, ((state.get("series") or {}).get(key[3:]) or {}).get("winner") if key.startswith("s::") else None)
+        if bracket_avg_key["value"]:
+            bracket_avg_link.grid()
+        else:
+            bracket_avg_link.grid_remove()
         draw_bracket_canvas()
+
+    def update_bracket_award_cards(totals, winner):
+        rows = {}
+        if totals:
+            players = [
+                (team, name, stats) for team, pl in totals.items() for name, stats in pl.items() if stats.get("games", 0) > 0
+            ]
+            if players:
+                pool = [item for item in players if item[0] == winner] or players
+                mvp = max(pool, key=lambda item: series_player_score(item[2]))
+                scorer = max(players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
+                passer = max(players, key=lambda item: item[2].get("ast", 0) / max(1, item[2].get("games", 1)))
+                stopper = max(players, key=lambda item: (item[2].get("stl", 0) + item[2].get("blk", 0)) / max(1, item[2].get("games", 1)))
+
+                def gp(item):
+                    return max(1, item[2].get("games", 1))
+                rows["Series MVP"] = (mvp[1], f"{mvp[0]}\n{mvp[2].get('pts', 0) / gp(mvp):.1f} PTS  •  {mvp[2].get('reb', 0) / gp(mvp):.1f} REB  •  {mvp[2].get('ast', 0) / gp(mvp):.1f} AST")
+                rows["Scoring Leader"] = (scorer[1], f"{scorer[0]}\n{scorer[2].get('pts', 0) / gp(scorer):.1f} PPG  •  {series_ts_value(scorer[2]):.1f} TS%")
+                rows["Playmaking Leader"] = (passer[1], f"{passer[0]}\n{passer[2].get('ast', 0) / gp(passer):.1f} APG")
+                rows["Defensive Playmaker"] = (stopper[1], f"{stopper[0]}\n{(stopper[2].get('stl', 0) + stopper[2].get('blk', 0)) / gp(stopper):.1f} stocks/game")
+        for award, (canvas, title_var, name_var, stat_var) in zip(
+            ("Series MVP", "Scoring Leader", "Playmaking Leader", "Defensive Playmaker"), bracket_award_cards
+        ):
+            title_var.set(award)
+            if award in rows:
+                name, stat = rows[award]
+                name_var.set(name)
+                stat_var.set(stat)
+                draw_named_headshot(canvas, name)
+            else:
+                name_var.set("Waiting for series...")
+                stat_var.set("")
+                draw_named_headshot(canvas, "")
+
+    def open_bracket_series_averages(_event=None):
+        key = bracket_avg_key["value"]
+        state = bracket_ui["state"] or {}
+        entry = (state.get("series") or {}).get(key) if key else None
+        totals = (entry or {}).get("totals")
+        if not totals:
+            return
+        bracket_avg_tree.delete(*bracket_avg_tree.get_children())
+        a, b = entry["a"], entry["b"]
+
+        def pct(made, att):
+            return f"{100 * made / att:.1f}" if att else "0.0"
+
+        for team in (a, b):
+            players = totals.get(team) or {}
+            bracket_avg_tree.insert("", "end", values=(team,) + ("",) * (len(bracket_avg_columns) - 1), tags=("section",))
+            for name, st in sorted(players.items(), key=lambda kv: -kv[1].get("minutes", 0)):
+                g = max(1, st.get("games", 0))
+                if st.get("games", 0) <= 0:
+                    continue
+                denom = 2 * (st.get("fga", 0) + 0.44 * st.get("fta", 0))
+                bracket_avg_tree.insert(
+                    "", "end",
+                    values=(
+                        table_player_name(name, 26), st.get("position", ""), st.get("games", 0), f"{st.get('minutes', 0) / 60 / g:.1f}",
+                        f"{st.get('pts', 0) / g:.1f}", f"{st.get('reb', 0) / g:.1f}", f"{st.get('ast', 0) / g:.1f}",
+                        f"{st.get('stl', 0) / g:.1f}", f"{st.get('blk', 0) / g:.1f}", f"{st.get('tov', 0) / g:.1f}",
+                        f"{st.get('fgm', 0) / g:.1f}/{st.get('fga', 0) / g:.1f}", pct(st.get("fgm", 0), st.get("fga", 0)),
+                        f"{st.get('tpm', 0) / g:.1f}/{st.get('tpa', 0) / g:.1f}", pct(st.get("tpm", 0), st.get("tpa", 0)),
+                        f"{st.get('ftm', 0) / g:.1f}/{st.get('fta', 0) / g:.1f}", pct(st.get("ftm", 0), st.get("fta", 0)),
+                        f"{100 * st.get('pts', 0) / denom:.1f}" if denom else "0.0",
+                        f"{st.get('plus_minus', 0) / g:+.1f}",
+                    ),
+                )
+        bracket_avg_title_var.set(f"Series averages: {a}  vs  {b}  ({entry.get('wins_a', 0)}-{entry.get('wins_b', 0)})")
+        bracket_ui["box_open"] = True
+        bracket_canvas.grid_remove()
+        bracket_detail_label.grid_remove()
+        bracket_summary_row.grid_remove()
+        bracket_avg_frame.grid(row=1, column=0, rowspan=3, columnspan=2, sticky="nsew")
 
     def open_bracket_game_box(_event=None):
         selection = bracket_games_tree.selection()
@@ -2637,12 +2773,13 @@ def run_gui_app():
         bracket_ui["box_open"] = True
         bracket_canvas.grid_remove()
         bracket_detail_label.grid_remove()
-        bracket_games_tree.grid_remove()
+        bracket_summary_row.grid_remove()
         bracket_box_frame.grid(row=1, column=0, rowspan=3, columnspan=2, sticky="nsew")
 
     def close_bracket_game_box():
         bracket_ui["box_open"] = False
         bracket_box_frame.grid_remove()
+        bracket_avg_frame.grid_remove()
         refresh_bracket_tab()
 
     def draw_bracket_team_row(x, y, w, h, name, seed, score, state_tag, tag, side, dim=False, selected=False):
@@ -2811,7 +2948,7 @@ def run_gui_app():
             bracket_canvas.grid(row=1, column=0, columnspan=2, sticky="nsew")
             bracket_mode_bar.grid(row=0, column=1, sticky="e", pady=(0, 6))
             bracket_detail_label.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
-            bracket_games_tree.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+            bracket_summary_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(6, 0))
             if not bracket_detail_var.get():
                 bracket_info_var.set("Click any series to see the game-by-game results. Use Play-In to see the play-in games behind the tree.")
             draw_bracket_canvas()
@@ -2819,7 +2956,7 @@ def run_gui_app():
             bracket_canvas.grid_remove()
             bracket_mode_bar.grid_remove()
             bracket_detail_label.grid_remove()
-            bracket_games_tree.grid_remove()
+            bracket_summary_row.grid_remove()
             bracket_tree.grid()
             bracket_scroll.grid()
             update_bracket_widget((playoff_sections_state.get("sections") or {}).get("_playoff_bracket", ""))
@@ -2827,6 +2964,7 @@ def run_gui_app():
     def set_bracket_view(view: str):
         bracket_ui["box_open"] = False
         bracket_box_frame.grid_remove()
+        bracket_avg_frame.grid_remove()
         bracket_ui["view"] = view
         bracket_ui["auto"] = False
         bracket_ui["selected"] = None
@@ -2834,6 +2972,8 @@ def run_gui_app():
         draw_bracket_canvas()
 
     bracket_games_tree.bind("<<TreeviewSelect>>", lambda _event: open_bracket_game_box())
+    bracket_avg_link.bind("<Button-1>", lambda _event: open_bracket_series_averages())
+    bracket_avg_back.configure(command=lambda: close_bracket_game_box())
     bracket_box_back.configure(command=lambda: close_bracket_game_box())
     bracket_tree_button.configure(command=lambda: set_bracket_view("tree"))
     bracket_playin_button.configure(command=lambda: set_bracket_view("playin"))
@@ -7845,6 +7985,7 @@ def run_gui_app():
         next_button.configure(state="disabled")
         bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False, box_open=False)
         bracket_box_frame.grid_remove()
+        bracket_avg_frame.grid_remove()
         bracket_games_tree.delete(*bracket_games_tree.get_children())
         bracket_detail_var.set("")
         sim_engine.BRACKET_STATE.clear()
