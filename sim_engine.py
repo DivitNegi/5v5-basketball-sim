@@ -16692,6 +16692,16 @@ def isolation_shot_creation(shooter: Player, defender: Player) -> Tuple[str, flo
     return random.choice(lines), 0.96 + max(0.0, shooter.shot_iq - 0.60) * 0.08
 
 
+# Teams whose offense is deliberately run through one lead playmaker. When that
+# player makes the first pass of a possession, the receivers swing it on far
+# less often, so his pass is the one that usually ends up as the assist (the
+# generic ball-movement chain used to hand the credit to the second passer).
+SYSTEM_PLAYMAKERS = {
+    "2027 Washington Wizards": "Trae Young",
+    "2027 Miami Heat": "Davion Mitchell",
+}
+
+
 def choose_ballhandler(team: Team) -> Player:
     """
     Default: initiate through the best creators, prioritizing playmaking.
@@ -18037,6 +18047,10 @@ def simulate_possession(off: Team, dff: Team,
         handler = choose_closing_initiator(off, closing_star)
     else:
         handler = choose_ballhandler(off)
+    # The system playmaker who started the possession: if a teammate's extra pass
+    # ends up as the last pass, the assist often still goes to the player who
+    # created the advantage (see SYSTEM_PLAYMAKERS).
+    possession_creator = handler if SYSTEM_PLAYMAKERS.get(off.name) == handler.name else None
     pass_first_clutch_creator = (
         off.name == "2027 Philadelphia 76ers"
         and closing_star is not None
@@ -18255,6 +18269,8 @@ def simulate_possession(off: Team, dff: Team,
             extra_pass_chance = 0.04 if shooter.playmaking < 0.90 else 0.12
         else:
             extra_pass_chance *= 0.25
+    if last_passer is not None and SYSTEM_PLAYMAKERS.get(off.name) == last_passer.name:
+        extra_pass_chance *= 0.40
     if play_context not in ("deep_paint_touch", "iso") and random.random() < extra_pass_chance:
         secondary = choose_shooter_excluding(off, shooter, allow_non_spacers=False)
         if secondary is not shooter:
@@ -18320,6 +18336,8 @@ def simulate_possession(off: Team, dff: Team,
         if closing_star_mode:
             movement_base *= 0.38 if shooter is closing_star else 0.55
         movement_base = max(0.10, min(0.72, movement_base))
+        if last_passer is not None and SYSTEM_PLAYMAKERS.get(off.name) == last_passer.name:
+            movement_base *= 0.50
 
         touched = [handler]
         if last_passer:
@@ -19479,7 +19497,15 @@ def simulate_possession(off: Team, dff: Team,
                 last_passer, shooter, shot_type, assist_context, quick_shot_for_assist
             )
         ):
-            record_assist(last_passer, off, pts)
+            credited_passer = last_passer
+            if (
+                possession_creator is not None
+                and credited_passer is not possession_creator
+                and possession_creator is not shooter
+                and random.random() < 0.55
+            ):
+                credited_passer = possession_creator
+            record_assist(credited_passer, off, pts)
             assist_recorded = True
 
         # LOW-CHANCE AND-ONE ON MADE SHOTS
