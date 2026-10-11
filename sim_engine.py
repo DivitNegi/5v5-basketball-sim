@@ -8646,10 +8646,10 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 Denver Nuggets":
         target_ranges = {
             "Jamal Murray": (32, 36), "Christian Braun": (22, 26),
-            "Cameron Johnson": (20, 25), "Aaron Gordon": (28, 33),
+            "Cameron Johnson": (28, 32), "Aaron Gordon": (28, 33),
             "Nikola Jokic": (36, 40), "DeMar DeRozan": (30, 34),
-            "Marvin Bagley III": (14, 20), "Julian Strawther": (14, 20),
-            "Tyus Jones": (12, 18), "Cam Whitmore": (8, 14),
+            "Marvin Bagley III": (8, 12), "Julian Strawther": (22, 26),
+            "Tyus Jones": (6, 10), "Cam Whitmore": (8, 14),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
