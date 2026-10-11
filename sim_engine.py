@@ -3201,7 +3201,7 @@ FEATURED_ROOKIE_ROLES_2027: Dict[str, Tuple[float, float]] = {
     # player's ratings through the normal shooter weighting -- no FGA cap.
     "Darryn Peterson": (0.29, 0.42),
     "Darius Acuff Jr.": (0.28, 0.40),
-    "AJ Dybantsa": (0.29, 0.44),
+    "AJ Dybantsa": (0.22, 0.32),
     "Cameron Boozer": (0.26, 0.38),
     "Caleb Wilson": (0.24, 0.34),
     "Keaton Wagler": (0.24, 0.35),
@@ -16798,6 +16798,25 @@ def choose_ballhandler(team: Team) -> Player:
                 * coach_handler_multiplier(team, p)
                 * fatigue_touch_multiplier(p)
                 * (1.8 if p.name == "Davion Mitchell" else 1.0)
+                for p in preferred
+            ]
+            return random.choices(preferred, weights=weights, k=1)[0]
+
+    if team.name == "2027 Washington Wizards":
+        trae = player_by_name(team.on_floor, ("Trae Young",))
+        # Washington runs through Trae Young as the lead playmaker, not as the
+        # primary scorer: he brings the ball up and sets up AJ Dybantsa, Davis
+        # and Sarr, which takes the creation load off the rookie.
+        if trae is not None and not trae.fouled_out and random.random() < 0.85:
+            return trae
+        preferred = [p for p in team.on_floor if p.name in ("Trae Young", "Kyshawn George", "AJ Dybantsa", "Khris Middleton")]
+        if preferred:
+            weights = [
+                max(0.01, playmaking_hub_score(p) ** 1.50)
+                * assist_load_factor(p, team)
+                * coach_handler_multiplier(team, p)
+                * fatigue_touch_multiplier(p)
+                * (2.0 if p.name == "Trae Young" else 1.0)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
