@@ -8964,10 +8964,10 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 Sacramento Kings":
         target_ranges = {
             "Darius Acuff Jr.": (30, 34), "Zach LaVine": (26, 31),
-            "De'Andre Hunter": (20, 26), "Keegan Murray": (20, 26),
+            "De'Andre Hunter": (12, 18), "Keegan Murray": (26, 31),
             "Domantas Sabonis": (28, 33), "Malik Monk": (16, 22),
-            "Maxime Raynaud": (14, 20), "Precious Achiuwa": (12, 18),
-            "Nique Clifford": (10, 16), "Ben Simmons": (10, 16),
+            "Maxime Raynaud": (12, 18), "Precious Achiuwa": (10, 16),
+            "Nique Clifford": (10, 16), "Ben Simmons": (24, 30),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))

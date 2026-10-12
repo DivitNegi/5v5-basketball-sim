@@ -16398,6 +16398,10 @@ def make_kings_2027() -> Team:
                clutchness=0.750, secondary_positions=('C',), height=82, speed=0.800,
                shot_iq=0.500, archetype='playmaking forward-guard', stamina=0.62),
     ]
+    # Starting five: Acuff, LaVine, Keegan Murray, Ben Simmons, Domantas Sabonis.
+    _hunter_i = next(i for i, p in enumerate(players) if p.name == "De'Andre Hunter")
+    _simmons_i = next(i for i, p in enumerate(players) if p.name == 'Ben Simmons')
+    players[_hunter_i], players[_simmons_i] = players[_simmons_i], players[_hunter_i]
     t = Team('2027 Sacramento Kings', players)
     t.init_lineup()
     return t
