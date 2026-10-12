@@ -1080,7 +1080,7 @@ def run_gui_app():
         _stat = tk.StringVar(value="")
         tk.Label(_card, textvariable=_title, bg=CARD, fg=GOLD, font=("Segoe UI", 11, "bold"), anchor="w").grid(row=0, column=1, sticky="ew")
         tk.Label(_card, textvariable=_name, bg=CARD, fg=TEXT, font=("Segoe UI", 12, "bold"), anchor="w").grid(row=1, column=1, sticky="ew")
-        tk.Label(_card, textvariable=_stat, bg=CARD, fg="#cbd5e1", font=("Segoe UI", 10), anchor="nw", justify="left", wraplength=300).grid(row=2, column=1, sticky="ew")
+        tk.Label(_card, textvariable=_stat, bg=CARD, fg="#cbd5e1", font=("Segoe UI", 10), anchor="nw", justify="left", wraplength=380).grid(row=2, column=1, sticky="ew")
         bracket_award_cards.append((_canvas, _title, _name, _stat))
     bracket_avg_link = tk.Label(
         bracket_games_frame, text="View series averages  >", bg=APP_BG, fg=CYAN, cursor="hand2",
@@ -1092,7 +1092,7 @@ def run_gui_app():
     bracket_games_tree.grid(row=0, column=0, sticky="nw")
     bracket_avg_link.grid(row=1, column=0, sticky="w", pady=(6, 0))
     bracket_avg_key = {"value": None}
-    for col, label, width in (("game", "Game", 110), ("score", "Score", 300), ("result", "Result", 220), ("where", "Hosted by", 220)):
+    for col, label, width in (("game", "Game", 100), ("score", "Score", 250), ("result", "Result", 150), ("where", "Hosted by", 100)):
         bracket_games_tree.heading(col, text=label)
         bracket_games_tree.column(col, width=width, minwidth=width, anchor="w", stretch=False)
     bracket_game_boxes: Dict[str, Tuple] = {}
