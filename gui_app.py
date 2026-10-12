@@ -14,12 +14,14 @@ _TEAM_YEAR_PATTERN = re.compile(r"^(\d{4}) (.+)$")
 # scoreboard's two teams on the other. A team's year is only shown when another
 # team in the SAME group shares its name (2016 vs 2017 Warriors) -- a stale
 # dropdown pick like the 1962 Celtics must not put a year on the 2027 Celtics.
-TEAM_NAME_UNIVERSE = {"groups": []}
+TEAM_NAME_UNIVERSE = {"groups": [], "always_year": False}
 
 
 def team_display_name(name):
     if not isinstance(name, str):
         return name
+    if TEAM_NAME_UNIVERSE.get("always_year"):
+        return name  # custom season: teams are different eras, so the year always shows
     match = _TEAM_YEAR_PATTERN.match(name)
     if not match:
         return name
@@ -8336,6 +8338,10 @@ def run_gui_app():
         if mode == "2027 play-in & playoffs" and not postseason_state["standings"]:
             status_var.set("Simulate the 2027 season first.")
             return
+        # A custom season (and its postseason) mixes eras, so team names keep their year.
+        TEAM_NAME_UNIVERSE["always_year"] = mode in ("Season mode", "Custom season (82 games)") or (
+            mode == "2027 play-in & playoffs" and bool(postseason_state.get("factories"))
+        )
         next_button.configure(state="disabled")
         live_standings.update(rows=[], completed=0, total=0, dirty=False)
         bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False, box_open=False)
