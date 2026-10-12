@@ -22273,7 +22273,8 @@ def build_season_sections(entries: List[Dict],
                           series_team_totals: Dict | None = None,
                           game_log: List[Tuple] | None = None,
                           game_extras: Dict | None = None,
-                          game_meta: Dict | None = None) -> Dict:
+                          game_meta: Dict | None = None,
+                          include_rookies: bool = True) -> Dict:
     def season_ts(stats: Dict) -> float:
         denom = 2 * (stats.get("fga", 0) + 0.44 * stats.get("fta", 0))
         return 0.0 if denom == 0 else 100 * stats.get("pts", 0) / denom
@@ -22446,7 +22447,8 @@ def build_season_sections(entries: List[Dict],
 
         awards_table.append({"award": "MVP", "player": mvp[1], "team": mvp[0], "stats": stat_line(mvp[0], mvp[2])})
         awards_table.append({"award": "DPOY", "player": dpoy[1], "team": dpoy[0], "stats": defense_stat_line(dpoy[0], dpoy[2])})
-        rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026]
+        # Rookie of the Year / All-Rookie teams only make sense for the 2026 class in the 2027 season.
+        rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026] if include_rookies else []
         all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams
         if rookies:
             roy = max(rookies, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
@@ -22716,7 +22718,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         SEASON_STAR_MINUTES_CAP = None
     sections = build_season_sections(entries, season_player_totals, season_team_totals,
                                      game_log=season_game_log.rows, game_extras=season_game_log.extras,
-                                     game_meta=season_game_log.games)
+                                     game_meta=season_game_log.games, include_rookies=False)
     if section_queue is not None:
         section_queue.put(sections)
     print("\nSeason complete. Standings, averages, advanced stats, shot diet, and awards are ready in the GUI.")
