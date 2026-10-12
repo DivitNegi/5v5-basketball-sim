@@ -6720,21 +6720,36 @@ def run_gui_app():
                 return base
 
             def auto_fill():
-                selected_names.clear()
+                # Keeps whatever is already selected and randomly fills only the
+                # open slots, each with a franchise not already on the list.
+                needed = 30 - len(selected_names)
+                if needed <= 0:
+                    title_var.set("You already have 30 teams. Remove some to randomize again.")
+                    return
                 eligible = [
                     name for name in team_names
                     if "Olympic" not in name and "Dream Team" not in name and "Redeem Team" not in name
                 ]
+                used = {franchise_key(name) for name in selected_names}
                 by_franchise: Dict[str, List[str]] = {}
                 for name in eligible:
-                    by_franchise.setdefault(franchise_key(name), []).append(name)
-                if len(by_franchise) < 30:
-                    title_var.set(f"Only {len(by_franchise)} different franchises are available. Need 30.")
+                    key = franchise_key(name)
+                    if key not in used:
+                        by_franchise.setdefault(key, []).append(name)
+                if len(by_franchise) < needed:
+                    title_var.set(
+                        f"Only {len(by_franchise)} franchises are left but {needed} slots are open. "
+                        "Remove a team that repeats a franchise, or add the rest by hand."
+                    )
                     return
-                # 30 different franchises, one random era from each.
-                for key in random.sample(list(by_franchise), 30):
+                # One random era from each of the franchises that fill the open slots.
+                for key in random.sample(list(by_franchise), needed):
                     selected_names.append(random.choice(by_franchise[key]))
-                title_var.set("Random 30: every team is a different franchise (one era each). Add or remove to edit.")
+                kept = 30 - needed
+                title_var.set(
+                    f"Random fill: kept your {kept} pick(s) and added {needed} different franchises. Add or remove to edit."
+                    if kept else "Random 30: every team is a different franchise (one era each). Add or remove to edit."
+                )
                 refresh_lists()
 
             def start():
@@ -6752,7 +6767,7 @@ def run_gui_app():
             button_frame.grid(row=2, column=1, sticky="ns", pady=(32, 10))
             ttk.Button(button_frame, text="Add >", command=add_team).pack(fill="x", pady=(0, 8))
             ttk.Button(button_frame, text="< Remove", command=remove_team).pack(fill="x", pady=(0, 16))
-            ttk.Button(button_frame, text="Random 30 (all different)", command=auto_fill).pack(fill="x")
+            ttk.Button(button_frame, text="Random fill (all different)", command=auto_fill).pack(fill="x")
 
             footer_buttons = ttk.Frame(dialog)
             footer_buttons.grid(row=3, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 16))
