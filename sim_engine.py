@@ -14024,6 +14024,8 @@ def shooter_weight(player: Player) -> float:
         role_volume *= max(0.62, 1.0 - (player.fga - 13) * 0.06)
 
     soft_cap = shot_volume_soft_cap(player)
+    if SEASON_STAR_MINUTES_CAP and player.pts >= 30:
+        soft_cap += HOT_GAME_SEASON_FGA_BONUS  # regular season: a hot night may run past the usual volume cap
     explicit_target = getattr(player, "target_fga_soft_cap", None)
     if explicit_target is not None and player.fga < explicit_target:
         # Explicit team-role targets are active goals, not merely ceilings.
@@ -14049,12 +14051,15 @@ def shooter_weight(player: Player) -> float:
     elif player.shot_tendency >= 0.18 and player.usage < 0.24:
         role_volume *= 1.0 + depth_factor * 0.40
 
-    if player.pts >= 36:
-        role_volume *= max(0.12, 1.0 - (player.pts - 35) * 0.10)
-    elif player.pts >= 32 and player.usage < 0.38:
-        role_volume *= max(0.20, 1.0 - (player.pts - 31) * 0.08)
-    elif player.pts >= 28 and player.shot_tendency < 0.48:
-        role_volume *= max(0.25, 1.0 - (player.pts - 27) * 0.10)
+    # Regular season: the in-game scoring damper only starts HOT_GAME_SEASON_PTS_SHIFT
+    # points later, so a star can actually reach the 60s on a big night.
+    scoring_pts = player.pts - HOT_GAME_SEASON_PTS_SHIFT if SEASON_STAR_MINUTES_CAP else player.pts
+    if scoring_pts >= 36:
+        role_volume *= max(0.12, 1.0 - (scoring_pts - 35) * 0.10)
+    elif scoring_pts >= 32 and player.usage < 0.38:
+        role_volume *= max(0.20, 1.0 - (scoring_pts - 31) * 0.08)
+    elif scoring_pts >= 28 and player.shot_tendency < 0.48:
+        role_volume *= max(0.25, 1.0 - (scoring_pts - 27) * 0.10)
 
     return max(
         0.0001,
@@ -14155,10 +14160,16 @@ def coach_handler_multiplier(team: Team, player: Player) -> float:
     return max(0.32, min(1.75, mult))
 
 
+# Season-only room for big scoring nights (see shooter_weight).
+HOT_GAME_SEASON_PTS_SHIFT = 22
+HOT_GAME_SEASON_FGA_BONUS = 10.0
+
+
 def has_shot_volume_left(player: Player) -> bool:
+    bonus = HOT_GAME_SEASON_FGA_BONUS if (SEASON_STAR_MINUTES_CAP and player.pts >= 30) else 0.0
     if player.shot_tendency >= 0.48 or player.usage >= 0.32:
-        return player.fga <= shot_volume_soft_cap(player) + 3.0
-    return player.fga <= shot_volume_soft_cap(player) + 1.0
+        return player.fga <= shot_volume_soft_cap(player) + 3.0 + bonus
+    return player.fga <= shot_volume_soft_cap(player) + 1.0 + bonus
 
 
 def can_be_designed_shooter(player: Player) -> bool:
