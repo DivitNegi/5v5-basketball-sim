@@ -13032,6 +13032,19 @@ def maybe_injury_stinger(player: Player, team: Team, shot_type: str, period: int
     time.sleep(SLEEP * 0.6)
 
 
+def timeout_play_repeat_factor(team: Team, play_key: str) -> float:
+    """Every time a team goes back to the same timeout/inbound look in a game
+    (a lob, or the same three), the defense is more ready for it: -8% make
+    probability per earlier use, down to a floor of 0.60."""
+    counts = getattr(team, "timeout_play_counts", None)
+    if counts is None:
+        counts = {}
+        team.timeout_play_counts = counts
+    used = counts.get(play_key, 0)
+    counts[play_key] = used + 1
+    return max(0.60, 1.0 - 0.08 * used)
+
+
 def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
                      teamA: Team, teamB: Team, matchups: Dict[Player, Player]) -> Tuple[Team, int] | None:
     if not getattr(off, "inbound_pending", False):
@@ -13142,7 +13155,13 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
     record_shot_diet(off, shot_type, shot_quality_diet_context("inbound", q_label), target, defender)
     if shot_type == "three":
         target.tpa += 1
-    made = random.random() < shot_make_prob(target, defender, shot_type, off, dff, period, score_time)
+    make_prob = shot_make_prob(target, defender, shot_type, off, dff, period, score_time)
+    # A drawn-up lob is a strong look, not a guaranteed bucket, and repeating
+    # the same inbound/timeout play gets scouted a little more each time.
+    make_prob = min(make_prob, 0.72 if inbound_play == "alley_oop" else 0.55)
+    if ato_boost or inbound_play == "alley_oop":
+        make_prob *= timeout_play_repeat_factor(off, inbound_play)
+    made = random.random() < make_prob
     clear_shot_temp_bonuses(target)
 
     if made:
@@ -17937,7 +17956,10 @@ def run_ato_play(off: Team, dff: Team, period: int, period_time: int,
     if shot_type == "three":
         target.tpa += 1
 
-    made = random.random() < shot_make_prob(target, defender, shot_type, off, dff, period, score_time)
+    make_prob = shot_make_prob(target, defender, shot_type, off, dff, period, score_time)
+    make_prob = min(make_prob, 0.72 if shot_type in ("dunk", "rim") else 0.55)
+    make_prob *= timeout_play_repeat_factor(off, "lob" if shot_type == "dunk" else shot_type)
+    made = random.random() < make_prob
     clear_shot_temp_bonuses(target)
 
     if made:
