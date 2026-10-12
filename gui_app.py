@@ -6706,17 +6706,33 @@ def run_gui_app():
                     selected_names.remove(name)
                     refresh_lists()
 
+            FRANCHISE_ALIASES = {"SuperSonics": "Thunder", "Sonics": "Thunder", "Bobcats": "Hornets", "Bullets": "Wizards"}
+            FRANCHISE_NICKNAMES = tuple(SEASON_EAST_NICKNAMES) + tuple(SEASON_WEST_NICKNAMES)
+
+            def franchise_key(name: str) -> str:
+                # "2016 Golden State Warriors" and "2024 Golden State Warriors" are one franchise.
+                base = re.sub(r"^\d{4}\s+", "", name)
+                for nickname in FRANCHISE_NICKNAMES:
+                    if base.endswith(nickname):
+                        return FRANCHISE_ALIASES.get(nickname, nickname)
+                return base
+
             def auto_fill():
                 selected_names.clear()
                 eligible = [
                     name for name in team_names
                     if "Olympic" not in name and "Dream Team" not in name and "Redeem Team" not in name
                 ]
-                if len(eligible) < 30:
-                    title_var.set(f"Only {len(eligible)} non-Olympic teams are available. Need 30.")
+                by_franchise: Dict[str, List[str]] = {}
+                for name in eligible:
+                    by_franchise.setdefault(franchise_key(name), []).append(name)
+                if len(by_franchise) < 30:
+                    title_var.set(f"Only {len(by_franchise)} different franchises are available. Need 30.")
                     return
-                selected_names.extend(random.sample(eligible, 30))
-                title_var.set("Randomly selected 30 non-Olympic teams.")
+                # 30 different franchises, one random era from each.
+                for key in random.sample(list(by_franchise), 30):
+                    selected_names.append(random.choice(by_franchise[key]))
+                title_var.set("Random 30: every team is a different franchise (one era each). Add or remove to edit.")
                 refresh_lists()
 
             def start():
@@ -6734,7 +6750,7 @@ def run_gui_app():
             button_frame.grid(row=2, column=1, sticky="ns", pady=(32, 10))
             ttk.Button(button_frame, text="Add >", command=add_team).pack(fill="x", pady=(0, 8))
             ttk.Button(button_frame, text="< Remove", command=remove_team).pack(fill="x", pady=(0, 16))
-            ttk.Button(button_frame, text="Auto Fill 30", command=auto_fill).pack(fill="x")
+            ttk.Button(button_frame, text="Random 30 (all different)", command=auto_fill).pack(fill="x")
 
             footer_buttons = ttk.Frame(dialog)
             footer_buttons.grid(row=3, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 16))
