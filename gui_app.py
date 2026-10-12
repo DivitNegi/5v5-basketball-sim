@@ -1462,7 +1462,7 @@ def run_gui_app():
     series_avg_quarter_dropdown = ttk.Combobox(series_avg_top, textvariable=series_avg_quarter_var, values=("All", "Q1", "Q2", "Q3", "Q4", "OT"), state="readonly", width=10)
     series_avg_quarter_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 16))
     ttk.Label(series_avg_top, text="Rank by").grid(row=0, column=4, sticky="w", padx=(0, 8))
-    AVG_RANK_OPTIONS = ("Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-",
+    AVG_RANK_OPTIONS = ("Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-", "STK",
                         "AST/TOV", "STL/TOV", "PTS/48", "REB/48", "AST/48", "STL/48", "BLK/48")
     series_avg_rank_var = tk.StringVar(value="Team order")
     series_avg_rank_dropdown = ttk.Combobox(series_avg_top, textvariable=series_avg_rank_var, values=AVG_RANK_OPTIONS, state="readonly", width=12)
@@ -1589,7 +1589,7 @@ def run_gui_app():
     HIGHS_STATS = {
         "PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk",
         "3PM": "tpm", "3PA": "tpa", "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta",
-        "TOV": "tov", "MIN": "min", "+/-": "pm",
+        "STK": "stk", "TOV": "tov", "MIN": "min", "+/-": "pm",
     }
     HIGHS_VIEWS = ("Season highs (every stat)", "Top games for stat", "Each player's best game")
     ttk.Label(highs_top, text="View").grid(row=0, column=0, sticky="w", padx=(0, 8))
@@ -3825,6 +3825,7 @@ def run_gui_app():
         "AST": lambda s, gp: s.get("ast", 0) / gp,
         "STL": lambda s, gp: s.get("stl", 0) / gp,
         "BLK": lambda s, gp: s.get("blk", 0) / gp,
+        "STK": lambda s, gp: (s.get("stl", 0) + s.get("blk", 0)) / gp,
         "TOV": lambda s, gp: s.get("tov", 0) / gp,
         "FG": lambda s, gp: s.get("fgm", 0) / gp,
         "FG%": lambda s, gp: stat_pct_value(s, "fgm", "fga"),
@@ -4359,26 +4360,31 @@ def run_gui_app():
         def tiebreak(row):
             return (row[idx["pts"]], row[idx["reb"]] + row[idx["ast"]], row[idx["min"]])
 
+        def stat_of(row, field):
+            if field == "stk":  # stocks = steals + blocks
+                return row[idx["stl"]] + row[idx["blk"]]
+            return row[idx[field]]
+
         view = highs_view_var.get()
         stat_label = highs_stat_var.get()
         if view == HIGHS_VIEWS[0]:
             for label, field in HIGHS_STATS.items():
-                best = max(rows, key=lambda row: (row[idx[field]],) + tiebreak(row))
-                insert_line(f"{label}: {best[idx[field]]}", best)
+                best = max(rows, key=lambda row: (stat_of(row, field),) + tiebreak(row))
+                insert_line(f"{label}: {stat_of(best, field)}", best)
             return
         field = HIGHS_STATS.get(stat_label, "pts")
         if view == HIGHS_VIEWS[1]:
-            ranked = sorted(rows, key=lambda row: (row[idx[field]],) + tiebreak(row), reverse=True)[:60]
+            ranked = sorted(rows, key=lambda row: (stat_of(row, field),) + tiebreak(row), reverse=True)[:60]
         else:
             best_by_player = {}
             for row in rows:
                 key = (row[idx["team"]], row[idx["player"]])
                 cur = best_by_player.get(key)
-                if cur is None or (row[idx[field]],) + tiebreak(row) > (cur[idx[field]],) + tiebreak(cur):
+                if cur is None or (stat_of(row, field),) + tiebreak(row) > (stat_of(cur, field),) + tiebreak(cur):
                     best_by_player[key] = row
-            ranked = sorted(best_by_player.values(), key=lambda row: (row[idx[field]],) + tiebreak(row), reverse=True)[:150]
+            ranked = sorted(best_by_player.values(), key=lambda row: (stat_of(row, field),) + tiebreak(row), reverse=True)[:150]
         for rank, row in enumerate(ranked, start=1):
-            insert_line(f"{rank}. {stat_label} {row[idx[field]]}", row)
+            insert_line(f"{rank}. {stat_label} {stat_of(row, field)}", row)
 
     def update_season_awards_table(sections: Dict):
         season_awards_tree.delete(*season_awards_tree.get_children())
