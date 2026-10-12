@@ -8195,7 +8195,10 @@ def run_gui_app():
     def update_season_progress(completed: int, total: int):
         total = max(1, int(total))
         completed = max(0, min(int(completed), total))
+        season_view["progress"] = (completed, total)
         text = f"{completed} of {total} games simulated"
+        if sim_engine.SIM_PAUSED:
+            text += "  (paused)"
         for var, bar in zip(season_progress_vars, season_progress_bars):
             var.set(text)
             bar.configure(maximum=total)
@@ -8203,6 +8206,10 @@ def run_gui_app():
 
     def sync_season_notice():
         want = bool(season_view["quiet"] and running["active"])
+        paused_now = bool(sim_engine.SIM_PAUSED)
+        if want and season_view.get("paused_shown") != paused_now and season_view.get("progress"):
+            season_view["paused_shown"] = paused_now
+            update_season_progress(*season_view["progress"])
         try:
             stand_open = str(series_tabs.tab(series_tabs.select(), "text")) == "Stand"
         except Exception:

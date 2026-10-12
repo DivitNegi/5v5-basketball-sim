@@ -22531,6 +22531,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         for idx in range(0, len(round_entries), 2):
             entry_a = round_entries[idx]
             entry_b = round_entries[idx + 1]
+            while SIM_PAUSED:
+                _REAL_SLEEP(0.05)
             team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"])
 
             add_player_to_series_totals(season_player_totals, team_a)

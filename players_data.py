@@ -7120,17 +7120,29 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         # (each returns the finished Team objects) and aggregated here.
         import multiprocessing
         import os
+        import time as _time
+        import sim_engine as _engine
         workers = max(1, min(12, (os.cpu_count() or 4) - 2))
         pool = multiprocessing.get_context("spawn").Pool(processes=workers)
         try:
-            for result in pool.imap_unordered(_run_2027_season_game, games, chunksize=4):
-                yield result
+            # Games go to the workers in small batches so Pause can hold the
+            # season between batches instead of the pool racing ahead.
+            batch = workers * 6
+            for start in range(0, len(games), batch):
+                while _engine.SIM_PAUSED:
+                    _time.sleep(0.1)
+                for result in pool.imap_unordered(_run_2027_season_game, games[start:start + batch], chunksize=2):
+                    yield result
         finally:
             pool.terminate()
             pool.join()
 
     def sequential_results():
+        import time as _time
+        import sim_engine as _engine
         for home_key, away_key in games:
+            while _engine.SIM_PAUSED:
+                _time.sleep(0.1)
             yield _run_2027_season_game((home_key, away_key))
 
     try:
@@ -7140,6 +7152,10 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         use_parallel = False
     results = parallel_results() if use_parallel else sequential_results()
     for done, (home_key, away_key, team_a, team_b) in enumerate(results, start=1):
+        import sim_engine as _pause_engine
+        while _pause_engine.SIM_PAUSED:
+            import time as _pause_time
+            _pause_time.sleep(0.1)
         add_player_to_series_totals(player_totals, team_a)
         add_player_to_series_totals(player_totals, team_b)
         add_team_to_series_totals(team_totals, team_a)
