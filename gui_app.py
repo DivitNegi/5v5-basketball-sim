@@ -1635,6 +1635,63 @@ def run_gui_app():
     highs_row_game: Dict[str, Tuple] = {}
     series_tabs.add(highs_frame, text="Highs")
 
+    # ---- Schedule: every regular-season game in order; click one for its box score
+    schedule_frame = ttk.Frame(series_tabs, padding=(6, 6))
+    schedule_frame.columnconfigure(0, weight=1)
+    schedule_frame.rowconfigure(1, weight=1)
+    schedule_top = ttk.Frame(schedule_frame)
+    schedule_top.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+    SCHEDULE_ORDERS = ("Schedule order", "Group by team (A-Z)", "Biggest margin", "Highest scoring")
+    ttk.Label(schedule_top, text="Team").grid(row=0, column=0, sticky="w", padx=(0, 8))
+    schedule_team_var = tk.StringVar(value="All Teams")
+    schedule_team_dropdown = ttk.Combobox(schedule_top, textvariable=schedule_team_var, values=("All Teams",), state="readonly", width=28)
+    schedule_team_dropdown.grid(row=0, column=1, sticky="w", padx=(0, 16))
+    ttk.Label(schedule_top, text="Order by").grid(row=0, column=2, sticky="w", padx=(0, 8))
+    schedule_order_var = tk.StringVar(value=SCHEDULE_ORDERS[0])
+    schedule_order_dropdown = ttk.Combobox(schedule_top, textvariable=schedule_order_var, values=SCHEDULE_ORDERS, state="readonly", width=22)
+    schedule_order_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 16))
+    schedule_count_var = tk.StringVar(value="")
+    ttk.Label(schedule_top, textvariable=schedule_count_var).grid(row=0, column=4, sticky="w")
+    schedule_columns = ("num", "home", "score", "away", "winner", "margin", "top", "result")
+    schedule_tree = ttk.Treeview(schedule_frame, columns=schedule_columns, show="headings", height=14, style="Series.Treeview")
+    schedule_scroll_y = ttk.Scrollbar(schedule_frame, orient="vertical", command=schedule_tree.yview)
+    schedule_tree.configure(yscrollcommand=schedule_scroll_y.set)
+    for col, label, width, anchor in (
+        ("num", "Gm", 64, "center"), ("home", "Home", 250, "w"), ("score", "Score", 130, "center"),
+        ("away", "Away", 250, "w"), ("winner", "Winner", 230, "w"), ("margin", "Margin", 76, "center"),
+        ("top", "Top scorer", 260, "w"), ("result", "Result", 90, "center"),
+    ):
+        schedule_tree.heading(col, text=label)
+        width = int(round(width * 1.15))
+        schedule_tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=False)
+    schedule_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
+    schedule_tree.tag_configure("win", foreground="#4ade80")
+    schedule_tree.tag_configure("loss", foreground="#f87171")
+    schedule_tree.grid(row=1, column=0, sticky="nsew")
+    schedule_scroll_y.grid(row=1, column=1, sticky="ns")
+    schedule_box_frame = ttk.Frame(schedule_frame)
+    schedule_box_frame.columnconfigure(0, weight=1)
+    schedule_box_frame.rowconfigure(1, weight=1)
+    schedule_box_bar = ttk.Frame(schedule_box_frame)
+    schedule_box_bar.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+    schedule_back_button = ttk.Button(schedule_box_bar, text="<  Back to schedule")
+    schedule_back_button.grid(row=0, column=0, sticky="w", padx=(0, 16))
+    schedule_box_title_var = tk.StringVar(value="")
+    ttk.Label(schedule_box_bar, textvariable=schedule_box_title_var, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w")
+    schedule_box_tree = ttk.Treeview(
+        schedule_box_frame, columns=tuple(col for col, _l, _w, _a in FULL_BOX_COLUMNS), show="headings", height=10, style="Series.Treeview",
+    )
+    schedule_box_scroll_y = ttk.Scrollbar(schedule_box_frame, orient="vertical", command=schedule_box_tree.yview)
+    schedule_box_scroll_x = ttk.Scrollbar(schedule_box_frame, orient="horizontal", command=schedule_box_tree.xview)
+    schedule_box_tree.configure(yscrollcommand=schedule_box_scroll_y.set, xscrollcommand=schedule_box_scroll_x.set)
+    configure_full_box_tree(schedule_box_tree)
+    schedule_box_tree.grid(row=1, column=0, sticky="nsew")
+    schedule_box_scroll_y.grid(row=1, column=1, sticky="ns")
+    schedule_box_scroll_x.grid(row=2, column=0, sticky="ew")
+    schedule_row_game: Dict[str, int] = {}
+    schedule_cache = {"rows_id": None, "top": {}}
+    series_tabs.add(schedule_frame, text="Sched")
+
     rotation_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
     rotation_widget_frame.columnconfigure(0, weight=1, uniform="stand")
     rotation_widget_frame.columnconfigure(1, weight=1, uniform="stand")
@@ -2099,6 +2156,10 @@ def run_gui_app():
     shot_team_filter_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
     shot_rank_stat_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_shot_defense_widgets(playoff_sections_state.get("sections") or {}))
+    for _schedule_dropdown in (schedule_team_dropdown, schedule_order_dropdown):
+        _schedule_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_schedule_table(playoff_sections_state.get("sections") or {}))
+    schedule_tree.bind("<<TreeviewSelect>>", lambda _event: show_schedule_box_score())
+    schedule_back_button.configure(command=lambda: close_schedule_box_score())
     highs_tree.bind("<Double-1>", lambda event: show_highs_box_score(event))
     highs_tree.bind("<Return>", lambda _event: show_highs_box_score(None))
     highs_back_button.configure(command=lambda: close_highs_box_score())
@@ -3095,7 +3156,8 @@ def run_gui_app():
         # to flash/reflow between games in a playoff series.
         previous = playoff_sections_state.get("sections") or {}
         if "_season_standings" in previous and "_season_standings" not in sections and "_season_player_totals" not in sections:
-            for season_key in ("_season_standings", "_season_awards_table", "_season_awards", "_season_game_log", "_season_game_log_fields"):
+            for season_key in ("_season_standings", "_season_awards_table", "_season_awards", "_season_game_log",
+                               "_season_game_log_fields", "_season_game_extras", "_season_games"):
                 if season_key in previous:
                     sections[season_key] = previous[season_key]
         playoff_sections_state["sections"] = sections
@@ -4008,6 +4070,148 @@ def run_gui_app():
                 draw_named_headshot(canvas, "")
                 name_var.set("Waiting for series...")
                 stat_var.set("")
+
+    def season_game_top_scorers(sections: Dict) -> Dict:
+        rows = sections.get("_season_game_log") or []
+        fields = sections.get("_season_game_log_fields") or ()
+        if schedule_cache["rows_id"] == id(rows):
+            return schedule_cache["top"]
+        top: Dict[int, Tuple] = {}
+        if rows and "gid" in fields:
+            ix = {name: i for i, name in enumerate(fields)}
+            for row in rows:
+                gid, pts = row[ix["gid"]], row[ix["pts"]]
+                cur = top.get(gid)
+                if cur is None or pts > cur[1]:
+                    top[gid] = (row[ix["player"]], pts, row[ix["team"]])
+        schedule_cache["rows_id"] = id(rows)
+        schedule_cache["top"] = top
+        return top
+
+    def update_schedule_table(sections: Dict):
+        close_schedule_box_score()
+        schedule_tree.delete(*schedule_tree.get_children())
+        schedule_row_game.clear()
+        games = sections.get("_season_games") or []
+        if not games:
+            schedule_tree.insert("", "end", values=("", "The schedule will appear here after Season mode.") + ("",) * 6)
+            schedule_count_var.set("")
+            return
+        teams = sorted({g["home"] for g in games} | {g["away"] for g in games})
+        schedule_team_dropdown.configure(values=("All Teams",) + tuple(teams))
+        if schedule_team_var.get() not in ("All Teams",) + tuple(teams):
+            schedule_team_var.set("All Teams")
+        team_filter = schedule_team_var.get()
+        order = schedule_order_var.get()
+        top = season_game_top_scorers(sections)
+
+        def row_values(game, perspective=None):
+            hs, as_ = game["home_score"], game["away_score"]
+            winner = game["home"] if hs > as_ else game["away"]
+            scorer = top.get(game["gid"])
+            result = ""
+            if perspective:
+                result = ("W " if winner == perspective else "L ") + (f"{max(hs, as_)}-{min(hs, as_)}")
+            return (
+                game["order"], table_player_name(game["home"], 30), f"{hs} - {as_}", table_player_name(game["away"], 30),
+                table_player_name(winner, 30), abs(hs - as_),
+                f"{scorer[0]} ({scorer[1]})" if scorer else "", result,
+            )
+
+        def add(game, perspective=None):
+            tags = ()
+            if perspective:
+                hs, as_ = game["home_score"], game["away_score"]
+                winner = game["home"] if hs > as_ else game["away"]
+                tags = ("win",) if winner == perspective else ("loss",)
+            iid = schedule_tree.insert("", "end", values=row_values(game, perspective), tags=tags)
+            schedule_row_game[iid] = game["gid"]
+
+        if team_filter != "All Teams":
+            mine = [g for g in games if team_filter in (g["home"], g["away"])]
+            if order == "Biggest margin":
+                mine.sort(key=lambda g: -abs(g["home_score"] - g["away_score"]))
+            elif order == "Highest scoring":
+                mine.sort(key=lambda g: -(g["home_score"] + g["away_score"]))
+            for game in mine:
+                add(game, team_filter)
+            wins = sum(1 for g in mine if (g["home"] if g["home_score"] > g["away_score"] else g["away"]) == team_filter)
+            schedule_count_var.set(f"{table_player_name(team_filter, 30)}: {len(mine)} games, {wins}-{len(mine) - wins}")
+            return
+        if order == "Group by team (A-Z)":
+            for team in teams:
+                mine = [g for g in games if team in (g["home"], g["away"])]
+                wins = sum(1 for g in mine if (g["home"] if g["home_score"] > g["away_score"] else g["away"]) == team)
+                schedule_tree.insert(
+                    "", "end",
+                    values=("", f"{table_player_name(team, 30)}   {wins}-{len(mine) - wins}") + ("",) * 6, tags=("section",),
+                )
+                for game in mine:
+                    add(game, team)
+        else:
+            ordered = list(games)
+            if order == "Biggest margin":
+                ordered.sort(key=lambda g: -abs(g["home_score"] - g["away_score"]))
+            elif order == "Highest scoring":
+                ordered.sort(key=lambda g: -(g["home_score"] + g["away_score"]))
+            for game in ordered:
+                add(game)
+        schedule_count_var.set(f"{len(games)} games")
+
+    def close_schedule_box_score():
+        schedule_box_frame.grid_remove()
+        schedule_top.grid()
+        schedule_tree.grid()
+        schedule_scroll_y.grid()
+
+    def show_schedule_box_score(_event=None):
+        selection = schedule_tree.selection()
+        if not selection:
+            return
+        gid = schedule_row_game.get(selection[0])
+        if gid is None:
+            return
+        sections = playoff_sections_state.get("sections") or {}
+        rows = sections.get("_season_game_log") or []
+        fields = sections.get("_season_game_log_fields") or ()
+        if not rows or "gid" not in fields:
+            return
+        ix = {name: i for i, name in enumerate(fields)}
+        game_rows = [row for row in rows if row[ix["gid"]] == gid]
+        if not game_rows:
+            return
+        meta = next((g for g in sections.get("_season_games") or [] if g["gid"] == gid), None)
+        extras_map = (sections.get("_season_game_extras") or {}).get(gid, {})
+        names = [meta["home"], meta["away"]] if meta else sorted({r[ix["team"]] for r in game_rows})
+        teams = []
+        for name in names:
+            team_rows = [r for r in game_rows if r[ix["team"]] == name]
+            team_rows.sort(key=lambda r: (0 if ("st" in ix and r[ix["st"]]) else 1, -r[ix["pts"]], -r[ix["min"]]))
+            score = (meta["home_score"] if name == meta["home"] else meta["away_score"]) if meta else 0
+            teams.append({
+                "name": team_display_name(name), "score": score, "extras": extras_map.get(name, {}),
+                "players": [
+                    {
+                        "name": r[ix["player"]], "pos": r[ix["pos"]] if "pos" in ix else "",
+                        "st": bool(r[ix["st"]]) if "st" in ix else False, "min": r[ix["min"]],
+                        "pts": r[ix["pts"]], "reb": r[ix["reb"]], "ast": r[ix["ast"]], "stl": r[ix["stl"]],
+                        "blk": r[ix["blk"]], "tov": r[ix["tov"]], "oreb": r[ix["oreb"]], "dreb": r[ix["dreb"]],
+                        "pf": r[ix["pf"]], "pm": r[ix["pm"]], "fgm": r[ix["fgm"]], "fga": r[ix["fga"]],
+                        "tpm": r[ix["tpm"]], "tpa": r[ix["tpa"]], "ftm": r[ix["ftm"]], "fta": r[ix["fta"]],
+                    }
+                    for r in team_rows
+                ],
+            })
+        fill_full_box_tree(schedule_box_tree, teams)
+        if meta:
+            schedule_box_title_var.set(
+                f"Game {meta['order']}:  {team_display_name(meta['home'])} {meta['home_score']}  -  "
+                f"{meta['away_score']} {team_display_name(meta['away'])}"
+            )
+        schedule_top.grid_remove()
+        schedule_tree.grid_remove()
+        schedule_scroll_y.grid_remove()
+        schedule_box_frame.grid(row=0, column=0, rowspan=2, columnspan=2, sticky="nsew")
 
     def close_highs_box_score():
         highs_box_frame.grid_remove()
@@ -5597,7 +5801,7 @@ def run_gui_app():
         except Exception:
             return
         sections = playoff_sections_state.get("sections") or {}
-        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "Shots", "Avg", "Award", "Season", "Highs"}
+        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "Shots", "Avg", "Award", "Season", "Highs", "Sched"}
         section_signature = (selected_tab, playoff_sections_state.get("revision", 0))
         if selected_tab in stored_section_tabs and getattr(update_extra_gui_tabs, "_last_section_signature", None) == section_signature:
             return
@@ -5623,6 +5827,8 @@ def run_gui_app():
             update_season_awards_table(sections)
         elif selected_tab == "Highs":
             update_season_highs_table(sections)
+        elif selected_tab == "Sched":
+            update_schedule_table(sections)
         elif selected_tab == "Stand":
             update_rotation_widget()
         elif selected_tab == "Line":

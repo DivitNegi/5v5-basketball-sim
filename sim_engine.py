@@ -22203,10 +22203,16 @@ class SeasonGameLog:
         self.team_games: Dict[str, int] = {}
         self.game_count = 0
         self.extras: Dict[int, Dict[str, Dict]] = {}
+        self.games: Dict[int, Dict] = {}
 
-    def add(self, team_a: Team, team_b: Team):
+    def add(self, team_a: Team, team_b: Team, order: int | None = None):
         self.game_count += 1
         gid = self.game_count
+        self.games[gid] = {
+            "gid": gid, "order": (order + 1) if order is not None else gid,
+            "home": team_a.name, "away": team_b.name,
+            "home_score": team_a.score, "away_score": team_b.score,
+        }
         self.extras[gid] = {
             team.name: {
                 "Paint": getattr(team, "points_paint", 0), "Fastbreak": getattr(team, "fastbreak_pts", 0),
@@ -22233,7 +22239,8 @@ def build_season_sections(entries: List[Dict],
                           series_totals: Dict | None = None,
                           series_team_totals: Dict | None = None,
                           game_log: List[Tuple] | None = None,
-                          game_extras: Dict | None = None) -> Dict:
+                          game_extras: Dict | None = None,
+                          game_meta: Dict | None = None) -> Dict:
     def season_ts(stats: Dict) -> float:
         denom = 2 * (stats.get("fga", 0) + 0.44 * stats.get("fta", 0))
         return 0.0 if denom == 0 else 100 * stats.get("pts", 0) / denom
@@ -22442,6 +22449,7 @@ def build_season_sections(entries: List[Dict],
         "_season_game_log": list(game_log or []),
         "_season_game_log_fields": SEASON_GAME_LOG_FIELDS,
         "_season_game_extras": dict(game_extras or {}),
+        "_season_games": sorted((game_meta or {}).values(), key=lambda g: g["order"]),
         "_season_standings": standings,
         "_season_awards": awards,
         "_season_awards_table": awards_table,
@@ -22564,7 +22572,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         if (game_no + 1) in (20, 41, 62, 82):
             print(f"Season sim progress: {game_no + 1}/82 games per team.")
     sections = build_season_sections(entries, season_player_totals, season_team_totals,
-                                     game_log=season_game_log.rows, game_extras=season_game_log.extras)
+                                     game_log=season_game_log.rows, game_extras=season_game_log.extras,
+                                     game_meta=season_game_log.games)
     if section_queue is not None:
         section_queue.put(sections)
     print("\nSeason complete. Standings, averages, advanced stats, shot diet, and awards are ready in the GUI.")

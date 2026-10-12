@@ -7089,18 +7089,20 @@ def build_2027_season_schedule():
 
 def _run_2027_season_game(task):
     """Worker entry point: simulate one silent season game and return the finished teams."""
-    home_key, away_key = task
+    home_key, away_key = task[0], task[1]
+    order = task[2] if len(task) > 2 else None
     # Regular season: first options play ~34-36 minutes, not playoff minutes.
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = 34
     team_a, team_b = simulate_silent_season_game(
         globals()[f"make_{home_key}_2027"], globals()[f"make_{away_key}_2027"]
     )
-    return home_key, away_key, team_a, team_b
+    return home_key, away_key, team_a, team_b, order
 
 
 def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     games, conf_of = build_2027_season_schedule()
+    games = [(home, away, order) for order, (home, away) in enumerate(games)]
     entries = []
     for key, conference in conf_of.items():
         factory = globals()[f"make_{key}_2027"]
@@ -7140,10 +7142,10 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     def sequential_results():
         import time as _time
         import sim_engine as _engine
-        for home_key, away_key in games:
+        for home_key, away_key, order in games:
             while _engine.SIM_PAUSED:
                 _time.sleep(0.1)
-            yield _run_2027_season_game((home_key, away_key))
+            yield _run_2027_season_game((home_key, away_key, order))
 
     try:
         import os as _os
@@ -7151,7 +7153,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     except Exception:
         use_parallel = False
     results = parallel_results() if use_parallel else sequential_results()
-    for done, (home_key, away_key, team_a, team_b) in enumerate(results, start=1):
+    for done, (home_key, away_key, team_a, team_b, order) in enumerate(results, start=1):
         import sim_engine as _pause_engine
         while _pause_engine.SIM_PAUSED:
             import time as _pause_time
@@ -7160,7 +7162,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         add_player_to_series_totals(player_totals, team_b)
         add_team_to_series_totals(team_totals, team_a)
         add_team_to_series_totals(team_totals, team_b)
-        game_log.add(team_a, team_b)
+        game_log.add(team_a, team_b, order)
         a, b = entry_by_name[team_a.name], entry_by_name[team_b.name]
         a["pf"] += team_a.score
         a["pa"] += team_b.score
@@ -7194,7 +7196,8 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
 
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = None
-    sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows, game_extras=game_log.extras)
+    sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,
+                                     game_extras=game_log.extras, game_meta=game_log.games)
     if section_queue is not None:
         section_queue.put(sections)
 
