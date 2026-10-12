@@ -7,6 +7,32 @@ from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
 from web_app import run_web_gui_app
 from broadcast import BroadcastBooth
 
+_engine_table_player_name = table_player_name
+_TEAM_YEAR_PATTERN = re.compile(r"^(\d{4}) (.+)$")
+# Teams currently on screen (kept up to date by the GUI). A team's year is only
+# shown when another team in play shares its name, e.g. 2016 vs 2017 Warriors.
+TEAM_NAME_UNIVERSE = {"names": frozenset()}
+
+
+def team_display_name(name):
+    if not isinstance(name, str):
+        return name
+    match = _TEAM_YEAR_PATTERN.match(name)
+    if not match:
+        return name
+    base = match.group(2)
+    for other in TEAM_NAME_UNIVERSE["names"]:
+        if other != name:
+            other_match = _TEAM_YEAR_PATTERN.match(other)
+            if other_match and other_match.group(2) == base:
+                return name
+    return base
+
+
+def table_player_name(name, width=PLAYER_NAME_COL_WIDTH):
+    return _engine_table_player_name(team_display_name(name), width)
+
+
 class GuiOutputProxy:
     def __init__(self, output_queue, scoreboard_queue, original_stdout, section_queue=None):
         self.output_queue = output_queue
@@ -276,6 +302,7 @@ def run_gui_app():
     team_b_score_var = tk.StringVar(value="0")
     team_a_name_var = tk.StringVar(value="Team A")
     team_b_name_var = tk.StringVar(value="Team B")
+    scoreboard_raw = {"a": "Team A", "b": "Team B"}
     team_a_series_var = tk.StringVar(value="")
     team_b_series_var = tk.StringVar(value="")
     status_var = tk.StringVar(value="Ready")
@@ -966,7 +993,7 @@ def run_gui_app():
             return f"{100 * pts / denom:.1f}" if denom else "0.0"
 
         for team in teams:
-            tree.insert("", "end", values=(f"{team.get('name', '')}    {team.get('score', '')}",) + blank, tags=("section",))
+            tree.insert("", "end", values=(f"{team_display_name(team.get('name', ''))}    {team.get('score', '')}",) + blank, tags=("section",))
             totals = {key: 0 for key in ("pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta")}
             minutes_total = 0.0
             for p in team.get("players", []):
@@ -2652,7 +2679,7 @@ def run_gui_app():
         else:
             lead = abbr_a if wins_a > wins_b else abbr_b
             head = f"{lead} lead {max(wins_a, wins_b)}-{min(wins_a, wins_b)}"
-        lines = [f"{a} vs {b}  |  {head}"]
+        lines = [f"{team_display_name(a)} vs {team_display_name(b)}  |  {head}"]
         for game_no, score_a, score_b, home in entry["games"]:
             winner_abbr = abbr_a if score_a > score_b else abbr_b
             where = bracket_team_style(home)[0] if home else ""
@@ -2686,7 +2713,7 @@ def run_gui_app():
             if a and b and game.get("score_a") is not None:
                 abbr_a, abbr_b = bracket_team_style(a)[0], bracket_team_style(b)[0]
                 winner_abbr = bracket_team_style(game.get("winner") or a)[0]
-                header = f"{conference} play-in: {a} vs {b}"
+                header = f"{conference} play-in: {team_display_name(a)} vs {team_display_name(b)}"
                 iid = bracket_games_tree.insert(
                     "", "end",
                     values=("Play-in", f"{abbr_a} {game['score_a']} - {game['score_b']} {abbr_b}", f"{winner_abbr} advance", abbr_a),
@@ -2719,10 +2746,10 @@ def run_gui_app():
 
                 def gp(item):
                     return max(1, item[2].get("games", 1))
-                rows["Series MVP"] = (mvp[1], f"{mvp[0]}\n{mvp[2].get('pts', 0) / gp(mvp):.1f} PTS  •  {mvp[2].get('reb', 0) / gp(mvp):.1f} REB  •  {mvp[2].get('ast', 0) / gp(mvp):.1f} AST")
-                rows["Scoring Leader"] = (scorer[1], f"{scorer[0]}\n{scorer[2].get('pts', 0) / gp(scorer):.1f} PPG  •  {series_ts_value(scorer[2]):.1f} TS%")
-                rows["Playmaking Leader"] = (passer[1], f"{passer[0]}\n{passer[2].get('ast', 0) / gp(passer):.1f} APG")
-                rows["Defensive Playmaker"] = (stopper[1], f"{stopper[0]}\n{(stopper[2].get('stl', 0) + stopper[2].get('blk', 0)) / gp(stopper):.1f} stocks/game")
+                rows["Series MVP"] = (mvp[1], f"{team_display_name(mvp[0])}\n{mvp[2].get('pts', 0) / gp(mvp):.1f} PTS  •  {mvp[2].get('reb', 0) / gp(mvp):.1f} REB  •  {mvp[2].get('ast', 0) / gp(mvp):.1f} AST")
+                rows["Scoring Leader"] = (scorer[1], f"{team_display_name(scorer[0])}\n{scorer[2].get('pts', 0) / gp(scorer):.1f} PPG  •  {series_ts_value(scorer[2]):.1f} TS%")
+                rows["Playmaking Leader"] = (passer[1], f"{team_display_name(passer[0])}\n{passer[2].get('ast', 0) / gp(passer):.1f} APG")
+                rows["Defensive Playmaker"] = (stopper[1], f"{team_display_name(stopper[0])}\n{(stopper[2].get('stl', 0) + stopper[2].get('blk', 0)) / gp(stopper):.1f} stocks/game")
         for award, (canvas, title_var, name_var, stat_var) in zip(
             ("Series MVP", "Scoring Leader", "Playmaking Leader", "Defensive Playmaker"), bracket_award_cards
         ):
@@ -2771,7 +2798,7 @@ def run_gui_app():
                         f"{st.get('plus_minus', 0) / g:+.1f}",
                     ),
                 )
-        bracket_avg_title_var.set(f"Series averages: {a}  vs  {b}  ({entry.get('wins_a', 0)}-{entry.get('wins_b', 0)})")
+        bracket_avg_title_var.set(f"Series averages: {team_display_name(a)}  vs  {team_display_name(b)}  ({entry.get('wins_a', 0)}-{entry.get('wins_b', 0)})")
         bracket_ui["box_open"] = True
         bracket_canvas.grid_remove()
         bracket_detail_label.grid_remove()
@@ -2789,7 +2816,7 @@ def run_gui_app():
         boxes, label = info
         fill_full_box_tree(bracket_box_tree, boxes)
         bracket_box_title_var.set(
-            f"{label}:  {boxes[0]['name']} {boxes[0]['score']}  -  {boxes[1]['score']} {boxes[1]['name']}"
+            f"{label}:  {team_display_name(boxes[0]['name'])} {boxes[0]['score']}  -  {boxes[1]['score']} {team_display_name(boxes[1]['name'])}"
         )
         bracket_ui["box_open"] = True
         bracket_canvas.grid_remove()
@@ -3957,9 +3984,9 @@ def run_gui_app():
             scorer = max(all_players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
             playmaker = max(all_players, key=lambda item: item[2].get("ast", 0) / max(1, item[2].get("games", 1)))
             defender = max(all_players, key=lambda item: (item[2].get("stl", 0) + item[2].get("blk", 0)) / max(1, item[2].get("games", 1)))
-            rows.append(("Scoring Leader", scorer[1], f"{scorer[0]}\n{scorer[2].get('pts', 0) / max(1, scorer[2].get('games', 1)):.1f} PPG  •  {series_ts_value(scorer[2]):.1f} TS%"))
-            rows.append(("Playmaking Leader", playmaker[1], f"{playmaker[0]}\n{playmaker[2].get('ast', 0) / max(1, playmaker[2].get('games', 1)):.1f} APG"))
-            rows.append(("Defensive Playmaker", defender[1], f"{defender[0]}\n{(defender[2].get('stl', 0) + defender[2].get('blk', 0)) / max(1, defender[2].get('games', 1)):.1f} stocks/game"))
+            rows.append(("Scoring Leader", scorer[1], f"{team_display_name(scorer[0])}\n{scorer[2].get('pts', 0) / max(1, scorer[2].get('games', 1)):.1f} PPG  •  {series_ts_value(scorer[2]):.1f} TS%"))
+            rows.append(("Playmaking Leader", playmaker[1], f"{team_display_name(playmaker[0])}\n{playmaker[2].get('ast', 0) / max(1, playmaker[2].get('games', 1)):.1f} APG"))
+            rows.append(("Defensive Playmaker", defender[1], f"{team_display_name(defender[0])}\n{(defender[2].get('stl', 0) + defender[2].get('blk', 0)) / max(1, defender[2].get('games', 1)):.1f} stocks/game"))
         return rows
 
     def update_series_award_widgets(sections: Dict):
@@ -4115,7 +4142,7 @@ def run_gui_app():
                 values=(
                     "",
                     row.get("player", ""),
-                    row.get("team", ""),
+                    team_display_name(row.get("team", "")),
                     row.get("stats", ""),
                 ),
             )
@@ -4260,7 +4287,7 @@ def run_gui_app():
     def short_team_name(team: Team | None) -> str:
         if team is None:
             return "-"
-        name = team.name
+        name = team_display_name(team.name)
         if len(name) > 24:
             return table_player_name(name, 24)
         return name
@@ -5769,9 +5796,28 @@ def run_gui_app():
             for label, value in zip(team_stats_labels[row], values):
                 label.configure(text=value)
 
+    def refresh_team_universe():
+        names = set()
+        sections = playoff_sections_state.get("sections") or {}
+        for key in ("_season_player_totals", "_series_totals", "_playoff_player_totals"):
+            names.update(k for k in (sections.get(key) or {}) if isinstance(k, str))
+        for row in sections.get("_season_standings") or []:
+            names.add(row.get("team", ""))
+        for row in live_standings.get("rows") or []:
+            names.add(row.get("team", ""))
+        names.update(((bracket_ui.get("state") or {}).get("teams") or {}).keys())
+        names.update((scoreboard_raw["a"], scoreboard_raw["b"]))
+        for team in (SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")):
+            if team is not None:
+                names.add(team.name)
+        names.discard("")
+        TEAM_NAME_UNIVERSE["names"] = frozenset(names)
+
     def set_scoreboard_teams(team_a: str, team_b: str):
-        team_a_name_var.set(team_a)
-        team_b_name_var.set(team_b)
+        scoreboard_raw["a"], scoreboard_raw["b"] = team_a, team_b
+        refresh_team_universe()
+        team_a_name_var.set(team_display_name(team_a))
+        team_b_name_var.set(team_display_name(team_b))
         team_a_score_var.set("0")
         team_b_score_var.set("0")
         team_a_series_var.set("")
@@ -5812,8 +5858,8 @@ def run_gui_app():
                 series_team_b = data["series_team_b"]
                 wins_a = data["series_wins_a"]
                 wins_b = data["series_wins_b"]
-                current_a = team_a_name_var.get()
-                current_b = team_b_name_var.get()
+                current_a = scoreboard_raw["a"]
+                current_b = scoreboard_raw["b"]
                 if current_a == series_team_b and current_b == series_team_a:
                     team_a_series_var.set(f"({wins_b}-{wins_a})")
                     team_b_series_var.set(f"({wins_a}-{wins_b})")
@@ -5821,16 +5867,21 @@ def run_gui_app():
                     if current_a != series_team_a or current_b != series_team_b:
                         # Fast-sim skips live scoreboard lines, so the names can lag
                         # behind: take them from the series record itself.
-                        team_a_name_var.set(series_team_a)
-                        team_b_name_var.set(series_team_b)
+                        scoreboard_raw["a"], scoreboard_raw["b"] = series_team_a, series_team_b
+                        refresh_team_universe()
+                        team_a_name_var.set(team_display_name(series_team_a))
+                        team_b_name_var.set(team_display_name(series_team_b))
                         draw_logo(team_a_logo, series_team_a)
                         draw_logo(team_b_logo, series_team_b)
                     team_a_series_var.set(f"({wins_a}-{wins_b})")
                     team_b_series_var.set(f"({wins_b}-{wins_a})")
             return
-        teams_changed = team_a_name_var.get() != data["team_a"] or team_b_name_var.get() != data["team_b"]
-        team_a_name_var.set(data["team_a"])
-        team_b_name_var.set(data["team_b"])
+        teams_changed = scoreboard_raw["a"] != data["team_a"] or scoreboard_raw["b"] != data["team_b"]
+        if teams_changed:
+            scoreboard_raw["a"], scoreboard_raw["b"] = data["team_a"], data["team_b"]
+            refresh_team_universe()
+        team_a_name_var.set(team_display_name(data["team_a"]))
+        team_b_name_var.set(team_display_name(data["team_b"]))
         team_a_score_var.set(data["score_a"])
         team_b_score_var.set(data["score_b"])
         score_history.append((data["period"], data["clock"], int(data["score_a"]) - int(data["score_b"])))
@@ -8239,6 +8290,7 @@ def run_gui_app():
         # box score for the rest of the session. Guarantee the reschedule no
         # matter what happens above it.
         try:
+            refresh_team_universe()
             sync_season_notice()
             lines_processed = 0
             try:
