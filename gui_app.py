@@ -807,11 +807,12 @@ def run_gui_app():
             "Custom 16-team playoffs",
             "Full 2027 playoffs",
             "2027 season (82 games)",
+            "Custom season (82 games)",
             "Fantasy draft playoffs",
             "Olympic tournament",
         ),
         state="readonly",
-        width=20,
+        width=24,
     )
     mode_dropdown.grid(row=0, column=1, padx=(0, 14), sticky="ew")
 
@@ -6188,7 +6189,7 @@ def run_gui_app():
 
     def set_team_dropdown_state():
         mode = mode_var.get()
-        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
+        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
         team_a_dropdown.configure(values=team_names, state=state)
         team_b_dropdown.configure(values=team_names, state=state)
         if team_a_var.get() not in factories and team_names:
@@ -6633,7 +6634,7 @@ def run_gui_app():
     def gui_select_season_teams() -> List[str]:
         def open_dialog(result_queue):
             dialog = tk.Toplevel(root)
-            dialog.title("Choose 30 Season Teams")
+            dialog.title("Choose 30 Teams for the Custom Season")
             dialog.configure(bg=APP_BG)
             dialog.geometry("940x660")
             dialog.minsize(800, 540)
@@ -6644,7 +6645,7 @@ def run_gui_app():
             dialog.rowconfigure(1, weight=1)
 
             title_var = tk.StringVar(value="Choose exactly 30 teams. The regular season will quiet-sim 82 games per team.")
-            tk.Label(dialog, text="Season Mode", bg=APP_BG, fg=GOLD, font=("Segoe UI", 18, "bold")).grid(row=0, column=0, columnspan=3, sticky="ew", padx=16, pady=(14, 2))
+            tk.Label(dialog, text="Custom Season", bg=APP_BG, fg=GOLD, font=("Segoe UI", 18, "bold")).grid(row=0, column=0, columnspan=3, sticky="ew", padx=16, pady=(14, 2))
             tk.Label(dialog, textvariable=title_var, bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11)).grid(row=1, column=0, columnspan=3, sticky="new", padx=16, pady=(0, 10))
 
             available_frame = tk.Frame(dialog, bg=CARD, highlightthickness=1, highlightbackground=BORDER, padx=8, pady=8)
@@ -8248,7 +8249,7 @@ def run_gui_app():
                     run_custom_16_team_playoffs(selected, sim_factories)
                 else:
                     print("Full playoffs cancelled." if mode == "Full playoffs" else "Custom playoffs cancelled.")
-            elif mode == "Season mode":
+            elif mode in ("Season mode", "Custom season (82 games)"):
                 selected = gui_select_season_teams()
                 if len(selected) == 30:
                     status_var.set("Season sim running...")
@@ -8331,11 +8332,11 @@ def run_gui_app():
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()
-        season_view["quiet"] = mode in ("2027 season (82 games)", "Season mode")
+        season_view["quiet"] = mode in ("2027 season (82 games)", "Season mode", "Custom season (82 games)")
         if season_view["quiet"]:
             update_season_progress(0, 1230 if mode == "2027 season (82 games)" else 82 * 15)
         running["active"] = True
