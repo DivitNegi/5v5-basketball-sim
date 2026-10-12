@@ -9,9 +9,12 @@ from broadcast import BroadcastBooth
 
 _engine_table_player_name = table_player_name
 _TEAM_YEAR_PATTERN = re.compile(r"^(\d{4}) (.+)$")
-# Teams currently on screen (kept up to date by the GUI). A team's year is only
-# shown when another team in play shares its name, e.g. 2016 vs 2017 Warriors.
-TEAM_NAME_UNIVERSE = {"names": frozenset()}
+# Teams currently on screen (kept up to date by the GUI), in groups that are
+# really in play together: the season/playoff data on one hand, and the
+# scoreboard's two teams on the other. A team's year is only shown when another
+# team in the SAME group shares its name (2016 vs 2017 Warriors) -- a stale
+# dropdown pick like the 1962 Celtics must not put a year on the 2027 Celtics.
+TEAM_NAME_UNIVERSE = {"groups": []}
 
 
 def team_display_name(name):
@@ -21,11 +24,14 @@ def team_display_name(name):
     if not match:
         return name
     base = match.group(2)
-    for other in TEAM_NAME_UNIVERSE["names"]:
-        if other != name:
-            other_match = _TEAM_YEAR_PATTERN.match(other)
-            if other_match and other_match.group(2) == base:
-                return name
+    for group in TEAM_NAME_UNIVERSE["groups"]:
+        if name not in group:
+            continue
+        for other in group:
+            if other != name:
+                other_match = _TEAM_YEAR_PATTERN.match(other)
+                if other_match and other_match.group(2) == base:
+                    return name
     return base
 
 
@@ -6012,12 +6018,13 @@ def run_gui_app():
         for row in live_standings.get("rows") or []:
             names.add(row.get("team", ""))
         names.update(((bracket_ui.get("state") or {}).get("teams") or {}).keys())
-        names.update((scoreboard_raw["a"], scoreboard_raw["b"]))
+        names.discard("")
+        on_scoreboard = {scoreboard_raw["a"], scoreboard_raw["b"]}
         for team in (SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")):
             if team is not None:
-                names.add(team.name)
-        names.discard("")
-        TEAM_NAME_UNIVERSE["names"] = frozenset(names)
+                on_scoreboard.add(team.name)
+        on_scoreboard.discard("")
+        TEAM_NAME_UNIVERSE["groups"] = [frozenset(names), frozenset(on_scoreboard)]
 
     def set_scoreboard_teams(team_a: str, team_b: str):
         scoreboard_raw["a"], scoreboard_raw["b"] = team_a, team_b
