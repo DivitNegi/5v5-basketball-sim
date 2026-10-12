@@ -16494,6 +16494,10 @@ def make_spurs_2027() -> Team:
                clutchness=0.400, secondary_positions=('PF',), height=83, speed=0.783,
                shot_iq=0.500, stamina=0.79),
     ]
+    # Dylan Harper starts over De'Aaron Fox (the first five on the list start).
+    harper_i = next(i for i, p in enumerate(players) if p.name == 'Dylan Harper')
+    fox_i = next(i for i, p in enumerate(players) if p.name == "De'Aaron Fox")
+    players[fox_i], players[harper_i] = players[harper_i], players[fox_i]
     t = Team('2027 San Antonio Spurs', players)
     t.init_lineup()
     return t

@@ -8977,10 +8977,10 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 San Antonio Spurs":
         target_ranges = {
             "Jayden Quaintance": (8, 14),
-            "De'Aaron Fox": (24, 29), "Stephon Castle": (26, 31),
+            "De'Aaron Fox": (20, 24), "Stephon Castle": (26, 31),
             "Devin Vassell": (22, 28), "Tobias Harris": (18, 24),
             "Victor Wembanyama": (32, 36), "Julian Champagnie": (18, 24),
-            "Dylan Harper": (14, 20), "Keldon Johnson": (12, 18),
+            "Dylan Harper": (28, 32), "Keldon Johnson": (12, 18),
             "Harrison Barnes": (12, 18), "Luke Kornet": (8, 14),
         }
         for p in team.roster:
