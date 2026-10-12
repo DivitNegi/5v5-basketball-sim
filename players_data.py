@@ -6980,21 +6980,31 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
     return winner, loser
 
 
-def run_2027_postseason(standings):
-    """Play-in tournament (7-10 seeds) followed by the full 2027 playoffs, seeded from season standings."""
+def run_2027_postseason(standings, custom_factories=None):
+    """Play-in tournament (7-10 seeds) followed by the full playoffs, seeded from season standings.
+
+    custom_factories: {team name: factory} for a custom-team season; None uses the 2027 teams."""
     if not standings:
-        print("Play the 2027 season first: no standings are available.")
+        print("Play a season first: no standings are available.")
         return
     factories, strengths, factory_names = {}, {}, {}
-    for divisions in SEASON_2027_DIVISIONS.values():
-        for keys in divisions.values():
-            for key in keys:
-                factory_name = f"make_{key}_2027"
-                factory = globals()[factory_name]
-                team = factory()
-                factories[team.name] = factory
-                factory_names[team.name] = factory_name
-                strengths[team.name] = team_strength_2027(team)
+    if custom_factories:
+        for row in standings:
+            name = row["team"]
+            factory = custom_factories[name]
+            factories[name] = factory
+            factory_names[name] = name
+            strengths[name] = team_strength_2027(factory())
+    else:
+        for divisions in SEASON_2027_DIVISIONS.values():
+            for keys in divisions.values():
+                for key in keys:
+                    factory_name = f"make_{key}_2027"
+                    factory = globals()[factory_name]
+                    team = factory()
+                    factories[team.name] = factory
+                    factory_names[team.name] = factory_name
+                    strengths[team.name] = team_strength_2027(team)
 
     print("\n" + "#" * 100)
     print("2027 PLAY-IN TOURNAMENT")

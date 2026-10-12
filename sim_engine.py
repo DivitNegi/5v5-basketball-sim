@@ -22549,11 +22549,59 @@ def simulate_silent_season_game(factory_a, factory_b) -> Tuple[Team, Team]:
     return team_a, team_b
 
 
+SEASON_EAST_NICKNAMES = (
+    "Celtics", "Nets", "Knicks", "76ers", "Raptors", "Bulls", "Cavaliers", "Pistons", "Pacers", "Bucks",
+    "Hawks", "Hornets", "Heat", "Magic", "Wizards", "Bullets", "Bobcats",
+)
+SEASON_WEST_NICKNAMES = (
+    "Nuggets", "Timberwolves", "Thunder", "Trail Blazers", "Jazz", "Warriors", "Clippers", "Lakers", "Suns",
+    "Kings", "Mavericks", "Rockets", "Grizzlies", "Pelicans", "Spurs", "SuperSonics", "Sonics",
+)
+
+
+def assign_season_conferences(entries: List[Dict]):
+    """East/West for a custom season: NBA franchises keep their real conference,
+    anything else fills in so the two conferences end up the same size."""
+    east, west, unknown = [], [], []
+    for entry in entries:
+        name = entry["name"]
+        if any(name.endswith(nick) for nick in SEASON_EAST_NICKNAMES):
+            east.append(entry)
+        elif any(name.endswith(nick) for nick in SEASON_WEST_NICKNAMES):
+            west.append(entry)
+        else:
+            unknown.append(entry)
+    target = len(entries) // 2
+    for entry in sorted(unknown, key=lambda e: e["name"]):
+        (east if len(east) < target else west).append(entry)
+    # Real conferences can be lopsided (e.g. 18 Western teams picked): even them out.
+    while len(east) > target + (len(entries) % 2):
+        west.append(east.pop())
+    while len(west) > len(entries) - target:
+        east.append(west.pop())
+    for entry in east:
+        entry["conference"] = "East"
+    for entry in west:
+        entry["conference"] = "West"
+
+
+def live_season_standings_payload(entries: List[Dict], completed: int, total: int) -> Dict:
+    rows = []
+    for e in entries:
+        games = max(1, e["wins"] + e["losses"])
+        rows.append({
+            "conference": e.get("conference", "-"), "team": e["name"], "wins": e["wins"], "losses": e["losses"],
+            "pf": e["pf"] / games, "pa": e["pa"] / games, "diff": (e["pf"] - e["pa"]) / games, "strength": e["strength"],
+        })
+    return {"season_standings": rows, "completed": completed, "total": total}
+
+
 def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, object], section_queue=None, progress_queue=None) -> Dict:
     entries = [season_entry_from_factory(name, factories[name]) for name in selected_names if name in factories]
     if len(entries) < 2:
         print("Season mode needs at least two teams.")
         return {}
+    assign_season_conferences(entries)
     entry_by_name = {entry["name"]: entry for entry in entries}
     season_player_totals = {}
     season_team_totals = {}
@@ -22580,7 +22628,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             add_player_to_series_totals(season_player_totals, team_b)
             add_team_to_series_totals(season_team_totals, team_a)
             add_team_to_series_totals(season_team_totals, team_b)
-            season_game_log.add(team_a, team_b)
+            season_game_log.add(team_a, team_b, order=completed_games)
 
             actual_a = entry_by_name.get(team_a.name, entry_a)
             actual_b = entry_by_name.get(team_b.name, entry_b)
@@ -22602,6 +22650,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             completed_games += 1
             if progress_queue is not None:
                 progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
+                if completed_games % 6 == 0 or completed_games == total_games:
+                    progress_queue.put(live_season_standings_payload(entries, completed_games, total_games))
         if (game_no + 1) in (20, 41, 62, 82):
             print(f"Season sim progress: {game_no + 1}/82 games per team.")
     sections = build_season_sections(entries, season_player_totals, season_team_totals,

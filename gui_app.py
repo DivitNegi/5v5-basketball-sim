@@ -8170,7 +8170,7 @@ def run_gui_app():
     sim_engine.GUI_POSITION_PICKER = gui_position_picker
     sim_engine.GUI_OPTION_PICKER = gui_option_picker
 
-    postseason_state = {"standings": None}
+    postseason_state = {"standings": None, "factories": None}
 
     def run_selected_sim(mode_override=None):
         mode = mode_override or mode_var.get()
@@ -8254,8 +8254,11 @@ def run_gui_app():
                     status_var.set("Season sim running...")
                     scoreboard_status_var.set("Season sim running in background...")
                     with contextlib.redirect_stdout(io.StringIO()):
-                        run_quiet_82_game_season(selected, sim_factories, section_queue, scoreboard_queue)
-                    scoreboard_status_var.set("Season complete. Open standings, averages, advanced, shots/defense, or awards.")
+                        custom_sections = run_quiet_82_game_season(selected, sim_factories, section_queue, scoreboard_queue)
+                    postseason_state["standings"] = (custom_sections or {}).get("_season_standings")
+                    postseason_state["factories"] = {name: sim_factories[name] for name in selected if name in sim_factories}
+                    scoreboard_status_var.set("Season complete. Press Next for the play-in and playoffs, or browse standings, schedule, averages, advanced, shots/defense, awards and highs.")
+                    scoreboard_queue.put({"postseason_ready": True})
                 else:
                     print("Season mode cancelled.")
             elif mode == "Fantasy draft season":
@@ -8273,11 +8276,12 @@ def run_gui_app():
                 scoreboard_status_var.set("2027 season running in the background (82 games per team)...")
                 season_sections = run_2027_season(section_queue, scoreboard_queue)
                 postseason_state["standings"] = (season_sections or {}).get("_season_standings")
+                postseason_state["factories"] = None
                 scoreboard_status_var.set("Season complete. Press Next for the play-in and playoffs, or browse standings, averages, advanced, shots/defense, awards and highs.")
                 scoreboard_queue.put({"postseason_ready": True})
             elif mode == "2027 play-in & playoffs":
                 status_var.set("2027 play-in and playoffs running...")
-                run_2027_postseason(postseason_state["standings"])
+                run_2027_postseason(postseason_state["standings"], postseason_state.get("factories"))
             else:
                 run_2016_playoffs()
             sim_completed = True
