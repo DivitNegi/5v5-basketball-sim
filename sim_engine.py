@@ -22596,7 +22596,18 @@ def live_season_standings_payload(entries: List[Dict], completed: int, total: in
     return {"season_standings": rows, "completed": completed, "total": total}
 
 
+def _quiet_season_worker(task):
+    """Worker entry point for the custom season: play one game between copies of two team templates."""
+    import copy
+    template_a, template_b, order = task
+    global SEASON_STAR_MINUTES_CAP
+    SEASON_STAR_MINUTES_CAP = 34
+    team_a, team_b = simulate_silent_season_game(lambda: copy.deepcopy(template_a), lambda: copy.deepcopy(template_b))
+    return team_a, team_b, order
+
+
 def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, object], section_queue=None, progress_queue=None) -> Dict:
+    global SEASON_STAR_MINUTES_CAP
     entries = [season_entry_from_factory(name, factories[name]) for name in selected_names if name in factories]
     if len(entries) < 2:
         print("Season mode needs at least two teams.")
@@ -22606,29 +22617,76 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     season_player_totals = {}
     season_team_totals = {}
     season_game_log = SeasonGameLog()
-    completed_games = 0
-    total_games = 82 * (len(entries) // 2)
-    print("\n=== SEASON MODE ===")
-    print(f"Quiet-simming 82 games for {len(entries)} teams with the full playoff game engine hidden from the GUI. No play-by-play will be printed during the regular season.")
-    if progress_queue is not None:
-        progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
-    for game_no in range(82):
+
+    # The whole schedule up front: 82 rounds of random pairings.
+    schedule = []
+    for _round in range(82):
         round_entries = entries[:]
         random.shuffle(round_entries)
         if len(round_entries) % 2 == 1:
             round_entries.pop()
         for idx in range(0, len(round_entries), 2):
-            entry_a = round_entries[idx]
-            entry_b = round_entries[idx + 1]
+            schedule.append((round_entries[idx], round_entries[idx + 1]))
+    total_games = len(schedule)
+    completed_games = 0
+    print("\n=== SEASON MODE ===")
+    print(f"Quiet-simming 82 games for {len(entries)} teams with the full playoff game engine hidden from the GUI. No play-by-play will be printed during the regular season.")
+    if progress_queue is not None:
+        progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
+
+    # Games are independent, so they are spread over worker processes by sending
+    # each worker copies of the two (picklable) team templates. Anything that
+    # cannot be pickled, or too few CPUs, falls back to one process.
+    templates = None
+    try:
+        import os
+        import pickle
+        if (os.cpu_count() or 1) >= 4:
+            templates = {entry["name"]: entry["factory"]() for entry in entries}
+            for template in templates.values():
+                pickle.dumps(template)
+    except Exception:
+        templates = None
+
+    def parallel_results():
+        import multiprocessing
+        import os
+        workers = max(1, min(12, (os.cpu_count() or 4) - 2))
+        pool = multiprocessing.get_context("spawn").Pool(processes=workers)
+        try:
+            batch = workers * 6
+            for start_index in range(0, total_games, batch):
+                while SIM_PAUSED:
+                    _REAL_SLEEP(0.05)
+                tasks = [
+                    (templates[ea["name"]], templates[eb["name"]], order)
+                    for order, (ea, eb) in enumerate(schedule[start_index:start_index + batch], start=start_index)
+                ]
+                for result in pool.imap_unordered(_quiet_season_worker, tasks, chunksize=2):
+                    yield result
+        finally:
+            pool.terminate()
+            pool.join()
+
+    def sequential_results():
+        for order, (entry_a, entry_b) in enumerate(schedule):
             while SIM_PAUSED:
                 _REAL_SLEEP(0.05)
             team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"])
+            yield team_a, team_b, order
 
+    SEASON_STAR_MINUTES_CAP = 34
+    try:
+        results = parallel_results() if templates is not None else sequential_results()
+        for team_a, team_b, order in results:
+            while SIM_PAUSED:
+                _REAL_SLEEP(0.05)
+            entry_a, entry_b = schedule[order]
             add_player_to_series_totals(season_player_totals, team_a)
             add_player_to_series_totals(season_player_totals, team_b)
             add_team_to_series_totals(season_team_totals, team_a)
             add_team_to_series_totals(season_team_totals, team_b)
-            season_game_log.add(team_a, team_b, order=completed_games)
+            season_game_log.add(team_a, team_b, order=order)
 
             actual_a = entry_by_name.get(team_a.name, entry_a)
             actual_b = entry_by_name.get(team_b.name, entry_b)
@@ -22652,8 +22710,10 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
                 if completed_games % 6 == 0 or completed_games == total_games:
                     progress_queue.put(live_season_standings_payload(entries, completed_games, total_games))
-        if (game_no + 1) in (20, 41, 62, 82):
-            print(f"Season sim progress: {game_no + 1}/82 games per team.")
+            if completed_games % 300 == 0:
+                print(f"Season sim progress: {completed_games}/{total_games} games.")
+    finally:
+        SEASON_STAR_MINUTES_CAP = None
     sections = build_season_sections(entries, season_player_totals, season_team_totals,
                                      game_log=season_game_log.rows, game_extras=season_game_log.extras,
                                      game_meta=season_game_log.games)
