@@ -1005,7 +1005,8 @@ def run_gui_app():
             tree.insert("", "end", values=(f"{team_display_name(team.get('name', ''))}    {team.get('score', '')}",) + blank, tags=("section",))
             totals = {key: 0 for key in ("pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta")}
             minutes_total = 0.0
-            for p in team.get("players", []):
+            # Every non-live box score (Highs, Schedule, bracket games) lists players by points.
+            for p in sorted(team.get("players", []), key=lambda pl: (-pl.get("pts", 0), -pl.get("min", 0))):
                 for key in totals:
                     totals[key] += p.get(key, 0)
                 minutes_total += p.get("min", 0)
