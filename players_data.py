@@ -7160,6 +7160,19 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
             team_totals[team_b.name]["wins"] += 1
         if progress_queue is not None:
             progress_queue.put({"season_progress": True, "completed": done, "total": total_games})
+            if done % 6 == 0 or done == total_games:
+                # live standings for the Stand tab while the season is being simmed
+                progress_queue.put({
+                    "season_standings": [
+                        {
+                            "conference": e["conference"], "team": e["name"], "wins": e["wins"], "losses": e["losses"],
+                            "pf": e["pf"] / max(1, e["wins"] + e["losses"]), "pa": e["pa"] / max(1, e["wins"] + e["losses"]),
+                            "diff": (e["pf"] - e["pa"]) / max(1, e["wins"] + e["losses"]), "strength": e["strength"],
+                        }
+                        for e in entries
+                    ],
+                    "completed": done, "total": total_games,
+                })
         if done % 300 == 0:
             print(f"Season sim progress: {done}/{total_games} games.")
 

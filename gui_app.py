@@ -1609,22 +1609,43 @@ def run_gui_app():
     series_tabs.add(highs_frame, text="Highs")
 
     rotation_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
-    rotation_widget_frame.columnconfigure(0, weight=1)
-    rotation_widget_frame.rowconfigure(0, weight=1)
-    rotation_columns = ("seed", "conf", "team", "w", "l", "pct", "pf", "pa", "diff", "str")
-    rotation_tree = ttk.Treeview(rotation_widget_frame, columns=rotation_columns, show="headings", height=10, style="Series.Treeview")
-    rotation_scroll = ttk.Scrollbar(rotation_widget_frame, orient="vertical", command=rotation_tree.yview)
-    rotation_tree.configure(yscrollcommand=rotation_scroll.set)
-    for col, label, width in (
-        ("seed", "#", 42), ("conf", "Conf", 58), ("team", "Team", 210), ("w", "W", 52),
-        ("l", "L", 52), ("pct", "PCT", 72), ("pf", "PF", 72), ("pa", "PA", 72),
-        ("diff", "DIFF", 72), ("str", "STR", 72),
-    ):
-        rotation_tree.heading(col, text=label)
-        width = int(round(width * 1.35))
-        rotation_tree.column(col, width=width, minwidth=width, anchor="center" if col != "team" else "w", stretch=False)
-    rotation_tree.grid(row=0, column=0, sticky="nsew")
-    rotation_scroll.grid(row=0, column=1, sticky="ns")
+    rotation_widget_frame.columnconfigure(0, weight=1, uniform="stand")
+    rotation_widget_frame.columnconfigure(1, weight=1, uniform="stand")
+    rotation_widget_frame.rowconfigure(1, weight=1)
+    rotation_columns = ("seed", "team", "w", "l", "pct", "gb", "diff", "pf", "pa", "str")
+    live_standings = {"rows": [], "completed": 0, "total": 0, "dirty": False}
+    rotation_status_var = tk.StringVar(value="")
+
+    def build_conference_tree(column: int, title: str):
+        tk.Label(
+            rotation_widget_frame, text=title, bg=APP_BG, fg=GOLD, font=("Segoe UI", 13, "bold"), anchor="w",
+        ).grid(row=0, column=column, sticky="ew", padx=(4 if column == 0 else 10, 4), pady=(0, 4))
+        holder = ttk.Frame(rotation_widget_frame)
+        holder.grid(row=1, column=column, sticky="nsew", padx=(0, 6) if column == 0 else (6, 0))
+        holder.columnconfigure(0, weight=1)
+        holder.rowconfigure(0, weight=1)
+        tree = ttk.Treeview(holder, columns=rotation_columns, show="headings", height=16, style="Series.Treeview")
+        scroll = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scroll.set)
+        for col, label, width in (
+            ("seed", "#", 40), ("team", "Team", 215), ("w", "W", 46), ("l", "L", 46), ("pct", "PCT", 66),
+            ("gb", "GB", 54), ("diff", "DIFF", 62), ("pf", "PF", 62), ("pa", "PA", 62), ("str", "STR", 58),
+        ):
+            tree.heading(col, text=label)
+            width = int(round(width * 1.15))
+            tree.column(col, width=width, minwidth=width, anchor="center" if col != "team" else "w", stretch=False)
+        tree.tag_configure("playin", foreground="#fbbf24")
+        tree.tag_configure("out", foreground="#94a3b8")
+        tree.tag_configure("line", foreground="#64748b")
+        tree.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=1, sticky="ns")
+        return tree
+
+    rotation_tree = build_conference_tree(0, "EASTERN CONFERENCE")
+    rotation_tree_west = build_conference_tree(1, "WESTERN CONFERENCE")
+    tk.Label(
+        rotation_widget_frame, textvariable=rotation_status_var, bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11), anchor="w",
+    ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(6, 0))
     series_tabs.add(rotation_widget_frame, text="Stand")
 
     lineup_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
@@ -3030,7 +3051,8 @@ def run_gui_app():
         playoff_avg_team_dropdown.configure(values=("All Teams",))
         playoff_avg_team_var.set("All Teams")
         rotation_tree.delete(*rotation_tree.get_children())
-        rotation_tree.insert("", "end", values=("", "", "Season standings will appear here after Season mode.", "", "", "", "", "", "", ""))
+        rotation_tree_west.delete(*rotation_tree_west.get_children())
+        rotation_tree.insert("", "end", values=("", "Season standings will appear here during Season mode.", "", "", "", "", "", "", "", ""))
         for canvas, _title_var, name_var, stat_var in award_cards:
             draw_named_headshot(canvas, "")
             name_var.set("Waiting for series...")
@@ -4705,47 +4727,51 @@ def run_gui_app():
 
     def update_rotation_widget():
         rotation_tree.delete(*rotation_tree.get_children())
-        standings = (playoff_sections_state.get("sections") or {}).get("_season_standings") or []
-        if standings:
-            def standings_values(seed, row):
-                return (
-                    seed,
-                    row.get("conference", ""),
-                    table_player_name(row.get("team", ""), 32),
-                    row.get("wins", 0),
-                    row.get("losses", 0),
-                    f"{row.get('pct', 0):.3f}",
-                    f"{row.get('pf', 0):.1f}",
-                    f"{row.get('pa', 0):.1f}",
-                    f"{row.get('diff', 0):+.1f}",
-                    f"{row.get('strength', 0):.1f}",
+        rotation_tree_west.delete(*rotation_tree_west.get_children())
+        final = (playoff_sections_state.get("sections") or {}).get("_season_standings") or []
+        rows_all = final or live_standings["rows"]
+        if rows_all:
+            for conference, tree in (("East", rotation_tree), ("West", rotation_tree_west)):
+                rows = sorted(
+                    (r for r in rows_all if r.get("conference") == conference),
+                    key=lambda r: (-(r.get("wins", 0) / max(1, r.get("wins", 0) + r.get("losses", 0))), -r.get("wins", 0), -r.get("diff", 0), -r.get("strength", 0)),
                 )
-
-            conferences = [c for c in ("East", "West") if any(r.get("conference") == c for r in standings)]
-            if conferences:
-                rotation_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
-                for conference in conferences:
-                    label = "EASTERN CONFERENCE" if conference == "East" else "WESTERN CONFERENCE"
-                    rotation_tree.insert("", "end", values=("", "", label, "W", "L", "PCT", "PF", "PA", "DIFF", "STR"), tags=("section",))
-                    rows = sorted(
-                        (r for r in standings if r.get("conference") == conference),
-                        key=lambda r: (r.get("wins", 0), r.get("diff", 0), r.get("strength", 0)),
-                        reverse=True,
+                if not rows:
+                    continue
+                lead_w, lead_l = rows[0].get("wins", 0), rows[0].get("losses", 0)
+                for seed, row in enumerate(rows, start=1):
+                    w, l = row.get("wins", 0), row.get("losses", 0)
+                    games = max(1, w + l)
+                    gb = ((lead_w - w) + (l - lead_l)) / 2
+                    tag = ("playin",) if 7 <= seed <= 10 else (("out",) if seed > 10 else ())
+                    tree.insert(
+                        "", "end",
+                        values=(
+                            seed, table_player_name(row.get("team", ""), 30), w, l, f"{w / games:.3f}",
+                            "-" if gb <= 0 else f"{gb:.1f}", f"{row.get('diff', 0):+.1f}",
+                            f"{row.get('pf', 0):.1f}", f"{row.get('pa', 0):.1f}", f"{row.get('strength', 0):.1f}",
+                        ),
+                        tags=tag,
                     )
-                    for seed, row in enumerate(rows, start=1):
-                        rotation_tree.insert("", "end", values=standings_values(seed, row))
-                        if seed == 8 and len(rows) > 8:
-                            rotation_tree.insert("", "end", values=("", "", "---- playoff line ----", "", "", "", "", "", "", ""))
-                return
-            for row in standings:
-                rotation_tree.insert("", "end", values=standings_values(row.get("seed", ""), row))
+                    if seed == 6:
+                        tree.insert("", "end", values=("", "-- play-in zone (7-10) --", "", "", "", "", "", "", "", ""), tags=("line",))
+                    elif seed == 10:
+                        tree.insert("", "end", values=("", "-- out of the playoffs --", "", "", "", "", "", "", "", ""), tags=("line",))
+            if final:
+                rotation_status_var.set("Final regular-season standings.  Seeds 1-6 are in, 7-10 go to the play-in.")
+            else:
+                rotation_status_var.set(
+                    f"LIVE: {live_standings['completed']} of {live_standings['total']} games simulated.  "
+                    "Seeds 1-6 are in, 7-10 go to the play-in."
+                )
             return
         teams = [SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")]
         if not all(teams):
-            rotation_tree.insert("", "end", values=("", "", "Season standings will appear here after Season mode.", "", "", "", "", "", "", ""))
+            rotation_tree.insert("", "end", values=("", "Season standings will appear here during Season mode.", "", "", "", "", "", "", "", ""))
+            rotation_status_var.set("")
             return
         for team in teams:
-            rotation_tree.insert("", "end", values=("", "-", short_team_name(team), "-", "-", "-", f"{team.score:.1f}", "-", "-", "Live"))
+            rotation_tree.insert("", "end", values=("", short_team_name(team), "-", "-", "-", "-", "-", f"{team.score:.1f}", "-", "Live"))
 
     def update_lineup_widget():
         lineup_tree.delete(*lineup_tree.get_children())
@@ -5761,7 +5787,7 @@ def run_gui_app():
             draw_logo(team_b_logo, team_b)
 
     def update_scoreboard(data):
-        if data.get("postseason_ready") or "bracket_state" in data:
+        if data.get("postseason_ready") or "bracket_state" in data or "season_standings" in data:
             return
         if data.get("season_progress"):
             completed = int(data.get("completed", 0))
@@ -7983,6 +8009,7 @@ def run_gui_app():
             status_var.set("Simulate the 2027 season first.")
             return
         next_button.configure(state="disabled")
+        live_standings.update(rows=[], completed=0, total=0, dirty=False)
         bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False, box_open=False)
         bracket_box_frame.grid_remove()
         bracket_avg_frame.grid_remove()
@@ -8176,16 +8203,27 @@ def run_gui_app():
 
     def sync_season_notice():
         want = bool(season_view["quiet"] and running["active"])
+        try:
+            stand_open = str(series_tabs.tab(series_tabs.select(), "text")) == "Stand"
+        except Exception:
+            stand_open = False
+        # The Stand tab stays uncovered during a season so its standings can
+        # update live; every other tab shows the plain "Simulating season" notice.
+        cover_tabs = want and not stand_open
         if want and not season_view["shown"]:
-            season_notice_tabs.place(x=0, y=40, relwidth=1.0, relheight=1.0, height=-40)
-            season_notice_tabs.lift()
             season_notice_box.place(x=0, y=0, relwidth=1.0, relheight=1.0)
             season_notice_box.lift()
             season_view["shown"] = True
         elif not want and season_view["shown"]:
-            season_notice_tabs.place_forget()
             season_notice_box.place_forget()
             season_view["shown"] = False
+        if cover_tabs and not season_view.get("tabs_shown"):
+            season_notice_tabs.place(x=0, y=40, relwidth=1.0, relheight=1.0, height=-40)
+            season_notice_tabs.lift()
+            season_view["tabs_shown"] = True
+        elif not cover_tabs and season_view.get("tabs_shown"):
+            season_notice_tabs.place_forget()
+            season_view["tabs_shown"] = False
 
     def poll_queues():
         # A single unhandled exception anywhere below used to stop this
@@ -8209,6 +8247,12 @@ def run_gui_app():
             try:
                 while True:
                     message = scoreboard_queue.get_nowait()
+                    if isinstance(message, dict) and "season_standings" in message:
+                        live_standings.update(
+                            rows=message["season_standings"], completed=message.get("completed", 0),
+                            total=message.get("total", 0), dirty=True,
+                        )
+                        continue
                     if isinstance(message, dict) and "bracket_state" in message:
                         # Bracket snapshots arrive after every game; they must not
                         # displace the series score / reset messages that came before.
@@ -8242,6 +8286,13 @@ def run_gui_app():
                 try:
                     if str(series_tabs.tab(series_tabs.select(), "text")) == "Brkt":
                         refresh_bracket_tab()
+                except Exception:
+                    pass
+            if live_standings["dirty"]:
+                try:
+                    if str(series_tabs.tab(series_tabs.select(), "text")) == "Stand":
+                        update_rotation_widget()
+                        live_standings["dirty"] = False
                 except Exception:
                     pass
             if latest_scoreboard is not None:
