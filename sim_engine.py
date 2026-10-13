@@ -12341,6 +12341,11 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     # able to push past that ordinary ceiling -- and a low-skill, low-clutch
     # player forced into a tough look under pressure should be able to dip
     # below the ordinary floor.
+    if shot_type == "rim" and quality_mult < 1.08:
+        # Open layups are now ~90% for good finishers; contested ones come
+        # down a bit so the league-wide layup percentage stays where it was.
+        p *= CONTESTED_LAYUP_SCALE
+
     soft_knee = {"three": 0.38, "mid": 0.43, "rim": 0.64, "post": 0.55, "post_fade": 0.45}.get(shot_type)
     if soft_knee is not None and p > soft_knee:
         p = soft_knee + (p - soft_knee) * (0.52 if shot_type in ("three", "mid") else 0.60)
@@ -17214,6 +17219,7 @@ def immediate_catch_chance(passer: Player, base: float, slope: float = 0.44,
     return max(lo, min(hi, base + slope * passer.playmaking + bonus))
 
 
+CONTESTED_LAYUP_SCALE = 0.955  # offsets the higher open-layup conversion to hold the league layup %
 ASSIST_CREDIT_SCALE = 1.32  # delayed (non-quick) finishes: league team assists were ~22.8/game vs ~26 real
 
 
