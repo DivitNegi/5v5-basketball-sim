@@ -13407,17 +13407,18 @@ def make_timberwolves_2027() -> Team:
         key=lambda player: starter_order.index(player.name) if player.name in starter_order else len(starter_order),
     )
     t = Team('2027 Minnesota Timberwolves', players)
-    # 2027 role overrides: LaMelo is a high-volume co-star; Kuminga starts at SF
-    # per the ESPN depth chart (Ayo Dosunmu is the second-string SF).
+    # 2027 role overrides: LaMelo and Ant are co-stars at ~18-20 shots each;
+    # Kuminga starts at SF per the ESPN depth chart (Ayo Dosunmu is the
+    # second-string SF).
     for player in t.roster:
         if player.name == 'Anthony Edwards':
-            player.shot_tendency = max(player.shot_tendency, 0.64)
-            player.usage = max(player.usage, 0.37)
-            player.target_fga_soft_cap = 24.0
-        elif player.name == 'LaMelo Ball':
-            player.shot_tendency = max(player.shot_tendency, 0.62)
-            player.usage = max(player.usage, 0.35)
+            player.shot_tendency = 0.56
+            player.usage = 0.31
             player.target_fga_soft_cap = 19.0
+        elif player.name == 'LaMelo Ball':
+            player.shot_tendency = 0.72
+            player.usage = 0.44
+            player.target_fga_soft_cap = 20.0
         elif player.name == 'Ayo Dosunmu':
             player.shot_tendency = max(player.shot_tendency, 0.42)
             player.usage = max(player.usage, 0.22)
