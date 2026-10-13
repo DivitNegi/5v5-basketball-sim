@@ -12309,11 +12309,13 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     if shot_type == "rim" and quality_mult >= 1.08:
         # An open layup is still a layup: real wide-open looks at the rim go
         # in about 72-75% of the time, not every time.
-        open_layup = 0.48 + 0.28 * min(1.0, skill_rating)
+        # Steeper in finishing skill: an average finisher converts ~72% of
+        # open layups, a 0.95+ finisher ~80% or better, a poor one ~58-62%.
+        open_layup = 0.72 + (min(1.0, skill_rating) - 0.85) * 2.0
         open_layup -= max(0.0, soft_defense_rating(effective_interior_def(defender)) - 0.60) * 0.10
         if elite_interior_scorer(shooter) or elite_rim_finisher(shooter):
             open_layup += 0.03
-        return max(0.55, min(p, open_layup))
+        return max(0.50, min(p, min(0.90, open_layup)))
 
     if base_p > 0.001:
         situational_ratio = p / base_p
@@ -17638,7 +17640,7 @@ def run_fastbreak(def_team: Team, off_team: Team, period: int, period_time: int,
         if fastbreak_wide_open:
             # Even a clear lane isn't automatic: wide-open layups go in ~87%,
             # dunks ~93%, instead of the boosts stacking all the way to 100%.
-            open_cap = (0.90 + finisher.rim_rating * 0.05) if shot_type == "dunk" else (0.66 + finisher.rim_rating * 0.10)
+            open_cap = (0.90 + finisher.rim_rating * 0.05) if shot_type == "dunk" else (0.54 + finisher.rim_rating * 0.24)
             make_prob = min(make_prob, open_cap)
     else:
         base_mid_floor = 0.54 if fastbreak_wide_open else 0.40

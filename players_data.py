@@ -13932,6 +13932,12 @@ def make_mavs_2027() -> Team:
                shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Dallas Mavericks', players)
+    # Kyrie is an elite catch-and-shoot / movement shooter as well as a
+    # pull-up creator: give him the off-ball shooting credit for it.
+    for player in t.roster:
+        if player.name == 'Kyrie Irving':
+            add_badge(player, 'catch_shoot', 'gold')
+            add_badge(player, 'movement_shooter', 'gold')
     t.init_lineup()
     return t
 
