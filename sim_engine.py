@@ -12205,6 +12205,13 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     if shot_creator_bonus:
         p *= 1.0 + shot_creator_bonus
 
+    # Small shot-making bonus for high-usage creators on contested jumpers:
+    # being the offense's lone option means tough looks all night, and the
+    # real stars who live there make them at a better rate than the same
+    # rating would on a role player's rare contested attempt.
+    if shot_type in ("three", "mid") and quality_mult < 1.04 and shooter.usage > 0.26:
+        p *= 1.0 + min(0.045, (shooter.usage - 0.26) * 0.40)
+
     posterizer_bonus = getattr(shooter, "posterizer_quality_bonus", 0.0)
     if posterizer_bonus and shot_type == "dunk":
         p *= 1.0 + posterizer_bonus
