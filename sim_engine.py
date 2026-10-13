@@ -22589,6 +22589,27 @@ def build_season_sections(entries: List[Dict],
                 f"{adv[23]:+.1f} DEF IMP"
             )
 
+        # Shots defended count by who they were taken by: stopping the league's
+        # best scorers is worth far more than staying near role players' shots.
+        _ranked_for_quality = sorted(all_players, key=lambda it: series_player_score(it[2]), reverse=True)
+        shooter_quality = {}
+        for _i, (_t, _n, _st) in enumerate(_ranked_for_quality):
+            shooter_quality[_n] = 0.50 + 1.80 * (1.0 - _i / max(1, len(_ranked_for_quality) - 1)) ** 1.6
+
+        def quality_defended(stats: Dict) -> Tuple[float, float, float]:
+            """(quality-weighted attempts, quality-weighted makes, attempts vs star shooters)."""
+            core_keys = ("three", "mid", "rim", "post", "dunk")
+            w_att = w_made = star_att = 0.0
+            for shooter_name, diet in (stats.get("defended_matchup_diet", {}) or {}).items():
+                qw = shooter_quality.get(shooter_name, 0.8)
+                att = sum(int(diet.get(k, 0) or 0) for k in core_keys)
+                made = sum(int(diet.get(f"{k}_made", 0) or 0) for k in core_keys)
+                w_att += att * qw
+                w_made += made * qw
+                if qw >= 1.6:
+                    star_att += att
+            return w_att, w_made, star_att
+
         def defensive_score(item: Tuple[str, str, Dict]) -> float:
             team_name, _name, stats = item
             player = player_lookup.get((team_name, _name))
@@ -22634,7 +22655,14 @@ def build_season_sections(entries: List[Dict],
             if mpg < 22.0:
                 low_min_penalty += 8.0 + (22.0 - mpg) * 2.2
             low_work_penalty = max(0.0, 5.0 - defended_pg) * 0.32
-            efficiency_bonus = (0.515 - allowed_pct) * 9.0 if attempts else -1.5
+            w_att, w_made, star_att = quality_defended(stats)
+            quality_defended_pg = w_att / gp
+            star_defended_pg = star_att / gp
+            if w_att > 0:
+                weighted_allowed = w_made / w_att
+                efficiency_bonus = (0.515 - weighted_allowed) * 14.0
+            else:
+                efficiency_bonus = (0.515 - allowed_pct) * 9.0 if attempts else -1.5
             skill_bonus = (defense_skill - 0.64) * 20.0
             weak_defender_penalty = max(0.0, 0.74 - defense_skill) * 58.0
             profile_floor_penalty = 22.0 if defense_skill < 0.68 else 0.0
@@ -22642,7 +22670,8 @@ def build_season_sections(entries: List[Dict],
                 minute_factor * 1.8
                 + stocks_pg * 4.2
                 + dreb_pg * 0.28
-                + defended_pg * 0.20
+                + quality_defended_pg * 0.55
+                + star_defended_pg * 0.55
                 + efficiency_bonus
                 + skill_bonus
                 + adv[23] * 0.85
