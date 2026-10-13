@@ -12307,15 +12307,14 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     if shot_type == "dunk" and quality_mult >= 1.08:
         return 1.0
     if shot_type == "rim" and quality_mult >= 1.08:
-        # An open layup is still a layup: real wide-open looks at the rim go
-        # in about 72-75% of the time, not every time.
-        # Steeper in finishing skill: an average finisher converts ~72% of
-        # open layups, a 0.95+ finisher ~80% or better, a poor one ~58-62%.
-        open_layup = 0.72 + (min(1.0, skill_rating) - 0.85) * 2.0
-        open_layup -= max(0.0, soft_defense_rating(effective_interior_def(defender)) - 0.60) * 0.10
-        if elite_interior_scorer(shooter) or elite_rim_finisher(shooter):
-            open_layup += 0.03
-        return max(0.50, min(p, min(0.90, open_layup)))
+        # An open layup has no defender to beat, so it is decided by the
+        # finisher alone (not by the defender's size or the shooter's height):
+        # a ~0.80 finisher converts ~72%, a 0.90 finisher ~87%, and a 0.92+
+        # finisher ~90% or better. Fatigue and a hot/cold stretch still move it.
+        finishing = max(shooter.rim_rating, 0.0)
+        open_layup = 0.72 + (min(1.0, finishing) - 0.80) * 1.50
+        open_layup *= max(0.94, fatigue_offense_factor(shooter))
+        return max(0.50, min(0.95, open_layup))
 
     if base_p > 0.001:
         situational_ratio = p / base_p
@@ -17621,7 +17620,7 @@ def run_fastbreak(def_team: Team, off_team: Team, period: int, period_time: int,
         if fastbreak_wide_open:
             # Even a clear lane isn't automatic: wide-open layups go in ~87%,
             # dunks ~93%, instead of the boosts stacking all the way to 100%.
-            open_cap = (0.90 + finisher.rim_rating * 0.05) if shot_type == "dunk" else (0.54 + finisher.rim_rating * 0.24)
+            open_cap = (0.90 + finisher.rim_rating * 0.05) if shot_type == "dunk" else min(0.95, 0.72 + (finisher.rim_rating - 0.80) * 1.50)
             make_prob = min(make_prob, open_cap)
     else:
         base_mid_floor = 0.54 if fastbreak_wide_open else 0.40
