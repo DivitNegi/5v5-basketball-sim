@@ -12236,7 +12236,9 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     elif shot_type == "mid":
         p *= 1.0 - 0.075 * height_tax * size
     elif shot_type in ("rim", "post"):
-        p *= 1.0 - 0.112 * height_tax * size
+        # An open layup has no defender to be taller than: no height penalty.
+        if not (shot_type == "rim" and quality_mult >= 1.08):
+            p *= 1.0 - 0.112 * height_tax * size
     elif shot_type == "post_fade":
         p *= 1.0 - 0.085 * height_tax * size
     elif shot_type == "dunk":
