@@ -12041,8 +12041,10 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
             defense_tax = 0.32
             finish_base = 1.00
         elif elite_slash_finish:
-            defense_tax = 0.56
-            finish_base = 0.85
+            # Was 0.85 / 0.56 -- a worse formula than the ordinary player's
+            # (0.96 / 0.42), so a 0.99 finisher like Kyrie shot ~48% at the rim.
+            defense_tax = 0.40
+            finish_base = 1.00
         elif shooter.height >= 80:
             # Size at the rim: even a non-featured big converts better than a
             # guard or wing of the same finishing rating.
