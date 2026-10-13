@@ -60,6 +60,8 @@ FOUL_SCALE = 1.45          # controls frequency of shooting fouls
 SLEEP = 1.2                    # base sleep between lines
 THREE_ATTEMPT_SCALE = 0.75     # global 3PA volume scaler
 DUNK_RATE_SCALE = 0.25       # lowers how often rim attempts become dunk attempts
+REBOUND_PUSH_SCALE = 0.36  # share of the old rebound-push chance that still runs
+HALF_COURT_POSSESSION_RANGE = (12, 22)  # seconds; was (12, 24) before transition volume was cut
 TRANSITION_FLAGRANT_RATE = 0.06  # very rare: portion of transition fouls upgraded
 TRANSITION_TAKE_FOUL_RATE = 0.20  # portion of transition fouls called as take fouls
 PLAYOFF_MODE = False            # tighter rotations, more physicality
@@ -11934,6 +11936,14 @@ def shot_skill_disparity_multiplier(rating: float, shot_type: str) -> float:
     return max(floor, 1.0 - (center - rating) * low_scale)
 
 
+def elite_rim_finisher(player: Player) -> bool:
+    """A big man whose finishing rating alone makes him a rim-finishing threat,
+    whether or not his usage/tendencies make him a featured post scorer. A
+    0.95+ finisher (Anthony Davis) was getting the ordinary-player rim
+    conversion just because he is a role-volume scorer."""
+    return player.height >= 80 and (player.rim_rating >= 0.90 or player.dunk_rating >= 0.90)
+
+
 def elite_interior_scorer(player: Player) -> bool:
     return (
         player.height >= 80
@@ -12010,14 +12020,19 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     elif shot_type == "rim":
         rating = compress_star_rating(effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim"))
         skill_rating = rating
-        elite_big_finish = elite_interior_scorer(shooter)
+        elite_big_finish = elite_interior_scorer(shooter) or elite_rim_finisher(shooter)
         elite_slash_finish = shooter.rim_rating >= 0.92 and (shooter.drive_tendency >= 0.18 or shooter.usage >= 0.28)
         if elite_big_finish:
-            defense_tax = 0.38
-            finish_base = 0.94
+            defense_tax = 0.32
+            finish_base = 1.00
         elif elite_slash_finish:
             defense_tax = 0.56
             finish_base = 0.85
+        elif shooter.height >= 80:
+            # Size at the rim: even a non-featured big converts better than a
+            # guard or wing of the same finishing rating.
+            defense_tax = 0.44
+            finish_base = 0.90
         else:
             # This bucket covers most of the league -- ordinary guards and
             # wings finishing at the rim, not dominant post players or elite
@@ -12037,10 +12052,14 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     elif shot_type == "dunk":
         rating = compress_star_rating(effective_rating(shooter.dunk_rating, shooter, team, opponent, period, period_time, "dunk"))
         skill_rating = rating
-        defense_tax = 0.42 if elite_interior_scorer(shooter) else 0.58
-        p = rating * (0.94 if elite_interior_scorer(shooter) else 0.88)
+        # Dunks were landing ~56-60% league-wide; a dunk is a finish at the rim
+        # with a running start, not a contested layup -- even a crowded one
+        # goes in most of the time.
+        elite_dunker = elite_interior_scorer(shooter) or elite_rim_finisher(shooter)
+        defense_tax = 0.30 if elite_dunker else 0.42
+        p = rating * (1.02 if elite_dunker else 0.98)
         p *= (1 - defense_tax * effective_interior_def(defender))
-        p = max(0.50 if elite_interior_scorer(shooter) else 0.45, p)
+        p = max(0.60 if elite_dunker else 0.54, p)
 
     elif shot_type == "post":
         rim = compress_star_rating(effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim"))
@@ -17652,7 +17671,10 @@ def should_push_after_rebound(rebounder: Player, team: Team, miss_kind: str,
         chance += 0.11
     if "transition_engine" in lead_handler.badges:
         chance += 0.10
-    return random.random() < max(0.08, min(0.42, chance))
+    # Teams were running off nearly every other defensive board (~13 pushes a
+    # game); most rebounds are walked up, only the real outlet pushes run.
+    chance = max(0.08, min(0.42, chance)) * REBOUND_PUSH_SCALE
+    return random.random() < chance
 
 
 def post_fade_attempt_chance(shooter: Player, defender: Player) -> float:
@@ -18082,7 +18104,7 @@ def simulate_possession(off: Team, dff: Team,
     if period >= 4 and 5 < period_time <= 24 and off.score < dff.score:
         return run_late_game_quick_possession(off, dff, period, period_time, teamA, teamB, matchups)
 
-    possession_time = random.randint(12, 24)
+    possession_time = random.randint(*HALF_COURT_POSSESSION_RANGE)
     pace = getattr(getattr(off, "coach_style", {}), "get", lambda *_: 1.0)("pace", 1.0)
     if pace > 1.0:
         possession_time = max(11, int(possession_time / pace))
