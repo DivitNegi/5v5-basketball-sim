@@ -13125,11 +13125,11 @@ def make_sixers_2027() -> Team:
         Player('Joel Embiid', 'C',
                0.25, 0.19, 0.19, 0.37, 0.57, 0.50,
                0.75, 0.90, 0.95, 0.89, 0.85,
-               0.15, 0.68, 0.70,
+               0.10, 0.68, 0.70,
                0.36, 0.73, 0.62, 0.90, 0.990, 0.600,
                0.68, 0.88,
                clutchness=0.80, height=84, speed=0.51,
-               shot_iq=0.67, archetype='big', stamina=0.56),
+               shot_iq=0.47, archetype='big', stamina=0.56),
         Player('Anfernee Simons', 'SG',
                0.58, 0.20, 0.17, 0.05, 0.20, 0.34,
                0.88, 0.80, 0.82, 0.74, 0.88,
@@ -13307,6 +13307,25 @@ def make_raptors_2027() -> Team:
                shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Toronto Raptors', players)
+    # Tendencies calibrated against 2025-26 real lines: Kawhi ~28 pts on ~19-20
+    # FGA with ~6 FTA and more midrange; Barrett ~19 pts / Quickley ~16 pts take
+    # a bigger share of the offense; Poeltl is a ~11 pt rim runner with no jumper.
+    for player in t.roster:
+        if player.name == 'Kawhi Leonard':
+            player.usage = 0.30
+            player.shot_tendency = 0.40
+            player.drive_tendency = 0.24
+            player.mid_tendency = 0.30
+        elif player.name == 'RJ Barrett':
+            player.usage = 0.31
+            player.shot_tendency = 0.47
+        elif player.name == 'Immanuel Quickley':
+            player.usage = 0.26
+            player.shot_tendency = 0.42
+        elif player.name == 'Jakob Poeltl':
+            player.shot_tendency = 0.16
+            player.mid_tendency = 0.14
+            player.drive_tendency = 0.26
     t.init_lineup()
     return t
 
@@ -13336,7 +13355,7 @@ def make_timberwolves_2027() -> Team:
                shot_iq=0.8, archetype='balanced', stamina=0.86,),
         Player('Jonathan Kuminga', 'SF',
                0.39, 0.12, 0.25, 0.24, 0.46, 0.33,
-               0.68, 0.78, 0.84, 0.81, 0.71,
+               0.75, 0.86, 0.90, 0.81, 0.71,
                0.23, 0.49, 0.60,
                0.40, 0.52, 0.57, 0.78, 0.933, 0.667,
                0.73, 0.73,
@@ -13355,7 +13374,7 @@ def make_timberwolves_2027() -> Team:
                0.050, 0.55, 0.92, 0.95, 0.52,
                0.13, 0.43, 0.53,
                0.41, 0.83, 0.91, 0.88, 0.600, 0.700,
-               0.65, 0.93,
+               0.65, 0.99,
                clutchness=0.66, height=85, speed=0.52,
                shot_iq=0.71, archetype='big', stamina=0.7),
         Player('Ayo Dosunmu', 'SF',
@@ -16241,6 +16260,13 @@ def make_suns_2027() -> Team:
                shot_iq=0.750, archetype='hustle guard', stamina=0.78),
     ]
     t = Team('2027 Phoenix Suns', players)
+    # Booker real 2025-26: 5.8 3PA / 18.7 FGA (31%), 8.1 FTA -- fewer threes,
+    # more drives/free throws than the old tendencies produced.
+    for player in t.roster:
+        if player.name == 'Devin Booker':
+            player.three_tendency = 0.38
+            player.drive_tendency = 0.33
+            player.mid_tendency = 0.36
     t.init_lineup()
     return t
 

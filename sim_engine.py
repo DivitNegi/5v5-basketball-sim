@@ -8691,9 +8691,9 @@ def _initialize_minute_targets_core(team: Team):
             "Allen Graves": (8, 14),
             "Immanuel Quickley": (30, 35),
             "RJ Barrett": (32, 36),
-            "Kawhi Leonard": (34, 38),
-            "Scottie Barnes": (34, 38),
-            "Jakob Poeltl": (28, 34),
+            "Kawhi Leonard": (31, 35),
+            "Scottie Barnes": (32, 36),
+            "Jakob Poeltl": (24, 29),
             "Collin Murray-Boyles": (18, 24),
             "Jamal Shead": (14, 20),
             "Ochai Agbaji": (14, 20),
@@ -8939,7 +8939,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Phoenix Suns":
         target_ranges = {
-            "Devin Booker": (32, 36), "Jalen Green": (20, 26),
+            "Devin Booker": (30, 34), "Jalen Green": (20, 26),
             "Dillon Brooks": (24, 29), "Miles Bridges": (20, 26),
             "Oso Ighodaro": (16, 22), "Collin Gillespie": (14, 20),
             "Mark Williams": (14, 20), "Luke Kennard": (12, 18),
