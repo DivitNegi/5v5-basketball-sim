@@ -22522,6 +22522,18 @@ def build_season_sections(entries: List[Dict],
     standings.sort(key=lambda row: (row["wins"], row["diff"], row["strength"]), reverse=True)
     for idx, row in enumerate(standings, start=1):
         row["seed"] = idx
+    # Conference seeds decide who is in the playoffs: only the top 8 in each
+    # conference are eligible for All-NBA (a star on a lottery team isn't).
+    conference_rank = {}
+    _seen_per_conf: Dict[str, int] = {}
+    for row in standings:
+        conf = row.get("conference", "-")
+        _seen_per_conf[conf] = _seen_per_conf.get(conf, 0) + 1
+        conference_rank[row["team"]] = _seen_per_conf[conf]
+    if "-" in _seen_per_conf and len(_seen_per_conf) == 1:
+        all_nba_eligible_teams = {row["team"] for row in standings[:16]}  # no conferences: top 16 overall
+    else:
+        all_nba_eligible_teams = {team for team, rank in conference_rank.items() if rank <= 8}
     all_players = [
         (team_name, name, stats)
         for team_name, players in series_totals.items()
@@ -22684,7 +22696,11 @@ def build_season_sections(entries: List[Dict],
         scorer = max(all_players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
         passer = max(all_players, key=lambda item: item[2].get("ast", 0) / max(1, item[2].get("games", 1)))
         defenders = sorted(all_players, key=defensive_score, reverse=True)
-        all_nba = sorted(all_players, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0), reverse=True)
+        all_nba = sorted(
+            [item for item in all_players if item[0] in all_nba_eligible_teams],
+            key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0),
+            reverse=True,
+        )
         dpoy = defenders[0]
         awards.append(("Season MVP", mvp[1], f"{mvp[0]} | {mvp[2].get('pts', 0) / max(1, mvp[2].get('games', 1)):.1f} PPG, {mvp[2].get('reb', 0) / max(1, mvp[2].get('games', 1)):.1f} RPG, {mvp[2].get('ast', 0) / max(1, mvp[2].get('games', 1)):.1f} APG"))
         awards.append(("DPOY", dpoy[1], f"{dpoy[0]} | {defense_stat_line(dpoy[0], dpoy[2])}"))
