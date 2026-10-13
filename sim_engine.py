@@ -12957,6 +12957,12 @@ def maybe_challenge_call(challenging_team: Team, call_text: str) -> bool:
     return overturned
 
 
+def is_guard_rim_finish(shooter: Player, shot_type: str) -> bool:
+    """Half-court rim/dunk attempts by PG/SG. These are only truly open off a
+    fastbreak or an ankle-breaker; otherwise the paint is crowded."""
+    return shot_type in ("rim", "dunk") and getattr(shooter, "position", "") in ("PG", "SG")
+
+
 def shot_quality(shooter: Player, defender: Player, shot_type: str, period: int, period_time: int) -> Tuple[str, float]:
     if is_paint_shot(shot_type):
         pressure = defender.interior_def
@@ -12986,6 +12992,10 @@ def shot_quality(shooter: Player, defender: Player, shot_type: str, period: int,
     if elite_handle and score >= 0.18:
         handle_bonus = max(0.0, shooter.ball_handle - 0.82) * 0.11
         return "wide open", 1.18 + handle_bonus + max(0.0, shooter.shot_iq - 0.84) * 0.035
+    if score >= 0.28 and is_guard_rim_finish(shooter, shot_type):
+        # Good handle or not, a guard attacking the rim in the half court still
+        # sees the help defense: lightly contested at best.
+        return "lightly contested", 0.97 + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.58 - shooter.shot_iq) * 0.02
     if score >= 0.28:
         handle_bonus = max(0.0, shooter.ball_handle - 0.82) * 0.10 if shot_type in ("three", "mid") else 0.0
         return "wide open", 1.18 + handle_bonus + max(0.0, shooter.shot_iq - 0.84) * 0.035
@@ -17490,6 +17500,11 @@ def run_fastbreak(def_team: Team, off_team: Team, period: int, period_time: int,
         if source == "steal":
             transition_floor += 0.03
         make_prob = max(make_prob, min(0.88, transition_floor))
+        if fastbreak_wide_open:
+            # Even a clear lane isn't automatic: wide-open layups go in ~87%,
+            # dunks ~93%, instead of the boosts stacking all the way to 100%.
+            open_cap = (0.90 + finisher.rim_rating * 0.05) if shot_type == "dunk" else (0.80 + finisher.rim_rating * 0.08)
+            make_prob = min(make_prob, open_cap)
     else:
         base_mid_floor = 0.54 if fastbreak_wide_open else 0.40
         make_prob = max(make_prob, min(0.68, base_mid_floor + effective_speed(finisher) * 0.08 + finisher.mid_rating * 0.06))
@@ -19102,8 +19117,18 @@ def simulate_possession(off: Team, dff: Team,
         print(random.choice(ankle_breaker_lines).format(shooter=shooter.name, defender=defender.name))
         time.sleep(SLEEP * 0.55)
 
+    ankle_breaker_rim = False
+    if (
+        not limitless_event and not ankle_breaker_open and is_guard_rim_finish(shooter, shot_type)
+        and random.random() < ankle_breaker_chance(shooter, defender, play_context) * 0.75
+    ):
+        ankle_breaker_rim = True
+        print(random.choice(ankle_breaker_lines).format(shooter=shooter.name, defender=defender.name))
+        print(f"{shooter.name} has a clear lane to the rim after the move.")
+        time.sleep(SLEEP * 0.55)
+
     double_teamed = False
-    if not combo_shot_described and not limitless_event and not ankle_breaker_open and should_double_team(shooter, defender, off, dff, period, period_time, shot_type):
+    if not combo_shot_described and not limitless_event and not ankle_breaker_open and not ankle_breaker_rim and should_double_team(shooter, defender, off, dff, period, period_time, shot_type):
         double_teamed = True
         doubled_player = shooter
         doubled_player.double_teams_faced += 1
@@ -19409,6 +19434,13 @@ def simulate_possession(off: Team, dff: Team,
     elif defensive_communication_error(off, dff, shooter, shot_type, play_context, period, period_time - possession_time):
         quality_label = "wide open"
         quality_mult = max(quality_mult, 1.16)
+    if is_guard_rim_finish(shooter, shot_type):
+        if ankle_breaker_rim:
+            quality_label = "wide open"
+            quality_mult = max(quality_mult, 1.20)
+        elif quality_label == "wide open":
+            quality_label = "lightly contested"
+            quality_mult = min(quality_mult, 1.0)
     creator_bonus = shot_creator_contested_bonus(shooter, quality_label, shot_type)
     if creator_bonus:
         shooter.shot_creator_quality_bonus = creator_bonus
@@ -20387,7 +20419,7 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
         # A real handle can break the defender's ankles and get a genuinely
         # wide-open look -- same mechanic (and same badge) as the main game.
         ankle_breaker_open = False
-        if shot_type in ("three", "mid") and random.random() < ankle_breaker_chance(shooter, defender, "iso"):
+        if shot_type in ("three", "mid", "rim", "dunk") and random.random() < ankle_breaker_chance(shooter, defender, "iso") * (0.75 if shot_type in ("rim", "dunk") else 1.0):
             ankle_breaker_open = True
             shooter.shot_quality_mult = getattr(shooter, "shot_quality_mult", 1.0) * 1.15
             print(random.choice(ankle_breaker_lines).format(shooter=shooter.name, defender=defender.name))
@@ -20417,6 +20449,8 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
         if ankle_breaker_open:
             if shot_type == "three":
                 print(f"{shooter.name} steps into the open three after the move.")
+            elif shot_type in ("rim", "dunk"):
+                print(f"{shooter.name} has a clear lane to the rim after the move.")
             else:
                 print(f"{shooter.name} rises into the open jumper after the shake.")
             time.sleep(SLEEP * 0.6)
