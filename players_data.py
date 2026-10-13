@@ -13816,9 +13816,9 @@ def make_mavs_2027() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player('Kyrie Irving', 'PG',
-               0.35, 0.34, 0.24, 0.50, 0.02, 0.440,
+               0.35, 0.34, 0.24, 0.50, 0.02, 0.330,
                0.920, 0.960, 0.990, 0.720, 0.900,
-               0.280, 0.60, 0.990,
+               0.330, 0.60, 0.990,
                0.75, 0.51, 0.43, 0.51, 0.500, 0.667,
                0.75, 0.40,
                clutchness=0.950,
