@@ -12044,8 +12044,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
             # correlated, team-wide bad shooting nights against good interior
             # defenses -- a bigger driver of unrealistic blowout margins than
             # any per-shot situational modifier.
-            defense_tax = 0.48
-            finish_base = 0.85
+            defense_tax = 0.46
+            finish_base = 0.92
         p = rating * finish_base
         p *= (1 - defense_tax * effective_interior_def(defender))
 
@@ -12280,8 +12280,16 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     # already floors open threes/mid shots -- should just go in. There's no
     # defender there to contest it; nothing downstream should still be able
     # to knock it below a make.
-    if shot_type in ("rim", "dunk") and quality_mult >= 1.08:
+    if shot_type == "dunk" and quality_mult >= 1.08:
         return 1.0
+    if shot_type == "rim" and quality_mult >= 1.08:
+        # An open layup is still a layup: real wide-open looks at the rim go
+        # in about 72-75% of the time, not every time.
+        open_layup = 0.48 + 0.28 * min(1.0, skill_rating)
+        open_layup -= max(0.0, effective_interior_def(defender) - 0.60) * 0.10
+        if elite_interior_scorer(shooter) or elite_rim_finisher(shooter):
+            open_layup += 0.03
+        return max(0.55, min(p, open_layup))
 
     if base_p > 0.001:
         situational_ratio = p / base_p
@@ -17543,7 +17551,7 @@ def run_fastbreak(def_team: Team, off_team: Team, period: int, period_time: int,
     finisher.shot_quality_mult = getattr(finisher, "shot_quality_mult", 1.0) * transition_boost
     make_prob = shot_make_prob(finisher, defender, shot_type, def_team, off_team, period, period_time)
     if shot_type in ("rim", "dunk"):
-        transition_floor = (0.72 if fastbreak_wide_open else 0.52) + effective_speed(finisher) * 0.10 + finisher.rim_rating * 0.05
+        transition_floor = (0.62 if fastbreak_wide_open else 0.52) + effective_speed(finisher) * 0.10 + finisher.rim_rating * 0.05
         if shot_type == "dunk":
             transition_floor += 0.04
         if source == "steal":
@@ -17552,7 +17560,7 @@ def run_fastbreak(def_team: Team, off_team: Team, period: int, period_time: int,
         if fastbreak_wide_open:
             # Even a clear lane isn't automatic: wide-open layups go in ~87%,
             # dunks ~93%, instead of the boosts stacking all the way to 100%.
-            open_cap = (0.90 + finisher.rim_rating * 0.05) if shot_type == "dunk" else (0.80 + finisher.rim_rating * 0.08)
+            open_cap = (0.90 + finisher.rim_rating * 0.05) if shot_type == "dunk" else (0.66 + finisher.rim_rating * 0.10)
             make_prob = min(make_prob, open_cap)
     else:
         base_mid_floor = 0.54 if fastbreak_wide_open else 0.40
@@ -17871,6 +17879,25 @@ def choose_shot_type(shooter: Player, defender: Player,
 
     if never_shoots_mid(shooter):
         raw_weights[1] = 0.0
+
+    if is_big and not shooter.ball_handle >= 0.84:
+        # Bigs work around the rim: the more of their game is drives, post-ups
+        # and dunks (vs jumpers), the more their shots come at the basket. A
+        # real stretch big (three tendency 0.34+ and a 0.76+ three) keeps his
+        # perimeter diet, just a little leaner on mid-range.
+        stretch_big = shooter.three_tendency >= 0.34 and shooter.three_rating >= 0.76
+        inside_lean = (shooter.drive_tendency + shooter.post_tendency + 0.5 * shooter.dunk_tendency) / max(
+            0.05, shooter.drive_tendency + shooter.post_tendency + 0.5 * shooter.dunk_tendency
+            + shooter.three_tendency + shooter.mid_tendency
+        )
+        if stretch_big:
+            raw_weights[1] *= 0.85
+            raw_weights[2] *= 1.10
+        else:
+            raw_weights[0] *= 0.88 - 0.10 * inside_lean
+            raw_weights[1] *= 0.80 - 0.10 * inside_lean
+            raw_weights[2] *= 1.20 + 0.35 * inside_lean
+            raw_weights[3] *= 1.12 + 0.25 * inside_lean
 
     scoring_ratings = {
         "three": shooter.three_rating,
