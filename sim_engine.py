@@ -16862,6 +16862,7 @@ SYSTEM_PLAYMAKERS = {
     "2027 Washington Wizards": "Trae Young",
     "2027 Miami Heat": "Davion Mitchell",
     "2027 Sacramento Kings": "Ben Simmons",
+    "2027 Philadelphia 76ers": "LeBron James",
 }
 
 
@@ -16990,6 +16991,25 @@ def choose_ballhandler(team: Team) -> Player:
                 * coach_handler_multiplier(team, p)
                 * fatigue_touch_multiplier(p)
                 * (2.0 if p.name == "Trae Young" else 1.0)
+                for p in preferred
+            ]
+            return random.choices(preferred, weights=weights, k=1)[0]
+
+    if team.name == "2027 Philadelphia 76ers":
+        lebron = player_by_name(team.on_floor, ("LeBron James",))
+        # LeBron runs Philadelphia's offense; Maxey and Brown are the finishers
+        # (Maxey mostly off the ball), so they initiate only some of the time.
+        if lebron is not None and not lebron.fouled_out and random.random() < 0.55:
+            return lebron
+        preferred = [p for p in team.on_floor if p.name in ("LeBron James", "Labaron Philon Jr.", "Tyrese Maxey", "Jaylen Brown", "Anfernee Simons")]
+        if preferred:
+            bias = {"LeBron James": 1.8, "Labaron Philon Jr.": 1.4, "Tyrese Maxey": 0.55, "Jaylen Brown": 0.40, "Anfernee Simons": 0.7}
+            weights = [
+                max(0.01, playmaking_hub_score(p) ** 1.50)
+                * assist_load_factor(p, team)
+                * coach_handler_multiplier(team, p)
+                * fatigue_touch_multiplier(p)
+                * bias.get(p.name, 1.0)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]

@@ -13189,21 +13189,30 @@ def make_sixers_2027() -> Team:
                shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Philadelphia 76ers', players)
-    # Brown is a scoring wing here, not a secondary point guard. Brown and
-    # Embiid are co-featured scorers -- explicit soft caps keep their shot
-    # volume balanced around ~20 attempts a game instead of Brown's higher
-    # shot_tendency exponent swallowing the offense while Embiid starves.
+    # Maxey, Brown and Embiid are the three co-featured scorers (~18 attempts
+    # each); LeBron runs the offense (see SYSTEM_PLAYMAKERS), so Maxey works
+    # mostly off the ball: catch-and-shoot, movement threes and cuts rather
+    # than dribble creation. Explicit targets keep the three balanced instead
+    # of one swallowing the offense while the others starve.
     for player in t.roster:
         if player.name == 'Jaylen Brown':
             player.playmaking = 0.48
             player.ball_handle = 0.70
-            player.usage = 0.29
-            player.shot_tendency = 0.52
-            player.target_fga_soft_cap = 20.0
+            player.usage = 0.38
+            player.shot_tendency = 0.62
+            player.target_fga_soft_cap = 18.5
         elif player.name == 'Joel Embiid':
-            player.usage = 0.32
-            player.shot_tendency = 0.54
-            player.target_fga_soft_cap = 20.0
+            player.usage = 0.43
+            player.shot_tendency = 0.63
+            player.target_fga_soft_cap = 18.5
+        elif player.name == 'Tyrese Maxey':
+            player.usage = 0.36
+            player.shot_tendency = 0.60
+            player.target_fga_soft_cap = 18.5
+            add_badge(player, 'catch_shoot', 'gold')
+            add_badge(player, 'movement_shooter', 'gold')
+        elif player.name in ('VJ Edgecombe', 'Kentavious Caldwell-Pope', 'Dean Wade', 'Anfernee Simons', 'Justin Edwards'):
+            player.shot_tendency = round(player.shot_tendency * 0.80, 3)
     t.init_lineup()
     return t
 
