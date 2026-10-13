@@ -5071,7 +5071,7 @@ def choose_coach_game_plan(team: Team, opponent: Team):
 
     if opponent_three >= 0.38:
         defensive_plan = "stay_home"
-    elif high_creation_star and style.get("coach_iq", 0.62) >= 0.78 and random.random() < 0.45:
+    elif high_creation_star and style.get("coach_iq", 0.62) >= 0.78 and random.random() < 0.35:
         defensive_plan = "show_recover"
     elif scoring_star_low_playmaking:
         defensive_plan = "blitz"
@@ -15276,7 +15276,7 @@ def hunt_mismatch(off: Team, dff: Team, matchups: Dict[Player, Player],
 
     _, _, scorer, defender = max(options, key=lambda item: (item[0], -item[1]))
     print(f"{off.name} hunt the matchup and bring {defender.name} into the action against {scorer.name}.")
-    if defender.name == getattr(off, "offensive_hunt_target", None) and random.random() < 0.45:
+    if defender.name == getattr(off, "offensive_hunt_target", None) and random.random() < 0.35:
         off.offensive_hunt_target = None
     time.sleep(SLEEP * 0.5)
     return scorer, defender
@@ -16999,7 +16999,7 @@ def choose_ballhandler(team: Team) -> Player:
         lebron = player_by_name(team.on_floor, ("LeBron James",))
         # LeBron runs Philadelphia's offense; Maxey and Brown are the finishers
         # (Maxey mostly off the ball), so they initiate only some of the time.
-        if lebron is not None and not lebron.fouled_out and random.random() < 0.55:
+        if lebron is not None and not lebron.fouled_out and random.random() < 0.35:
             return lebron
         preferred = [p for p in team.on_floor if p.name in ("LeBron James", "Labaron Philon Jr.", "Tyrese Maxey", "Jaylen Brown", "Anfernee Simons")]
         if preferred:
@@ -17225,7 +17225,19 @@ def immediate_catch_chance(passer: Player, base: float, slope: float = 0.44,
     return max(lo, min(hi, base + slope * passer.playmaking + bonus))
 
 
+ASSIST_CREDIT_SCALE = 1.32  # delayed (non-quick) finishes: league team assists were ~22.8/game vs ~26 real
+
+
 def assist_credit_chance(passer: Player, shooter: Player, shot_type: str,
+                         pnr_result: str | None = None,
+                         quick_shot: bool = True) -> float:
+    chance = _assist_credit_chance_core(passer, shooter, shot_type, pnr_result, quick_shot)
+    if quick_shot:
+        return chance
+    return min(0.97, chance * ASSIST_CREDIT_SCALE)
+
+
+def _assist_credit_chance_core(passer: Player, shooter: Player, shot_type: str,
                          pnr_result: str | None = None,
                          quick_shot: bool = True) -> float:
     # A direct pass into a shot IS an assist -- that isn't up for a
@@ -19221,7 +19233,7 @@ def simulate_possession(off: Team, dff: Team,
             and random.random() < min(0.86, (0.25 + 0.36 * three_pref) * THREE_ATTEMPT_SCALE)
         ):
             shot_type = "three"
-        elif shooter.rim_rating >= 0.86 and random.random() < 0.45:
+        elif shooter.rim_rating >= 0.86 and random.random() < 0.35:
             shot_type = "rim"
         else:
             shot_type = choose_shot_type(shooter, defender, off, dff, period, period_time)
