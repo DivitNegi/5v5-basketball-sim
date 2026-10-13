@@ -20,8 +20,7 @@ Originally a single ~43,000-line script; split into modules by concern:
 - **`gui_app.py`** — the primary Tkinter desktop GUI.
 - **`web_app.py`** — a secondary, browser-based GUI served over local HTTP
   (used as a fallback when Tkinter isn't available).
-- **`main.py`** — entry point; launches the GUI or an interactive terminal
-  menu.
+- **`main.py`** — entry point; running it opens the GUI.
 
 ### A note on the split
 
@@ -41,8 +40,7 @@ function is defined in.
 ## Running it
 
 ```bash
-python main.py --gui        # Tkinter desktop GUI
-python main.py               # interactive terminal menu (game, fantasy draft, playoffs, Olympic tournament, or GUI)
+python main.py               # opens the Tkinter desktop GUI
 ```
 
 Requires Python 3.10+. `Pillow` is optional (used for logo/headshot images
