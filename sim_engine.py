@@ -2468,7 +2468,7 @@ def maybe_dribble_chain_pass(off, dff, handler, shot_type: str,
     receiver_defender = matchups.get(receiver, random.choice(dff.on_floor))
     if receiver.three_tendency > 0 and receiver.three_rating >= 0.74 and random.random() < min(0.78, 0.28 + receiver.three_tendency * 0.72):
         next_shot_type = "three"
-    elif receiver.mid_rating >= receiver.rim_rating and receiver.mid_tendency > 0:
+    elif receiver.mid_rating >= receiver.rim_rating and receiver.mid_tendency > 0 and not never_shoots_mid(receiver):
         next_shot_type = "mid"
     else:
         next_shot_type = "rim"
@@ -15307,6 +15307,21 @@ def is_non_spacer(player: Player) -> bool:
     return player.three_tendency <= 0.10 and player.mid_tendency <= 0.10
 
 
+def never_shoots_mid(player: Player) -> bool:
+    """Players with essentially no mid-range game (a ~0.05 mid tendency, or a
+    mid rating around 0.50) don't take mid-range shots at all -- not as a
+    post fade, a pop, or a forced late look."""
+    return player.mid_tendency <= 0.06 or player.mid_rating <= 0.52
+
+
+def mid_range_replacement(player: Player) -> str:
+    if player.three_tendency >= 0.30 and player.three_rating >= 0.62 and random.random() < 0.5:
+        return "three"
+    if player.post_tendency > player.drive_tendency and player.height >= 78:
+        return "post"
+    return "rim"
+
+
 def catch_shoot_receiver_factor(player: Player) -> float:
     """
     Primary iso creators can still shoot off the catch, but the offense should
@@ -17678,7 +17693,7 @@ def should_push_after_rebound(rebounder: Player, team: Team, miss_kind: str,
 
 
 def post_fade_attempt_chance(shooter: Player, defender: Player) -> float:
-    if shooter.post_tendency <= 0 or shooter.mid_tendency <= 0:
+    if shooter.post_tendency <= 0 or shooter.mid_tendency <= 0 or never_shoots_mid(shooter):
         return 0.0
 
     post_size = 0.10 if shooter.height >= 78 else 0.0
@@ -17838,6 +17853,9 @@ def choose_shot_type(shooter: Player, defender: Player,
         raw_weights[1] *= 0.88
         if shooter.rim_rating >= 0.78:
             raw_weights[2] *= 1.06
+
+    if never_shoots_mid(shooter):
+        raw_weights[1] = 0.0
 
     scoring_ratings = {
         "three": shooter.three_rating,
@@ -19129,6 +19147,9 @@ def simulate_possession(off: Team, dff: Team,
                 getattr(shooter, "shot_quality_mult", 1.0)
                 * limitless_range_quality_multiplier(shooter, heat_check=limitless_event == "heat_check")
             )
+
+    if shot_type in ("mid", "post_fade") and never_shoots_mid(shooter):
+        shot_type = mid_range_replacement(shooter)
 
     ankle_breaker_open = False
     if not limitless_event and shot_type in ("three", "mid") and random.random() < ankle_breaker_chance(shooter, defender, play_context):
@@ -20440,6 +20461,9 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
 
         # A real handle can break the defender's ankles and get a genuinely
         # wide-open look -- same mechanic (and same badge) as the main game.
+        if shot_type in ("mid", "post_fade") and never_shoots_mid(shooter):
+            shot_type = mid_range_replacement(shooter)
+
         ankle_breaker_open = False
         if shot_type in ("three", "mid", "rim", "dunk") and random.random() < ankle_breaker_chance(shooter, defender, "iso") * (0.75 if shot_type in ("rim", "dunk") else 1.0):
             ankle_breaker_open = True
