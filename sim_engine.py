@@ -16755,6 +16755,7 @@ def isolation_shot_creation(shooter: Player, defender: Player) -> Tuple[str, flo
 SYSTEM_PLAYMAKERS = {
     "2027 Washington Wizards": "Trae Young",
     "2027 Miami Heat": "Davion Mitchell",
+    "2027 Sacramento Kings": "Ben Simmons",
 }
 
 
@@ -16883,6 +16884,25 @@ def choose_ballhandler(team: Team) -> Player:
                 * coach_handler_multiplier(team, p)
                 * fatigue_touch_multiplier(p)
                 * (2.0 if p.name == "Trae Young" else 1.0)
+                for p in preferred
+            ]
+            return random.choices(preferred, weights=weights, k=1)[0]
+
+    if team.name == "2027 Sacramento Kings":
+        simmons = player_by_name(team.on_floor, ("Ben Simmons",))
+        # Ben Simmons is Sacramento's point forward: he brings the ball up and
+        # runs the offense for Acuff, LaVine, Murray and Sabonis rather than
+        # scoring himself.
+        if simmons is not None and not simmons.fouled_out and random.random() < 0.58:
+            return simmons
+        preferred = [p for p in team.on_floor if p.name in ("Ben Simmons", "Darius Acuff Jr.", "Zach LaVine", "Domantas Sabonis")]
+        if preferred:
+            weights = [
+                max(0.01, playmaking_hub_score(p) ** 1.50)
+                * assist_load_factor(p, team)
+                * coach_handler_multiplier(team, p)
+                * fatigue_touch_multiplier(p)
+                * (1.8 if p.name == "Ben Simmons" else 1.0)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
