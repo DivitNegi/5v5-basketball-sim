@@ -58,10 +58,10 @@ except Exception:
 GAME_SECONDS = 48 * 60         # 48-minute game
 FOUL_SCALE = 1.45          # controls frequency of shooting fouls
 SLEEP = 1.2                    # base sleep between lines
-THREE_ATTEMPT_SCALE = 0.75     # global 3PA volume scaler
+THREE_ATTEMPT_SCALE = 0.88     # global 3PA volume scaler
 DUNK_RATE_SCALE = 0.25       # lowers how often rim attempts become dunk attempts
 REBOUND_PUSH_SCALE = 0.36  # share of the old rebound-push chance that still runs
-HALF_COURT_POSSESSION_RANGE = (12, 22)  # seconds; was (12, 24) before transition volume was cut
+HALF_COURT_POSSESSION_RANGE = (11, 22)  # seconds; was (12, 24) before transition volume was cut
 TRANSITION_FLAGRANT_RATE = 0.06  # very rare: portion of transition fouls upgraded
 TRANSITION_TAKE_FOUL_RATE = 0.20  # portion of transition fouls called as take fouls
 PLAYOFF_MODE = False            # tighter rotations, more physicality
@@ -11962,13 +11962,13 @@ def wide_open_jumper_floor(shooter: Player, shot_type: str, defender: Player | N
     defense_shave = max(0.0, effective_perimeter_def(defender) - 0.55) * 0.16 if defender is not None else 0.0
     if shot_type == "three":
         if shooter.three_rating >= 0.90:
-            floor = 0.58 + (shooter.three_rating - 0.90) * 0.95
+            floor = 0.55 + (shooter.three_rating - 0.90) * 0.95
             floor += max(0.0, shooter.shot_iq - 0.78) * 0.05
-            return min(0.70, floor) - defense_shave
+            return min(0.67, floor) - defense_shave
 
-        floor = 0.36 + max(0.0, shooter.three_rating - 0.70) * 0.36
+        floor = 0.33 + max(0.0, shooter.three_rating - 0.70) * 0.36
         floor += max(0.0, shooter.shot_iq - 0.78) * 0.025
-        return min(0.54, floor) - defense_shave
+        return min(0.51, floor) - defense_shave
 
     if shot_type == "mid":
         if shooter.mid_rating >= 0.90:
@@ -11976,9 +11976,9 @@ def wide_open_jumper_floor(shooter: Player, shot_type: str, defender: Player | N
             floor += max(0.0, shooter.shot_iq - 0.78) * 0.04
             return min(0.78, floor) - defense_shave
 
-        floor = 0.46 + max(0.0, shooter.mid_rating - 0.70) * 0.55
+        floor = 0.42 + max(0.0, shooter.mid_rating - 0.70) * 0.55
         floor += max(0.0, shooter.shot_iq - 0.78) * 0.035
-        return min(0.66, floor) - defense_shave
+        return min(0.62, floor) - defense_shave
 
     return 0.0
 
@@ -12008,14 +12008,14 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     if shot_type == "three":
         rating = compress_star_rating(effective_rating(shooter.three_rating, shooter, team, opponent, period, period_time, "three"))
         skill_rating = rating
-        p = rating * 0.66
-        p *= (1 - 0.58 * effective_perimeter_def(defender))
+        p = rating * 0.68
+        p *= (1 - 0.50 * effective_perimeter_def(defender))
 
     elif shot_type == "mid":
         rating = compress_star_rating(effective_rating(shooter.mid_rating, shooter, team, opponent, period, period_time, "mid"))
         skill_rating = rating
-        p = rating * 0.74
-        p *= (1 - 0.56 * effective_perimeter_def(defender))
+        p = rating * 0.78
+        p *= (1 - 0.52 * effective_perimeter_def(defender))
 
     elif shot_type == "rim":
         rating = compress_star_rating(effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim"))
@@ -12056,10 +12056,10 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         # with a running start, not a contested layup -- even a crowded one
         # goes in most of the time.
         elite_dunker = elite_interior_scorer(shooter) or elite_rim_finisher(shooter)
-        defense_tax = 0.30 if elite_dunker else 0.42
-        p = rating * (1.02 if elite_dunker else 0.98)
+        defense_tax = 0.20 if elite_dunker else 0.28
+        p = rating * (1.06 if elite_dunker else 1.02)
         p *= (1 - defense_tax * effective_interior_def(defender))
-        p = max(0.60 if elite_dunker else 0.54, p)
+        p = max(0.68 if elite_dunker else 0.62, p)
 
     elif shot_type == "post":
         rim = compress_star_rating(effective_rating(shooter.rim_rating, shooter, team, opponent, period, period_time, "rim"))
@@ -12070,7 +12070,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         # post-up's efficiency even accounting for contact and length down
         # low. Raised the finish base and eased the interior-defense tax.
         defense_tax = 0.34 if elite_interior_scorer(shooter) else 0.48
-        p = base * (0.98 if elite_interior_scorer(shooter) else 0.90)
+        p = base * (0.98 if elite_interior_scorer(shooter) else 0.95)
         p *= (1 - defense_tax * effective_interior_def(defender))
 
     elif shot_type == "post_fade":
@@ -12089,6 +12089,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         p = base * 0.76
         p *= (1 - 0.61 * effective_interior_def(defender))
 
+    final_dunk_floor = 0.0
     p *= shot_skill_disparity_multiplier(skill_rating, shot_type)
 
     # Baseline locked in purely from skill vs. matchup quality. Everything
@@ -12135,14 +12136,14 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
             # shooting) shouldn't ignore who's closing out -- a sharp,
             # engaged perimeter defender should still meaningfully cut into
             # it, not just the shooter's own touch.
-            good_look_bonus = max(0.55, good_look_bonus - effective_perimeter_def(defender) * 0.18)
+            good_look_bonus = max(0.50, good_look_bonus * 0.86 - effective_perimeter_def(defender) * 0.18)
         quality_mult = 1.0 + (quality_mult - 1.0) * good_look_bonus
     p *= quality_mult
     open_jumper_floor = wide_open_jumper_floor(shooter, shot_type, defender) if quality_mult >= 1.08 else 0.0
 
     if quality_mult < 0.97:
         if shot_type in ("three", "mid"):
-            p *= 1.0 - max(0.0, effective_perimeter_def(defender) - 0.55) * 0.16
+            p *= 1.0 - max(0.0, effective_perimeter_def(defender) - 0.55) * 0.08
         elif is_paint_shot(shot_type):
             p *= 1.0 - max(0.0, effective_interior_def(defender) - 0.55) * 0.18
 
@@ -12217,6 +12218,16 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     elif shot_type == "dunk":
         p *= 1.0 - 0.088 * height_tax * size
 
+    if shot_type == "dunk":
+        # Real dunks go in ~90% of the time, ~80% even when crowded: the
+        # situational penalties above can bend that but not flatten it.
+        dunk_floor = min(0.94, 0.68 + 0.30 * shooter.dunk_rating)
+        dunk_floor -= max(0.0, effective_interior_def(defender) - 0.80) * 0.20
+        if quality_mult < 0.90:
+            dunk_floor -= 0.04
+        final_dunk_floor = dunk_floor
+        p = max(p, dunk_floor)
+
     if shooter.shot_iq < 0.50:
         if shot_type in ("three", "mid"):
             p = min(p, 0.46 + shooter.shot_iq * 0.16)
@@ -12254,7 +12265,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         if open_jumper_floor:
             p *= 1.0 - max(0.0, contest - 0.82) * 0.02
         else:
-            p *= 1.0 - max(0.0, contest - 0.60) * 0.10
+            p *= 1.0 - max(0.0, contest - 0.60) * 0.05
     elif is_paint_shot(shot_type):
         contest = effective_interior_def(defender)
         if quality_mult >= 1.12:
@@ -12309,6 +12320,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     )
     dynamic_ceiling = min(0.97, 0.90 + ceiling_lift)
     dynamic_floor = max(0.02, 0.05 - floor_drag)
+    if final_dunk_floor:
+        p = max(p, final_dunk_floor)
     return max(dynamic_floor, min(dynamic_ceiling, p))
 
 
@@ -12673,6 +12686,8 @@ def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> floa
     if is_paint_shot(shot_type):
         p = 0.012 + 0.34 * block_skill * foul_trouble_defense_factor(defender)
         p *= 1.0 + max(0.0, effective_interior_def(defender) - 0.78) * 0.22
+        if shot_type == "dunk":
+            p *= 0.45  # a dunk is rarely rejected; most blocked "dunks" were layups
         if defender.block >= 0.97:
             p *= 1.12  # generational rim protector (99-block tier) separates from the 90s
     else:
@@ -13014,19 +13029,19 @@ def shot_quality(shooter: Player, defender: Player, shot_type: str, period: int,
     if score >= 0.28 and is_guard_rim_finish(shooter, shot_type):
         # Good handle or not, a guard attacking the rim in the half court still
         # sees the help defense: lightly contested at best.
-        return "lightly contested", 0.97 + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.58 - shooter.shot_iq) * 0.02
+        return "lightly contested", 0.99 + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.58 - shooter.shot_iq) * 0.02
     if score >= 0.28:
         handle_bonus = max(0.0, shooter.ball_handle - 0.82) * 0.10 if shot_type in ("three", "mid") else 0.0
         return "wide open", 1.18 + handle_bonus + max(0.0, shooter.shot_iq - 0.84) * 0.035
     if elite_handle and score >= -0.14:
         handle_bonus = max(0.0, shooter.ball_handle - 0.84) * 0.07
-        return "lightly contested", 0.97 + handle_bonus + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.58 - shooter.shot_iq) * 0.02
+        return "lightly contested", 0.99 + handle_bonus + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.58 - shooter.shot_iq) * 0.02
     if score >= 0.06:
         handle_bonus = max(0.0, shooter.ball_handle - 0.84) * 0.06 if shot_type in ("three", "mid") else 0.0
-        return "lightly contested", 0.97 + handle_bonus + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.58 - shooter.shot_iq) * 0.02
+        return "lightly contested", 0.99 + handle_bonus + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.58 - shooter.shot_iq) * 0.02
     if score <= -0.28:
-        return "smothered", 0.76 - max(0.0, 0.70 - shooter.shot_iq) * 0.08
-    return "tightly contested", 0.89 + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.60 - shooter.shot_iq) * 0.04
+        return "smothered", 0.80 - max(0.0, 0.70 - shooter.shot_iq) * 0.08
+    return "tightly contested", 0.92 + max(0.0, shooter.shot_iq - 0.84) * 0.01 - max(0.0, 0.60 - shooter.shot_iq) * 0.04
 
 
 def signature_move_line(player: Player, shot_type: str, context: str | None = None):
