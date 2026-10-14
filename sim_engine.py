@@ -12662,6 +12662,31 @@ def team_offball_gravity(team: Team, exclude: Player = None) -> float:
     return sum(player_perimeter_gravity(p) for p in teammates) / len(teammates)
 
 
+def team_support_look_bonus(shooter: Player, team: Team) -> float:
+    """
+    How much the rest of the floor helps this shooter get a clean look.
+
+    Centered on an ordinary supporting cast (so league averages don't move):
+    real spacing (defenders can't sag off shooters), a good passer who creates
+    catch-and-shoot chances, and a second scorer who makes help come off him all
+    add to the quality of his looks; a lone star surrounded by non-shooters and
+    non-creators gets fewer of them. Capped at +/-0.08 on the look score.
+    """
+    mates = [p for p in getattr(team, "on_floor", []) if p is not shooter]
+    if not mates:
+        return 0.0
+    spacing = team_offball_gravity(team, shooter)
+    best_passer = max(p.playmaking for p in mates)
+    usages = sorted((p.usage for p in mates), reverse=True)
+    second_scorer = usages[0] if usages else 0.20
+    bonus = (
+        0.35 * (spacing - 0.60)
+        + 0.18 * (best_passer - 0.70)
+        + 0.30 * (second_scorer - 0.20)
+    )
+    return max(-0.08, min(0.08, bonus))
+
+
 def paint_spacing_multiplier(team: Team, shooter: Player) -> float:
     spacing = team_offball_gravity(team, shooter)
     non_spacers = sum(1 for p in getattr(team, "on_floor", []) if p is not shooter and is_non_spacer(p))
@@ -13091,6 +13116,7 @@ def shot_quality(shooter: Player, defender: Player, shot_type: str, period: int,
     elif shot_type in ("rim", "dunk"):
         creation += handle_creation * 0.12
     score = creation - pressure * 1.08 - 0.12 * height_advantage(defender, shooter)
+    score += getattr(shooter, "_support_bonus", 0.0)  # teammates' spacing / passing / second scorer
     # Playmaking and handle make the creation, but a self-created jumper is
     # only a "good look" if the shooter can actually punish it: a great
     # passer with a so-so jumper doesn't get to be wide open all game.
@@ -19605,7 +19631,9 @@ def simulate_possession(off: Team, dff: Team,
             print_shot_attempt_sequence(shooter, shot_type, play_context or pnr_result)
     time.sleep(SLEEP * 0.8)
 
+    shooter._support_bonus = team_support_look_bonus(shooter, off)
     quality_label, quality_mult = shot_quality(shooter, defender, shot_type, period, period_time - possession_time)
+    shooter._support_bonus = 0.0
     if play_context == "double_wide_open":
         quality_label = "wide open"
         quality_mult = max(quality_mult, 1.20 + (catch_shoot_badge_quality_bonus(shooter) if shot_type in ("three", "mid") else 0.0))
