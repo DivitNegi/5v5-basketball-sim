@@ -22772,7 +22772,9 @@ def build_season_sections(entries: List[Dict],
         def standings_bonus(team_name: str, weight: float) -> float:
             return (team_win_pct.get(team_name, 0.5) - 0.5) * weight
 
-        mvp = max(all_players, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0))
+        # MVP comes from the playoff teams (top 8 in a conference), same pool as All-NBA.
+        mvp_pool = [item for item in all_players if item[0] in all_nba_eligible_teams] or all_players
+        mvp = max(mvp_pool, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0))
         scorer = max(all_players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
         passer = max(all_players, key=lambda item: item[2].get("ast", 0) / max(1, item[2].get("games", 1)))
         defenders = sorted(all_players, key=defensive_score, reverse=True)
@@ -22781,6 +22783,10 @@ def build_season_sections(entries: List[Dict],
             key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0),
             reverse=True,
         )
+        # The MVP is always on the All-NBA First Team (as its first name).
+        if mvp in all_nba:
+            all_nba.remove(mvp)
+        all_nba.insert(0, mvp)
         dpoy = defenders[0]
         awards.append(("Season MVP", mvp[1], f"{mvp[0]} | {mvp[2].get('pts', 0) / max(1, mvp[2].get('games', 1)):.1f} PPG, {mvp[2].get('reb', 0) / max(1, mvp[2].get('games', 1)):.1f} RPG, {mvp[2].get('ast', 0) / max(1, mvp[2].get('games', 1)):.1f} APG"))
         awards.append(("DPOY", dpoy[1], f"{dpoy[0]} | {defense_stat_line(dpoy[0], dpoy[2])}"))
