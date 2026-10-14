@@ -3100,6 +3100,13 @@ def run_gui_app():
         if champion:
             champion_label = champion.split(" ", 1)[1] if champion[:4].isdigit() else champion
             c.create_text(W / 2, fin + rh * 2 + 30, text=f"CHAMPIONS: {champion_label}", fill="#facc15", font=("Segoe UI", 16, "bold"))
+            finals_mvp = state.get("finals_mvp") or {}
+            if finals_mvp:
+                c.create_text(
+                    W / 2, fin + rh * 2 + 58,
+                    text=f"FINALS MVP: {finals_mvp.get('player', '')}  ({finals_mvp.get('line', '')})",
+                    fill="#e5e7eb", font=("Segoe UI", 13, "bold"),
+                )
         for lbl, x in (("First Round", col_x(0)), ("Semifinals", col_x(1)), ("Conf. Finals", col_x(2)), ("NBA Finals", col_x(3)),
                        ("Conf. Finals", col_x(4)), ("Semifinals", col_x(5)), ("First Round", col_x(6))):
             c.create_text(x + bw / 2, H - 14, text=lbl, fill="#64748b", font=("Segoe UI", 10))

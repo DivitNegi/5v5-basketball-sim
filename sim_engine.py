@@ -5546,6 +5546,11 @@ def add_player_to_series_totals(series_totals: Dict, team: Team):
         s["tpa"] += p.tpa
         s["ftm"] += p.ftm
         s["fta"] += p.fta
+        s["starts"] = s.get("starts", 0) + (1 if getattr(p, "is_starter", False) else 0)
+        clutch_bucket = s.setdefault("clutch_shot_diet", {})
+        for key, value in (getattr(p, "clutch_shot_diet", {}) or {}).items():
+            if isinstance(value, (int, float)):
+                clutch_bucket[key] = clutch_bucket.get(key, 0) + value
         for key, value in getattr(p, "shot_diet", {}).items():
             s["shot_diet"][key] = s["shot_diet"].get(key, 0) + value
         for q, q_diet in (getattr(p, "quarter_shot_diet", {}) or {}).items():
@@ -22851,6 +22856,42 @@ def build_season_sections(entries: List[Dict],
 
         awards_table.append({"award": "MVP", "player": mvp[1], "team": mvp[0], "stats": stat_line(mvp[0], mvp[2])})
         awards_table.append({"award": "DPOY", "player": dpoy[1], "team": dpoy[0], "stats": defense_stat_line(dpoy[0], dpoy[2])})
+
+        # Sixth Man: best player who comes off the bench (started under a third of
+        # his games, real minutes, enough games).
+        def started_share(stats: Dict) -> float:
+            return stats.get("starts", 0) / max(1, stats.get("games", 1))
+
+        bench_pool = [
+            item for item in all_players
+            if item[2].get("games", 0) >= 30
+            and started_share(item[2]) <= 0.34
+            and item[2].get("minutes", 0) / 60 / max(1, item[2].get("games", 1)) >= 14
+        ]
+        if bench_pool:
+            sixth = max(bench_pool, key=lambda item: series_player_score(item[2]) + standings_bonus(item[0], 4.0))
+            awards.append(("Sixth Man", sixth[1], f"{sixth[0]} | {sixth[2].get('pts', 0) / max(1, sixth[2].get('games', 1)):.1f} PPG, {sixth[2].get('reb', 0) / max(1, sixth[2].get('games', 1)):.1f} RPG, {sixth[2].get('ast', 0) / max(1, sixth[2].get('games', 1)):.1f} APG"))
+            awards_table.append({"award": "Sixth Man", "player": sixth[1], "team": sixth[0], "stats": stat_line(sixth[0], sixth[2])})
+
+        # Clutch Player: points scored in clutch time (4th quarter / OT, last 6
+        # minutes, within 10) from the field, with a real shooting floor.
+        def clutch_numbers(stats: Dict) -> Tuple[int, int, int]:
+            diet = stats.get("clutch_shot_diet", {}) or {}
+            made2 = sum(int(diet.get(f"{k}_made", 0) or 0) for k in ("rim", "dunk", "mid", "post", "post_fade"))
+            made3 = int(diet.get("three_made", 0) or 0)
+            att = sum(int(diet.get(k, 0) or 0) + int(diet.get(f"{k}_made", 0) or 0) for k in ("rim", "dunk", "mid", "post", "post_fade", "three"))
+            return 2 * made2 + 3 * made3, made2 + made3, att
+
+        clutch_rows = []
+        for item in all_players:
+            pts_c, made_c, att_c = clutch_numbers(item[2])
+            if att_c >= 25 and made_c / max(1, att_c) >= 0.42:
+                clutch_rows.append((pts_c + 0.6 * (made_c - 0.45 * att_c), pts_c, made_c, att_c, item))
+        if clutch_rows:
+            _score, pts_c, made_c, att_c, item = max(clutch_rows, key=lambda row: row[0])
+            clutch_text = f"{pts_c} clutch FG pts on {made_c}/{att_c} ({100 * made_c / max(1, att_c):.1f}%)"
+            awards.append(("Clutch Player", item[1], f"{item[0]} | {clutch_text}"))
+            awards_table.append({"award": "Clutch Player", "player": item[1], "team": item[0], "stats": f"{clutch_text} | {stat_line(item[0], item[2])}"})
         # Rookie of the Year / All-Rookie teams only make sense for the 2026 class in the 2027 season.
         rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026] if include_rookies else []
         all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams

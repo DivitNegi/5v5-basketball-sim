@@ -6927,11 +6927,26 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, c
     print_2027_bracket_state(rounds)
     champion = run_2027_playoff_series(conference_champions[0], conference_champions[1], factories, stage)
     rounds["Finals"]["NBA Finals"] = [(conference_champions[0], conference_champions[1], champion)]
+    finals_mvp = None
+    try:
+        finals_entry = (BRACKET_STATE.get("series") or {}).get(f"{conference_champions[0]}|{conference_champions[1]}") or {}
+        finals_players = (finals_entry.get("totals") or {}).get(champion, {})
+        if finals_players:
+            mvp_name, mvp_stats = max(finals_players.items(), key=lambda item: series_player_score(item[1]))
+            g = max(1, mvp_stats.get("games", 1))
+            finals_mvp = {
+                "player": mvp_name, "team": champion,
+                "line": f"{mvp_stats.get('pts', 0) / g:.1f} PTS, {mvp_stats.get('reb', 0) / g:.1f} REB, {mvp_stats.get('ast', 0) / g:.1f} AST",
+            }
+            print(f"FINALS MVP: {mvp_name} ({champion}) - {finals_mvp['line']}")
+            stage["lines"].append(f"FINALS MVP: {mvp_name} - {finals_mvp['line']}")
+    except Exception:
+        finals_mvp = None
     print_2027_bracket_state(rounds)
     print("\n" + "#" * 100)
     print(f"2027 PLAYOFF SIM CHAMPION: {champion}")
     print("#" * 100)
-    publish_bracket_state(champion=champion)
+    publish_bracket_state(champion=champion, finals_mvp=finals_mvp)
     stage["lines"].append(f"CHAMPION: {champion}")
     push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"], winner_name=champion)
 
