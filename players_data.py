@@ -16752,3 +16752,42 @@ def _build_fantasy_player_pools_uncached(year_prefix: str = None) -> Dict[str, L
 
     return pools
 
+
+
+# ---------------------------------------------------------------------------
+# 2016 teams: non-stretch bigs don't take mid-range jumpers.
+# Most 2016 bigs carried a default ~0.60 mid tendency even with no jumper
+# (Hollins, Capela, Biyombo, Adams...). Strip it from every C/PF without a real
+# three-point game, except the bigs who genuinely shoot the mid-range.
+# ---------------------------------------------------------------------------
+REAL_MID_RANGE_BIGS_2016 = {
+    "LaMarcus Aldridge", "David West", "Tim Duncan", "Zach Randolph", "Dirk Nowitzki",
+    "Blake Griffin", "Al Jefferson", "Amar'e Stoudemire", "David Lee", "Marc Gasol",
+    "Pau Gasol", "Kevin Garnett", "Chris Bosh",
+}
+
+
+def _is_non_stretch_big_2016(player) -> bool:
+    if player.position not in ("C", "PF"):
+        return False
+    return not (player.three_rating >= 0.60 and player.three_tendency >= 0.15)
+
+
+def _with_2016_big_mid_cleanup(factory):
+    import functools
+
+    @functools.wraps(factory)
+    def wrapped(*args, **kwargs):
+        team = factory(*args, **kwargs)
+        if isinstance(team, Team):
+            for p in team.roster:
+                if _is_non_stretch_big_2016(p) and p.name not in REAL_MID_RANGE_BIGS_2016:
+                    p.mid_tendency = 0.0
+        return team
+
+    return wrapped
+
+
+for _name, _fn in list(globals().items()):
+    if _name.startswith("make_") and _name.endswith("_2016") and callable(_fn):
+        globals()[_name] = _with_2016_big_mid_cleanup(_fn)

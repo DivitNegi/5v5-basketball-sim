@@ -15380,20 +15380,11 @@ def is_non_spacer(player: Player) -> bool:
     return player.three_tendency <= 0.10 and player.mid_tendency <= 0.10
 
 
-def is_non_stretch_big(player: Player) -> bool:
-    """A center / power forward who is not a stretch big: no real three-point
-    game (rating under 0.60 or tendency under 0.15)."""
-    if player.position not in ("C", "PF"):
-        return False
-    return not (player.three_rating >= 0.60 and player.three_tendency >= 0.15)
-
-
 def never_shoots_mid(player: Player) -> bool:
     """Players with essentially no mid-range game (a ~0.05 mid tendency, or a
     mid rating around 0.50) don't take mid-range shots at all -- not as a
-    post fade, a pop, or a forced late look. Non-stretch bigs don't take
-    mid-range jumpers either: they work the paint."""
-    return player.mid_tendency <= 0.06 or player.mid_rating <= 0.52 or is_non_stretch_big(player)
+    post fade, a pop, or a forced late look."""
+    return player.mid_tendency <= 0.06 or player.mid_rating <= 0.52
 
 
 def mid_range_replacement(player: Player) -> str:
