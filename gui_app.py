@@ -2877,7 +2877,7 @@ def run_gui_app():
                 tags=("section",),
             )
             team_sum = {key_: 0 for key_ in ("pts", "reb", "ast", "stl", "blk", "tov", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus", "minutes")}
-            for name, st in sorted(players.items(), key=lambda kv: -kv[1].get("minutes", 0)):
+            for name, st in sorted(players.items(), key=lambda kv: (-kv[1].get("pts", 0) / max(1, kv[1].get("games", 0)), -kv[1].get("minutes", 0))):
                 if st.get("games", 0) <= 0:
                     continue
                 g = max(1, st.get("games", 0))
