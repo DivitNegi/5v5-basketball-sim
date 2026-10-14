@@ -23369,10 +23369,10 @@ def run_fantasy_draft_and_game(year_prefix: str = None):
     run_fantasy_playoffs_from_season(standings)
 
 
-FANTASY_SEASON_DRAFT_ROUNDS = 10
+FANTASY_SEASON_DRAFT_ROUNDS = 12
 
 
-def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROUNDS):
+def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROUNDS, include_custom=None):
     """
     Snake fantasy draft for the season-and-playoffs fantasy modes.
 
@@ -23381,12 +23381,29 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
     (highest overall) version, with no version prompt. The draft slots are the
     current franchises (no year in the name). Returns
     (team_names, factories, user_team_name), or (None, None, None).
+
+    include_custom: whether user-created custom players are in the pool. None
+    asks (all-time draft only); the 2027-only draft never includes them.
     """
     from players_data import build_fantasy_player_pools, fantasy_team_factories
 
     pools = build_fantasy_player_pools(year_prefix)
+    has_custom = any(
+        getattr(pl, "source_team", "") == "Custom Player"
+        for pos_pool in pools.values() for pl, _desc in pos_pool
+    )
     if year_prefix:
-        # "2027 players only": user-created custom players are not 2027 players.
+        include_custom = False  # custom players are not 2027 players
+    elif include_custom is None and has_custom:
+        options = ["Exclude custom players", "Include custom players"]
+        if GUI_OPTION_PICKER is not None:
+            choice = GUI_OPTION_PICKER("Custom Players", "Add your custom players to the all-time draft pool?", options)
+            include_custom = choice == "Include custom players"
+        else:
+            include_custom = input("Include your custom players in the pool? (y/N): ").strip().lower().startswith("y")
+    if include_custom is None:
+        include_custom = True
+    if not include_custom:
         for pos in pools:
             pools[pos] = [(pl, desc) for pl, desc in pools[pos] if getattr(pl, "source_team", "") != "Custom Player"]
     franchise_names = sorted({
@@ -23411,7 +23428,9 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
     drafted_rosters: Dict[str, List[Player]] = {name: [] for name in team_order}
     taken_names: set = set()
 
-    pool_label = "2027 players only" if year_prefix else "all-time players (best version of each)"
+    pool_label = "2027 players only" if year_prefix else (
+        "all-time players (best version of each)" + (", custom players included" if include_custom else "")
+    )
     print("\n=== FANTASY DRAFT -> SEASON -> PLAYOFFS ===")
     print(f"Pool: {pool_label}. {len(team_order)} teams, {rounds} rounds, snake order, you pick first.")
     print("After the draft the 82-game season and the play-in / playoffs run automatically.")
