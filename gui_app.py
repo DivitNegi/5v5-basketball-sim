@@ -6362,8 +6362,8 @@ def run_gui_app():
             fantasy_dialog["win"] = dialog
             dialog.title("Fantasy Draft Board")
             dialog.configure(bg=APP_BG)
-            dialog.geometry(fantasy_picker_memory.get("geometry") or "1840x860")
-            dialog.minsize(1500, 680)
+            dialog.geometry(fantasy_picker_memory.get("geometry") or "2400x900")
+            dialog.minsize(1900, 700)
             dialog.columnconfigure(1, weight=0)
             dialog.transient(root)
             dialog.grab_set()
@@ -6399,8 +6399,8 @@ def run_gui_app():
             y_scroll = ttk.Scrollbar(board_frame, orient="vertical", command=tree.yview)
             tree.configure(yscrollcommand=y_scroll.set)
             widths = {
-                "name": 140, "team": 170, "pos": 56, "ovr": 64, "play": 74, "three": 74,
-                "mid": 74, "rim": 74, "pdef": 78, "idef": 78, "stl": 66, "blk": 66, "arch": 200,
+                "name": 230, "team": 170, "pos": 56, "ovr": 64, "play": 74, "three": 74,
+                "mid": 74, "rim": 74, "pdef": 78, "idef": 78, "stl": 66, "blk": 66, "arch": 130,
             }
             labels = {
                 "name": "Player", "team": "Team", "pos": "POS", "ovr": "OVR", "play": "PLAY",
@@ -6421,13 +6421,13 @@ def run_gui_app():
             for col, label, width in (
                 ("team", "Team", 220), ("pos", "POS", 56), ("ovr", "OVR", 64), ("play", "PLAY", 74),
                 ("three", "3PT", 74), ("mid", "MID", 74), ("rim", "RIM", 74), ("pdef", "PDEF", 78),
-                ("idef", "IDEF", 78), ("arch", "Archetype", 200),
+                ("idef", "IDEF", 78), ("arch", "Archetype", 130),
             ):
                 version_tree.heading(col, text=label)
                 version_tree.column(col, width=width, anchor="center" if col not in ("team", "arch") else "w", stretch=col in ("team", "arch"))
             version_tree.grid(row=1, column=0, sticky="ew", pady=(6, 0))
 
-            side = tk.Frame(dialog, bg=CARD, highlightthickness=1, highlightbackground=BORDER, padx=10, pady=10, width=520)
+            side = tk.Frame(dialog, bg=CARD, highlightthickness=1, highlightbackground=BORDER, padx=10, pady=10, width=1040)
             side.grid(row=2, column=1, rowspan=2, sticky="nsew", padx=(0, 14), pady=(0, 10))
             side.grid_propagate(False)
             side.columnconfigure(0, weight=1)
