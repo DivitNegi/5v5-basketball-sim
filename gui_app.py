@@ -8453,7 +8453,7 @@ def run_gui_app():
                     print("Season mode cancelled.")
             elif mode in FANTASY_SEASON_MODES:
                 # Draft (best version of each player), then straight into the
-                # 82-game season and the play-in / playoffs.
+                # 82-game season; the play-in / playoffs start on Next.
                 year_prefix = "2027 " if "2027" in mode else None
                 draft_names, draft_factories, draft_user_team = run_fantasy_season_draft(year_prefix)
                 if draft_names and draft_factories:
@@ -8466,9 +8466,8 @@ def run_gui_app():
                     postseason_state["standings"] = (fantasy_sections or {}).get("_season_standings")
                     postseason_state["factories"] = dict(draft_factories)
                     season_view["quiet"] = False
-                    scoreboard_status_var.set("Regular season complete. Play-in and playoffs starting...")
-                    status_var.set("Fantasy play-in and playoffs running...")
-                    run_2027_postseason(postseason_state["standings"], postseason_state["factories"])
+                    scoreboard_status_var.set("Regular season complete. Browse standings, schedule, averages, awards and highs, then press Next for the play-in and playoffs.")
+                    scoreboard_queue.put({"postseason_ready": True})
                 else:
                     print("Fantasy draft cancelled.")
             elif mode == "Fantasy draft season":

@@ -23558,7 +23558,7 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
     )
     print("\n=== FANTASY DRAFT -> SEASON -> PLAYOFFS ===")
     print(f"Pool: {pool_label}. {len(team_order)} teams, {rounds} rounds, snake order, you pick first.")
-    print("After the draft the 82-game season and the play-in / playoffs run automatically.")
+    print("After the draft the 82-game season runs automatically; press Next afterwards for the play-in and playoffs.")
 
     for round_num in range(1, rounds + 1):
         current_order = team_order if round_num % 2 == 1 else list(reversed(team_order))
