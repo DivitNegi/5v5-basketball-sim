@@ -6303,6 +6303,8 @@ def run_gui_app():
         )
         return selected if selected in options else player.position
 
+    fantasy_picker_memory = {"pos": "All", "search": "", "geometry": None}
+
     def gui_fantasy_picker(pools: Dict[str, List[Tuple[Player, str]]], taken_names: set):
         def stat_value(player: Player, key: str):
             if key == "name":
@@ -6337,8 +6339,9 @@ def run_gui_app():
             dialog = tk.Toplevel(root)
             dialog.title("Fantasy Draft Board")
             dialog.configure(bg=APP_BG)
-            dialog.geometry("1180x720")
-            dialog.minsize(980, 600)
+            dialog.geometry(fantasy_picker_memory.get("geometry") or "1560x780")
+            dialog.minsize(1180, 620)
+            dialog.columnconfigure(1, weight=0)
             dialog.transient(root)
             dialog.grab_set()
             dialog.columnconfigure(0, weight=1)
@@ -6346,21 +6349,21 @@ def run_gui_app():
             dialog.rowconfigure(4, weight=0)
 
             header = tk.Frame(dialog, bg=PANEL, highlightthickness=1, highlightbackground=BORDER_BRIGHT, padx=14, pady=10)
-            header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
+            header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=14, pady=(14, 8))
             header.columnconfigure(1, weight=1)
             tk.Label(header, text="Fantasy Draft Board", bg=PANEL, fg=GOLD, font=("Segoe UI", 18, "bold")).grid(row=0, column=0, sticky="w")
             status_var_dialog = tk.StringVar(value="Pick a player, choose a version if needed, then draft.")
             tk.Label(header, textvariable=status_var_dialog, bg=PANEL, fg=TEXT_SOFT, font=("Segoe UI", 11), anchor="e").grid(row=0, column=1, sticky="ew")
 
             filters = ttk.Frame(dialog)
-            filters.grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 8))
+            filters.grid(row=1, column=0, columnspan=2, sticky="ew", padx=14, pady=(0, 8))
             filters.columnconfigure(3, weight=1)
             tk.Label(filters, text="Position", bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11, "bold")).grid(row=0, column=0, padx=(0, 6))
-            pos_var = tk.StringVar(value="All")
+            pos_var = tk.StringVar(value=fantasy_picker_memory.get("pos", "All"))
             pos_dropdown = ttk.Combobox(filters, textvariable=pos_var, values=("All", "PG", "SG", "SF", "PF", "C"), state="readonly", width=10)
             pos_dropdown.grid(row=0, column=1, padx=(0, 14))
             tk.Label(filters, text="Search", bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11, "bold")).grid(row=0, column=2, padx=(0, 6))
-            search_var = tk.StringVar(value="")
+            search_var = tk.StringVar(value=fantasy_picker_memory.get("search", ""))
             search_entry = dark_entry(filters, textvariable=search_var)
             search_entry.grid(row=0, column=3, sticky="ew")
 
@@ -6401,8 +6404,62 @@ def run_gui_app():
                 version_tree.column(col, width=width, anchor="center" if col not in ("team", "arch") else "w", stretch=col in ("team", "arch"))
             version_tree.grid(row=1, column=0, sticky="ew", pady=(6, 0))
 
+            draft_state = getattr(sim_engine, "FANTASY_DRAFT_STATE", None) or {}
+            side = tk.Frame(dialog, bg=CARD, highlightthickness=1, highlightbackground=BORDER, padx=8, pady=8, width=400)
+            side.grid(row=2, column=1, rowspan=2, sticky="nsew", padx=(0, 14), pady=(0, 10))
+            side.grid_propagate(False)
+            side.columnconfigure(0, weight=1)
+            side.rowconfigure(3, weight=1)
+            side.rowconfigure(5, weight=3)
+            if draft_state:
+                clock_text = (
+                    f"Round {draft_state.get('round', 0)} of {draft_state.get('rounds', 0)}  |  "
+                    f"Pick {draft_state.get('pick_in_round', 0)} of {draft_state.get('teams', 0)}  |  "
+                    f"Overall {draft_state.get('overall', 0)} of {draft_state.get('total_picks', 0)}"
+                )
+                tk.Label(side, text="You are on the clock", bg=CARD, fg=GOLD, font=("Segoe UI", 12, "bold"), anchor="w").grid(row=0, column=0, sticky="ew")
+                tk.Label(side, text=clock_text, bg=CARD, fg=TEXT_SOFT, font=("Segoe UI", 10), anchor="w").grid(row=1, column=0, sticky="ew")
+                rosters_now = draft_state.get("rosters", {})
+                my_players = list(rosters_now.get(draft_state.get("user_team"), []))
+                tk.Label(side, text=f"Your team: {draft_state.get('user_team', '')} ({len(my_players)}/{draft_state.get('rounds', 0)})", bg=CARD, fg=GOLD, font=("Segoe UI", 12, "bold"), anchor="w").grid(row=2, column=0, sticky="ew", pady=(8, 0))
+                my_list = tk.Listbox(side, bg=PANEL_DARK, fg=TEXT, relief="flat", font=("Segoe UI", 10), activestyle="none", height=8)
+                for pl in my_players:
+                    my_list.insert("end", f"{pl.position:<3} {pl.name}  ({fantasy_ovr(pl)})")
+                my_list.grid(row=3, column=0, sticky="nsew", pady=(4, 6))
+                tk.Label(side, text="Draft log (snake: order reverses every round)", bg=CARD, fg=GOLD, font=("Segoe UI", 12, "bold"), anchor="w").grid(row=4, column=0, sticky="ew")
+                log_frame = tk.Frame(side, bg=CARD)
+                log_frame.grid(row=5, column=0, sticky="nsew", pady=(4, 0))
+                log_frame.columnconfigure(0, weight=1)
+                log_frame.rowconfigure(0, weight=1)
+                log_list = tk.Listbox(log_frame, bg=PANEL_DARK, fg=TEXT, relief="flat", font=("Consolas", 9), activestyle="none")
+                log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=log_list.yview)
+                log_list.configure(yscrollcommand=log_scroll.set)
+                log_list.grid(row=0, column=0, sticky="nsew")
+                log_scroll.grid(row=0, column=1, sticky="ns")
+                log_entries = list(draft_state.get("log", []))
+                for entry in log_entries:
+                    marker = ">" if entry.get("user") else " "
+                    log_list.insert(
+                        "end",
+                        f"{marker}R{entry['round']}.{entry['pick']:02d} {team_display_name(entry['team'])[:20]:<20} {entry['player']} ({entry['pos']}, {entry['ovr']})",
+                    )
+                    if entry.get("user"):
+                        log_list.itemconfig("end", fg=GOLD)
+                if log_entries:
+                    log_list.see("end")
+            else:
+                tk.Label(side, text="Draft log appears during the season fantasy drafts.", bg=CARD, fg=TEXT_SOFT, font=("Segoe UI", 10), anchor="w", wraplength=360, justify="left").grid(row=0, column=0, sticky="ew")
+
             selected_candidates = []
             selected_versions = []
+
+            def remember_board_state():
+                fantasy_picker_memory["pos"] = pos_var.get()
+                fantasy_picker_memory["search"] = search_var.get()
+                try:
+                    fantasy_picker_memory["geometry"] = dialog.geometry()
+                except Exception:
+                    pass
 
             def filtered_candidates():
                 pos = pos_var.get()
@@ -6478,6 +6535,7 @@ def run_gui_app():
                 if player is None:
                     status_var_dialog.set("Select a player first.")
                     return
+                remember_board_state()
                 result_queue.put(player)
                 dialog.destroy()
 
@@ -6486,7 +6544,7 @@ def run_gui_app():
                 dialog.destroy()
 
             button_frame = ttk.Frame(dialog)
-            button_frame.grid(row=4, column=0, sticky="ew", padx=14, pady=(0, 14))
+            button_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=14, pady=(0, 14))
             button_frame.columnconfigure(0, weight=1)
             button_frame.columnconfigure(1, weight=1)
             ttk.Button(button_frame, text="Draft Selected Player", command=draft_selected).grid(row=0, column=0, sticky="ew", padx=(0, 6))

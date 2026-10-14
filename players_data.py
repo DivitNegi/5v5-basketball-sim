@@ -4230,14 +4230,14 @@ def make_clippers_2014() -> Team:
         Player("Blake Griffin", "PF",
                       0.08, 0.34, 0.34, 0.24, 0.72, 0.420,
                       0.36, 0.86, 0.94, 0.98, 0.72,
-                      0.28, 0.72, 0.70,
+                      0.20, 0.72, 0.70,
                       0.66, 0.72, 0.78, 0.90, 0.667, 0.933,
                       0.70, 0.78,
                       clutchness=0.84, stamina=0.86),
         Player("DeAndre Jordan", "C",
                0.00, 0.02, 0.38, 0.60, 0.78, 0.240,
                0.05, 0.50, 0.92, 0.94, 0.44,
-               0.10, 0.22, 0.22,
+               0.18, 0.22, 0.22,
                0.38, 0.88, 0.93, 0.97, 0.733, 0.933,
                0.60, 0.73, stamina=0.84),
         Player("Jamal Crawford", "SG",
@@ -5895,7 +5895,7 @@ PLAYOFF_2016_RATING_ROSTERS = {
             0.360, 0.930, 0.930,
             0.480, 0.530, 0.360, 0.620, 0.990, 0.600,
             0.720, 0.640,
-            0.760, 77, ('clutch_silver', 'closer_silver', 'iso_scorer', 'shot_creator_gold'), 0.840, 0.88,
+            0.300, 77, ('clutch_silver', 'closer_silver', 'iso_scorer', 'shot_creator_gold'), 0.840, 0.88,
         ),
         (
             'Trevor Ariza', 'SF',
@@ -10269,11 +10269,11 @@ def make_mavs_2011() -> Team:
         Player("Shawn Marion", "SF",
                0.20, 0.28, 0.34, 0.18, 0.38, 0.240,
                0.70, 0.78, 0.86, 0.82, 0.74,
-               0.16, 0.42, 0.50,
+               0.20, 0.42, 0.50,
                0.90, 0.61, 0.58, 0.75, 0.600, 0.733,
                0.84, 0.80, stamina=0.72),
         Player("Dirk Nowitzki", "PF",
-               0.34, 0.46, 0.10, 0.10, 0.12, 0.540,
+               0.34, 0.46, 0.10, 0.10, 0.12, 0.240,
                0.90, 0.98, 0.98, 0.70, 0.90,
                0.22, 0.68, 0.72,
                0.63, 0.60, 0.79, 0.86, 0.990, 0.667,
@@ -16678,7 +16678,40 @@ def gui_team_factories() -> Dict[str, callable]:
             teams.setdefault(team.name, factory)
     return dict(sorted(teams.items()))
 
-def build_fantasy_player_pools(year_prefix: str = None) -> Dict[str, List[Tuple[Player, str]]]:
+_FANTASY_POOL_CACHE: Dict = {}
+
+
+def _fantasy_pool_signature():
+    import os
+    sig = []
+    for path in ("custom_players.json", "custom_roster_swaps.json"):
+        try:
+            sig.append(os.path.getmtime(os.path.join(os.path.dirname(os.path.abspath(__file__)), path)))
+        except OSError:
+            sig.append(0.0)
+    return tuple(sig)
+
+
+def build_fantasy_player_pools(year_prefix: str = None, use_cache: bool = False) -> Dict[str, List[Tuple[Player, str]]]:
+    """
+    Building the pool instantiates every team in the sim, which is slow for the
+    all-time pool. With use_cache=True it is reused until the custom player or
+    roster swap files change; each caller gets its own copy of the pool lists
+    (the player objects are shared, so only callers that never mutate drafted
+    players should opt in).
+    """
+    if not use_cache:
+        return _build_fantasy_player_pools_uncached(year_prefix)
+    key = (year_prefix, _fantasy_pool_signature())
+    cached = _FANTASY_POOL_CACHE.get(key)
+    if cached is None:
+        _FANTASY_POOL_CACHE.clear()
+        cached = _build_fantasy_player_pools_uncached(year_prefix)
+        _FANTASY_POOL_CACHE[key] = cached
+    return {pos: list(items) for pos, items in cached.items()}
+
+
+def _build_fantasy_player_pools_uncached(year_prefix: str = None) -> Dict[str, List[Tuple[Player, str]]]:
     """
     Fantasy draft pool across simulator teams.
     If the same player appears more than once, show him once on the board,

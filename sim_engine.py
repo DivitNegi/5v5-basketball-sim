@@ -21880,6 +21880,83 @@ def fantasy_team_need_score(candidate: Player, ai_players: List[Player]) -> floa
     return score
 
 
+FANTASY_POSITION_TARGETS = {"PG": 2, "SG": 2, "SF": 3, "PF": 2, "C": 2}  # a 12-man roster
+
+
+def fantasy_composition_need(candidate: Player, roster: List[Player]) -> float:
+    """
+    What this roster still lacks, scored for one candidate: position balance,
+    shooting / spacing, finishing at the rim, shot creation, rim protection,
+    perimeter defense and rebounding. Early picks are mostly talent; the more
+    players a team has, the more it drafts to fill holes.
+    """
+    n = len(roster)
+    score = 0.0
+    counts = fantasy_roster_counts(roster)
+    pos = candidate.position if candidate.position in counts else "SF"
+
+    # --- position balance (guards / wings / bigs)
+    if n >= 2:
+        shortage = max(0, FANTASY_POSITION_TARGETS[pos] - counts[pos]) / FANTASY_POSITION_TARGETS[pos]
+        score += 12.0 * shortage
+        if counts[pos] >= FANTASY_POSITION_TARGETS[pos] + 1:
+            score -= 10.0  # already stacked at the position
+    guards = counts["PG"] + counts["SG"]
+    bigs = counts["PF"] + counts["C"]
+    if n >= 4 and candidate.position in ("PG", "SG") and guards == 0:
+        score += 14.0
+    if n >= 4 and candidate.position in ("PF", "C") and bigs == 0:
+        score += 14.0
+
+    # --- shooting and spacing (target grows as the roster fills)
+    shooters = sum(1 for p in roster if p.three_rating >= 0.80 and p.three_tendency >= 0.25)
+    want_shooters = min(5, 1 + int(n * 0.45))
+    is_shooter = candidate.three_rating >= 0.80 and candidate.three_tendency >= 0.25
+    if is_shooter and shooters < want_shooters:
+        score += min(16.0, 6.0 * (want_shooters - shooters))
+    non_spacers = sum(1 for p in roster if p.three_rating < 0.50 and p.three_tendency < 0.15)
+    if non_spacers >= 2 and candidate.three_rating < 0.50 and candidate.three_tendency < 0.15:
+        score -= 12.0  # no third non-shooter in the rotation
+
+    # --- finishing at the rim / roll game
+    finishers = sum(
+        1 for p in roster
+        if (p.rim_rating >= 0.88 or p.dunk_rating >= 0.88) and (p.drive_tendency >= 0.20 or p.dunk_tendency >= 0.25 or p.post_tendency >= 0.25)
+    )
+    cand_finisher = (candidate.rim_rating >= 0.88 or candidate.dunk_rating >= 0.88) and (
+        candidate.drive_tendency >= 0.20 or candidate.dunk_tendency >= 0.25 or candidate.post_tendency >= 0.25
+    )
+    if cand_finisher and finishers < 3:
+        score += 6.0 * (3 - finishers)
+
+    # --- shot creation
+    creators = sum(1 for p in roster if p.playmaking >= 0.75 or p.ball_handle >= 0.82)
+    cand_creator = candidate.playmaking >= 0.75 or candidate.ball_handle >= 0.82
+    if cand_creator and creators < 2:
+        score += 9.0 * (2 - creators)
+    ball_dominant = sum(1 for p in roster if p.usage >= 0.30)
+    if ball_dominant >= 2 and candidate.usage >= 0.30 and n >= 3:
+        score -= 9.0  # one more usage-hog helps nobody
+
+    # --- defense and rebounding
+    anchors = sum(1 for p in roster if p.interior_def >= 0.80 or p.block >= 0.60)
+    if anchors < 1 and (candidate.interior_def >= 0.80 or candidate.block >= 0.60):
+        score += 11.0
+    elif anchors < 2 and (candidate.interior_def >= 0.84 or candidate.block >= 0.66):
+        score += 4.0
+    stoppers = sum(1 for p in roster if p.perimeter_def >= 0.78)
+    if stoppers < 2 and candidate.perimeter_def >= 0.78:
+        score += 5.0 * (2 - stoppers)
+    top = sorted(roster, key=fantasy_ovr, reverse=True)[:8]
+    if len(top) >= 5:
+        board_avg = sum(p.dreb + p.oreb for p in top) / len(top)
+        if board_avg < 0.95 and (candidate.dreb + candidate.oreb) >= 1.15:
+            score += 5.0
+
+    weight = min(1.0, 0.45 + 0.07 * n)
+    return score * weight
+
+
 def fantasy_counter_user_score(candidate: Player, user_players: List[Player]) -> float:
     if not user_players:
         return 0.0
@@ -21928,8 +22005,9 @@ def fantasy_ai_candidate_score(candidate: Player, ai_players: List[Player], user
         "Kevin Durant": 8,
     }
     score += draft_priority.get(candidate.name, 0)
-    score += fantasy_team_need_score(candidate, ai_players)
-    score += fantasy_counter_user_score(candidate, user_players) * 0.55
+    score += fantasy_team_need_score(candidate, ai_players) * 0.45
+    score += fantasy_composition_need(candidate, ai_players)
+    score += fantasy_counter_user_score(candidate, user_players) * 0.40
     score += candidate.clutchness * 4
     if ovr >= 98:
         score += 22
@@ -23276,13 +23354,46 @@ def fantasy_available_players(pools: Dict[str, List[Tuple[Player, str]]],
     return available
 
 
+_FANTASY_RANKED_CACHE: Dict = {"pools_id": None, "size": 0, "ranked": []}
+
+
+def fantasy_ranked_candidates(pools: Dict[str, List[Tuple[Player, str]]]) -> List[Player]:
+    """Every distinct player on the board, best overall first (cached per pool)."""
+    size = sum(len(v) for v in pools.values())
+    if _FANTASY_RANKED_CACHE["pools_id"] != id(pools) or _FANTASY_RANKED_CACHE["size"] != size:
+        seen = set()
+        players = []
+        for pool in pools.values():
+            for candidate, _desc in pool:
+                key = getattr(candidate, "fantasy_base_name", candidate.name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                players.append(candidate)
+        rated = sorted(((fantasy_ovr(pl), pl) for pl in players), key=lambda item: -item[0])
+        _FANTASY_RANKED_CACHE["pools_id"] = id(pools)
+        _FANTASY_RANKED_CACHE["size"] = size
+        _FANTASY_RANKED_CACHE["ranked"] = [pl for _ovr, pl in rated]
+    return _FANTASY_RANKED_CACHE["ranked"]
+
+
 def ai_pick_for_fantasy_team(pools: Dict[str, List[Tuple[Player, str]]],
                              taken_names: set,
                              team_players: List[Player],
                              user_players: List[Player]) -> Player:
     best_player = None
     best_score = -9999.0
-    for candidate in fantasy_available_players(pools, taken_names):
+    # Score only the best remaining players by overall (a wider net as the
+    # roster fills and role needs matter more); the rest can't win a pick.
+    shortlist_size = min(260, 60 + 16 * len(team_players))
+    shortlist = []
+    for candidate in fantasy_ranked_candidates(pools):
+        if getattr(candidate, "fantasy_base_name", candidate.name) in taken_names:
+            continue
+        shortlist.append(candidate)
+        if len(shortlist) >= shortlist_size:
+            break
+    for candidate in shortlist:
         score = fantasy_ai_candidate_score(candidate, team_players, user_players)
         score += random.uniform(-1.25, 1.25)
         if score > best_score:
@@ -23371,6 +23482,10 @@ def run_fantasy_draft_and_game(year_prefix: str = None):
 
 FANTASY_SEASON_DRAFT_ROUNDS = 12
 
+# Live draft state the GUI board reads: whose pick it is, the user's roster so
+# far, and a log of every pick (which team took which player).
+FANTASY_DRAFT_STATE: Dict = {}
+
 
 def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROUNDS, include_custom=None):
     """
@@ -23387,7 +23502,7 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
     """
     from players_data import build_fantasy_player_pools, fantasy_team_factories
 
-    pools = build_fantasy_player_pools(year_prefix)
+    pools = build_fantasy_player_pools(year_prefix, use_cache=True)
     has_custom = any(
         getattr(pl, "source_team", "") == "Custom Player"
         for pos_pool in pools.values() for pl, _desc in pos_pool
@@ -23427,7 +23542,17 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
     team_order = [user_team_name] + [name for name in franchise_names if name != user_team_name]
     drafted_rosters: Dict[str, List[Player]] = {name: [] for name in team_order}
     taken_names: set = set()
+    # A small pool (the 2027-only one has ~320 players) can't fill 12 rounds of
+    # 30 teams: use as many full rounds as there are players for.
+    pool_size = len(fantasy_available_players(pools, taken_names))
+    rounds = max(1, min(rounds, pool_size // len(team_order)))
 
+    FANTASY_DRAFT_STATE.clear()
+    FANTASY_DRAFT_STATE.update({
+        "user_team": user_team_name, "rosters": drafted_rosters, "log": [],
+        "round": 0, "rounds": rounds, "pick_in_round": 0, "teams": len(team_order),
+        "overall": 0, "total_picks": rounds * len(team_order),
+    })
     pool_label = "2027 players only" if year_prefix else (
         "all-time players (best version of each)" + (", custom players included" if include_custom else "")
     )
@@ -23441,7 +23566,11 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
         print("\n" + "=" * 80)
         print(f"FANTASY DRAFT ROUND {round_num} of {rounds}")
         print("=" * 80)
-        for team_name in current_order:
+        for pick_in_round, team_name in enumerate(current_order, start=1):
+            FANTASY_DRAFT_STATE["round"] = round_num
+            FANTASY_DRAFT_STATE["pick_in_round"] = pick_in_round
+            FANTASY_DRAFT_STATE["overall"] = (round_num - 1) * len(team_order) + pick_in_round
+            FANTASY_DRAFT_STATE["on_clock"] = team_name
             if team_name == user_team_name:
                 print(f"\n{user_team_name} are on the clock.")
                 picked = user_pick_from_pool(pools, taken_names)
@@ -23460,6 +23589,11 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
                 drafted_rosters[team_name].append(picked)
                 taken_names.add(getattr(picked, "fantasy_base_name", picked.name))
                 round_picks.append((team_name, picked))
+            FANTASY_DRAFT_STATE["log"].append({
+                "round": round_num, "pick": pick_in_round, "overall": FANTASY_DRAFT_STATE["overall"],
+                "team": team_name, "player": picked.name, "pos": picked.position, "ovr": fantasy_ovr(picked),
+                "user": team_name == user_team_name,
+            })
         print_fantasy_draft_round_summary(round_num, round_picks)
 
     print("\n=== DRAFT COMPLETE ===")
