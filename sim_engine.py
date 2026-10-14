@@ -5588,6 +5588,17 @@ def add_player_to_series_totals(series_totals: Dict, team: Team):
                 q[key] += row.get(key, 0)
 
 
+_OPP_PAIR_PENDING: Dict[int, Tuple[str, Dict, int]] = {}
+_OPP_KEYS = ("fgm", "fga", "tpm", "tpa", "ftm", "fta", "oreb", "dreb", "reb", "ast", "tov", "stl", "blk")
+
+
+def _add_opponent_totals(target: Dict, opp_totals: Dict, opp_score: int):
+    target["opp_games"] = target.get("opp_games", 0) + 1
+    target["opp_pts"] = target.get("opp_pts", 0) + opp_score
+    for key in _OPP_KEYS:
+        target["opp_" + key] = target.get("opp_" + key, 0) + opp_totals.get(key, 0)
+
+
 def add_team_to_series_totals(series_team_totals: Dict, team: Team):
     if team.name not in series_team_totals:
         series_team_totals[team.name] = {
@@ -5629,6 +5640,18 @@ def add_team_to_series_totals(series_team_totals: Dict, team: Team):
     s["tpa"] += totals["tpa"]
     s["ftm"] += totals["ftm"]
     s["fta"] += totals["fta"]
+
+    # Callers always add the two teams of a game back to back: pair them so each
+    # team also carries what its opponents did against it (opp_* totals), which
+    # the team advanced stats (DRtg, opponent eFG%, ...) need.
+    pending = _OPP_PAIR_PENDING.pop(id(series_team_totals), None)
+    if pending is None:
+        _OPP_PAIR_PENDING[id(series_team_totals)] = (team.name, totals, team.score)
+    else:
+        other_name, other_totals, other_score = pending
+        if other_name in series_team_totals and other_name != team.name:
+            _add_opponent_totals(series_team_totals[other_name], totals, team.score)
+            _add_opponent_totals(s, other_totals, other_score)
 
 
 def snapshot_team_box(team: Team) -> Dict:

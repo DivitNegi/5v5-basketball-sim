@@ -952,6 +952,8 @@ def run_gui_app():
             row_labels.append(value)
         team_stats_labels.append(row_labels)
 
+    STAT_SOURCES = ("Playoffs", "Season")
+    stat_source_var = tk.StringVar(value="Playoffs")
     series_tabs = ttk.Notebook(content_frame, width=600)
     series_tabs.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
     series_texts = {}
@@ -1212,7 +1214,11 @@ def run_gui_app():
     ttk.Checkbutton(
         advanced_filter_frame, text="Rank all players (no team headers)", variable=advanced_flat_var,
         command=lambda: refresh_advanced_dropdown(),
-    ).grid(row=0, column=4, sticky="w")
+    ).grid(row=0, column=4, sticky="w", padx=(0, 16))
+    ttk.Label(advanced_filter_frame, text="Show").grid(row=0, column=5, sticky="w", padx=(0, 8))
+    advanced_source_dropdown = ttk.Combobox(advanced_filter_frame, textvariable=stat_source_var, values=STAT_SOURCES, state="readonly", width=10)
+    advanced_source_dropdown.grid(row=0, column=6, sticky="w")
+    advanced_source_dropdown.bind("<<ComboboxSelected>>", lambda _e: on_stat_source_change())
     advanced_columns = ("team", "player", "mpg", "per", "ts", "efg", "3par", "ftr", "orb", "drb", "astp", "astpts", "stlp", "blkp", "tovp", "usg", "ws", "bpm", "vorp", "offimpact", "defimpact", "totalimpact", "plusminus", "dbltm")
     advanced_tree = ttk.Treeview(
         advanced_widget_frame,
@@ -1240,6 +1246,41 @@ def run_gui_app():
     advanced_scroll_x.grid(row=2, column=0, sticky="ew")
     advanced_tree.tag_configure("team", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
     series_tabs.add(advanced_widget_frame, text="Adv")
+
+    team_adv_frame = ttk.Frame(series_tabs, padding=(8, 8))
+    team_adv_frame.columnconfigure(0, weight=1)
+    team_adv_frame.rowconfigure(1, weight=1)
+    team_adv_top = ttk.Frame(team_adv_frame)
+    team_adv_top.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+    ttk.Label(team_adv_top, text="Show").grid(row=0, column=0, sticky="w", padx=(0, 8))
+    team_adv_source_dropdown = ttk.Combobox(team_adv_top, textvariable=stat_source_var, values=STAT_SOURCES, state="readonly", width=10)
+    team_adv_source_dropdown.grid(row=0, column=1, sticky="w", padx=(0, 16))
+    team_adv_source_dropdown.bind("<<ComboboxSelected>>", lambda _e: on_stat_source_change())
+    ttk.Label(team_adv_top, text="Rank by").grid(row=0, column=2, sticky="w", padx=(0, 8))
+    TEAM_ADV_SORTS = ("Net Rtg", "Off Rtg", "Def Rtg", "Pace", "eFG%", "TS%", "TOV%", "ORB%", "DRB%", "FTr", "3PAr", "AST%", "Opp eFG%", "Opp TOV%", "Win%")
+    team_adv_sort_var = tk.StringVar(value="Net Rtg")
+    team_adv_sort_dropdown = ttk.Combobox(team_adv_top, textvariable=team_adv_sort_var, values=TEAM_ADV_SORTS, state="readonly", width=12)
+    team_adv_sort_dropdown.grid(row=0, column=3, sticky="w")
+    team_adv_sort_dropdown.bind("<<ComboboxSelected>>", lambda _e: update_team_advanced_widgets(playoff_sections_state.get("sections") or {}))
+    team_adv_columns = ("rank", "team", "gp", "w", "l", "pts", "opp", "ortg", "drtg", "net", "pace", "efg", "ts", "tov", "orb", "drb", "ftr", "tpar", "ast", "oefg", "ots", "otov", "oorb")
+    team_adv_tree = ttk.Treeview(team_adv_frame, columns=team_adv_columns, show="headings", height=14, style="Series.Treeview")
+    team_adv_scroll_y = ttk.Scrollbar(team_adv_frame, orient="vertical", command=team_adv_tree.yview)
+    team_adv_scroll_x = ttk.Scrollbar(team_adv_frame, orient="horizontal", command=team_adv_tree.xview)
+    team_adv_tree.configure(yscrollcommand=team_adv_scroll_y.set, xscrollcommand=team_adv_scroll_x.set)
+    for col, label, width in (
+        ("rank", "#", 40), ("team", "Team", 190), ("gp", "GP", 48), ("w", "W", 44), ("l", "L", 44),
+        ("pts", "PTS", 60), ("opp", "OPP", 60), ("ortg", "OFF RTG", 80), ("drtg", "DEF RTG", 80), ("net", "NET", 66),
+        ("pace", "PACE", 62), ("efg", "eFG%", 62), ("ts", "TS%", 62), ("tov", "TOV%", 62), ("orb", "ORB%", 62),
+        ("drb", "DRB%", 62), ("ftr", "FTr", 58), ("tpar", "3PAr", 58), ("ast", "AST%", 62),
+        ("oefg", "OPP eFG%", 84), ("ots", "OPP TS%", 80), ("otov", "OPP TOV%", 84), ("oorb", "OPP ORB%", 84),
+    ):
+        team_adv_tree.heading(col, text=label)
+        width = int(round(width * 1.25))
+        team_adv_tree.column(col, width=width, minwidth=width, anchor="center" if col != "team" else "w", stretch=False)
+    team_adv_tree.grid(row=1, column=0, sticky="nsew")
+    team_adv_scroll_y.grid(row=1, column=1, sticky="ns")
+    team_adv_scroll_x.grid(row=2, column=0, sticky="ew")
+    series_tabs.add(team_adv_frame, text="TAdv")
 
     shot_defense_widget_frame = ttk.Frame(series_tabs, padding=(8, 8))
     shot_defense_widget_frame.columnconfigure(0, weight=1)
@@ -1330,7 +1371,11 @@ def run_gui_app():
         shot_defense_filter_frame, textvariable=shot_rank_def_min_var, width=6,
         bg=CARD_ALT, fg=TEXT, insertbackground=TEXT, relief="flat", font=("Segoe UI", 12),
     )
-    shot_rank_def_min_entry.grid(row=0, column=18, sticky="w")
+    shot_rank_def_min_entry.grid(row=0, column=18, sticky="w", padx=(0, 16))
+    tk.Label(shot_defense_filter_frame, text="Show", bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 12, "bold")).grid(row=0, column=19, sticky="w", padx=(0, 8))
+    shot_source_dropdown = ttk.Combobox(shot_defense_filter_frame, textvariable=stat_source_var, values=STAT_SOURCES, state="readonly", width=10)
+    shot_source_dropdown.grid(row=0, column=20, sticky="w")
+    shot_source_dropdown.bind("<<ComboboxSelected>>", lambda _e: on_stat_source_change())
     shot_columns = ("team", "player", "3p", "open3", "cont3", "mid", "openmid", "contmid", "rim", "openrim", "contrim", "post", "dunk", "cs", "iso", "putb", "open", "cont", "sq", "total")
     shot_tree = ttk.Treeview(
         shot_defense_widget_frame,
@@ -1484,7 +1529,11 @@ def run_gui_app():
                         "AST/TOV", "STL/TOV", "PTS/48", "REB/48", "AST/48", "STL/48", "BLK/48")
     series_avg_rank_var = tk.StringVar(value="Team order")
     series_avg_rank_dropdown = ttk.Combobox(series_avg_top, textvariable=series_avg_rank_var, values=AVG_RANK_OPTIONS, state="readonly", width=12)
-    series_avg_rank_dropdown.grid(row=0, column=5, sticky="w")
+    series_avg_rank_dropdown.grid(row=0, column=5, sticky="w", padx=(0, 16))
+    ttk.Label(series_avg_top, text="Show").grid(row=0, column=6, sticky="w", padx=(0, 8))
+    series_avg_source_dropdown = ttk.Combobox(series_avg_top, textvariable=stat_source_var, values=STAT_SOURCES, state="readonly", width=10)
+    series_avg_source_dropdown.grid(row=0, column=7, sticky="w")
+    series_avg_source_dropdown.bind("<<ComboboxSelected>>", lambda _e: on_stat_source_change())
     series_avg_columns = ("team", "player", "gp", "min", "pts", "reb", "orb", "ast", "stl", "blk", "tov", "fg", "fgp", "tp", "tpp", "ft", "ftp", "ts", "plusminus")
     series_avg_tree = ttk.Treeview(
         series_avg_widget_frame,
@@ -3227,12 +3276,109 @@ def run_gui_app():
         previous = playoff_sections_state.get("sections") or {}
         if "_season_standings" in previous and "_season_standings" not in sections and "_season_player_totals" not in sections:
             for season_key in ("_season_standings", "_season_awards_table", "_season_awards", "_season_game_log",
-                               "_season_game_log_fields", "_season_game_extras", "_season_games"):
+                               "_season_game_log_fields", "_season_game_extras", "_season_games",
+                               "_season_player_totals", "_season_team_totals"):
                 if season_key in previous:
                     sections[season_key] = previous[season_key]
         playoff_sections_state["sections"] = sections
         playoff_sections_state["revision"] += 1
         update_extra_gui_tabs()
+
+    def stat_totals_for_source(sections: Dict):
+        """(player totals, team totals, label) for the Season / Playoffs dropdown.
+
+        Season data comes from the completed regular season; playoff data from
+        the playoff running totals. With only one of them available that one is
+        shown, whatever the dropdown says."""
+        season_p = sections.get("_season_player_totals") or {}
+        season_t = sections.get("_season_team_totals") or {}
+        playoff_p = sections.get("_playoff_player_totals") or {}
+        playoff_t = sections.get("_playoff_team_totals") or {}
+        series_p = sections.get("_series_totals") or {}
+        series_t = sections.get("_series_team_totals") or {}
+        if not playoff_p and series_p and series_p is not season_p:
+            playoff_p, playoff_t = series_p, series_t  # a series / game-mode push
+        if not season_p and not playoff_p:
+            return series_p, series_t, "Series"
+        choice = stat_source_var.get()
+        if choice == "Season" and season_p:
+            return season_p, season_t, "Season"
+        if choice != "Season" and playoff_p:
+            return playoff_p, playoff_t, "Playoffs"
+        if season_p:
+            return season_p, season_t, "Season"
+        return playoff_p, playoff_t, "Playoffs"
+
+    def on_stat_source_change():
+        update_extra_gui_tabs._last_section_signature = None
+        update_extra_gui_tabs()
+
+    def team_advanced_row(team: Dict):
+        gp = max(1, team.get("games", 0))
+        fga, fta, fgm, tpm, tpa = team.get("fga", 0), team.get("fta", 0), team.get("fgm", 0), team.get("tpm", 0), team.get("tpa", 0)
+        pts, oreb, dreb, tov, ast = team.get("pts", 0), team.get("oreb", 0), team.get("dreb", 0), team.get("tov", 0), team.get("ast", 0)
+        poss = fga - oreb + tov + 0.44 * fta
+        row = {"gp": gp, "w": team.get("wins", 0), "l": team.get("games", 0) - team.get("wins", 0)}
+        row["pts"] = pts / gp
+        row["poss"] = poss
+        row["efg"] = 100 * (fgm + 0.5 * tpm) / max(1, fga)
+        row["ts"] = 100 * pts / max(1.0, 2 * (fga + 0.44 * fta))
+        row["tov"] = 100 * tov / max(1.0, poss)
+        row["ftr"] = fta / max(1, fga)
+        row["tpar"] = tpa / max(1, fga)
+        row["ast"] = 100 * ast / max(1, fgm)
+        row["win"] = 100 * row["w"] / gp
+        row["pace"] = poss / gp
+        row["ortg"] = 100 * pts / max(1.0, poss)
+        have_opp = team.get("opp_games", 0) > 0
+        if have_opp:
+            o_fga, o_fta, o_fgm, o_tpm = team.get("opp_fga", 0), team.get("opp_fta", 0), team.get("opp_fgm", 0), team.get("opp_tpm", 0)
+            o_oreb, o_dreb, o_tov, o_pts = team.get("opp_oreb", 0), team.get("opp_dreb", 0), team.get("opp_tov", 0), team.get("opp_pts", 0)
+            o_poss = o_fga - o_oreb + o_tov + 0.44 * o_fta
+            avg_poss = (poss + o_poss) / 2
+            row["pace"] = avg_poss / gp
+            row["opp"] = o_pts / gp
+            row["ortg"] = 100 * pts / max(1.0, avg_poss)
+            row["drtg"] = 100 * o_pts / max(1.0, avg_poss)
+            row["net"] = row["ortg"] - row["drtg"]
+            row["orb"] = 100 * oreb / max(1, oreb + o_dreb)
+            row["drb"] = 100 * dreb / max(1, dreb + o_oreb)
+            row["oefg"] = 100 * (o_fgm + 0.5 * o_tpm) / max(1, o_fga)
+            row["ots"] = 100 * o_pts / max(1.0, 2 * (o_fga + 0.44 * o_fta))
+            row["otov"] = 100 * o_tov / max(1.0, o_poss)
+            row["oorb"] = 100 * o_oreb / max(1, o_oreb + dreb)
+        return row
+
+    def update_team_advanced_widgets(sections: Dict):
+        _players, team_totals, label = stat_totals_for_source(sections)
+        team_adv_tree.delete(*team_adv_tree.get_children())
+        if not team_totals:
+            team_adv_tree.insert("", "end", values=("", "Team advanced stats appear once games have been played.") + ("",) * (len(team_adv_columns) - 2))
+            return
+        rows = []
+        for name, totals in team_totals.items():
+            if totals.get("games", 0) <= 0:
+                continue
+            rows.append((name, team_advanced_row(totals)))
+        sort_key = {
+            "Net Rtg": "net", "Off Rtg": "ortg", "Def Rtg": "drtg", "Pace": "pace", "eFG%": "efg", "TS%": "ts",
+            "TOV%": "tov", "ORB%": "orb", "DRB%": "drb", "FTr": "ftr", "3PAr": "tpar", "AST%": "ast",
+            "Opp eFG%": "oefg", "Opp TOV%": "otov", "Win%": "win",
+        }.get(team_adv_sort_var.get(), "net")
+        low_is_better = sort_key in ("drtg", "tov", "oefg")  # defense / ball security: lower ranks higher
+        rows.sort(key=lambda item: item[1].get(sort_key, 0.0), reverse=not low_is_better)
+
+        def fmt(row, key, spec="{:.1f}"):
+            return spec.format(row[key]) if key in row else "-"
+
+        for rank, (name, row) in enumerate(rows, start=1):
+            team_adv_tree.insert("", "end", values=(
+                rank, team_display_name(name), row["gp"], row["w"], row["l"], f"{row['pts']:.1f}", fmt(row, "opp"),
+                fmt(row, "ortg"), fmt(row, "drtg"), fmt(row, "net", "{:+.1f}"), f"{row['pace']:.1f}",
+                f"{row['efg']:.1f}", f"{row['ts']:.1f}", f"{row['tov']:.1f}", fmt(row, "orb"), fmt(row, "drb"),
+                f"{row['ftr']:.2f}", f"{row['tpar']:.2f}", f"{row['ast']:.1f}",
+                fmt(row, "oefg"), fmt(row, "ots"), fmt(row, "otov"), fmt(row, "oorb"),
+            ))
 
     def series_ts_value(stats: Dict) -> float:
         denom = 2 * (stats.get("fga", 0) + 0.44 * stats.get("fta", 0))
@@ -3283,8 +3429,7 @@ def run_gui_app():
         return row.get("minutes", 0.0)
 
     def update_advanced_widgets(sections: Dict):
-        series_totals = sections.get("_season_player_totals") or sections.get("_series_totals") or sections.get("_playoff_player_totals") or {}
-        series_team_totals = sections.get("_season_team_totals") or sections.get("_series_team_totals") or sections.get("_playoff_team_totals") or {}
+        series_totals, series_team_totals, _source_label = stat_totals_for_source(sections)
         teams = ["All Teams"] + list(series_team_totals.keys() or series_totals.keys())
         current_team = advanced_team_var.get()
         advanced_team_dropdown.configure(values=teams or ("All Teams",))
@@ -3447,12 +3592,12 @@ def run_gui_app():
 
     def game_diet_totals(sections: Dict, selected: str, kind: str, quarter: str = "All Quarters") -> Dict:
         if selected == "All Games":
-            totals = sections.get("_season_player_totals") or sections.get("_series_totals") or live_diet_totals()
+            totals = stat_totals_for_source(sections)[0] or live_diet_totals()
             return apply_quarter_filter(totals, quarter)
         try:
             game_num = int(selected.replace("Game", "").strip())
         except ValueError:
-            return apply_quarter_filter(sections.get("_season_player_totals") or sections.get("_series_totals") or live_diet_totals(), quarter)
+            return apply_quarter_filter(stat_totals_for_source(sections)[0] or live_diet_totals(), quarter)
         for game in sections.get("_game_logs", []) or []:
             if game.get("game_num") != game_num:
                 continue
@@ -3469,7 +3614,7 @@ def run_gui_app():
                     }
                 totals[team.get("name", "")] = team_bucket
             return apply_quarter_filter(totals, quarter)
-        return apply_quarter_filter(sections.get("_season_player_totals") or sections.get("_series_totals") or live_diet_totals(), quarter)
+        return apply_quarter_filter(stat_totals_for_source(sections)[0] or live_diet_totals(), quarter)
 
     def filter_diet_totals_by_team(totals: Dict, selected_team: str) -> Dict:
         if selected_team == "All Teams":
@@ -3818,8 +3963,7 @@ def run_gui_app():
         return totals
 
     def update_series_average_widgets(sections: Dict):
-        series_totals = sections.get("_season_player_totals") or sections.get("_series_totals") or {}
-        series_team_totals = sections.get("_season_team_totals") or sections.get("_series_team_totals") or {}
+        series_totals, series_team_totals, _source_label = stat_totals_for_source(sections)
         teams = ["All Teams"] + list(series_team_totals.keys())
         current = series_avg_team_var.get()
         series_avg_team_dropdown.configure(values=teams or ("All Teams",))
@@ -4051,8 +4195,7 @@ def run_gui_app():
 
     def refresh_series_average_dropdown(_event=None):
         sections = playoff_sections_state.get("sections") or {}
-        series_totals = sections.get("_season_player_totals") or sections.get("_series_totals") or {}
-        series_team_totals = sections.get("_season_team_totals") or sections.get("_series_team_totals") or {}
+        series_totals, series_team_totals, _source_label = stat_totals_for_source(sections)
         insert_average_rows(series_avg_tree, series_totals, series_team_totals, series_avg_team_var.get(), selected_average_period(), series_avg_rank_var.get())
 
     def refresh_advanced_dropdown(_event=None):
@@ -5877,7 +6020,7 @@ def run_gui_app():
         except Exception:
             return
         sections = playoff_sections_state.get("sections") or {}
-        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "Shots", "Avg", "Award", "Season", "Highs", "Sched"}
+        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "TAdv", "Shots", "Avg", "Award", "Season", "Highs", "Sched"}
         section_signature = (selected_tab, playoff_sections_state.get("revision", 0))
         if selected_tab in stored_section_tabs and getattr(update_extra_gui_tabs, "_last_section_signature", None) == section_signature:
             return
@@ -5893,6 +6036,8 @@ def run_gui_app():
             refresh_bracket_tab()
         elif selected_tab == "Adv":
             update_advanced_widgets(sections)
+        elif selected_tab == "TAdv":
+            update_team_advanced_widgets(sections)
         elif selected_tab == "Shots":
             update_shot_defense_widgets(sections)
         elif selected_tab == "Avg":
