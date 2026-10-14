@@ -51,6 +51,7 @@ class GuiOutputProxy:
         self.full_output = []
         self.scoreboard_pattern = re.compile(r"^(.+?) \| ([0-9]+:[0-9]{2}) \| (.+?): (\d+)\s+(.+?): (\d+)$")
         self.hide_gui_log_section = False
+        self._last_yield = 0.0
 
     def write(self, text):
         if not text:
@@ -61,6 +62,14 @@ class GuiOutputProxy:
         quick = bool(getattr(sim_engine, "SIM_STICKY_FAST", None))
         if not quick:
             _REAL_SLEEP(0.001)
+        else:
+            # Full-speed sims never sleep, so the sim thread kept the GIL for
+            # seconds at a time and the window stopped responding. Hand it to
+            # the GUI thread for a moment a few times a second.
+            now = time.perf_counter()
+            if now - self._last_yield > 0.12:
+                _REAL_SLEEP(0.03)
+                self._last_yield = time.perf_counter()
         self.buffer += text
         while "\n" in self.buffer:
             line, self.buffer = self.buffer.split("\n", 1)
