@@ -23584,6 +23584,86 @@ def run_fantasy_draft_and_game(year_prefix: str = None):
 
 
 FANTASY_SEASON_DRAFT_ROUNDS = 12
+GUI_DRAFT_RECAP_VIEWER = None  # set by the GUI: shows the recap table and waits for Continue
+
+FANTASY_GRADE_BANDS = (
+    (2, "A+"), (5, "A"), (8, "A-"), (12, "B+"), (16, "B"), (20, "B-"), (24, "C+"), (27, "C"), (29, "C-"), (99, "D"),
+)
+
+
+def fantasy_team_notes(roster: List[Player]) -> List[str]:
+    """Plain-language strengths and holes of a drafted roster."""
+    notes = []
+    shooters = sum(1 for p in roster if p.three_rating >= 0.80 and p.three_tendency >= 0.25)
+    creators = sum(1 for p in roster if p.playmaking >= 0.75 or p.ball_handle >= 0.82)
+    anchors = sum(1 for p in roster if p.interior_def >= 0.80 or p.block >= 0.60)
+    stoppers = sum(1 for p in roster if p.perimeter_def >= 0.78)
+    finishers = sum(1 for p in roster if p.rim_rating >= 0.88 or p.dunk_rating >= 0.88)
+    best = max((fantasy_ovr(p) for p in roster), default=0)
+    counts = fantasy_roster_counts(roster)
+    if best >= 96:
+        notes.append("superstar")
+    if shooters >= 6:
+        notes.append("elite spacing")
+    elif shooters <= 2:
+        notes.append("thin on shooting")
+    if creators >= 4:
+        notes.append("deep playmaking")
+    elif creators <= 1:
+        notes.append("few creators")
+    if anchors >= 3:
+        notes.append("strong rim protection")
+    elif anchors == 0:
+        notes.append("no rim protection")
+    if stoppers >= 4:
+        notes.append("lockdown perimeter D")
+    if finishers >= 6:
+        notes.append("great finishers")
+    if counts["PG"] + counts["SG"] <= 2:
+        notes.append("short on guards")
+    if counts["PF"] + counts["C"] <= 2:
+        notes.append("short on bigs")
+    return notes[:4]
+
+
+def fantasy_draft_recap(drafted_rosters: Dict[str, List[Player]], user_team_name: str) -> List[Dict]:
+    """Grade every drafted team and project a record from roster strength."""
+    strengths = {}
+    for name, roster in drafted_rosters.items():
+        team = make_fantasy_team_factory(name, roster)()
+        strengths[name] = fantasy_season_strength(team)
+    values = list(strengths.values())
+    mean = sum(values) / max(1, len(values))
+    spread = (sum((v - mean) ** 2 for v in values) / max(1, len(values))) ** 0.5 or 1.0
+    ranked = sorted(strengths.items(), key=lambda item: item[1], reverse=True)
+    rows = []
+    for rank, (name, strength) in enumerate(ranked, start=1):
+        z = (strength - mean) / spread
+        wins = int(round(max(14, min(68, 41 + 10.5 * z))))
+        grade = next(label for limit, label in FANTASY_GRADE_BANDS if rank <= limit)
+        roster = drafted_rosters[name]
+        top = sorted(roster, key=fantasy_ovr, reverse=True)[:3]
+        rows.append({
+            "rank": rank, "team": name, "grade": grade, "wins": wins, "losses": 82 - wins,
+            "strength": round(strength, 1),
+            "top": ", ".join(f"{pl.name} ({fantasy_ovr(pl)})" for pl in top),
+            "notes": ", ".join(fantasy_team_notes(roster)),
+            "user": name == user_team_name,
+        })
+    return rows
+
+
+def show_fantasy_draft_recap(drafted_rosters: Dict[str, List[Player]], user_team_name: str) -> List[Dict]:
+    rows = fantasy_draft_recap(drafted_rosters, user_team_name)
+    print("\n=== DRAFT GRADES AND PROJECTIONS ===")
+    for row in rows:
+        marker = ">" if row["user"] else " "
+        print(f"{marker}{row['rank']:>2}. {row['team']:<26} {row['grade']:<3} proj {row['wins']}-{row['losses']}  {row['top']}")
+        if row["notes"]:
+            print(f"      {row['notes']}")
+    if GUI_DRAFT_RECAP_VIEWER is not None:
+        GUI_DRAFT_RECAP_VIEWER(rows, user_team_name)
+    return rows
 
 # Live draft state the GUI board reads: whose pick it is, the user's roster so
 # far, and a log of every pick (which team took which player).
@@ -23703,6 +23783,8 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
     print(f"\n{user_team_name} final roster:")
     for pl in drafted_rosters[user_team_name]:
         print(f"  - {pl.name} ({pl.position}, {getattr(pl, 'source_team', '')}) OVR {fantasy_ovr(pl)}")
+
+    show_fantasy_draft_recap(drafted_rosters, user_team_name)
 
     factories = {
         name: make_fantasy_team_factory(name, roster, user_controlled=False)

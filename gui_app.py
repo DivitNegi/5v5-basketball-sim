@@ -8535,9 +8535,56 @@ def run_gui_app():
         if players:
             listbox.selection_set(0)
 
+    def gui_draft_recap(rows, user_team):
+        def open_dialog(result_queue):
+            close_fantasy_dialog()  # the draft board is done
+            dialog = tk.Toplevel(root)
+            dialog.title("Fantasy Draft Recap")
+            dialog.configure(bg=APP_BG)
+            dialog.geometry("1500x760")
+            dialog.minsize(1100, 520)
+            dialog.transient(root)
+            dialog.grab_set()
+            dialog.columnconfigure(0, weight=1)
+            dialog.rowconfigure(1, weight=1)
+            tk.Label(dialog, text="Draft Grades and Projected Records", bg=APP_BG, fg=GOLD, font=("Segoe UI", 18, "bold")).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
+            frame = tk.Frame(dialog, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+            frame.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 10))
+            frame.columnconfigure(0, weight=1)
+            frame.rowconfigure(0, weight=1)
+            cols = ("rank", "team", "grade", "proj", "top", "notes")
+            tree = ttk.Treeview(frame, columns=cols, show="headings", style="Series.Treeview")
+            for col, label, width, anchor in (
+                ("rank", "#", 46, "center"), ("team", "Team", 230, "w"), ("grade", "Grade", 70, "center"),
+                ("proj", "Proj W-L", 100, "center"), ("top", "Best players (OVR)", 560, "w"), ("notes", "Strengths / holes", 360, "w"),
+            ):
+                tree.heading(col, text=label)
+                tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col in ("top", "notes"))
+            scroll = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+            tree.configure(yscrollcommand=scroll.set)
+            tree.grid(row=0, column=0, sticky="nsew", padx=(8, 0), pady=8)
+            scroll.grid(row=0, column=1, sticky="ns", pady=8)
+            tree.tag_configure("user", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
+            for row in rows:
+                tree.insert(
+                    "", "end",
+                    values=(row["rank"], team_display_name(row["team"]), row["grade"], f"{row['wins']}-{row['losses']}", row["top"], row["notes"]),
+                    tags=("user",) if row.get("user") else (),
+                )
+
+            def go():
+                result_queue.put(True)
+                dialog.destroy()
+
+            ttk.Button(dialog, text="Continue to the season", command=go).grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 14))
+            dialog.protocol("WM_DELETE_WINDOW", go)
+
+        return gui_dialog_wait(open_dialog)
+
     sim_engine.GUI_FANTASY_PICKER = gui_fantasy_picker
     sim_engine.GUI_POSITION_PICKER = gui_position_picker
     sim_engine.GUI_OPTION_PICKER = gui_option_picker
+    sim_engine.GUI_DRAFT_RECAP_VIEWER = gui_draft_recap
 
     postseason_state = {"standings": None, "factories": None}
 
