@@ -61,7 +61,7 @@ SLEEP = 1.2                    # base sleep between lines
 THREE_ATTEMPT_SCALE = 0.88     # global 3PA volume scaler
 DUNK_RATE_SCALE = 0.25       # lowers how often rim attempts become dunk attempts
 REBOUND_PUSH_SCALE = 0.36  # share of the old rebound-push chance that still runs
-HALF_COURT_POSSESSION_RANGE = (11, 22)  # seconds; was (12, 24) before transition volume was cut
+HALF_COURT_POSSESSION_RANGE = (11, 21)  # seconds; was (12, 24) before transition volume was cut
 TRANSITION_FLAGRANT_RATE = 0.06  # very rare: portion of transition fouls upgraded
 TRANSITION_TAKE_FOUL_RATE = 0.20  # portion of transition fouls called as take fouls
 PLAYOFF_MODE = False            # tighter rotations, more physicality
@@ -11886,7 +11886,9 @@ def rebound_weight(player: Player, miss_type: str, offensive: bool) -> float:
 
 def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player]:
     sanitize_live_lineups(off, dff)
-    base_off_chance = 0.15 if miss_type == "jumper" else 0.30
+    # Real offensive rebound rate is ~26% overall (~20% off jumpers, ~33% off
+    # rim/paint misses); the old 15% / 30% bases produced a ~16% league ORB%.
+    base_off_chance = 0.25 if miss_type == "jumper" else 0.43
     off_reb_rating = sum(p.oreb for p in off.on_floor) / max(1, len(off.on_floor))
     def_reb_rating = sum(p.dreb for p in dff.on_floor) / max(1, len(dff.on_floor))
     off_chance = base_off_chance + (off_reb_rating - def_reb_rating) * 0.12
@@ -11905,7 +11907,7 @@ def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player
         off_chance *= 0.76
     if getattr(off, "crash_glass_emphasis", False):
         off_chance *= 1.10
-    off_chance = max(0.08, min(0.42, off_chance))
+    off_chance = max(0.08, min(0.50, off_chance))
     if random.random() < off_chance:
         team = off
         weights = [rebound_weight(p, miss_type, offensive=True) for p in team.on_floor]
@@ -18251,9 +18253,12 @@ def simulate_possession(off: Team, dff: Team,
         return run_late_game_quick_possession(off, dff, period, period_time, teamA, teamB, matchups)
 
     possession_time = random.randint(*HALF_COURT_POSSESSION_RANGE)
+    # Team pace works both ways: fast teams shorten the half-court possession,
+    # slow ones (grind / post-hub styles) let more of the clock run.
     pace = getattr(getattr(off, "coach_style", {}), "get", lambda *_: 1.0)("pace", 1.0)
-    if pace > 1.0:
-        possession_time = max(11, int(possession_time / pace))
+    pace = max(0.90, min(1.12, pace))
+    if pace != 1.0:
+        possession_time = max(10, min(24, int(round(possession_time / pace))))
 
     if period <= 3 and period_time <= 24:
         possession_time = period_time
