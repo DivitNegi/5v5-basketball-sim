@@ -6303,7 +6303,7 @@ def run_gui_app():
         )
         return selected if selected in options else player.position
 
-    fantasy_picker_memory = {"pos": "All", "search": "", "geometry": None}
+    fantasy_picker_memory = {"pos": "All", "search": "", "geometry": None, "sort_col": None, "sort_desc": True}
     fantasy_dialog = {"win": None}  # one board window is kept open for the whole draft
 
     def close_fantasy_dialog():
@@ -6407,8 +6407,27 @@ def run_gui_app():
                 "three": "3PT", "mid": "MID", "rim": "RIM", "pdef": "PDEF", "idef": "IDEF",
                 "stl": "STL", "blk": "BLK", "arch": "Archetype",
             }
+            text_columns = ("name", "team", "pos", "arch")
+
+            def sort_by_column(col):
+                if fantasy_picker_memory.get("sort_col") == col:
+                    fantasy_picker_memory["sort_desc"] = not fantasy_picker_memory.get("sort_desc", True)
+                else:
+                    fantasy_picker_memory["sort_col"] = col
+                    fantasy_picker_memory["sort_desc"] = col not in text_columns  # stats high-to-low, text A-Z
+                update_heading_arrows()
+                refresh_board()
+
+            def update_heading_arrows():
+                active = fantasy_picker_memory.get("sort_col")
+                for c in columns:
+                    arrow = ""
+                    if c == active:
+                        arrow = " v" if fantasy_picker_memory.get("sort_desc", True) else " ^"
+                    tree.heading(c, text=labels[c] + arrow, command=lambda cc=c: sort_by_column(cc))
+
             for col in columns:
-                tree.heading(col, text=labels[col])
+                tree.heading(col, text=labels[col], command=lambda cc=col: sort_by_column(cc))
                 tree.column(col, width=widths[col], minwidth=widths[col], anchor="center" if col not in ("name", "team", "arch") else "w", stretch=col == "arch")
             tree.grid(row=0, column=0, sticky="nsew", padx=(8, 0), pady=8)
             y_scroll.grid(row=0, column=1, sticky="ns", pady=8)
@@ -6530,7 +6549,14 @@ def run_gui_app():
             def refresh_board(*_args):
                 selected_candidates.clear()
                 tree.delete(*tree.get_children())
-                for idx, (player, _desc) in enumerate(filtered_candidates(), start=0):
+                board_rows = list(filtered_candidates())
+                sort_col = fantasy_picker_memory.get("sort_col")
+                if sort_col in columns:
+                    def sort_key(item):
+                        value = stat_value(item[0], sort_col)
+                        return (str(value).lower(),) if sort_col in text_columns else (float(value) if value != "" else -1.0,)
+                    board_rows.sort(key=sort_key, reverse=bool(fantasy_picker_memory.get("sort_desc", True)))
+                for idx, (player, _desc) in enumerate(board_rows, start=0):
                     selected_candidates.append(player)
                     tree.insert("", "end", iid=str(idx), values=tuple(stat_value(player, col) for col in columns))
                 status_var_dialog.set(f"{len(selected_candidates)} available players shown. Taken players are hidden.")
@@ -6628,6 +6654,7 @@ def run_gui_app():
             pos_dropdown.bind("<<ComboboxSelected>>", refresh_board)
             search_var.trace_add("write", refresh_board)
             dialog.protocol("WM_DELETE_WINDOW", cancel)
+            update_heading_arrows()
             refresh_board()
             render_side()
             side_refresh_loop()
