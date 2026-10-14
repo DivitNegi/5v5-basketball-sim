@@ -12277,10 +12277,10 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     if shot_type == "dunk":
         # Real dunks go in ~90% of the time, ~80% even when crowded: the
         # situational penalties above can bend that but not flatten it.
-        dunk_floor = min(0.94, 0.68 + 0.30 * shooter.dunk_rating)
-        dunk_floor -= max(0.0, soft_defense_rating(effective_interior_def(defender)) - 0.80) * 0.20
+        dunk_floor = min(0.96, 0.78 + 0.21 * shooter.dunk_rating)
+        dunk_floor -= max(0.0, soft_defense_rating(effective_interior_def(defender)) - 0.80) * 0.15
         if quality_mult < 0.90:
-            dunk_floor -= 0.04
+            dunk_floor -= 0.03
         final_dunk_floor = dunk_floor
         p = max(p, dunk_floor)
 
@@ -12374,6 +12374,11 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     # able to push past that ordinary ceiling -- and a low-skill, low-clutch
     # player forced into a tough look under pressure should be able to dip
     # below the ordinary floor.
+    if shot_type == "rim" and quality_mult < 1.08 and is_true_big(shooter):
+        # Centers / true power forwards finish through contact better than the
+        # generic formula gave them (real bigs shoot ~66-70% at the rim).
+        p *= 1.05
+
     soft_knee = {"three": 0.38, "mid": 0.43, "rim": 0.64, "post": 0.55, "post_fade": 0.45}.get(shot_type)
     if soft_knee is not None and p > soft_knee:
         p = soft_knee + (p - soft_knee) * (0.52 if shot_type in ("three", "mid") else 0.60)
