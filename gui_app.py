@@ -41,6 +41,12 @@ def table_player_name(name, width=PLAYER_NAME_COL_WIDTH):
     return _engine_table_player_name(team_display_name(name), width)
 
 
+FANTASY_SEASON_MODES = (
+    "Fantasy draft: 2027 players (season + playoffs)",
+    "Fantasy draft: all-time (season + playoffs)",
+)
+
+
 class GuiOutputProxy:
     def __init__(self, output_queue, scoreboard_queue, original_stdout, section_queue=None):
         self.output_queue = output_queue
@@ -819,6 +825,8 @@ def run_gui_app():
             "Full 2027 playoffs",
             "2027 season (82 games)",
             "Custom season (82 games)",
+            "Fantasy draft: 2027 players (season + playoffs)",
+            "Fantasy draft: all-time (season + playoffs)",
             "Fantasy draft playoffs",
             "Olympic tournament",
         ),
@@ -8252,7 +8260,7 @@ def run_gui_app():
 
         sys.stdout = proxy
         builtins.input = gui_input
-        sim_engine.GUI_SERIES_UPDATE_QUEUE = section_queue if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Olympic tournament", "Full 2027 playoffs", "2027 play-in & playoffs") else None
+        sim_engine.GUI_SERIES_UPDATE_QUEUE = section_queue if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Olympic tournament", "Full 2027 playoffs", "2027 play-in & playoffs") or mode in FANTASY_SEASON_MODES else None
         sim_engine.GUI_SCOREBOARD_QUEUE = scoreboard_queue
         sim_engine.SIM_FAST_FORWARD = False
         sim_engine.SIM_JUMP_TARGET = None
@@ -8311,6 +8319,26 @@ def run_gui_app():
                     scoreboard_queue.put({"postseason_ready": True})
                 else:
                     print("Season mode cancelled.")
+            elif mode in FANTASY_SEASON_MODES:
+                # Draft (best version of each player), then straight into the
+                # 82-game season and the play-in / playoffs.
+                year_prefix = "2027 " if "2027" in mode else None
+                draft_names, draft_factories, draft_user_team = run_fantasy_season_draft(year_prefix)
+                if draft_names and draft_factories:
+                    status_var.set("Fantasy season running...")
+                    scoreboard_status_var.set("Fantasy season running in background (82 games per team)...")
+                    season_view["quiet"] = True
+                    scoreboard_queue.put({"season_progress": True, "completed": 0, "total": 82 * len(draft_names) // 2})
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        fantasy_sections = run_quiet_82_game_season(draft_names, draft_factories, section_queue, scoreboard_queue)
+                    postseason_state["standings"] = (fantasy_sections or {}).get("_season_standings")
+                    postseason_state["factories"] = dict(draft_factories)
+                    season_view["quiet"] = False
+                    scoreboard_status_var.set("Regular season complete. Play-in and playoffs starting...")
+                    status_var.set("Fantasy play-in and playoffs running...")
+                    run_2027_postseason(postseason_state["standings"], postseason_state["factories"])
+                else:
+                    print("Fantasy draft cancelled.")
             elif mode == "Fantasy draft season":
                 run_fantasy_draft_and_game(None)
             elif mode == "2026 fantasy draft season":
@@ -8385,7 +8413,7 @@ def run_gui_app():
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and mode not in FANTASY_SEASON_MODES and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()

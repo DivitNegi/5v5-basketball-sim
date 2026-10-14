@@ -23369,6 +23369,92 @@ def run_fantasy_draft_and_game(year_prefix: str = None):
     run_fantasy_playoffs_from_season(standings)
 
 
+FANTASY_SEASON_DRAFT_ROUNDS = 10
+
+
+def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROUNDS):
+    """
+    Snake fantasy draft for the season-and-playoffs fantasy modes.
+
+    year_prefix "2027 " drafts only from 2027 players; None drafts from every
+    player in the simulator. Either way each player is taken as his best
+    (highest overall) version, with no version prompt. The draft slots are the
+    current franchises (no year in the name). Returns
+    (team_names, factories, user_team_name), or (None, None, None).
+    """
+    from players_data import build_fantasy_player_pools, fantasy_team_factories
+
+    pools = build_fantasy_player_pools(year_prefix)
+    if year_prefix:
+        # "2027 players only": user-created custom players are not 2027 players.
+        for pos in pools:
+            pools[pos] = [(pl, desc) for pl, desc in pools[pos] if getattr(pl, "source_team", "") != "Custom Player"]
+    franchise_names = sorted({
+        factory().name.replace("2027 ", "", 1).strip()
+        for factory in fantasy_team_factories("2027 ")
+    })
+    if len(franchise_names) < 2:
+        print("Not enough franchises to run a fantasy draft.")
+        return None, None, None
+
+    if GUI_OPTION_PICKER is not None:
+        user_team_name = GUI_OPTION_PICKER("Choose Fantasy Team", "Pick the franchise you want to control.", franchise_names)
+        if user_team_name not in franchise_names:
+            user_team_name = franchise_names[0]
+    else:
+        print("\nChoose the franchise you want to control:")
+        for idx, name in enumerate(franchise_names, start=1):
+            print(f"  {idx}. {name}")
+        raw = input(f"Enter number (1-{len(franchise_names)}): ").strip()
+        user_team_name = franchise_names[int(raw) - 1] if raw.isdigit() and 1 <= int(raw) <= len(franchise_names) else franchise_names[0]
+    team_order = [user_team_name] + [name for name in franchise_names if name != user_team_name]
+    drafted_rosters: Dict[str, List[Player]] = {name: [] for name in team_order}
+    taken_names: set = set()
+
+    pool_label = "2027 players only" if year_prefix else "all-time players (best version of each)"
+    print("\n=== FANTASY DRAFT -> SEASON -> PLAYOFFS ===")
+    print(f"Pool: {pool_label}. {len(team_order)} teams, {rounds} rounds, snake order, you pick first.")
+    print("After the draft the 82-game season and the play-in / playoffs run automatically.")
+
+    for round_num in range(1, rounds + 1):
+        current_order = team_order if round_num % 2 == 1 else list(reversed(team_order))
+        round_picks = []
+        print("\n" + "=" * 80)
+        print(f"FANTASY DRAFT ROUND {round_num} of {rounds}")
+        print("=" * 80)
+        for team_name in current_order:
+            if team_name == user_team_name:
+                print(f"\n{user_team_name} are on the clock.")
+                picked = user_pick_from_pool(pools, taken_names)
+                versions = list(getattr(picked, "fantasy_versions", None) or [])
+                if versions:
+                    picked = max(versions, key=fantasy_ovr)  # always the best version
+                drafted_rosters[team_name].append(picked)
+                taken_names.add(getattr(picked, "fantasy_base_name", picked.name))
+                round_picks.append((team_name, picked))
+                print(f"Your roster so far ({len(drafted_rosters[team_name])}): "
+                      f"{', '.join(pl.name for pl in drafted_rosters[team_name])}")
+            else:
+                picked = ai_pick_for_fantasy_team(pools, taken_names, drafted_rosters[team_name], drafted_rosters[user_team_name])
+                if picked is None:
+                    continue
+                drafted_rosters[team_name].append(picked)
+                taken_names.add(getattr(picked, "fantasy_base_name", picked.name))
+                round_picks.append((team_name, picked))
+        print_fantasy_draft_round_summary(round_num, round_picks)
+
+    print("\n=== DRAFT COMPLETE ===")
+    print(f"\n{user_team_name} final roster:")
+    for pl in drafted_rosters[user_team_name]:
+        print(f"  - {pl.name} ({pl.position}, {getattr(pl, 'source_team', '')}) OVR {fantasy_ovr(pl)}")
+
+    factories = {
+        name: make_fantasy_team_factory(name, roster, user_controlled=False)
+        for name, roster in drafted_rosters.items()
+    }
+    return list(team_order), factories, user_team_name
+
+
 def run_fantasy_draft_playoffs():
     from players_data import build_fantasy_player_pools
     """
