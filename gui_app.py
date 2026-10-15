@@ -1501,6 +1501,76 @@ def run_gui_app():
     show_shot_defense_tree()
     series_tabs.add(shot_defense_widget_frame, text="Shots")
 
+    # ---- Heat tab: zone heat map for a team or a player (rim / paint / mid-range / three)
+    heat_frame = ttk.Frame(series_tabs, padding=(8, 8))
+    heat_frame.columnconfigure(0, weight=1)
+    heat_frame.rowconfigure(1, weight=1)
+    heat_top = ttk.Frame(heat_frame)
+    heat_top.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+    ttk.Label(heat_top, text="Team").grid(row=0, column=0, sticky="w", padx=(0, 8))
+    heat_team_var = tk.StringVar(value="All Teams")
+    heat_team_dropdown = ttk.Combobox(heat_top, textvariable=heat_team_var, values=("All Teams",), state="readonly", width=26)
+    heat_team_dropdown.grid(row=0, column=1, sticky="w", padx=(0, 14))
+    ttk.Label(heat_top, text="Player").grid(row=0, column=2, sticky="w", padx=(0, 8))
+    heat_player_var = tk.StringVar(value="All players")
+    heat_player_dropdown = ttk.Combobox(heat_top, textvariable=heat_player_var, values=("All players",), state="readonly", width=24)
+    heat_player_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 14))
+    ttk.Label(heat_top, text="Color by").grid(row=0, column=4, sticky="w", padx=(0, 8))
+    heat_metric_var = tk.StringVar(value="FG% vs league")
+    heat_metric_dropdown = ttk.Combobox(heat_top, textvariable=heat_metric_var, values=("FG% vs league", "Shot frequency", "Points per shot"), state="readonly", width=16)
+    heat_metric_dropdown.grid(row=0, column=5, sticky="w", padx=(0, 14))
+    ttk.Label(heat_top, text="Show").grid(row=0, column=6, sticky="w", padx=(0, 8))
+    heat_source_dropdown = ttk.Combobox(heat_top, textvariable=stat_source_var, values=STAT_SOURCES, state="readonly", width=10)
+    heat_source_dropdown.grid(row=0, column=7, sticky="w")
+    heat_canvas = tk.Canvas(heat_frame, width=760, height=560, bg=APP_BG, highlightthickness=0, bd=0)
+    heat_canvas.grid(row=1, column=0, sticky="nsew")
+    heat_source_dropdown.bind("<<ComboboxSelected>>", lambda _e: on_stat_source_change())
+    heat_team_dropdown.bind("<<ComboboxSelected>>", lambda _e: (heat_player_var.set("All players"), update_heat_widget(playoff_sections_state.get("sections") or {})))
+    heat_player_dropdown.bind("<<ComboboxSelected>>", lambda _e: update_heat_widget(playoff_sections_state.get("sections") or {}))
+    heat_metric_dropdown.bind("<<ComboboxSelected>>", lambda _e: update_heat_widget(playoff_sections_state.get("sections") or {}))
+    heat_canvas.bind("<Configure>", lambda _e: update_heat_widget(playoff_sections_state.get("sections") or {}))
+    series_tabs.add(heat_frame, text="Heat")
+
+    # ---- Comp tab: two players side by side
+    compare_frame = ttk.Frame(series_tabs, padding=(8, 8))
+    compare_frame.columnconfigure(0, weight=1)
+    compare_frame.rowconfigure(1, weight=1)
+    compare_top = ttk.Frame(compare_frame)
+    compare_top.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+    compare_vars = {}
+    for col, (side, label) in enumerate((("a", "Player A"), ("b", "Player B"))):
+        base = col * 4
+        ttk.Label(compare_top, text=f"{label} team").grid(row=0, column=base, sticky="w", padx=(0, 6))
+        team_var = tk.StringVar(value="")
+        team_box = ttk.Combobox(compare_top, textvariable=team_var, values=(), state="readonly", width=22)
+        team_box.grid(row=0, column=base + 1, sticky="w", padx=(0, 8))
+        ttk.Label(compare_top, text="Player").grid(row=0, column=base + 2, sticky="w", padx=(0, 6))
+        player_var = tk.StringVar(value="")
+        player_box = ttk.Combobox(compare_top, textvariable=player_var, values=(), state="readonly", width=22)
+        player_box.grid(row=0, column=base + 3, sticky="w", padx=(0, 16))
+        compare_vars[side] = {"team_var": team_var, "team_box": team_box, "player_var": player_var, "player_box": player_box}
+    ttk.Label(compare_top, text="Show").grid(row=0, column=8, sticky="w", padx=(0, 6))
+    compare_source_dropdown = ttk.Combobox(compare_top, textvariable=stat_source_var, values=STAT_SOURCES, state="readonly", width=10)
+    compare_source_dropdown.grid(row=0, column=9, sticky="w")
+    compare_source_dropdown.bind("<<ComboboxSelected>>", lambda _e: on_stat_source_change())
+    compare_columns = ("stat", "a", "b")
+    compare_tree = ttk.Treeview(compare_frame, columns=compare_columns, show="headings", height=22, style="Series.Treeview")
+    compare_tree.heading("stat", text="Stat")
+    compare_tree.heading("a", text="Player A")
+    compare_tree.heading("b", text="Player B")
+    compare_tree.column("stat", width=230, anchor="w", stretch=False)
+    compare_tree.column("a", width=300, anchor="center", stretch=True)
+    compare_tree.column("b", width=300, anchor="center", stretch=True)
+    compare_scroll = ttk.Scrollbar(compare_frame, orient="vertical", command=compare_tree.yview)
+    compare_tree.configure(yscrollcommand=compare_scroll.set)
+    compare_tree.grid(row=1, column=0, sticky="nsew")
+    compare_scroll.grid(row=1, column=1, sticky="ns")
+    compare_tree.tag_configure("better", foreground=GOLD, font=("Segoe UI", 11, "bold"))
+    series_tabs.add(compare_frame, text="Comp")
+    for _side in ("a", "b"):
+        compare_vars[_side]["team_box"].bind("<<ComboboxSelected>>", lambda _e, s=_side: (compare_vars[s]["player_var"].set(""), update_compare_widget(playoff_sections_state.get("sections") or {})))
+        compare_vars[_side]["player_box"].bind("<<ComboboxSelected>>", lambda _e: update_compare_widget(playoff_sections_state.get("sections") or {}))
+
     q4_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
     q4_widget_frame.columnconfigure(0, weight=1)
     q4_widget_frame.rowconfigure(0, weight=1)
@@ -3312,6 +3382,203 @@ def run_gui_app():
         playoff_sections_state["sections"] = sections
         playoff_sections_state["revision"] += 1
         update_extra_gui_tabs()
+
+    HEAT_ZONES = (
+        # key, label, diet types, league FG% reference
+        ("rim", "At the rim", ("rim", "dunk"), 63.0),
+        ("paint", "Paint / post", ("post", "post_fade"), 44.0),
+        ("mid", "Mid-range", ("mid",), 41.5),
+        ("three", "Three", ("three",), 36.5),
+    )
+
+    def heat_zone_totals(diet: Dict) -> Dict:
+        zones = {}
+        for key, _label, types, _ref in HEAT_ZONES:
+            att = sum(int(diet.get(tp, 0) or 0) for tp in types)
+            made = sum(int(diet.get(f"{tp}_made", 0) or 0) for tp in types)
+            zones[key] = (att, made)
+        return zones
+
+    def heat_color(value: float, low: float, high: float) -> str:
+        """Blue (cold) -> neutral -> red (hot)."""
+        span = max(1e-9, high - low)
+        x = max(0.0, min(1.0, (value - low) / span))
+        if x < 0.5:
+            f = x / 0.5
+            r, gch, b = int(40 + f * 70), int(90 + f * 40), int(190 - f * 60)
+        else:
+            f = (x - 0.5) / 0.5
+            r, gch, b = int(110 + f * 125), int(130 - f * 85), int(130 - f * 90)
+        return f"#{r:02x}{gch:02x}{b:02x}"
+
+    def update_heat_widget(sections: Dict):
+        players_by_team, team_totals, _label = stat_totals_for_source(sections)
+        teams = ["All Teams"] + list(players_by_team.keys())
+        heat_team_dropdown.configure(values=teams)
+        if heat_team_var.get() not in teams:
+            heat_team_var.set("All Teams")
+        team_choice = heat_team_var.get()
+        scope = players_by_team if team_choice == "All Teams" else {team_choice: players_by_team.get(team_choice, {})}
+        names = sorted({name for roster in scope.values() for name in roster})
+        heat_player_dropdown.configure(values=["All players"] + names)
+        if heat_player_var.get() not in ["All players"] + names:
+            heat_player_var.set("All players")
+        player_choice = heat_player_var.get()
+        diet = {}
+        games = 0
+        for roster in scope.values():
+            team_games = 0
+            for name, stats in roster.items():
+                if player_choice != "All players" and name != player_choice:
+                    continue
+                team_games = max(team_games, stats.get("games", 0))
+                for key, value in (stats.get("shot_diet") or {}).items():
+                    if isinstance(value, (int, float)):
+                        diet[key] = diet.get(key, 0) + value
+            games += team_games  # team-games, so "per game" is per team game
+        zones = heat_zone_totals(diet)
+        total_att = sum(att for att, _m in zones.values())
+        metric = heat_metric_var.get()
+        c = heat_canvas
+        c.delete("all")
+        W = max(520, c.winfo_width())
+        H = max(420, c.winfo_height())
+        cw, ch = min(W - 280, (H - 40) * 500 / 470), 0
+        cw = max(320, cw)
+        ch = cw * 470 / 500
+        ox, oy = 20, 20
+        sx = cw / 500.0
+
+        def X(v):
+            return ox + v * sx
+
+        def Y(v):
+            return oy + v * sx
+
+        def zone_color(key, ref):
+            att, made = zones[key]
+            if not att:
+                return "#1f2937"
+            pct = 100.0 * made / att
+            if metric == "Shot frequency":
+                share = att / max(1, total_att)
+                return heat_color(share, 0.0, 0.45)
+            if metric == "Points per shot":
+                pts = (3 * made if key == "three" else 2 * made) / att
+                return heat_color(pts, 0.65, 1.30)
+            return heat_color(pct, ref - 12, ref + 12)
+
+        ref = {key: r for key, _l, _t, r in HEAT_ZONES}
+        # court: three-point zone first, then mid-range, paint, rim on top
+        c.create_rectangle(X(0), Y(0), X(500), Y(470), fill=zone_color("three", ref["three"]), outline="#e5e7eb", width=2)
+        r_arc = 225
+        c.create_oval(X(250 - r_arc), Y(420 - r_arc), X(250 + r_arc), Y(420 + r_arc), fill=zone_color("mid", ref["mid"]), outline="#e5e7eb", width=2)
+        c.create_rectangle(X(0), Y(420), X(500), Y(470), fill=zone_color("three", ref["three"]), outline="")
+        c.create_rectangle(X(30), Y(420), X(470), Y(470), fill=zone_color("mid", ref["mid"]), outline="")
+        c.create_rectangle(X(185), Y(240), X(315), Y(470), fill=zone_color("paint", ref["paint"]), outline="#e5e7eb", width=2)
+        c.create_oval(X(212), Y(382), X(288), Y(458), fill=zone_color("rim", ref["rim"]), outline="#e5e7eb", width=2)
+        c.create_rectangle(X(0), Y(0), X(500), Y(470), outline="#e5e7eb", width=3)
+        c.create_oval(X(238), Y(408), X(262), Y(432), outline="#f97316", width=3)
+
+        def zone_label(key, label, x, y):
+            att, made = zones[key]
+            pct = f"{100.0 * made / att:.1f}%" if att else "-"
+            per_game = f"{att / max(1, games):.1f}/g" if att and games else ""
+            share = f"{100.0 * att / max(1, total_att):.0f}% of shots"
+            c.create_text(X(x), Y(y), text=f"{label}\n{pct}   {made}/{att}\n{per_game}  {share}", fill="#f9fafb", font=("Segoe UI", 11, "bold"), justify="center")
+
+        zone_label("three", "Three", 250, 45)
+        zone_label("mid", "Mid-range", 250, 175)
+        zone_label("paint", "Paint / post", 250, 300)
+        zone_label("rim", "Rim", 250, 368)
+        title = (player_choice if player_choice != "All players" else (team_display_name(team_choice) if team_choice != "All Teams" else "Whole league")) + f"   ({metric})"
+        c.create_text(ox + cw + 24, oy + 6, anchor="nw", text=title, fill=GOLD, font=("Segoe UI", 14, "bold"), width=max(220, W - cw - 60))
+        legend_y = oy + 70
+        c.create_text(ox + cw + 24, legend_y, anchor="nw", fill=TEXT_SOFT, font=("Segoe UI", 11), width=max(220, W - cw - 60),
+                      text="Red = better than league average, blue = worse.\nZones come from shot types: rim + dunks, post shots, mid-range, threes. League references: rim 63%, post 44%, mid 41.5%, three 36.5%.")
+        for i, (key, label, _t, r) in enumerate(HEAT_ZONES):
+            att, made = zones[key]
+            if att:
+                pct = 100.0 * made / att
+                diff = pct - r
+                c.create_text(ox + cw + 24, legend_y + 90 + i * 24, anchor="nw", fill=TEXT, font=("Segoe UI", 11),
+                              text=f"{label}: {pct:.1f}% ({diff:+.1f} vs league)")
+
+    COMPARE_ROWS = (
+        ("Games", lambda s, gp: f"{s.get('games', 0)}", None),
+        ("Minutes / game", lambda s, gp: f"{s.get('minutes', 0) / 60 / gp:.1f}", "min"),
+        ("Points / game", lambda s, gp: f"{s.get('pts', 0) / gp:.1f}", "pts"),
+        ("Rebounds / game", lambda s, gp: f"{s.get('reb', 0) / gp:.1f}", "reb"),
+        ("Assists / game", lambda s, gp: f"{s.get('ast', 0) / gp:.1f}", "ast"),
+        ("Steals / game", lambda s, gp: f"{s.get('stl', 0) / gp:.1f}", "stl"),
+        ("Blocks / game", lambda s, gp: f"{s.get('blk', 0) / gp:.1f}", "blk"),
+        ("Turnovers / game", lambda s, gp: f"{s.get('tov', 0) / gp:.1f}", "tov_low"),
+        ("FG%", lambda s, gp: f"{stat_pct_value(s, 'fgm', 'fga'):.1f}", "fg"),
+        ("3P%", lambda s, gp: f"{stat_pct_value(s, 'tpm', 'tpa'):.1f}", "tp"),
+        ("FT%", lambda s, gp: f"{stat_pct_value(s, 'ftm', 'fta'):.1f}", "ft"),
+        ("eFG%", lambda s, gp: f"{100 * (s.get('fgm', 0) + 0.5 * s.get('tpm', 0)) / max(1, s.get('fga', 0)):.1f}", "efg"),
+        ("TS%", lambda s, gp: f"{series_ts_value(s):.1f}", "ts"),
+        ("Points / 36", lambda s, gp: f"{36 * s.get('pts', 0) / max(1.0, s.get('minutes', 0) / 60):.1f}", "p36"),
+        ("Rebounds / 36", lambda s, gp: f"{36 * s.get('reb', 0) / max(1.0, s.get('minutes', 0) / 60):.1f}", "r36"),
+        ("Assists / 36", lambda s, gp: f"{36 * s.get('ast', 0) / max(1.0, s.get('minutes', 0) / 60):.1f}", "a36"),
+        ("Stocks (stl+blk) / 36", lambda s, gp: f"{36 * (s.get('stl', 0) + s.get('blk', 0)) / max(1.0, s.get('minutes', 0) / 60):.1f}", "s36"),
+        ("AST / TOV", lambda s, gp: f"{s.get('ast', 0) / max(1, s.get('tov', 0)):.2f}", "ast_tov"),
+        ("Plus-minus / game", lambda s, gp: f"{s.get('plus_minus', 0) / gp:+.1f}", "pm"),
+    )
+
+    def comparison_value(key: str, s: Dict) -> float:
+        gp = max(1, s.get("games", 0))
+        mins = max(1.0, s.get("minutes", 0) / 60)
+        table = {
+            "min": s.get("minutes", 0) / 60 / gp, "pts": s.get("pts", 0) / gp, "reb": s.get("reb", 0) / gp,
+            "ast": s.get("ast", 0) / gp, "stl": s.get("stl", 0) / gp, "blk": s.get("blk", 0) / gp,
+            "tov_low": -s.get("tov", 0) / gp, "fg": stat_pct_value(s, "fgm", "fga"), "tp": stat_pct_value(s, "tpm", "tpa"),
+            "ft": stat_pct_value(s, "ftm", "fta"), "efg": (s.get("fgm", 0) + 0.5 * s.get("tpm", 0)) / max(1, s.get("fga", 0)),
+            "ts": series_ts_value(s), "p36": 36 * s.get("pts", 0) / mins, "r36": 36 * s.get("reb", 0) / mins,
+            "a36": 36 * s.get("ast", 0) / mins, "s36": 36 * (s.get("stl", 0) + s.get("blk", 0)) / mins,
+            "ast_tov": s.get("ast", 0) / max(1, s.get("tov", 0)), "pm": s.get("plus_minus", 0) / gp,
+        }
+        return table.get(key, 0.0)
+
+    def update_compare_widget(sections: Dict):
+        players_by_team, _team_totals, _label = stat_totals_for_source(sections)
+        team_names = list(players_by_team.keys())
+        for side in ("a", "b"):
+            refs = compare_vars[side]
+            refs["team_box"].configure(values=[team_display_name(n) for n in team_names])
+        lookup = {team_display_name(n): n for n in team_names}
+        for idx, side in enumerate(("a", "b")):
+            refs = compare_vars[side]
+            if refs["team_var"].get() not in lookup and team_names:
+                refs["team_var"].set(team_display_name(team_names[min(idx, len(team_names) - 1)]))
+            roster = players_by_team.get(lookup.get(refs["team_var"].get(), ""), {})
+            by_games = sorted(roster, key=lambda n: -roster[n].get("minutes", 0))
+            refs["player_box"].configure(values=by_games)
+            if refs["player_var"].get() not in roster and by_games:
+                refs["player_var"].set(by_games[0])
+        selected = {}
+        for side in ("a", "b"):
+            refs = compare_vars[side]
+            team_key = lookup.get(refs["team_var"].get(), "")
+            stats = (players_by_team.get(team_key, {}) or {}).get(refs["player_var"].get())
+            selected[side] = (refs["player_var"].get(), team_key, stats)
+        compare_tree.delete(*compare_tree.get_children())
+        compare_tree.heading("a", text=f"{selected['a'][0]} ({team_display_name(selected['a'][1])})" if selected["a"][2] else "Player A")
+        compare_tree.heading("b", text=f"{selected['b'][0]} ({team_display_name(selected['b'][1])})" if selected["b"][2] else "Player B")
+        if not selected["a"][2] or not selected["b"][2]:
+            compare_tree.insert("", "end", values=("Pick two players once games have been played.", "", ""))
+            return
+        sa, sb = selected["a"][2], selected["b"][2]
+        gpa, gpb = max(1, sa.get("games", 0)), max(1, sb.get("games", 0))
+        for label, fmt, key in COMPARE_ROWS:
+            va, vb = fmt(sa, gpa), fmt(sb, gpb)
+            tags = ()
+            if key:
+                na, nb = comparison_value(key, sa), comparison_value(key, sb)
+                if abs(na - nb) > 1e-9:
+                    va = ("> " + va) if na > nb else va
+                    vb = ("> " + vb) if nb > na else vb
+            compare_tree.insert("", "end", values=(label, va, vb), tags=tags)
 
     def team_recap_lines(team: str, games: List[Dict], log_rows, log_fields):
         """Season story for one team from the schedule results and the player game log."""
@@ -6157,7 +6424,7 @@ def run_gui_app():
         except Exception:
             return
         sections = playoff_sections_state.get("sections") or {}
-        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "TAdv", "Recap", "Shots", "Avg", "Award", "Season", "Highs", "Sched"}
+        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "TAdv", "Recap", "Shots", "Heat", "Comp", "Avg", "Award", "Season", "Highs", "Sched"}
         section_signature = (selected_tab, playoff_sections_state.get("revision", 0))
         if selected_tab in stored_section_tabs and getattr(update_extra_gui_tabs, "_last_section_signature", None) == section_signature:
             return
@@ -6177,6 +6444,10 @@ def run_gui_app():
             update_team_advanced_widgets(sections)
         elif selected_tab == "Recap":
             update_team_recap(sections)
+        elif selected_tab == "Heat":
+            update_heat_widget(sections)
+        elif selected_tab == "Comp":
+            update_compare_widget(sections)
         elif selected_tab == "Shots":
             update_shot_defense_widgets(sections)
         elif selected_tab == "Avg":
