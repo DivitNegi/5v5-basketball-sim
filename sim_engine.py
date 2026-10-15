@@ -8343,6 +8343,45 @@ def apply_quarter_starter_swaps(team: Team, period: int):
         starter.is_starter, backup.is_starter = True, False
 
 
+def normalize_minute_targets(team: Team, game_minutes: int = 240):
+    """
+    Team targets don't add to a game's 240 minutes (some rosters ask for 275,
+    others for 200), so the rotation logic could never honour them: the
+    overbooked team's bench got ~10 minutes against a 30-minute target, the
+    underbooked team's starters ran 14 over. Scale them so they sum to 240.
+    """
+    players = [p for p in team.roster if getattr(p, "target_minutes", 0) > 0]
+    total = sum(p.target_minutes for p in players)
+    if total <= 0:
+        return
+    factor = max(0.78, min(1.28, game_minutes / total))
+    hard_cap = int(SEASON_STAR_MINUTES_CAP) if SEASON_STAR_MINUTES_CAP else 40
+    hard_cap = max(hard_cap, 34)
+    for p in players:
+        p.target_minutes = max(2, min(hard_cap, int(round(p.target_minutes * factor))))
+    # rounding / caps: settle the remainder on the big-minute players
+    shortfall = game_minutes - sum(p.target_minutes for p in players)
+    ranked = sorted(players, key=lambda pl: pl.target_minutes, reverse=True)
+    guard = 0
+    while shortfall != 0 and guard < 60:
+        step = 1 if shortfall > 0 else -1
+        moved = False
+        for pl in ranked:
+            if step > 0 and pl.target_minutes < hard_cap:
+                pl.target_minutes += 1
+                shortfall -= 1
+                moved = True
+            elif step < 0 and pl.target_minutes > 4:
+                pl.target_minutes -= 1
+                shortfall += 1
+                moved = True
+            if shortfall == 0:
+                break
+        guard += 1
+        if not moved:
+            break
+
+
 def initialize_minute_targets(team: Team):
     _initialize_minute_targets_core(team)
     if SEASON_STAR_MINUTES_CAP:
@@ -8350,6 +8389,7 @@ def initialize_minute_targets(team: Team):
         for p in team.roster:
             if getattr(p, "target_minutes", 0) > cap:
                 p.target_minutes = random.randint(max(30, cap - 2), cap)
+    normalize_minute_targets(team)
     apply_gui_minutes_overrides(team)
 
 
@@ -11022,6 +11062,23 @@ def should_restore_fourth_core(teamA: Team, teamB: Team, period: int, period_tim
     return period >= 4 and period_time <= 9 * 60 and abs(teamA.score - teamB.score) <= 16
 
 
+MINUTES_OVERAGE_LIMIT = 5.0  # minutes past his target before a player is held out of forced lineups
+
+
+def is_overworked(player: Player, team: Team) -> bool:
+    """Past target + 5 minutes: the forced starter / closing lineups leave him
+    out, except in the last couple of minutes of a one-possession game."""
+    if player.minutes / 60 - target_minutes(player, team) <= MINUTES_OVERAGE_LIMIT:
+        return False
+    ctx = SIM_CONTEXT if isinstance(globals().get("SIM_CONTEXT"), dict) else {}
+    period, clock = ctx.get("period"), ctx.get("period_time")
+    teamA, teamB = ctx.get("teamA"), ctx.get("teamB")
+    if isinstance(period, int) and period >= 4 and isinstance(clock, int) and clock <= 150 and teamA is not None and teamB is not None:
+        if abs(teamA.score - teamB.score) <= 5:
+            return False
+    return True
+
+
 def force_starter_lineup(team: Team, protected: Player = None):
     if getattr(team, "garbage_time_locked", False):
         return
@@ -11029,8 +11086,10 @@ def force_starter_lineup(team: Team, protected: Player = None):
 
     available = [
         p for p in team.roster
-        if not p.fouled_out and not is_garbage_only_player(p, team)
+        if not p.fouled_out and not is_garbage_only_player(p, team) and not is_overworked(p, team)
     ]
+    if len(available) < 5:
+        available = [p for p in team.roster if not p.fouled_out and not is_garbage_only_player(p, team)]
     if len(available) < 5:
         available = [p for p in team.roster if not p.fouled_out]
 
@@ -11065,7 +11124,13 @@ def force_closing_lineup(team: Team, protected: Player = None):
         if not p.fouled_out
         and not is_foul_rest_locked(p, current_period)
         and not is_garbage_only_player(p, team)
+        and not is_overworked(p, team)
     ]
+    if len(available) < 5:
+        available = [
+            p for p in team.roster
+            if not p.fouled_out and not is_foul_rest_locked(p, current_period) and not is_garbage_only_player(p, team)
+        ]
     if len(available) < 5:
         available = [p for p in team.roster if not p.fouled_out and not is_garbage_only_player(p, team)]
     if len(available) < 5:
