@@ -22968,6 +22968,78 @@ def build_season_sections(entries: List[Dict],
             clutch_text = f"{line['ppg']:.1f} Q4 PPG on {line['fgm']}/{line['fga']} FG, {100 * line['ts']:.1f} Q4 TS%"
             awards.append(("Clutch Player", item[1], f"{item[0]} | {clutch_text}"))
             awards_table.append({"award": "Clutch Player", "player": item[1], "team": item[0], "stats": f"{clutch_text} | {stat_line(item[0], item[2])}"})
+        # All-Star teams: per conference, 2 guards + 3 frontcourt starters and 7
+        # reserves, picked on season production plus team success; then the
+        # East-West game is simmed and gets an MVP.
+        conference_of_team = {row["team"]: row.get("conference", "-") for row in standings}
+        all_star_candidates = [
+            item for item in all_players
+            if item[2].get("games", 0) >= 30 and item[2].get("minutes", 0) / 60 / max(1, item[2].get("games", 1)) >= 20
+        ]
+
+        def all_star_score(item) -> float:
+            return series_player_score(item[2]) + standings_bonus(item[0], 6.0)
+
+        def is_guard_player(item) -> bool:
+            pl = player_lookup.get((item[0], item[1]))
+            return str(getattr(pl, "position", item[2].get("position", ""))).upper() in ("PG", "SG")
+
+        all_star_rosters = {}
+        conferences_present = sorted({c for c in conference_of_team.values() if c in ("East", "West")})
+        for conference in conferences_present:
+            pool = sorted(
+                [item for item in all_star_candidates if conference_of_team.get(item[0]) == conference],
+                key=all_star_score, reverse=True,
+            )
+            guards = [item for item in pool if is_guard_player(item)][:2]
+            front = [item for item in pool if not is_guard_player(item)][:3]
+            starters = guards + front
+            chosen = {id(item) for item in starters}
+            reserves = [item for item in pool if id(item) not in chosen][:7]
+            all_star_rosters[conference] = (starters, reserves)
+            for role, group in (("Starter", starters), ("Reserve", reserves)):
+                for item in group:
+                    awards_table.append({
+                        "award": f"All-Star {conference} ({role})", "player": item[1], "team": item[0],
+                        "stats": stat_line(item[0], item[2]),
+                    })
+
+        if len(all_star_rosters) == 2:
+            try:
+                import copy as _copy
+                game_teams = []
+                for conference in ("East", "West"):
+                    starters, reserves = all_star_rosters[conference]
+                    squad = []
+                    for item in starters + reserves:
+                        pl = player_lookup.get((item[0], item[1]))
+                        if pl is not None:
+                            squad.append(_copy.deepcopy(pl))
+                    for i, pl in enumerate(squad):
+                        pl.target_minutes = 28 if i < 5 else (22 if i < 8 else 12)
+                    game_teams.append((f"{conference} All-Stars", squad))
+                if all(len(sq) >= 8 for _n, sq in game_teams):
+                    def _all_star_factory(name, squad):
+                        def factory():
+                            team = Team(name, [_copy.deepcopy(pl) for pl in squad])
+                            team.init_lineup()
+                            return team
+                        return factory
+                    east_team, west_team = simulate_silent_season_game(
+                        _all_star_factory(*game_teams[0]), _all_star_factory(*game_teams[1])
+                    )
+                    mvp_pl = max(east_team.roster + west_team.roster, key=lambda pl: pl.pts + 0.7 * pl.reb + 1.0 * pl.ast + 1.5 * (pl.stl + pl.blk_stat))
+                    winner = east_team if east_team.score > west_team.score else west_team
+                    score_line = f"{east_team.name} {east_team.score} - {west_team.name} {west_team.score}"
+                    mvp_team = east_team if mvp_pl in east_team.roster else west_team
+                    awards.append(("All-Star Game MVP", mvp_pl.name, f"{score_line} | {mvp_pl.pts} PTS, {mvp_pl.reb} REB, {mvp_pl.ast} AST"))
+                    awards_table.append({
+                        "award": "All-Star Game", "player": f"{winner.name} win", "team": score_line,
+                        "stats": f"MVP {mvp_pl.name} ({mvp_team.name}): {mvp_pl.pts} PTS, {mvp_pl.reb} REB, {mvp_pl.ast} AST",
+                    })
+            except Exception:
+                pass
+
         # Rookie of the Year / All-Rookie teams only make sense for the 2026 class in the 2027 season.
         rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026] if include_rookies else []
         all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams
