@@ -16858,6 +16858,11 @@ for _name, _fn in list(globals().items()):
         globals()[_name] = _with_2016_big_mid_cleanup(_fn)
 
 
+# 2017-18 teams that were not already defined above (see teams_2018.py).
+import teams_2018 as _teams_2018
+_teams_2018.register(globals())
+
+
 # Real-stat calibration overrides (see real_stat_calibration.py); keep this last so it wraps every factory.
 import real_stat_calibration as _real_stat_calibration
 _real_stat_calibration.wrap_factories(globals())

@@ -8366,6 +8366,8 @@ def normalize_minute_targets(team: Team, game_minutes: int = 240):
     if SEASON_STAR_MINUTES_CAP and team.name == "2018 Oklahoma City Thunder":
         hard_cap = 37
     hard_cap = max(hard_cap, 34)
+    if team_has_real_minutes(team):
+        hard_cap = 44  # real rotations: a 36-37 mpg starter keeps his minutes
     for p in players:
         p.target_minutes = max(2, min(hard_cap, int(round(p.target_minutes * factor))))
     # rounding / caps: settle the remainder on the big-minute players
@@ -8391,10 +8393,17 @@ def normalize_minute_targets(team: Team, game_minutes: int = 240):
             break
 
 
+def team_has_real_minutes(team: Team) -> bool:
+    """Historical teams can carry each player's real per-game minutes (`real_mpg`) in their roster data."""
+    return bool(team.roster) and all(getattr(p, "real_mpg", None) for p in team.roster)
+
+
 def initialize_minute_targets(team: Team):
     _initialize_minute_targets_core(team)
     if SEASON_STAR_MINUTES_CAP:
         cap = 37 if team.name == "2018 Oklahoma City Thunder" else int(SEASON_STAR_MINUTES_CAP)
+        if team_has_real_minutes(team):
+            cap = 40  # a real 36-37 mpg starter keeps his real minutes
         for p in team.roster:
             if getattr(p, "target_minutes", 0) > cap:
                 p.target_minutes = random.randint(max(30, cap - 2), cap)
@@ -8431,6 +8440,14 @@ def apply_gui_minutes_overrides(team: Team):
 def _initialize_minute_targets_core(team: Team):
     ranked = sorted(team.roster, key=overall_rating, reverse=True)
     core_stars = set(rotation_star_players(team))
+
+    if team_has_real_minutes(team):
+        # Real rotation: each player's target is his real per-game minutes,
+        # give or take a minute of ordinary game-to-game variation.
+        for p in team.roster:
+            mpg = int(round(float(p.real_mpg)))
+            p.target_minutes = random.randint(max(2, mpg - 1), mpg + 1)
+        return
 
     if team.name == "2018 Oklahoma City Thunder":
         # Narrow ranges preserve the real 2017-18 rotation while still allowing
