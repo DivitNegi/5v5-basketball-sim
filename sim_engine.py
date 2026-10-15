@@ -21851,9 +21851,13 @@ def user_pick_from_pool(pools: Dict[str, List[Tuple[Player, str]]],
     """
     if GUI_FANTASY_PICKER is not None:
         picked = GUI_FANTASY_PICKER(pools, taken_names)
+        if picked == FANTASY_DRAFT_CANCEL or FANTASY_DRAFT_CANCEL_REQUESTED:
+            raise FantasyDraftCancelled()
         while picked is None:
             print("Draft pick is required. Reopening the fantasy draft board.")
             picked = GUI_FANTASY_PICKER(pools, taken_names)
+            if picked == FANTASY_DRAFT_CANCEL or FANTASY_DRAFT_CANCEL_REQUESTED:
+                raise FantasyDraftCancelled()
         if picked is not None:
             print(f"You drafted {picked.name} ({picked.position}) from {picked.source_team}.")
             return picked
@@ -23732,6 +23736,14 @@ def run_fantasy_draft_and_game(year_prefix: str = None):
 
 
 FANTASY_SEASON_DRAFT_ROUNDS = 12
+
+
+class FantasyDraftCancelled(Exception):
+    """The user pressed Cancel (or closed the board) during a fantasy draft."""
+
+
+FANTASY_DRAFT_CANCEL = "__fantasy_draft_cancel__"  # what the board returns for Cancel
+FANTASY_DRAFT_CANCEL_REQUESTED = False
 GUI_DRAFT_RECAP_VIEWER = None  # set by the GUI: shows the recap table and waits for Continue
 
 FANTASY_GRADE_BANDS = (
@@ -23878,6 +23890,8 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
     pool_size = len(fantasy_available_players(pools, taken_names))
     rounds = max(1, min(rounds, pool_size // len(team_order)))
 
+    global FANTASY_DRAFT_CANCEL_REQUESTED
+    FANTASY_DRAFT_CANCEL_REQUESTED = False
     FANTASY_DRAFT_STATE.clear()
     FANTASY_DRAFT_STATE.update({
         "user_team": user_team_name, "rosters": drafted_rosters, "log": [],
@@ -23898,6 +23912,8 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
         print(f"FANTASY DRAFT ROUND {round_num} of {rounds}")
         print("=" * 80)
         for pick_in_round, team_name in enumerate(current_order, start=1):
+            if FANTASY_DRAFT_CANCEL_REQUESTED:
+                raise FantasyDraftCancelled()
             FANTASY_DRAFT_STATE["round"] = round_num
             FANTASY_DRAFT_STATE["pick_in_round"] = pick_in_round
             FANTASY_DRAFT_STATE["overall"] = (round_num - 1) * len(team_order) + pick_in_round

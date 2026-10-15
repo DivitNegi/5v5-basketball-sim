@@ -7177,7 +7177,9 @@ def run_gui_app():
                 fantasy_dialog["rq"].put(player)
 
             def cancel():
-                fantasy_dialog["rq"].put(None)
+                # Cancel / closing the board ends the whole fantasy draft.
+                sim_engine.FANTASY_DRAFT_CANCEL_REQUESTED = True
+                fantasy_dialog["rq"].put(sim_engine.FANTASY_DRAFT_CANCEL)
                 fantasy_dialog["win"] = None
                 dialog.destroy()
 
@@ -9123,6 +9125,11 @@ def run_gui_app():
             else:
                 run_2016_playoffs()
             sim_completed = True
+        except sim_engine.FantasyDraftCancelled:
+            print("Fantasy draft cancelled.")
+            sim_completed = True
+            status_var.set("Fantasy draft cancelled.")
+            scoreboard_status_var.set("Fantasy draft cancelled.")
         except Exception:
             sim_error = traceback.format_exc()
             print(sim_error)
