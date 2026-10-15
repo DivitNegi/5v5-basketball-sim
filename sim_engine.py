@@ -20894,6 +20894,13 @@ def simulate_game(teamA: Team, teamB: Team):
     apply_manual_player_roles(teamA)
     apply_manual_player_roles(teamB)
 
+    # Who actually starts: the five on the floor after every lineup adjustment
+    # (position balancing can differ from roster order). Season stats count
+    # starts from this, not from flags that quarter swaps flip later.
+    for _team in (teamA, teamB):
+        for _p in _team.roster:
+            _p.started_game = any(_p is _q for _q in _team.on_floor)
+
     print(f"{teamA.name} vs {teamB.name}")
     time.sleep(SLEEP * 0.7)
 
