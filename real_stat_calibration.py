@@ -184,7 +184,10 @@ OVERRIDES = {
         "Jayson Tatum": {"block": 0.545, "dreb": 0.791, "dunk_rating": 0.789, "ft_rating": 0.821, "mid_rating": 0.848, "oreb": 0.301, "playmaking": 0.718, "rim_rating": 0.818, "shot_tendency": 0.443, "steal": 0.51, "three_rating": 0.846, "three_tendency": 0.238, "usage": 0.332},
     },
     "2024 Dallas Mavericks": {
-        "Luka Doncic": {"block": 0.67, "dreb": 0.96, "dunk_rating": 0.93, "ft_rating": 0.784, "mid_rating": 0.99, "oreb": 0.617, "playmaking": 0.877, "rim_rating": 0.99, "shot_tendency": 0.99, "steal": 0.77, "three_rating": 0.879, "three_tendency": 0.95, "usage": 0.82},
+        # Volume (usage / shot_tendency / three_tendency) is left to the hand-entered row; he takes ~23 shots a night.
+        "Luka Doncic": {"block": 0.67, "dreb": 0.96, "dunk_rating": 0.93, "ft_rating": 0.784, "mid_rating": 0.99, "oreb": 0.617, "playmaking": 0.80, "foul_draw": 0.80, "rim_rating": 0.99, "steal": 0.77, "three_rating": 0.84,
+                        # ~23 shots a night: an explicit attempt role plus opt-in "keep the possession when behind pace".
+                        "target_fga_soft_cap": 25.0, "target_fga_per_game": 22.6, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
     "2024 Denver Nuggets": {
         "Nikola Jokic": {"block": 0.73, "dreb": 0.99, "dunk_rating": 0.675, "ft_rating": 0.782, "mid_rating": 0.904, "oreb": 0.875, "playmaking": 0.949, "rim_rating": 0.939, "shot_tendency": 0.573, "steal": 0.68, "three_rating": 0.757, "three_tendency": 0.212, "usage": 0.376},

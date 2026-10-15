@@ -16247,6 +16247,26 @@ def maybe_pick_and_roll(off: Team, dff: Team,
         return handler, handler_def, screener, "handler"
 
 
+PACE_KEEP_BASE = 0.25
+PACE_KEEP_SLOPE = 0.15
+PACE_KEEP_MAX = 0.80
+
+
+def pace_keep_chance(gap: float) -> float:
+    return min(PACE_KEEP_MAX, PACE_KEEP_BASE + gap * PACE_KEEP_SLOPE)
+
+
+def paced_attempt_gap(player: Player) -> float:
+    """How many field-goal attempts a player with a per-game attempt role is behind his minute-by-minute pace."""
+    pace_target = getattr(player, "target_fga_per_game", None)
+    precision = max(0.0, min(1.0, getattr(player, "target_fga_precision", 0.0)))
+    if pace_target is None or precision <= 0:
+        return 0.0
+    played_minutes = max(0.0, player.minutes / 60.0)
+    rotation_minutes = max(1.0, float(getattr(player, "target_minutes", 0) or 36.0))
+    return float(pace_target) * min(1.0, played_minutes / rotation_minutes) - player.fga
+
+
 def choose_shooter(team: Team) -> Player:
     players = designed_shooter_options(team.on_floor)
     volume_options = [p for p in players if has_shot_volume_left(p)]
@@ -18674,6 +18694,16 @@ def simulate_possession(off: Team, dff: Team,
         and random.random() < min(0.85, 0.35 + (ball_movement - 1.0) * 1.25)
     ):
         shooter = choose_shooter_excluding(off, handler, allow_non_spacers=False)
+    if not closing_star_mode:
+        # Opt-in per-game attempt roles: a featured scorer who is behind his
+        # minute-by-minute pace keeps the possession (as handler or as the
+        # intended shooter) instead of always feeding a teammate.
+        for _pace_owner in (handler, shooter):
+            if getattr(_pace_owner, "keep_pace_shots", False) and can_be_designed_shooter(_pace_owner):
+                _gap = paced_attempt_gap(_pace_owner)
+                if _gap > 0.75 and random.random() < pace_keep_chance(_gap):
+                    shooter = _pace_owner
+                    break
     last_passer: Player | None = None
     # Ordinary possessions are not catch-and-shoots by default. Specific
     # actions below opt into an immediate assisted finish.
@@ -18689,6 +18719,13 @@ def simulate_possession(off: Team, dff: Team,
     else:
         play_type = real_play_type(off, handler)
     play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter, previous_handler=previous_handler)
+    if play_shooter is not shooter and getattr(shooter, "keep_pace_shots", False):
+        # A featured scorer with a per-game attempt role that is behind his
+        # minute-by-minute pace keeps some of the possessions the play type
+        # would have rerouted to a teammate (opt-in per player in team data).
+        pace_gap = paced_attempt_gap(shooter)
+        if pace_gap > 0.75 and random.random() < pace_keep_chance(pace_gap):
+            play_shooter, play_passer, play_context = shooter, None, None
     off.current_play_initiator = None
     if play_passer and play_passer is not play_shooter:
         last_passer = play_passer
@@ -18825,6 +18862,8 @@ def simulate_possession(off: Team, dff: Team,
             extra_pass_chance *= 0.25
     if last_passer is not None and SYSTEM_PLAYMAKERS.get(off.name) == last_passer.name:
         extra_pass_chance *= 0.40
+    if getattr(shooter, "keep_pace_shots", False) and paced_attempt_gap(shooter) > 1.0:
+        extra_pass_chance *= 0.35
     if play_context not in ("deep_paint_touch", "iso") and random.random() < extra_pass_chance:
         secondary = choose_shooter_excluding(off, shooter, allow_non_spacers=False)
         if secondary is not shooter:
@@ -19295,6 +19334,8 @@ def simulate_possession(off: Team, dff: Team,
         kickout_chance = shooter.playmaking * 0.14
         if shooter.shot_iq >= 0.82 and iso_mult < 0.92:
             kickout_chance += 0.18
+        if getattr(shooter, "keep_pace_shots", False) and paced_attempt_gap(shooter) > 1.0:
+            kickout_chance *= 0.35
         if random.random() < kickout_chance:
             kickout = choose_shooter_excluding(off, shooter)
             print(f"{shooter.name} draws help and kicks it out to {kickout.name}.")
@@ -19643,6 +19684,8 @@ def simulate_possession(off: Team, dff: Team,
                 if period >= 4 and period_time <= 6 * 60:
                     keep_chance += doubled_player.clutchness * 0.08
                 keep_chance = min(0.52, keep_chance)
+            if getattr(doubled_player, "keep_pace_shots", False) and paced_attempt_gap(doubled_player) > 1.0:
+                keep_chance = min(0.85, max(keep_chance, 0.20) + 0.35)
             if random.random() < keep_chance:
                 print(f"{doubled_player.name} splits the double and keeps the shot for himself.")
                 time.sleep(SLEEP * 0.5)
