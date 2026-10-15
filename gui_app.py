@@ -1247,6 +1247,28 @@ def run_gui_app():
     advanced_tree.tag_configure("team", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
     series_tabs.add(advanced_widget_frame, text="Adv")
 
+    team_recap_frame = ttk.Frame(series_tabs, padding=(8, 8))
+    team_recap_frame.columnconfigure(0, weight=1)
+    team_recap_frame.rowconfigure(1, weight=1)
+    team_recap_top = ttk.Frame(team_recap_frame)
+    team_recap_top.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+    ttk.Label(team_recap_top, text="Team").grid(row=0, column=0, sticky="w", padx=(0, 8))
+    team_recap_var = tk.StringVar(value="")
+    team_recap_dropdown = ttk.Combobox(team_recap_top, textvariable=team_recap_var, values=(), state="readonly", width=34)
+    team_recap_dropdown.grid(row=0, column=1, sticky="w")
+    team_recap_text = tk.Text(
+        team_recap_frame, wrap="word", bg=PANEL_DARK, fg=TEXT, insertbackground=TEXT,
+        font=("Segoe UI", 12), relief="flat", padx=14, pady=12, state="disabled",
+    )
+    team_recap_scroll = ttk.Scrollbar(team_recap_frame, orient="vertical", command=team_recap_text.yview)
+    team_recap_text.configure(yscrollcommand=team_recap_scroll.set)
+    team_recap_text.grid(row=1, column=0, sticky="nsew")
+    team_recap_scroll.grid(row=1, column=1, sticky="ns")
+    team_recap_text.tag_configure("head", foreground=GOLD, font=("Segoe UI", 15, "bold"))
+    team_recap_text.tag_configure("label", foreground=GOLD, font=("Segoe UI", 12, "bold"))
+    team_recap_dropdown.bind("<<ComboboxSelected>>", lambda _e: update_team_recap(playoff_sections_state.get("sections") or {}))
+    series_tabs.add(team_recap_frame, text="Recap")
+
     team_adv_frame = ttk.Frame(series_tabs, padding=(8, 8))
     team_adv_frame.columnconfigure(0, weight=1)
     team_adv_frame.rowconfigure(1, weight=1)
@@ -3290,6 +3312,114 @@ def run_gui_app():
         playoff_sections_state["sections"] = sections
         playoff_sections_state["revision"] += 1
         update_extra_gui_tabs()
+
+    def team_recap_lines(team: str, games: List[Dict], log_rows, log_fields):
+        """Season story for one team from the schedule results and the player game log."""
+        mine = [g for g in games if team in (g.get("home"), g.get("away"))]
+        mine.sort(key=lambda g: g.get("order", 0))
+        if not mine:
+            return [("head", f"{team_display_name(team)}"), ("", "No games recorded yet.")]
+        results = []
+        for g in mine:
+            home = g["home"] == team
+            pf, pa = (g["home_score"], g["away_score"]) if home else (g["away_score"], g["home_score"])
+            opp = g["away"] if home else g["home"]
+            results.append({"n": len(results) + 1, "home": home, "pf": pf, "pa": pa, "opp": opp, "win": pf > pa, "margin": pf - pa})
+        wins = sum(1 for r in results if r["win"])
+        losses = len(results) - wins
+
+        def streak(flag):
+            best, cur, start, best_range = 0, 0, 0, (0, 0)
+            for r in results:
+                if r["win"] == flag:
+                    if cur == 0:
+                        start = r["n"]
+                    cur += 1
+                    if cur > best:
+                        best, best_range = cur, (start, r["n"])
+                else:
+                    cur = 0
+            return best, best_range
+
+        win_streak, win_range = streak(True)
+        loss_streak, loss_range = streak(False)
+
+        def stretch(size, best=True):
+            if len(results) < size:
+                return None
+            scores = []
+            for i in range(len(results) - size + 1):
+                w = sum(1 for r in results[i:i + size] if r["win"])
+                scores.append((w, i))
+            w, i = (max if best else min)(scores, key=lambda item: item[0])
+            return w, size - w, results[i]["n"], results[i + size - 1]["n"]
+
+        best10, worst10 = stretch(10, True), stretch(10, False)
+        home_w = sum(1 for r in results if r["home"] and r["win"])
+        home_l = sum(1 for r in results if r["home"] and not r["win"])
+        road_w = sum(1 for r in results if not r["home"] and r["win"])
+        road_l = sum(1 for r in results if not r["home"] and not r["win"])
+        close = [r for r in results if abs(r["margin"]) <= 5]
+        close_w = sum(1 for r in close if r["win"])
+        blow = [r for r in results if abs(r["margin"]) >= 15]
+        blow_w = sum(1 for r in blow if r["win"])
+        biggest_win = max(results, key=lambda r: r["margin"])
+        biggest_loss = min(results, key=lambda r: r["margin"])
+        avg_pf = sum(r["pf"] for r in results) / len(results)
+        avg_pa = sum(r["pa"] for r in results) / len(results)
+        last10 = results[-10:]
+        lines = [
+            ("head", f"{team_display_name(team)}   {wins}-{losses}  ({wins / max(1, len(results)):.3f})"),
+            ("", f"Scoring {avg_pf:.1f} - {avg_pa:.1f}  (avg margin {avg_pf - avg_pa:+.1f})   |   Last 10: {sum(1 for r in last10 if r['win'])}-{sum(1 for r in last10 if not r['win'])}"),
+            ("", ""),
+            ("label", "Splits"),
+            ("", f"Home {home_w}-{home_l}    Road {road_w}-{road_l}    Close games (5 or less) {close_w}-{len(close) - close_w}    Blowouts (15+) {blow_w}-{len(blow) - blow_w}"),
+            ("", ""),
+            ("label", "Streaks and stretches"),
+            ("", f"Longest win streak: {win_streak} (games {win_range[0]}-{win_range[1]})"),
+            ("", f"Longest losing streak: {loss_streak} (games {loss_range[0]}-{loss_range[1]})"),
+        ]
+        if best10:
+            lines.append(("", f"Best 10-game stretch: {best10[0]}-{best10[1]} (games {best10[2]}-{best10[3]})"))
+        if worst10:
+            lines.append(("", f"Worst 10-game stretch: {worst10[0]}-{worst10[1]} (games {worst10[2]}-{worst10[3]})"))
+        lines += [
+            ("", ""),
+            ("label", "Extremes"),
+            ("", f"Biggest win: +{biggest_win['margin']} {'vs' if biggest_win['home'] else 'at'} {team_display_name(biggest_win['opp'])}, {biggest_win['pf']}-{biggest_win['pa']} (game {biggest_win['n']})"),
+            ("", f"Worst loss: {biggest_loss['margin']} {'vs' if biggest_loss['home'] else 'at'} {team_display_name(biggest_loss['opp'])}, {biggest_loss['pf']}-{biggest_loss['pa']} (game {biggest_loss['n']})"),
+        ]
+        if log_rows and log_fields:
+            ix = {name: i for i, name in enumerate(log_fields)}
+            team_rows = [r for r in log_rows if r[ix["team"]] == team] if "team" in ix else []
+            if team_rows and "pts" in ix and "player" in ix:
+                top = sorted(team_rows, key=lambda r: -r[ix["pts"]])[:3]
+                lines += [("", ""), ("label", "Best individual games")]
+                for r in top:
+                    opp_text = team_display_name(r[ix["opp"]]) if "opp" in ix else ""
+                    lines.append(("", f"{r[ix['player']]}: {r[ix['pts']]} PTS, {r[ix['reb']] if 'reb' in ix else 0} REB, {r[ix['ast']] if 'ast' in ix else 0} AST vs {opp_text}"))
+        return lines
+
+    def update_team_recap(sections: Dict):
+        games = sections.get("_season_games") or []
+        standings = sections.get("_season_standings") or []
+        names = [row["team"] for row in standings] or sorted({g["home"] for g in games} | {g["away"] for g in games})
+        team_recap_dropdown.configure(values=[team_display_name(n) for n in names])
+        lookup = {team_display_name(n): n for n in names}
+        shown = team_recap_var.get()
+        if shown not in lookup:
+            if names:
+                shown = team_display_name(names[0])
+                team_recap_var.set(shown)
+        team_recap_text.configure(state="normal")
+        team_recap_text.delete("1.0", "end")
+        if not games or shown not in lookup:
+            team_recap_text.insert("end", "Team season recaps appear after a regular season has been simulated.")
+        else:
+            lines = team_recap_lines(lookup[shown], games, sections.get("_season_game_log") or [], sections.get("_season_game_log_fields") or [])
+            for tag, text in lines:
+                team_recap_text.insert("end", text + "\n", tag or ())
+        team_recap_text.configure(state="disabled")
 
     def stat_totals_for_source(sections: Dict):
         """(player totals, team totals, label) for the Season / Playoffs dropdown.
@@ -6027,7 +6157,7 @@ def run_gui_app():
         except Exception:
             return
         sections = playoff_sections_state.get("sections") or {}
-        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "TAdv", "Shots", "Avg", "Award", "Season", "Highs", "Sched"}
+        stored_section_tabs = {"Box", "Post", "Mem", "Tree", "Brkt", "Adv", "TAdv", "Recap", "Shots", "Avg", "Award", "Season", "Highs", "Sched"}
         section_signature = (selected_tab, playoff_sections_state.get("revision", 0))
         if selected_tab in stored_section_tabs and getattr(update_extra_gui_tabs, "_last_section_signature", None) == section_signature:
             return
@@ -6045,6 +6175,8 @@ def run_gui_app():
             update_advanced_widgets(sections)
         elif selected_tab == "TAdv":
             update_team_advanced_widgets(sections)
+        elif selected_tab == "Recap":
+            update_team_recap(sections)
         elif selected_tab == "Shots":
             update_shot_defense_widgets(sections)
         elif selected_tab == "Avg":
