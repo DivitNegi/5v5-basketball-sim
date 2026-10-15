@@ -8176,6 +8176,11 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name == "Luke Kennard" and team.name == "2026 Los Angeles Lakers":
         return True
+    if team.name == "2018 Oklahoma City Thunder" and player.name in (
+        "Jerami Grant", "Raymond Felton", "Patrick Patterson",
+        "Alex Abrines", "Terrance Ferguson",
+    ):
+        return True
     return False
 
 
@@ -8223,6 +8228,8 @@ def mandatory_closers(team: Team) -> Tuple[str, ...]:
         return ("Kyrie Irving", "Jayson Tatum", "Jaylen Brown", "Al Horford")
     if team.name == "2018 New Orleans Pelicans":
         return ("Anthony Davis", "DeMarcus Cousins", "Jrue Holiday")
+    if team.name == "2018 Oklahoma City Thunder":
+        return ("Russell Westbrook", "Paul George", "Carmelo Anthony", "Steven Adams")
     if team.name == "2024 Dallas Mavericks":
         return ("Luka Doncic", "Kyrie Irving")
     return tuple()
@@ -8356,6 +8363,8 @@ def normalize_minute_targets(team: Team, game_minutes: int = 240):
         return
     factor = max(0.78, min(1.28, game_minutes / total))
     hard_cap = int(SEASON_STAR_MINUTES_CAP) if SEASON_STAR_MINUTES_CAP else 40
+    if SEASON_STAR_MINUTES_CAP and team.name == "2018 Oklahoma City Thunder":
+        hard_cap = 37
     hard_cap = max(hard_cap, 34)
     for p in players:
         p.target_minutes = max(2, min(hard_cap, int(round(p.target_minutes * factor))))
@@ -8385,11 +8394,26 @@ def normalize_minute_targets(team: Team, game_minutes: int = 240):
 def initialize_minute_targets(team: Team):
     _initialize_minute_targets_core(team)
     if SEASON_STAR_MINUTES_CAP:
-        cap = int(SEASON_STAR_MINUTES_CAP)
+        cap = 37 if team.name == "2018 Oklahoma City Thunder" else int(SEASON_STAR_MINUTES_CAP)
         for p in team.roster:
             if getattr(p, "target_minutes", 0) > cap:
                 p.target_minutes = random.randint(max(30, cap - 2), cap)
     normalize_minute_targets(team)
+    if team.name == "2018 Oklahoma City Thunder":
+        exact_rotation = {
+            "Russell Westbrook": 36,
+            "Paul George": 36,
+            "Steven Adams": 29,
+            "Carmelo Anthony": 30,
+            "Andre Roberson": 31,
+            "Jerami Grant": 20,
+            "Raymond Felton": 16,
+            "Patrick Patterson": 15,
+            "Alex Abrines": 15,
+            "Terrance Ferguson": 12,
+        }
+        for p in team.roster:
+            p.target_minutes = exact_rotation.get(p.name, p.target_minutes)
     apply_gui_minutes_overrides(team)
 
 
@@ -8407,6 +8431,26 @@ def apply_gui_minutes_overrides(team: Team):
 def _initialize_minute_targets_core(team: Team):
     ranked = sorted(team.roster, key=overall_rating, reverse=True)
     core_stars = set(rotation_star_players(team))
+
+    if team.name == "2018 Oklahoma City Thunder":
+        # Narrow ranges preserve the real 2017-18 rotation while still allowing
+        # natural game-to-game substitution differences.
+        target_ranges = {
+            "Russell Westbrook": (35, 37),
+            "Paul George": (36, 38),
+            "Steven Adams": (32, 34),
+            "Carmelo Anthony": (31, 33),
+            "Andre Roberson": (25, 28),
+            "Jerami Grant": (19, 22),
+            "Raymond Felton": (15, 18),
+            "Patrick Patterson": (14, 17),
+            "Alex Abrines": (14, 17),
+            "Terrance Ferguson": (11, 14),
+        }
+        for p in team.roster:
+            low, high = target_ranges.get(p.name, (6, 12))
+            p.target_minutes = random.randint(low, high)
+        return
 
     if team.name == "2024 Olympic USA":
         target_ranges = {
@@ -9329,8 +9373,15 @@ def initialize_game_flow(teamA: Team, teamB: Team):
             t.coach_style["pace"] = max(t.coach_style.get("pace", 1.0), 1.08)
             t.coach_style["ball_movement"] = max(t.coach_style.get("ball_movement", 1.0), 1.16)
         elif t.name == "2018 Oklahoma City Thunder":
-            t.coach_style["pace"] = max(t.coach_style.get("pace", 1.0), 1.02)
-            t.coach_style["ball_movement"] = min(t.coach_style.get("ball_movement", 1.0), 1.04)
+            t.coach_style["offensive_style"] = "heliocentric spread"
+            t.coach_style["pace"] = 0.99
+            t.coach_style["three_preference"] = 1.02
+            t.coach_style["ball_movement"] = 0.94
+            t.coach_style["heliocentric"] = 1.08
+            t.coach_style["pnr_frequency"] = 1.22
+            t.coach_style["playbook_frequency"] = 2.00
+            t.coach_style["rotation_depth"] = 10
+            t.coach_style["help_aggression"] = 1.16
         elif t.name == "2011 Dallas Mavericks":
             t.coach_style["pace"] = min(t.coach_style.get("pace", 1.0), 0.92)
             t.coach_style["help_aggression"] = max(t.coach_style.get("help_aggression", 1.0), 1.12)
@@ -10405,6 +10456,54 @@ def swap_players(team: Team, out_player: Player, sub_in: Player, label: str) -> 
     return True
 
 
+def enforce_thunder_2018_rotation(team: Team, period: int, period_time: int, protected: Player = None) -> bool:
+    """Pace the 2017-18 Thunder rotation toward its real regular-season minutes."""
+    if team.name != "2018 Oklahoma City Thunder" or getattr(team, "garbage_time_locked", False):
+        return False
+
+    elapsed = max(
+        0.0,
+        ((period - 1) * rules_quarter_seconds() + (rules_quarter_seconds() - period_time)) / 60,
+    )
+
+    def expected(p: Player) -> float:
+        return min(target_minutes(p, team), elapsed * (target_minutes(p, team) / 48.0) + 0.8)
+
+    bench_needs = [
+        p for p in team.bench
+        if is_rotation_window_candidate(p, team, period, period_time)
+        and p.minutes / 60 < target_minutes(p, team) - 0.5
+        and p.minutes / 60 < expected(p) - 0.35
+    ]
+    if not bench_needs:
+        return False
+
+    priority = {
+        "Jerami Grant": 1.20,
+        "Raymond Felton": 1.12,
+        "Patrick Patterson": 1.02,
+        "Alex Abrines": 1.00,
+        "Terrance Ferguson": 0.94,
+    }
+    sub_in = max(
+        bench_needs,
+        key=lambda p: (expected(p) - p.minutes / 60, priority.get(p.name, 0.85)),
+    )
+    candidates = [
+        p for p in team.on_floor
+        if p is not protected and not p.fouled_out and not is_foul_rest_locked(p, period)
+    ]
+    if not candidates:
+        return False
+    out_player = max(
+        candidates,
+        key=lambda p: (p.minutes / 60 - expected(p), p.minutes / 60 - target_minutes(p, team)),
+    )
+    if out_player.minutes / 60 - expected(out_player) < -0.8:
+        return False
+    return swap_players(team, out_player, sub_in, " (2018 rotation)")
+
+
 def enforce_spurs_rotation_map(team: Team, period: int, period_time: int, protected: Player = None) -> bool:
     """Keep the 2026 Spurs close to their intended playoff minute ladder."""
     if team.name != "2026 San Antonio Spurs" or getattr(team, "garbage_time_locked", False):
@@ -10542,6 +10641,11 @@ def dead_ball_rotation(team: Team, period: int, period_time: int,
 
     if not hasattr(team.roster[0], "target_minutes"):
         initialize_minute_targets(team)
+
+    if enforce_thunder_2018_rotation(team, period, period_time, protected):
+        team.last_sub_period = period
+        team.last_sub_time = period_time
+        return
 
     if enforce_spurs_rotation_map(team, period, period_time, protected):
         team.last_sub_period = period
@@ -10975,7 +11079,8 @@ def dead_ball_subs(teamA: Team, teamB: Team, period: int, period_time: int,
 def out_of_bounds_turnover_chance(passer: Player, receiver: Player) -> float:
     passer_security = 0.55 * passer.playmaking + 0.45 * passer.ball_handle
     pressure = 1.0 - passer_security
-    return max(0.004, min(0.030, 0.006 + pressure * 0.020))
+    risk = max(0.70, min(2.20, getattr(passer, "turnover_risk", 1.0)))
+    return max(0.004, min(0.045, (0.006 + pressure * 0.020) * risk))
 
 
 def deflection_out_of_bounds_chance(passer: Player, receiver: Player, defender: Player) -> float:
@@ -11874,8 +11979,9 @@ def pass_interception_chance(passer: Player, receiver: Player, defender: Player)
     passer_security = 0.55 * passer.playmaking + 0.45 * passer.ball_handle
     lane_read = 0.65 * heat_stat(defender, "steal") + 0.35 * defender.perimeter_def
     receiver_pressure = 1.0 - 0.25 * receiver.ball_handle
-    chance = 0.006 + lane_read * receiver_pressure * 0.054 - passer_security * 0.014
-    return max(0.0035, min(0.062, chance))
+    risk = max(0.70, min(2.20, getattr(passer, "turnover_risk", 1.0)))
+    chance = (0.006 + lane_read * receiver_pressure * 0.054 - passer_security * 0.014) * risk
+    return max(0.0035, min(0.085, chance))
 
 
 def call_foul(team: Team, player: Player, label: str):
@@ -11891,7 +11997,8 @@ def attempt_on_ball_steal(handler: Player, defender: Player) -> bool:
     norm_steal = heat_stat(defender, "steal")
     ball_sec = 0.6 * handler.ball_handle + 0.4 * handler.playmaking
     base = 0.083
-    p = base * norm_steal / (0.5 + 0.5 * ball_sec)
+    risk = max(0.70, min(2.20, getattr(handler, "turnover_risk", 1.0)))
+    p = base * norm_steal / (0.5 + 0.5 * ball_sec) * risk
     p *= max(0.75, 1.0 - max(0.0, (defender.minutes / 60 - 36) * 0.006))
     return random.random() < p
 
@@ -14277,15 +14384,33 @@ def shooter_weight(player: Player) -> float:
     if SEASON_STAR_MINUTES_CAP and player.pts >= 30:
         soft_cap += HOT_GAME_SEASON_FGA_BONUS  # regular season: a hot night may run past the usual volume cap
     explicit_target = getattr(player, "target_fga_soft_cap", None)
+    target_precision = max(0.0, min(1.0, getattr(player, "target_fga_precision", 0.0)))
     if explicit_target is not None and player.fga < explicit_target:
         # Explicit team-role targets are active goals, not merely ceilings.
         # Increase touches while a featured scorer is materially below target.
         deficit_ratio = (float(explicit_target) - player.fga) / max(1.0, float(explicit_target))
-        role_volume *= 1.0 + min(0.48, deficit_ratio * 0.72)
+        role_volume *= 1.0 + min(
+            0.48 + 0.72 * target_precision,
+            deficit_ratio * (0.72 + 1.60 * target_precision),
+        )
+    pace_target = getattr(player, "target_fga_per_game", None)
+    if pace_target is not None and target_precision > 0:
+        # Pace historical roles by minutes played. This avoids every player
+        # chasing a full-game total from the opening tip and keeps the real
+        # shot hierarchy stable without freezing matchup or hot-hand variance.
+        played_minutes = max(0.0, player.minutes / 60.0)
+        rotation_minutes = max(1.0, float(getattr(player, "target_minutes", 0) or 36.0))
+        expected_attempts = float(pace_target) * min(1.0, played_minutes / rotation_minutes)
+        pace_gap = expected_attempts - player.fga
+        if pace_gap > 0.35:
+            role_volume *= 1.0 + min(3.0, pace_gap * (0.30 + 0.35 * target_precision))
+        elif pace_gap < -0.35:
+            role_volume *= max(0.05, 1.0 - (-pace_gap) * (0.25 + 0.30 * target_precision))
     if player.fga > soft_cap:
         overage = player.fga - soft_cap
-        drop_rate = 0.11 if true_primary_shot_creator(player) else 0.18
-        role_volume *= max(0.22 if true_primary_shot_creator(player) else 0.12, 1.0 - overage * drop_rate)
+        drop_rate = (0.11 if true_primary_shot_creator(player) else 0.18) + 0.16 * target_precision
+        floor = (0.22 if true_primary_shot_creator(player) else 0.12) * (1.0 - 0.55 * target_precision)
+        role_volume *= max(floor, 1.0 - overage * drop_rate)
     elif player.usage >= 0.30 and player.shot_tendency >= 0.55 and player.fga < soft_cap * 0.55:
         role_volume *= 1.0 + min(0.38, (soft_cap * 0.55 - player.fga) * 0.045)
 
@@ -14536,7 +14661,13 @@ TEAM_PLAYBOOKS = {
     "2021 Los Angeles Clippers": ["clippers_kawhi_iso", "clippers_pg_pin", "clippers_small_ball"],
     "2024 Los Angeles Clippers": ["clippers_harden_spread", "clippers_kawhi_iso", "clippers_pg_pin"],
     "2018 New Orleans Pelicans": ["pelicans_ad_cousins_highlow", "pelicans_rondo_jrue", "pelicans_mirotic_space"],
-    "2018 Oklahoma City Thunder": ["thunder_russ_rim", "thunder_pg_wing", "thunder_melo_trail"],
+    "2018 Oklahoma City Thunder": [
+        "thunder_russ_rim", "thunder_russ_rim", "thunder_russ_rim",
+        "thunder_russ_rim", "thunder_russ_rim", "thunder_russ_rim",
+        "thunder_russ_rim", "thunder_russ_rim",
+        "thunder_pg_wing", "thunder_melo_trail",
+        "thunder_adams_roll",
+    ],
     "2011 Dallas Mavericks": ["mavs_dirk_elbow", "mavs_kidd_flow", "mavs_terry_second"],
     "2013 Memphis Grizzlies": ["grizzlies_zbo_duckin", "grizzlies_gasol_elbow", "grizzlies_conley_drag"],
     "2015 Atlanta Hawks": ["hawks_horford_delay", "hawks_korver_chase", "hawks_millsap_slip"],
@@ -14914,6 +15045,24 @@ def best_play_target(options: List[Player], score_fn, default: Player) -> Player
 def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, current_shooter: Player, previous_handler: Player = None) -> Tuple[Player, Player | None, str | None]:
     if not play_type:
         return current_shooter, None, None
+
+    if play_type in ("thunder_russ_rim", "thunder_pg_wing", "thunder_melo_trail", "thunder_adams_roll"):
+        russ = player_by_name(off.on_floor, ("Russell Westbrook",))
+        george = player_by_name(off.on_floor, ("Paul George",))
+        melo = player_by_name(off.on_floor, ("Carmelo Anthony",))
+        adams = player_by_name(off.on_floor, ("Steven Adams",))
+        if play_type == "thunder_russ_rim" and russ is not None and has_shot_volume_left(russ):
+            print(f"{off.name} flatten the floor and let {russ.name} attack the paint.")
+            return russ, None, play_type
+        if play_type == "thunder_pg_wing" and george is not None and has_shot_volume_left(george):
+            print(f"{russ.name if russ else handler.name} draws the defense before finding {george.name} on the wing.")
+            return george, russ if russ is not george else None, play_type
+        if play_type == "thunder_melo_trail" and melo is not None and has_shot_volume_left(melo):
+            print(f"{russ.name if russ else handler.name} pushes the break as {melo.name} trails into his scoring spot.")
+            return melo, russ if russ is not melo else None, play_type
+        if play_type == "thunder_adams_roll" and adams is not None and has_shot_volume_left(adams):
+            print(f"{russ.name if russ else handler.name} turns the corner and feeds {adams.name} on the roll.")
+            return adams, russ if russ is not adams else None, play_type
 
     if play_type in ("sixers_lebron_create", "sixers_maxey_slot"):
         lebron = player_by_name(off.on_floor, ("LeBron James",))
@@ -15328,7 +15477,7 @@ PLAYBOOK_CONTEXTS = {
     "grizzlies_ja_spread", "grizzlies_bane_lift", "grizzlies_jjj_pop",
     "clippers_kawhi_iso", "clippers_pg_pin", "clippers_small_ball",
     "pelicans_ad_cousins_highlow", "pelicans_rondo_jrue", "pelicans_mirotic_space",
-    "thunder_pg_wing", "thunder_melo_trail",
+    "thunder_pg_wing", "thunder_melo_trail", "thunder_adams_roll",
     "mavs_dirk_elbow", "mavs_kidd_flow", "mavs_terry_second",
     "grizzlies_zbo_duckin", "grizzlies_gasol_elbow", "grizzlies_conley_drag",
     "hawks_horford_delay", "hawks_korver_chase", "hawks_millsap_slip",
@@ -15502,7 +15651,8 @@ def double_team_turnover_chance(player: Player, defender: Player, dff: Team, cov
         pressure += 0.018
     elif coverage == "late_double_rotate":
         pressure += 0.010
-    return max(0.012, min(0.28, pressure))
+    risk = max(0.70, min(2.20, getattr(player, "turnover_risk", 1.0)))
+    return max(0.012, min(0.32, pressure * risk))
 
 
 def is_non_spacer(player: Player) -> bool:
@@ -16102,6 +16252,25 @@ def choose_shooter(team: Team) -> Player:
     volume_options = [p for p in players if has_shot_volume_left(p)]
     if volume_options:
         players = volume_options
+    # Historical teams may carry per-game attempt roles. If one eligible
+    # player is meaningfully behind his minute-by-minute pace, periodically
+    # call his number directly; otherwise the ordinary weighted selection
+    # below still controls the possession and preserves natural variance.
+    paced = []
+    for p in players:
+        pace_target = getattr(p, "target_fga_per_game", None)
+        precision = max(0.0, min(1.0, getattr(p, "target_fga_precision", 0.0)))
+        if pace_target is None or precision <= 0:
+            continue
+        played_minutes = max(0.0, p.minutes / 60.0)
+        rotation_minutes = max(1.0, float(getattr(p, "target_minutes", 0) or 36.0))
+        expected_attempts = float(pace_target) * min(1.0, played_minutes / rotation_minutes)
+        paced.append((expected_attempts - p.fga, precision, p))
+    if paced:
+        gap, precision, paced_player = max(paced, key=lambda item: item[0])
+        feed_chance = min(0.65, (0.08 + gap * 0.12) * precision)
+        if gap > 0.75 and random.random() < feed_chance:
+            return paced_player
     weights = [shooter_weight(p) * coach_shot_role_multiplier(team, p) for p in players]
     total = sum(weights)
     if total <= 0:
@@ -17012,6 +17181,14 @@ def choose_ballhandler(team: Team) -> Player:
     Special-case: 2017 Warriors -> Curry and Draymond initiate most actions;
     KD is treated more like an elite scoring release valve than a point forward.
     """
+    if team.name == "2018 Oklahoma City Thunder":
+        westbrook = player_by_name(team.on_floor, ("Russell Westbrook",))
+        # The 2017-18 offense was initiated overwhelmingly by Westbrook. He
+        # can still pass out of the action, but George/Melo should not replace
+        # him as the routine bring-up handler while he is on the floor.
+        if westbrook is not None and not westbrook.fouled_out and random.random() < 0.88:
+            return westbrook
+
     if team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors"):
         preferred = [p for p in team.on_floor if p.name in ("Stephen Curry", "Draymond Green", "Andre Iguodala", "Shaun Livingston")]
         if preferred:
@@ -18479,6 +18656,12 @@ def simulate_possession(off: Team, dff: Team,
         # handler always supplies the final pass; possessions often include a
         # reset, hand-back, or an unassisted attack later in the clock.
         pass_chance *= 0.84
+        # A score-first creator can keep more of these possessions without
+        # losing the playmaking rating that controls *which* passes he sees
+        # and how effectively he executes them. Team-specific roster data can
+        # opt into this; ordinary players remain unchanged.
+        score_first_bias = max(0.0, min(1.0, getattr(handler, "score_first_bias", 0.0)))
+        pass_chance *= 1.0 - 0.45 * score_first_bias
         pass_chance = max(0.30, min(0.90, pass_chance))
         if random.random() >= pass_chance:
             shooter = handler
@@ -19347,7 +19530,22 @@ def simulate_possession(off: Team, dff: Team,
     elif play_context in PLAYBOOK_CONTEXTS:
         if play_context in ("lakers_shaq_seal", "bulls_triangle_post", "sixers_embiid_elbow"):
             shot_type = "post"
-        elif play_context in ("rockets_spread_lob", "nuggets_gordon_dunker", "lakers_ad_duckin", "bucks_giannis_wall", "sixers_simmons_dunker", "thunder_russ_rim"):
+        elif play_context == "thunder_russ_rim":
+            # Westbrook's named action is still a downhill spread set, but he
+            # took 4.1 threes per game in 2017-18. Let defenders going under
+            # the screen produce that pull-up instead of forcing every call
+            # to the rim.
+            russ_three_chance = min(0.30, shooter.three_tendency * 0.78 * three_pref)
+            if random.random() < russ_three_chance:
+                shot_type = "three"
+            elif random.random() < 0.25:
+                # Going under was not the only counter: Westbrook also lived
+                # in the pull-up midrange. This keeps the set from producing
+                # an unrealistic stream of rim fouls instead of shot attempts.
+                shot_type = "mid"
+            else:
+                shot_type = "dunk" if random.random() < effective_dunk_attempt_chance(shooter) else "rim"
+        elif play_context in ("rockets_spread_lob", "nuggets_gordon_dunker", "lakers_ad_duckin", "bucks_giannis_wall", "sixers_simmons_dunker", "thunder_adams_roll"):
             shot_type = "dunk" if random.random() < effective_dunk_attempt_chance(shooter) else "rim"
         elif play_context == "sixers_butler_slot":
             shot_type = "rim" if random.random() < 0.45 else "mid"
