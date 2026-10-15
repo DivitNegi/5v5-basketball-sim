@@ -13206,7 +13206,9 @@ def shot_quality(shooter: Player, defender: Player, shot_type: str, period: int,
     if late_clock:
         return "late-clock forced", 0.86 + max(0.0, shooter.shot_iq - 0.74) * 0.04 - max(0.0, 0.58 - shooter.shot_iq) * 0.06
     if shooter.usage < 0.16 and shooter.shot_iq < 0.68 and score < 0.08:
-        return "rushed role-player look", 0.88 - max(0.0, 0.68 - shooter.shot_iq) * 0.08
+        # A role player's rushed look is a bit worse, not a 12% penalty: the old
+        # 0.88 left the deep bench ~2 TS points under real life.
+        return "rushed role-player look", 0.94 - max(0.0, 0.68 - shooter.shot_iq) * 0.05
     elite_handle = shooter.ball_handle >= 0.88 and shot_type in ("three", "mid")
     if elite_handle and score >= 0.26:
         handle_bonus = max(0.0, shooter.ball_handle - 0.82) * 0.08
