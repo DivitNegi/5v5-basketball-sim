@@ -3430,6 +3430,7 @@ class Team:
 
 
             p.is_starter = i < 5
+            p.started_game = i < 5  # tip-off lineup; is_starter flips with quarter swaps
         if getattr(self, "lock_custom_starting_positions", False):
             return
         balance_lineup_positions(self)
@@ -5546,7 +5547,7 @@ def add_player_to_series_totals(series_totals: Dict, team: Team):
         s["tpa"] += p.tpa
         s["ftm"] += p.ftm
         s["fta"] += p.fta
-        s["starts"] = s.get("starts", 0) + (1 if getattr(p, "is_starter", False) else 0)
+        s["starts"] = s.get("starts", 0) + (1 if getattr(p, "started_game", getattr(p, "is_starter", False)) else 0)
         clutch_bucket = s.setdefault("clutch_shot_diet", {})
         for key, value in (getattr(p, "clutch_shot_diet", {}) or {}).items():
             if isinstance(value, (int, float)):
