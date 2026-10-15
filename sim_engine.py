@@ -12853,7 +12853,7 @@ def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> floa
         p = 0.012 + 0.34 * block_skill * foul_trouble_defense_factor(defender)
         p *= 1.0 + max(0.0, effective_interior_def(defender) - 0.78) * 0.22
         if shot_type == "dunk":
-            p *= 0.45  # a dunk is rarely rejected; most blocked "dunks" were layups
+            p *= 0.22  # a dunk is rarely rejected (~1-2% in the NBA)
         if defender.block >= 0.97:
             p *= 1.12  # generational rim protector (99-block tier) separates from the 90s
     else:
@@ -17465,7 +17465,7 @@ def chasedown_block_chance(defender: Player, finisher: Player, shot_type: str) -
     if defender.name == "LeBron James":
         chance += 0.020
     if shot_type == "dunk":
-        chance *= 0.82
+        chance *= 0.45  # a chasedown rejection of a dunk is rare
     if PLAYOFF_MODE:
         chance *= 1.06
     return max(0.0, min(0.20, chance))
@@ -18264,7 +18264,7 @@ def run_ato_play(off: Team, dff: Team, period: int, period_time: int,
         target.tpa += 1
 
     make_prob = shot_make_prob(target, defender, shot_type, off, dff, period, score_time)
-    make_prob = min(make_prob, 0.72 if shot_type in ("dunk", "rim") else 0.55)
+    make_prob = min(make_prob, 0.82 if shot_type in ("dunk", "rim") else 0.55)
     make_prob *= timeout_play_repeat_factor(off, "lob" if shot_type == "dunk" else shot_type)
     made = random.random() < make_prob
     clear_shot_temp_bonuses(target)
