@@ -22879,23 +22879,28 @@ def build_season_sections(entries: List[Dict],
             awards.append(("Sixth Man", sixth[1], f"{sixth[0]} | {sixth[2].get('pts', 0) / max(1, sixth[2].get('games', 1)):.1f} PPG, {sixth[2].get('reb', 0) / max(1, sixth[2].get('games', 1)):.1f} RPG, {sixth[2].get('ast', 0) / max(1, sixth[2].get('games', 1)):.1f} APG"))
             awards_table.append({"award": "Sixth Man", "player": sixth[1], "team": sixth[0], "stats": stat_line(sixth[0], sixth[2])})
 
-        # Clutch Player: points scored in clutch time (4th quarter / OT, last 6
-        # minutes, within 10) from the field, with a real shooting floor.
-        def clutch_numbers(stats: Dict) -> Tuple[int, int, int]:
-            diet = stats.get("clutch_shot_diet", {}) or {}
-            made2 = sum(int(diet.get(f"{k}_made", 0) or 0) for k in ("rim", "dunk", "mid", "post", "post_fade"))
-            made3 = int(diet.get("three_made", 0) or 0)
-            att = sum(int(diet.get(k, 0) or 0) + int(diet.get(f"{k}_made", 0) or 0) for k in ("rim", "dunk", "mid", "post", "post_fade", "three"))
-            return 2 * made2 + 3 * made3, made2 + made3, att
+        # Clutch Player: best fourth quarter across every game (all of Q4, not
+        # just crunch time): fourth-quarter points per game, free throws
+        # included, for players who shoot it efficiently and play real minutes.
+        def fourth_quarter_line(stats: Dict):
+            quarters = stats.get("quarter_stats", {}) or {}
+            q4 = quarters.get(4) or quarters.get("4") or {}
+            games = q4.get("games", 0)
+            if games <= 0:
+                return None
+            pts, fga, fta = q4.get("pts", 0), q4.get("fga", 0), q4.get("fta", 0)
+            ts = pts / max(1.0, 2 * (fga + 0.44 * fta))
+            return {"games": games, "pts": pts, "fgm": q4.get("fgm", 0), "fga": fga,
+                    "ppg": pts / games, "ts": ts, "mpg": q4.get("minutes", 0) / 60 / games}
 
         clutch_rows = []
         for item in all_players:
-            pts_c, made_c, att_c = clutch_numbers(item[2])
-            if att_c >= 25 and made_c / max(1, att_c) >= 0.42:
-                clutch_rows.append((pts_c + 0.6 * (made_c - 0.45 * att_c), pts_c, made_c, att_c, item))
+            line = fourth_quarter_line(item[2])
+            if line and line["games"] >= 30 and line["mpg"] >= 5.0 and line["ts"] >= 0.54:
+                clutch_rows.append((line["ppg"] * (1.0 + (line["ts"] - 0.56)), line, item))
         if clutch_rows:
-            _score, pts_c, made_c, att_c, item = max(clutch_rows, key=lambda row: row[0])
-            clutch_text = f"{pts_c} clutch FG pts on {made_c}/{att_c} ({100 * made_c / max(1, att_c):.1f}%)"
+            _score, line, item = max(clutch_rows, key=lambda row: row[0])
+            clutch_text = f"{line['ppg']:.1f} Q4 PPG on {line['fgm']}/{line['fga']} FG, {100 * line['ts']:.1f} Q4 TS%"
             awards.append(("Clutch Player", item[1], f"{item[0]} | {clutch_text}"))
             awards_table.append({"award": "Clutch Player", "player": item[1], "team": item[0], "stats": f"{clutch_text} | {stat_line(item[0], item[2])}"})
         # Rookie of the Year / All-Rookie teams only make sense for the 2026 class in the 2027 season.
