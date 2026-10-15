@@ -1529,17 +1529,26 @@ def run_gui_app():
     compare_grid.columnconfigure(0, weight=1, uniform="cmp")
     compare_grid.columnconfigure(1, weight=1, uniform="cmp")
     compare_grid.columnconfigure(2, weight=1, uniform="cmp")
-    COMPARE_GOOD, COMPARE_BAD = "#14532d", "#7f1d1d"  # dark green / dark red cell fills
+    COMPARE_GOOD, COMPARE_BAD = "#4ade80", "#f87171"  # text colors: better / worse (no cell fills)
     compare_cells = []  # (stat label, a label, b label) per row, row 0 is the header
 
     def build_compare_grid():
         for r in range(len(COMPARE_ROWS) + 1):
             cells = []
+            row_bg = PANEL if r == 0 else (CARD if r % 2 else CARD_ALT)
             for c in range(3):
+                if r == 0:
+                    font = ("Segoe UI", 15, "bold")
+                    fg = GOLD if c else TEXT_SOFT
+                elif c == 0:
+                    font = ("Segoe UI", 12)
+                    fg = TEXT_SOFT
+                else:
+                    font = ("Segoe UI", 16, "bold")
+                    fg = TEXT
                 lbl = tk.Label(
-                    compare_grid, text="", bg=CARD if r else PANEL, fg=GOLD if r == 0 else TEXT,
-                    font=("Segoe UI", 12, "bold" if (r == 0 or c == 0) else "normal"),
-                    anchor="w" if c == 0 else "center", padx=12, pady=5, highlightthickness=1, highlightbackground=BORDER,
+                    compare_grid, text="", bg=row_bg, fg=fg, font=font,
+                    anchor="w" if c == 0 else "center", padx=18, pady=7 if r else 10, bd=0, highlightthickness=0,
                 )
                 lbl.grid(row=r, column=c, sticky="nsew")
                 cells.append(lbl)
@@ -3447,9 +3456,9 @@ def run_gui_app():
         header[2].configure(text=f"{selected['b'][0]}  ({team_display_name(selected['b'][1])})" if selected["b"][2] else "Player B")
 
         def reset_row(cells, label="", va="", vb=""):
-            cells[0].configure(text=label, bg=CARD)
-            cells[1].configure(text=va, bg=CARD, fg=TEXT)
-            cells[2].configure(text=vb, bg=CARD, fg=TEXT)
+            cells[0].configure(text=label)
+            cells[1].configure(text=va, fg=TEXT)
+            cells[2].configure(text=vb, fg=TEXT)
 
         if not selected["a"][2] or not selected["b"][2]:
             for i, cells in enumerate(compare_cells[1:], start=1):
@@ -3464,8 +3473,8 @@ def run_gui_app():
                 na, nb = comparison_value(key, sa), comparison_value(key, sb)
                 if abs(na - nb) > 1e-9:
                     better, worse = (cells[1], cells[2]) if na > nb else (cells[2], cells[1])
-                    better.configure(bg=COMPARE_GOOD, fg="#ecfdf5")
-                    worse.configure(bg=COMPARE_BAD, fg="#fef2f2")
+                    better.configure(fg=COMPARE_GOOD)
+                    worse.configure(fg=COMPARE_BAD)
 
     def team_recap_lines(team: str, games: List[Dict], log_rows, log_fields):
         """Season story for one team from the schedule results and the player game log."""
