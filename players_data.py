@@ -16505,7 +16505,7 @@ def make_spurs_2027() -> Team:
                0.42, 0.30, 0.18, 0.20, 0.36, 0.30,
                0.850, 0.90, 0.960, 0.980, 0.830,
                0.24, 0.500, 0.760,
-               0.590, 0.990, 0.850, 0.980, 0.970, 0.667,
+               0.590, 0.990, 0.850, 0.980, 0.880, 0.667,
                0.92, 0.990,
                clutchness=0.950, height=88, speed=0.780,
                shot_iq=0.850, archetype='generational unicorn', badges=('chasedown', 'shot_creator'), stamina=0.74),
