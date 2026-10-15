@@ -22713,6 +22713,7 @@ def build_season_sections(entries: List[Dict],
         return 0.0 if denom == 0 else 100 * stats.get("pts", 0) / denom
 
     standings = []
+    all_star_game = None
     if series_totals is None:
         series_totals = {}
     if series_team_totals is None:
@@ -22972,6 +22973,7 @@ def build_season_sections(entries: List[Dict],
             clutch_text = f"{line['ppg']:.1f} Q4 PPG on {line['fgm']}/{line['fga']} FG, {100 * line['ts']:.1f} Q4 TS%"
             awards.append(("Clutch Player", item[1], f"{item[0]} | {clutch_text}"))
             awards_table.append({"award": "Clutch Player", "player": item[1], "team": item[0], "stats": f"{clutch_text} | {stat_line(item[0], item[2])}"})
+        all_star_rows = []  # listed just above the All-Rookie teams
         # All-Star teams: per conference, 2 guards + 3 frontcourt starters and 7
         # reserves, picked on season production plus team success; then the
         # East-West game is simmed and gets an MVP.
@@ -22981,8 +22983,45 @@ def build_season_sections(entries: List[Dict],
             if item[2].get("games", 0) >= 30 and item[2].get("minutes", 0) / 60 / max(1, item[2].get("games", 1)) >= 20
         ]
 
-        def all_star_score(item) -> float:
+        # Fan vote (starters) leans on popularity: scoring, name value, how big
+        # the star is and the market he plays in. The coaches (reserves) lean on
+        # production but are still swayed by it.
+        FAME = {
+            "LeBron James": 1.0, "Stephen Curry": 0.95, "Kevin Durant": 0.85, "Luka Doncic": 0.8,
+            "Giannis Antetokounmpo": 0.8, "Victor Wembanyama": 0.8, "Nikola Jokic": 0.65, "Shai G-Alexander": 0.6,
+            "Anthony Edwards": 0.65, "Jayson Tatum": 0.6, "Jimmy Butler": 0.45, "Kyrie Irving": 0.7,
+            "Kawhi Leonard": 0.55, "Joel Embiid": 0.55, "Devin Booker": 0.55, "Jalen Brunson": 0.5,
+            "Cooper Flagg": 0.7, "LaMelo Ball": 0.55, "Trae Young": 0.5, "Ja Morant": 0.5, "Zion Williamson": 0.5,
+            "Damian Lillard": 0.5, "James Harden": 0.5, "Anthony Davis": 0.45, "Donovan Mitchell": 0.4,
+        }
+        MARKET = {
+            "Lakers": 1.0, "Knicks": 0.95, "Warriors": 0.85, "Celtics": 0.75, "Bulls": 0.7, "Heat": 0.6,
+            "Clippers": 0.55, "76ers": 0.55, "Nets": 0.5, "Mavericks": 0.45, "Rockets": 0.45, "Suns": 0.4,
+            "Raptors": 0.4, "Spurs": 0.4, "Nuggets": 0.3, "Bucks": 0.25, "Thunder": 0.25, "Hawks": 0.3,
+            "Timberwolves": 0.25, "Pistons": 0.3, "Cavaliers": 0.3, "Magic": 0.25, "Pacers": 0.2, "Jazz": 0.2,
+            "Grizzlies": 0.2, "Hornets": 0.2, "Kings": 0.2, "Pelicans": 0.2, "Trail Blazers": 0.2, "Wizards": 0.3,
+        }
+
+        def popularity_score(item) -> float:
+            stats = item[2]
+            gp = max(1, stats.get("games", 1))
+            pl = player_lookup.get((item[0], item[1]))
+            ovr = overall_rating(pl) if pl is not None else 75
+            nickname = next((n for n in MARKET if item[0].endswith(n)), "")
+            return (
+                0.42 * min(1.2, (stats.get("pts", 0) / gp) / 32.0)
+                + 0.22 * max(0.0, min(1.0, (ovr - 70) / 28.0))
+                + 0.16 * FAME.get(item[1], 0.0)
+                + 0.10 * MARKET.get(nickname, 0.25)
+                + 0.10 * max(0.0, min(1.0, (team_win_pct.get(item[0], 0.5) - 0.3) / 0.45))
+            )
+
+        def production_score(item) -> float:
             return series_player_score(item[2]) + standings_bonus(item[0], 6.0)
+
+        def all_star_score(item) -> float:
+            # coaches' reserves: 70% production, 30% popularity (rescaled to points)
+            return 0.7 * production_score(item) + 0.3 * (popularity_score(item) * 60.0)
 
         def is_guard_player(item) -> bool:
             pl = player_lookup.get((item[0], item[1]))
@@ -22991,19 +23030,18 @@ def build_season_sections(entries: List[Dict],
         all_star_rosters = {}
         conferences_present = sorted({c for c in conference_of_team.values() if c in ("East", "West")})
         for conference in conferences_present:
-            pool = sorted(
-                [item for item in all_star_candidates if conference_of_team.get(item[0]) == conference],
-                key=all_star_score, reverse=True,
-            )
-            guards = [item for item in pool if is_guard_player(item)][:2]
-            front = [item for item in pool if not is_guard_player(item)][:3]
+            conference_items = [item for item in all_star_candidates if conference_of_team.get(item[0]) == conference]
+            fan_pool = sorted(conference_items, key=popularity_score, reverse=True)
+            guards = [item for item in fan_pool if is_guard_player(item)][:2]
+            front = [item for item in fan_pool if not is_guard_player(item)][:3]
             starters = guards + front
             chosen = {id(item) for item in starters}
-            reserves = [item for item in pool if id(item) not in chosen][:7]
+            coach_pool = sorted(conference_items, key=all_star_score, reverse=True)
+            reserves = [item for item in coach_pool if id(item) not in chosen][:7]
             all_star_rosters[conference] = (starters, reserves)
             for role, group in (("Starter", starters), ("Reserve", reserves)):
                 for item in group:
-                    awards_table.append({
+                    all_star_rows.append({
                         "award": f"All-Star {conference} ({role})", "player": item[1], "team": item[0],
                         "stats": stat_line(item[0], item[2]),
                     })
@@ -23036,8 +23074,28 @@ def build_season_sections(entries: List[Dict],
                     winner = east_team if east_team.score > west_team.score else west_team
                     score_line = f"{east_team.name} {east_team.score} - {west_team.name} {west_team.score}"
                     mvp_team = east_team if mvp_pl in east_team.roster else west_team
+                    all_star_game = {
+                        "title": score_line,
+                        "teams": [
+                            {
+                                "name": tm.name, "score": tm.score, "extras": {},
+                                "players": [
+                                    {
+                                        "name": pl.name, "pos": pl.position, "st": bool(getattr(pl, "started_game", False)),
+                                        "min": round(pl.minutes / 60, 1), "pts": pl.pts, "reb": pl.reb, "ast": pl.ast,
+                                        "stl": pl.stl, "blk": pl.blk_stat, "tov": pl.tov, "oreb": pl.oreb_stat,
+                                        "dreb": pl.dreb_stat, "pf": pl.pf, "pm": pl.plus_minus, "fgm": pl.fgm,
+                                        "fga": pl.fga, "tpm": pl.tpm, "tpa": pl.tpa, "ftm": pl.ftm, "fta": pl.fta,
+                                    }
+                                    for pl in sorted(tm.roster, key=lambda x: (not getattr(x, "started_game", False), -x.pts))
+                                    if pl.minutes > 0
+                                ],
+                            }
+                            for tm in (east_team, west_team)
+                        ],
+                    }
                     awards.append(("All-Star Game MVP", mvp_pl.name, f"{score_line} | {mvp_pl.pts} PTS, {mvp_pl.reb} REB, {mvp_pl.ast} AST"))
-                    awards_table.append({
+                    all_star_rows.append({
                         "award": "All-Star Game", "player": f"{winner.name} win", "team": score_line,
                         "stats": f"MVP {mvp_pl.name} ({mvp_team.name}): {mvp_pl.pts} PTS, {mvp_pl.reb} REB, {mvp_pl.ast} AST",
                     })
@@ -23070,6 +23128,7 @@ def build_season_sections(entries: List[Dict],
             label = "All-Defensive First Team" if team_no == 1 else "All-Defensive Second Team"
             for idx, (team_name, name, stats) in enumerate(defenders[start:start + 5], start=1):
                 awards_table.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": defense_stat_line(team_name, stats)})
+        awards_table.extend(all_star_rows)
         awards_table.extend(all_rookie_rows)
     top_lines = ["82-GAME SEASON COMPLETE", "", "Standings"]
     for row in standings:
@@ -23085,6 +23144,7 @@ def build_season_sections(entries: List[Dict],
         "_season_standings": standings,
         "_season_awards": awards,
         "_season_awards_table": awards_table,
+        "_all_star_game": all_star_game,
         "_season_player_totals": series_totals,
         "_season_team_totals": series_team_totals,
         "_series_totals": series_totals,
