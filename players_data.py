@@ -16856,3 +16856,8 @@ def _with_2016_big_mid_cleanup(factory):
 for _name, _fn in list(globals().items()):
     if _name.startswith("make_") and _name.endswith("_2016") and callable(_fn):
         globals()[_name] = _with_2016_big_mid_cleanup(_fn)
+
+
+# Real-stat calibration overrides (see real_stat_calibration.py); keep this last so it wraps every factory.
+import real_stat_calibration as _real_stat_calibration
+_real_stat_calibration.wrap_factories(globals())
