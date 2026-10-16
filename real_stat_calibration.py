@@ -153,7 +153,15 @@ OVERRIDES = {
         "LeBron James": {"block": 0.7, "dreb": 0.84, "dunk_rating": 0.948, "ft_rating": 0.723, "mid_rating": 0.874, "oreb": 0.492, "playmaking": 0.891, "rim_rating": 0.924, "shot_tendency": 0.709, "steal": 0.48, "three_rating": 0.802, "three_tendency": 0.437, "usage": 0.507},
     },
     "2018 Houston Rockets": {
-        "James Harden": {"block": 0.69, "dreb": 0.718, "dunk_rating": 0.694, "ft_rating": 0.879, "mid_rating": 0.721, "oreb": 0.365, "playmaking": 0.914, "rim_rating": 0.83, "shot_tendency": 0.99, "steal": 0.87, "three_rating": 0.967, "three_tendency": 0.55, "usage": 0.445},
+        "James Harden": {"block": 0.69, "dreb": 0.718, "dunk_rating": 0.694, "ft_rating": 0.879, "mid_rating": 0.721, "oreb": 0.365, "playmaking": 0.914, "rim_rating": 0.83, "shot_tendency": 0.99, "steal": 0.87, "three_rating": 0.967, "three_tendency": 0.55, "usage": 0.445,
+                         # 30+ a night: an explicit attempt role (~23 shots) that keeps possessions when behind pace
+                         "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
+    },
+    "2020 Houston Rockets": {
+        # Harden's 2019-20 scoring title: ~34 points on ~23 shots and 11+ free throws. His hand-entered row had him
+        # at a 0.30 usage / 0.64 foul draw / 0.40 shot IQ, which left him at ~19 points.
+        "James Harden": {"usage": 0.45, "shot_tendency": 0.95, "foul_draw": 0.95, "shot_iq": 0.62, "three_rating": 0.91,
+                         "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
     "2018 Milwaukee Bucks": {
         "Giannis Antetokounmpo": {"block": 0.705, "dreb": 0.805, "dunk_rating": 0.933, "ft_rating": 0.593, "mid_rating": 0.701, "oreb": 0.728, "playmaking": 0.711, "rim_rating": 0.904, "shot_tendency": 0.497, "steal": 0.601, "three_rating": 0.49, "three_tendency": 0.237, "usage": 0.302},
