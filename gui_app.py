@@ -3,6 +3,8 @@
 import sim_engine
 from sim_engine import *
 from players_data import *
+import players_data as _players_data_module
+from season_2018 import run_2018_season, run_2018_playoffs, factories_2018
 from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
 from web_app import run_web_gui_app
 from broadcast import BroadcastBooth
@@ -824,6 +826,8 @@ def run_gui_app():
             "Custom 16-team playoffs",
             "Full 2027 playoffs",
             "2027 season (82 games)",
+            "2018 season (82 games)",
+            "Full 2018 playoffs",
             "Custom season (82 games)",
             "Fantasy draft: 2027 players (season + playoffs)",
             "Fantasy draft: all-time (season + playoffs)",
@@ -6692,7 +6696,7 @@ def run_gui_app():
 
     def set_team_dropdown_state():
         mode = mode_var.get()
-        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
+        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "Full 2018 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
         team_a_dropdown.configure(values=team_names, state=state)
         team_b_dropdown.configure(values=team_names, state=state)
         if team_a_var.get() not in factories and team_names:
@@ -8945,7 +8949,7 @@ def run_gui_app():
 
         sys.stdout = proxy
         builtins.input = gui_input
-        sim_engine.GUI_SERIES_UPDATE_QUEUE = section_queue if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Olympic tournament", "Full 2027 playoffs", "2027 play-in & playoffs") or mode in FANTASY_SEASON_MODES else None
+        sim_engine.GUI_SERIES_UPDATE_QUEUE = section_queue if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Olympic tournament", "Full 2027 playoffs", "Full 2018 playoffs", "2027 play-in & playoffs") or mode in FANTASY_SEASON_MODES else None
         sim_engine.GUI_SCOREBOARD_QUEUE = scoreboard_queue
         sim_engine.SIM_FAST_FORWARD = False
         sim_engine.SIM_JUMP_TARGET = None
@@ -9041,8 +9045,18 @@ def run_gui_app():
                 postseason_state["factories"] = None
                 scoreboard_status_var.set("Season complete. Press Next for the play-in and playoffs, or browse standings, averages, advanced, shots/defense, awards and highs.")
                 scoreboard_queue.put({"postseason_ready": True})
+            elif mode == "Full 2018 playoffs":
+                run_2018_playoffs()
+            elif mode == "2018 season (82 games)":
+                status_var.set("2018 season running...")
+                scoreboard_status_var.set("2018 season running in the background (82 games per team)...")
+                season_sections = run_2018_season(section_queue, scoreboard_queue)
+                postseason_state["standings"] = (season_sections or {}).get("_season_standings")
+                postseason_state["factories"] = factories_2018()
+                scoreboard_status_var.set("Season complete. Press Next for the play-in and playoffs, or browse standings, averages, advanced, shots/defense, awards and highs.")
+                scoreboard_queue.put({"postseason_ready": True})
             elif mode == "2027 play-in & playoffs":
-                status_var.set("2027 play-in and playoffs running...")
+                status_var.set(f"{_players_data_module.POSTSEASON_YEAR_LABEL} play-in and playoffs running...")
                 run_2027_postseason(postseason_state["standings"], postseason_state.get("factories"))
             else:
                 run_2016_playoffs()
@@ -9074,7 +9088,7 @@ def run_gui_app():
             builtins.input = original_input
             sys.stdout = original_stdout
             running["active"] = False
-            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2016 playoffs", "Full 2027 playoffs", "2027 play-in & playoffs", "Fantasy draft playoffs", "Olympic tournament"):
+            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2016 playoffs", "Full 2027 playoffs", "Full 2018 playoffs", "2027 play-in & playoffs", "Fantasy draft playoffs", "Olympic tournament"):
                 scoreboard_queue.put({"reset_series_score": True, "series_status": "Series reset: 0-0"})
             if sim_completed:
                 pass
@@ -9106,13 +9120,13 @@ def run_gui_app():
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and mode not in FANTASY_SEASON_MODES and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and mode not in FANTASY_SEASON_MODES and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()
-        season_view["quiet"] = mode in ("2027 season (82 games)", "Season mode", "Custom season (82 games)")
+        season_view["quiet"] = mode in ("2027 season (82 games)", "2018 season (82 games)", "Season mode", "Custom season (82 games)")
         if season_view["quiet"]:
-            update_season_progress(0, 1230 if mode == "2027 season (82 games)" else 82 * 15)
+            update_season_progress(0, 1230 if mode in ("2027 season (82 games)", "2018 season (82 games)") else 82 * 15)
         running["active"] = True
         pause_button.configure(text="Pause")
         status_var.set("Running...")

@@ -201,18 +201,18 @@ def infer_custom_player_archetype(player: Player) -> str:
 def make_mavs_2024() -> Team:
     players = [
         Player("Luka Doncic", "PG",
-               0.95, 0.30, 0.20, 0.50,   0.00, 0.99,
+               0.99, 0.20, 0.20, 0.40,   0.00, 0.99,
                0.88, 0.96, 0.99, 0.78, 0.78,
-               0.70, 0.92, 0.95,
+               0.99, 0.92, 0.95,
                0.65, 0.52, 0.50, 0.81, 0.99, 0.800,
                0.60, 0.57,
                clutchness=0.98,
                shot_iq=0.70, iso_tendency = .99, stamina=0.8),
 
         Player("Kyrie Irving", "SG",
-               0.70, 0.50, 0.24, 0.50,   0.00, 0.450,
+               0.70, 0.50, 0.24, 0.50,   0.00, 0.650,
                0.90, 0.95, 0.99, 0.25, 0.90,
-               0.26, 0.70, 0.99,
+               0.20, 0.70, 0.99,
                0.75, 0.51, 0.43, 0.51, 0.400, 0.667,
                0.75, 0.32,
                clutchness=0.99,
@@ -221,14 +221,14 @@ def make_mavs_2024() -> Team:
         Player("Derrick Jones Jr.", "SF",
                0.28, 0.00, 0.34, 0.16,   0.70, 0.212,
                0.76, 0.74, 0.92, 0.96, 0.72,
-               0.12, 0.35, 0.42,
+               0.10, 0.35, 0.42,
                0.47, 0.73, 0.46, 0.46, 0.600, 0.733,
                0.80, 0.65, stamina=0.9),
 
         Player("P.J. Washington", "PF",
                0.25, 0.28, 0.18, 0.16,   0.30, 0.278,
                0.82, 0.80, 0.82, 0.78, 0.72,
-               0.16, 0.45, 0.46,
+               0.12, 0.45, 0.46,
                0.42, 0.69, 0.50, 0.71, 0.600, 0.800,
                0.78, 0.77,
                clutchness=0.70, stamina=0.83),
@@ -236,7 +236,7 @@ def make_mavs_2024() -> Team:
         Player("Daniel Gafford", "C",
                0.00, 0.05, 0.42, 0.53,   0.75, 0.320,
                0.05, 0.62, 0.92, 0.94, 0.68,
-               0.12, 0.25, 0.25,
+               0.10, 0.25, 0.25,
                0.45, 0.88, 0.80, 0.78, 0.800, 0.933,
                0.56, 0.84, stamina=0.78),
 
@@ -248,7 +248,7 @@ def make_mavs_2024() -> Team:
                0.57, 0.83, stamina=0.82),
 
         Player("Tim Hardaway Jr.", "SG",
-               0.60, 0.24, 0.12, 0.04,   0.08, 0.338,
+               0.60, 0.24, 0.12, 0.04,   0.08, 0.538,
                0.86, 0.80, 0.76, 0.60, 0.82,
                0.20, 0.42, 0.45,
                0.35, 0.34, 0.28, 0.47, 0.533, 0.600,
@@ -522,11 +522,11 @@ def make_heat_2023() -> Team:
 def make_lakers_2020() -> Team:
     players = [
         Player("LeBron James", "SF",
-               0.30, 0.30, 0.30, 0.60, 0.35, 0.350,
+               0.30, 0.30, 0.30, 0.60, 0.35, 0.850,
                0.83, 0.88, 0.99, 0.92, 0.74,
-               0.34, 0.98, 0.84,
+               0.50, 0.98, 0.84,
                0.46, 0.57, 0.38, 0.69, 0.867, 0.733,
-               0.88, 0.80, stamina=0.93),
+               0.88, 0.80, stamina=0.93, shot_iq = .70),
 
         Player("Anthony Davis", "PF",
                0.1, 0.25, 0.35, 0.16, 0.50, 0.400,
@@ -6807,6 +6807,9 @@ def run_2016_playoffs():
 # same bracket flow as the 2016 playoffs.
 # ============================================================
 
+POSTSEASON_YEAR_LABEL = "2027"      # which season the play-in / playoff screens are labelled with
+POSTSEASON_SEASON_LABEL = "2026-27"
+
 PLAYOFF_2027_CONFERENCES = {
     "East": [
         "make_hawks_2027", "make_celtics_2027", "make_nets_2027", "make_hornets_2027", "make_bulls_2027",
@@ -6847,7 +6850,7 @@ def playoff_2027_field() -> Dict[str, List[Tuple[str, int, float, str]]]:
 
 def run_2027_playoff_series(team_a_name: str, team_b_name: str, factories: Dict, stage: Dict = None) -> str:
     print("\n" + "=" * 100)
-    print(f"2027 PLAYOFF SERIES: {team_a_name} vs {team_b_name}")
+    print(f"{POSTSEASON_YEAR_LABEL} PLAYOFF SERIES: {team_a_name} vs {team_b_name}")
     print("=" * 100)
     if stage is None:
         return run_best_of_7_series(factories[team_a_name], factories[team_b_name])
@@ -6864,7 +6867,7 @@ def run_2027_playoff_series(team_a_name: str, team_b_name: str, factories: Dict,
 
 
 def print_2027_playoff_standings(field, ranked_by: str = "roster strength"):
-    print(f"\n2026-27 PLAYOFF SEEDS (ranked by {ranked_by})")
+    print(f"\n{POSTSEASON_SEASON_LABEL} PLAYOFF SEEDS (ranked by {ranked_by})")
     for conference, rows in field.items():
         print(f"\n{conference}")
         for name, seed, strength, _factory in rows:
@@ -6875,7 +6878,7 @@ def print_2027_bracket_state(rounds):
     import copy
     publish_bracket_state(rounds=copy.deepcopy(rounds))
     print("\n" + "=" * 100)
-    print("2027 PLAYOFF BRACKET")
+    print(f"{POSTSEASON_YEAR_LABEL} PLAYOFF BRACKET")
     print("=" * 100)
     for conference in ("East", "West"):
         print(f"\n{conference}")
@@ -6905,10 +6908,13 @@ def print_2027_bracket_state(rounds):
 
 
 def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, clear_state: bool = True, stage: Dict = None):
+    global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL
+    if field is None:
+        POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL = "2027", "2026-27"
     if clear_state:
         BRACKET_STATE.clear()
     if stage is None:
-        stage = {"players": {}, "teams": {}, "lines": ["2027 PLAYOFFS", "=" * 60]}
+        stage = {"players": {}, "teams": {}, "lines": [f"{POSTSEASON_YEAR_LABEL} PLAYOFFS", "=" * 60]}
         push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"])
     if field is None:
         field = playoff_2027_field()
@@ -6994,7 +7000,7 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, c
         finals_mvp = None
     print_2027_bracket_state(rounds)
     print("\n" + "#" * 100)
-    print(f"2027 PLAYOFF SIM CHAMPION: {champion}")
+    print(f"{POSTSEASON_YEAR_LABEL} PLAYOFF SIM CHAMPION: {champion}")
     print("#" * 100)
     publish_bracket_state(champion=champion, finals_mvp=finals_mvp)
     stage["lines"].append(f"CHAMPION: {champion}")
@@ -7013,7 +7019,7 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
     if conference is not None:
         record_2027_play_in(conference, slot, high_name, low_name)
     print("\n" + "=" * 100)
-    print(f"2027 PLAY-IN: {label} | {high_name} (home) vs {low_name}")
+    print(f"{POSTSEASON_YEAR_LABEL} PLAY-IN: {label} | {high_name} (home) vs {low_name}")
     print("=" * 100)
     team_a = factories[high_name]()
     team_b = factories[low_name]()
@@ -7071,10 +7077,10 @@ def run_2027_postseason(standings, custom_factories=None):
                     strengths[team.name] = team_strength_2027(team)
 
     print("\n" + "#" * 100)
-    print("2027 PLAY-IN TOURNAMENT")
+    print(f"{POSTSEASON_YEAR_LABEL} PLAY-IN TOURNAMENT")
     print("#" * 100)
     BRACKET_STATE.clear()
-    stage = {"players": {}, "teams": {}, "lines": ["2027 PLAY-IN AND PLAYOFFS", "=" * 60, "PLAY-IN"]}
+    stage = {"players": {}, "teams": {}, "lines": [f"{POSTSEASON_YEAR_LABEL} PLAY-IN AND PLAYOFFS", "=" * 60, "PLAY-IN"]}
     push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"])  # tabs reset to play-in/playoff stats
     bracket_teams = BRACKET_STATE.setdefault("teams", {})
     for row in standings:
@@ -7104,7 +7110,7 @@ def run_2027_postseason(standings, custom_factories=None):
         field[conference] = [(name, seed, strengths[name], factory_names[name]) for seed, name in enumerate(seeds, start=1)]
         print(f"\n{conference} playoff seeds: " + ", ".join(f"{seed}. {name}" for seed, name in enumerate(seeds, start=1)))
 
-    print("\n2027 PLAYOFFS (seeded from the regular season and play-in)")
+    print(f"\n{POSTSEASON_YEAR_LABEL} PLAYOFFS (seeded from the regular season and play-in)")
     stage["lines"].extend(["", "PLAYOFFS"])
     run_2027_playoffs(field, factories, announce_seeds=False, clear_state=False, stage=stage)
 
@@ -7175,6 +7181,8 @@ def _run_2027_season_game(task):
 
 
 def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
+    global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL
+    POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL = "2027", "2026-27"
     games, conf_of = build_2027_season_schedule()
     games = [(home, away, order) for order, (home, away) in enumerate(games)]
     entries = []
