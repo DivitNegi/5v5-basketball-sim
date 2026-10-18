@@ -734,13 +734,6 @@ def make_hawks_2018() -> Team:
                0.49, 0.72, 0.66, 0.99, 0.54, 0.59,
                0.48, 0.89,
                stamina=0.69, archetype="post_scorer", height=82),
-        Player("Ersan İlyasova", "PF",
-               0.44, 0.31, 0.24, 0.04, 0.12, 0.36,
-               0.75, 0.87, 0.90, 0.53, 0.81,
-               0.20, 0.63, 0.43,
-               0.64, 0.63, 0.61, 0.70, 0.65, 0.49,
-               0.68, 0.63,
-               stamina=0.70, archetype="stretch_big", height=81),
         Player("John Collins", "PF",
                0.13, 0.26, 0.40, 0.13, 0.71, 0.16,
                0.41, 0.67, 0.97, 0.98, 0.70,
@@ -776,15 +769,8 @@ def make_hawks_2018() -> Team:
                0.35, 0.12, 0.27, 0.40, 0.87, 0.50,
                0.76, 0.44,
                stamina=0.58, archetype="playmaker", height=75),
-        Player("Marco Belinelli", "SG",
-               0.46, 0.51, 0.15, 0.03, 0.10, 0.41,
-               0.79, 0.79, 0.60, 0.30, 0.93,
-               0.23, 0.61, 0.71,
-               0.54, 0.09, 0.42, 0.51, 0.64, 0.32,
-               0.81, 0.44,
-               stamina=0.66, archetype="movement_shooter", height=77),
     ]
-    return _team("2018 Atlanta Hawks", players, (30.0, 31.0, 27.5, 24.9, 25.5, 24.1, 12.7, 14.6, 12.7, 13.7, 23.3))
+    return _team("2018 Atlanta Hawks", players, (30.0, 31.0, 27.5, 24.9, 24.1, 12.7, 14.6, 12.7, 13.7))
 
 
 def make_nets_2018() -> Team:
@@ -859,13 +845,6 @@ def make_nets_2018() -> Team:
                0.21, 0.49, 0.39, 0.60, 0.52, 0.61,
                0.62, 0.63,
                stamina=0.59, archetype="movement_shooter", height=79),
-        Player("Trevor Booker", "PF",
-               0.13, 0.30, 0.23, 0.12, 0.08, 0.38,
-               0.50, 0.85, 0.91, 0.55, 0.55,
-               0.29, 0.65, 0.43,
-               0.09, 0.14, 0.62, 0.70, 0.79, 0.61,
-               0.58, 0.56,
-               stamina=0.63, archetype="balanced", height=80),
         Player("Dante Cunningham", "SF",
                0.21, 0.30, 0.23, 0.06, 0.08, 0.08,
                0.74, 0.99, 0.99, 0.66, 0.73,
@@ -874,7 +853,7 @@ def make_nets_2018() -> Team:
                0.69, 0.58,
                stamina=0.61, archetype="balanced", height=80),
     ]
-    return _team("2018 Brooklyn Nets", players, (29.9, 29.3, 28.2, 28.8, 25.7, 7.9, 9.5, 25.3, 26.3, 9.2, 10.4, 9.6))
+    return _team("2018 Brooklyn Nets", players, (29.9, 29.3, 28.2, 28.8, 25.7, 7.9, 9.5, 25.3, 26.3, 9.2, 9.6))
 
 
 def make_hornets_2018() -> Team:
@@ -1039,15 +1018,8 @@ def make_bulls_2018() -> Team:
                0.51, 0.61, 0.79, 0.89, 0.55, 0.50,
                0.65, 0.68,
                stamina=0.64, archetype="post_scorer", height=81),
-        Player("Nikola Mirotić", "PF",
-               0.48, 0.20, 0.35, 0.04, 0.08, 0.52,
-               0.97, 0.82, 0.77, 0.45, 0.83,
-               0.30, 0.72, 0.44,
-               0.43, 0.68, 0.50, 0.90, 0.73, 0.47,
-               0.62, 0.75,
-               stamina=0.69, archetype="stretch_big", height=82),
     ]
-    return _team("2018 Chicago Bulls", players, (31.5, 29.7, 26.4, 29.3, 27.2, 9.1, 27.3, 9.3, 7.1, 9.3, 8.9, 24.9))
+    return _team("2018 Chicago Bulls", players, (31.5, 29.7, 26.4, 29.3, 27.2, 9.1, 27.3, 9.3, 7.1, 9.3, 8.9))
 
 
 def make_mavs_2018() -> Team:
@@ -1129,15 +1101,8 @@ def make_mavs_2018() -> Team:
                0.09, 0.13, 0.25, 0.41, 0.48, 0.51,
                0.67, 0.53,
                stamina=0.65, archetype="balanced", height=79),
-        Player("Devin Harris", "PG",
-               0.30, 0.30, 0.23, 0.03, 0.08, 0.35,
-               0.80, 0.81, 0.70, 0.31, 0.83,
-               0.22, 0.65, 0.85,
-               0.55, 0.17, 0.35, 0.45, 0.99, 0.68,
-               0.80, 0.48,
-               stamina=0.57, archetype="balanced", height=75),
     ]
-    return _team("2018 Dallas Mavericks", players, (34.2, 24.7, 29.7, 33.8, 7.9, 9.9, 27.8, 10.0, 23.2, 7.4, 22.9, 8.6))
+    return _team("2018 Dallas Mavericks", players, (34.2, 24.7, 29.7, 33.8, 7.9, 9.9, 27.8, 10.0, 23.2, 7.4, 22.9))
 
 
 def make_nuggets_2018() -> Team:
@@ -1253,13 +1218,6 @@ def make_pistons_2018() -> Team:
                0.61, 0.40, 0.34, 0.49, 0.72, 0.53,
                0.90, 0.52,
                stamina=0.73, archetype="balanced", height=78),
-        Player("Tobias Harris", "PF",
-               0.28, 0.38, 0.24, 0.12, 0.21, 0.27,
-               0.91, 0.89, 0.83, 0.56, 0.84,
-               0.15, 0.61, 0.44,
-               0.39, 0.52, 0.31, 0.52, 0.55, 0.41,
-               0.61, 0.58,
-               stamina=0.82, archetype="balanced", height=80),
         Player("Reggie Jackson", "PG",
                0.43, 0.48, 0.25, 0.03, 0.10, 0.45,
                0.74, 0.92, 0.80, 0.34, 0.85,
@@ -1310,7 +1268,7 @@ def make_pistons_2018() -> Team:
                0.82, 0.41,
                stamina=0.55, archetype="three_and_d", height=73),
     ]
-    return _team("2018 Detroit Pistons", players, (33.7, 27.9, 27.4, 32.6, 26.7, 31.7, 24.9, 10.1, 9.1, 9.2, 6.7))
+    return _team("2018 Detroit Pistons", players, (33.7, 27.9, 27.4, 26.7, 31.7, 24.9, 10.1, 9.1, 9.2, 6.7))
 
 
 def make_warriors_2018() -> Team:
@@ -1613,13 +1571,6 @@ def make_lakers_2018() -> Team:
                0.52, 0.44, 0.51, 0.67, 0.70, 0.47,
                0.77, 0.54,
                stamina=0.66, archetype="movement_shooter", height=77),
-        Player("Larry Nance Jr.", "C",
-               0.06, 0.20, 0.35, 0.14, 0.08, 0.03,
-               0.20, 0.75, 0.99, 0.64, 0.66,
-               0.03, 0.69, 0.30,
-               0.99, 0.79, 0.82, 0.74, 0.94, 0.67,
-               0.67, 0.65,
-               stamina=0.64, archetype="post_scorer", height=78),
         Player("Tyler Ennis", "PG",
                0.31, 0.30, 0.23, 0.03, 0.08, 0.32,
                0.63, 0.76, 0.76, 0.34, 0.75,
@@ -1634,13 +1585,6 @@ def make_lakers_2018() -> Team:
                0.76, 0.19, 0.38, 0.45, 0.72, 0.55,
                0.76, 0.44,
                stamina=0.55, archetype="balanced", height=75),
-        Player("Jordan Clarkson", "SG",
-               0.45, 0.44, 0.25, 0.03, 0.12, 0.53,
-               0.81, 0.83, 0.90, 0.37, 0.77,
-               0.29, 0.69, 0.75,
-               0.48, 0.09, 0.51, 0.57, 0.58, 0.38,
-               0.77, 0.45,
-               stamina=0.66, archetype="playmaker", height=77),
         Player("Corey Brewer", "SF",
                0.32, 0.30, 0.23, 0.06, 0.08, 0.04,
                0.54, 0.73, 0.76, 0.44, 0.72,
@@ -1649,7 +1593,7 @@ def make_lakers_2018() -> Team:
                0.86, 0.51,
                stamina=0.55, archetype="balanced", height=81),
     ]
-    return _team("2018 Los Angeles Lakers", players, (33.2, 23.4, 33.5, 34.2, 26.7, 31.2, 9.2, 8.7, 5.0, 6.0, 23.7, 5.1))
+    return _team("2018 Los Angeles Lakers", players, (33.2, 23.4, 33.5, 34.2, 26.7, 31.2, 9.2, 5.0, 6.0, 5.1))
 
 
 def make_grizzlies_2018() -> Team:
@@ -1703,13 +1647,6 @@ def make_grizzlies_2018() -> Team:
                0.50, 0.33, 0.43, 0.50, 0.49, 0.69,
                0.80, 0.51,
                stamina=0.59, archetype="balanced", height=75),
-        Player("James Ennis III", "SF",
-               0.25, 0.13, 0.28, 0.06, 0.31, 0.03,
-               0.83, 0.86, 0.96, 0.58, 0.85,
-               0.03, 0.37, 0.55,
-               0.50, 0.48, 0.47, 0.51, 0.88, 0.48,
-               0.74, 0.55,
-               stamina=0.66, archetype="balanced", height=78),
         Player("Mario Chalmers", "PG",
                0.58, 0.30, 0.24, 0.03, 0.08, 0.15,
                0.76, 0.81, 0.68, 0.34, 0.85,
@@ -1732,7 +1669,7 @@ def make_grizzlies_2018() -> Team:
                0.43, 0.87,
                stamina=0.55, archetype="post_scorer", height=81),
     ]
-    return _team("2018 Memphis Grizzlies", players, (28.7, 33.0, 28.0, 23.7, 22.8, 30.9, 12.8, 23.4, 14.1, 12.6, 10.0))
+    return _team("2018 Memphis Grizzlies", players, (28.7, 33.0, 28.0, 23.7, 22.8, 30.9, 12.8, 14.1, 12.6, 10.0))
 
 
 def make_heat_2018() -> Team:
@@ -1977,15 +1914,8 @@ def make_knicks_2018() -> Team:
                0.57, 0.10, 0.46, 0.57, 0.46, 0.40,
                0.74, 0.38,
                stamina=0.63, archetype="floor_general", height=72),
-        Player("Doug McDermott", "SF",
-               0.15, 0.26, 0.26, 0.06, 0.17, 0.09,
-               0.89, 0.85, 0.87, 0.43, 0.76,
-               0.05, 0.12, 0.54,
-               0.05, 0.17, 0.32, 0.41, 0.50, 0.42,
-               0.63, 0.54,
-               stamina=0.62, archetype="balanced", height=79),
     ]
-    return _team("2018 New York Knicks", players, (25.8, 30.4, 25.0, 33.1, 32.4, 11.4, 22.3, 11.1, 21.9, 13.4, 13.1))
+    return _team("2018 New York Knicks", players, (25.8, 30.4, 25.0, 33.1, 32.4, 11.4, 22.3, 11.1, 21.9, 13.4))
 
 
 def make_magic_2018() -> Team:
@@ -2018,13 +1948,6 @@ def make_magic_2018() -> Team:
                0.43, 0.42, 0.44, 0.49, 0.86, 0.52,
                0.76, 0.50,
                stamina=0.76, archetype="balanced", height=78),
-        Player("Elfrid Payton", "PG",
-               0.02, 0.29, 0.36, 0.03, 0.11, 0.55,
-               0.77, 0.69, 0.89, 0.31, 0.64,
-               0.34, 0.99, 0.92,
-               0.66, 0.52, 0.53, 0.59, 0.70, 0.48,
-               0.84, 0.49,
-               stamina=0.75, archetype="floor_general", height=75),
         Player("DJ Augustin", "PG",
                0.35, 0.17, 0.24, 0.03, 0.08, 0.42,
                0.85, 0.84, 0.67, 0.31, 0.87,
@@ -2068,7 +1991,7 @@ def make_magic_2018() -> Team:
                0.41, 0.77,
                stamina=0.55, archetype="stretch_big", height=82),
     ]
-    return _team("2018 Orlando Magic", players, (32.9, 32.2, 29.5, 29.4, 28.6, 23.5, 22.1, 10.7, 11.7, 11.7, 7.7))
+    return _team("2018 Orlando Magic", players, (32.9, 32.2, 29.5, 29.4, 23.5, 22.1, 10.7, 11.7, 11.7, 7.7))
 
 
 def make_sixers_2018() -> Team:
@@ -2357,13 +2280,6 @@ def make_kings_2018() -> Team:
                0.30, 0.45, 0.31, 0.48, 0.29, 0.40,
                0.68, 0.56,
                stamina=0.64, archetype="balanced", height=80),
-        Player("George Hill", "PG",
-               0.19, 0.46, 0.21, 0.03, 0.10, 0.25,
-               0.96, 0.85, 0.88, 0.31, 0.78,
-               0.15, 0.65, 0.84,
-               0.66, 0.51, 0.42, 0.50, 0.83, 0.43,
-               0.75, 0.50,
-               stamina=0.71, archetype="balanced", height=76),
         Player("Garrett Temple", "SG",
                0.23, 0.49, 0.17, 0.03, 0.12, 0.26,
                0.89, 0.79, 0.80, 0.26, 0.77,
@@ -2407,7 +2323,7 @@ def make_kings_2018() -> Team:
                0.76, 0.42,
                stamina=0.58, archetype="playmaker", height=71),
     ]
-    return _team("2018 Sacramento Kings", players, (27.8, 25.6, 28.0, 27.9, 12.1, 26.6, 24.8, 11.3, 25.3, 10.7, 9.7, 10.3))
+    return _team("2018 Sacramento Kings", players, (27.8, 25.6, 28.0, 27.9, 12.1, 24.8, 11.3, 25.3, 10.7, 9.7, 10.3))
 
 
 def make_spurs_2018() -> Team:
