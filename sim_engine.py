@@ -8313,7 +8313,7 @@ def rotation_star_players(team: Team) -> List[Player]:
         # left him with ordinary-starter rest rules instead of star-level
         # minutes. The Warriors' stars are Curry and Butler.
         return [p for p in ranked if p.name in ("Stephen Curry", "Jimmy Butler")]
-    star_count = 1 if team.name == "2026 Los Angeles Lakers" else 2
+    star_count = 2  # 2026 Lakers: Luka and LeBron are both iron-man stars
     stars = ranked[:star_count]
     required_names = set(mandatory_closers(team))
     for p in ranked:
@@ -8738,19 +8738,21 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2026 Los Angeles Lakers":
-        # Exact per-player minutes from the real 2025-26 box score, not
-        # ranges, since the rotation engine only aims at whatever this
-        # gives it -- a range just adds noise around the real number.
+        # Exact per-player minutes, not ranges, since the rotation engine only
+        # aims at whatever this gives it -- a range just adds noise. Luka is on
+        # the roster again (injuries don't matter here), so the minutes below
+        # are the healthy rotation, not the real injury-hit box score.
         target_ranges = {
-            "Rui Hachimura": (39, 39),
-            "LeBron James": (38, 38),
-            "Austin Reaves": (37, 37),
-            "Marcus Smart": (35, 35),
-            "Luke Kennard": (33, 33),
-            "Deandre Ayton": (29, 29),
-            "Jaxson Hayes": (16, 16),
+            "Luka Doncic": (36, 36),
+            "LeBron James": (34, 34),
+            "Austin Reaves": (34, 34),
+            "Rui Hachimura": (28, 28),
+            "Deandre Ayton": (27, 27),
+            "Marcus Smart": (22, 22),
+            "Luke Kennard": (20, 20),
             "Jake LaRavia": (14, 14),
-            "Jarred Vanderbilt": (0, 0),
+            "Jaxson Hayes": (13, 13),
+            "Jarred Vanderbilt": (7, 7),
             "Bronny James": (5, 5),
         }
         for p in team.roster:
