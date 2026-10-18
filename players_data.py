@@ -17,7 +17,6 @@ from teams.teams_1986 import *
 from teams.teams_1987 import *
 from teams.teams_1989 import *
 from teams.teams_1991 import *
-from teams.teams_1992 import *
 from teams.teams_1994 import *
 from teams.teams_1995 import *
 from teams.teams_1996 import *
@@ -49,6 +48,7 @@ from teams.teams_2024 import *
 from teams.teams_2025 import *
 from teams.teams_2026 import *
 from teams.teams_2027 import *
+from teams.teams_olympic import *
 
 
 def _rating_to_float(value, default: float = 0.50) -> float:

@@ -16,6 +16,8 @@ Originally a single ~43,000-line script; split into modules by concern:
   subsystem.
 - **`teams/teams_YYYY.py`** — one file per season holding that season's team
   rosters (`make_*_YYYY` factory functions), e.g. `teams/teams_2018.py`.
+  `teams/teams_olympic.py` holds the special international teams (1992 Dream Team,
+  2008 Redeem Team and the 2024 Olympic field).
 - **`players_data.py`** — imports every `teams/teams_YYYY.py`, applies the
   real-stat calibration overrides, and holds the fantasy player pool builder,
   the postseason/season runners and the team-factory registries
