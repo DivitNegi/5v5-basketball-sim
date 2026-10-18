@@ -146,31 +146,16 @@ OVERRIDES = {
         "Klay Thompson": {"block": 0.567, "dreb": 0.444, "dunk_rating": 0.845, "ft_rating": 0.901, "mid_rating": 0.844, "oreb": 0.306, "playmaking": 0.478, "rim_rating": 0.85, "shot_tendency": 0.449, "steal": 0.63, "three_rating": 0.912, "three_tendency": 0.6, "usage": 0.273},
         "Stephen Curry": {"block": 0.468, "dreb": 0.571, "dunk_rating": 0.658, "ft_rating": 0.889, "mid_rating": 0.98, "oreb": 0.344, "playmaking": 0.743, "rim_rating": 0.896, "shot_tendency": 0.617, "steal": 0.61, "three_rating": 0.957, "three_tendency": 0.667, "usage": 0.318},
     },
-    "2018 Boston Celtics": {
-        "Kyrie Irving": {"block": 0.476, "dreb": 0.581, "dunk_rating": 0.305, "ft_rating": 0.854, "mid_rating": 0.886, "oreb": 0.491, "playmaking": 0.676, "rim_rating": 0.898, "shot_tendency": 0.473, "steal": 0.65, "three_rating": 0.99, "three_tendency": 0.381, "usage": 0.302},
-    },
-    "2018 Cleveland Cavaliers": {
-        "LeBron James": {"block": 0.7, "dreb": 0.84, "dunk_rating": 0.948, "ft_rating": 0.723, "mid_rating": 0.874, "oreb": 0.492, "playmaking": 0.891, "rim_rating": 0.924, "shot_tendency": 0.709, "steal": 0.48, "three_rating": 0.802, "three_tendency": 0.437, "usage": 0.507},
-    },
     "2018 Houston Rockets": {
-        "James Harden": {"block": 0.69, "dreb": 0.718, "dunk_rating": 0.694, "ft_rating": 0.879, "mid_rating": 0.721, "oreb": 0.365, "playmaking": 0.914, "rim_rating": 0.83, "shot_tendency": 0.99, "steal": 0.87, "three_rating": 0.967, "three_tendency": 0.55, "usage": 0.445,
-                         # 30+ a night: an explicit attempt role (~23 shots) that keeps possessions when behind pace
-                         "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
+        # Harden's ratings are calibrated in teams/teams_2018.py; this keeps only his attempt role:
+        # 30+ a night on ~23 shots that keep the possession when behind pace.
+        "James Harden": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
     "2020 Houston Rockets": {
         # Harden's 2019-20 scoring title: ~34 points on ~23 shots and 11+ free throws. His hand-entered row had him
         # at a 0.30 usage / 0.64 foul draw / 0.40 shot IQ, which left him at ~19 points.
         "James Harden": {"usage": 0.45, "shot_tendency": 0.95, "foul_draw": 0.95, "shot_iq": 0.62, "three_rating": 0.91,
                          "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
-    },
-    "2018 Milwaukee Bucks": {
-        "Giannis Antetokounmpo": {"block": 0.705, "dreb": 0.805, "dunk_rating": 0.933, "ft_rating": 0.593, "mid_rating": 0.701, "oreb": 0.728, "playmaking": 0.711, "rim_rating": 0.904, "shot_tendency": 0.497, "steal": 0.601, "three_rating": 0.49, "three_tendency": 0.237, "usage": 0.302},
-    },
-    "2018 New Orleans Pelicans": {
-        "Anthony Davis": {"block": 0.874, "dreb": 0.99, "dunk_rating": 0.896, "ft_rating": 0.828, "mid_rating": 0.83, "oreb": 0.895, "playmaking": 0.486, "rim_rating": 0.873, "shot_tendency": 0.438, "steal": 0.649, "three_rating": 0.748, "three_tendency": 0.207, "usage": 0.229},
-    },
-    "2018 Utah Jazz": {
-        "Donovan Mitchell": {"block": 0.392, "dreb": 0.582, "dunk_rating": 0.89, "ft_rating": 0.805, "mid_rating": 0.903, "oreb": 0.34, "playmaking": 0.51, "rim_rating": 0.96, "shot_tendency": 0.287, "steal": 0.7, "three_rating": 0.904, "three_tendency": 0.348, "usage": 0.22},
     },
     "2019 Golden State Warriors": {
         "Kevin Durant": {"block": 0.713, "dreb": 0.574, "dunk_rating": 0.803, "ft_rating": 0.877, "mid_rating": 0.882, "oreb": 0.314, "playmaking": 0.85, "rim_rating": 0.79, "shot_tendency": 0.502, "steal": 0.316, "three_rating": 0.77, "three_tendency": 0.405, "usage": 0.366},

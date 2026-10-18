@@ -8147,6 +8147,17 @@ def is_defensive_role_player(p: Player) -> bool:
     )
 
 
+PRIORITY_RESERVES_2018 = {
+    "2018 Cleveland Cavaliers": ("Kyle Korver",),
+    "2018 Milwaukee Bucks": ("Tony Snell", "Thon Maker"),
+    "2018 Houston Rockets": ("Luc Mbah a Moute", "Gerald Green"),
+    "2018 Boston Celtics": ("Terry Rozier", "Marcus Morris", "Marcus Smart"),
+    "2018 Toronto Raptors": ("Fred VanVleet", "Jakob Poeltl"),
+    "2018 New Orleans Pelicans": ("Darius Miller", "Nikola Mirotic"),
+    "2018 Utah Jazz": ("Jae Crowder",),
+}
+
+
 def is_priority_reserve(player: Player, team: Team) -> bool:
     if player.name == "Shaun Livingston" and team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2019 Golden State Warriors"):
         return True
@@ -8178,6 +8189,8 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name in ("Wayne Ellington", "Bam Adebayo", "Justise Winslow") and team.name == "2018 Miami Heat":
         return True  # real rotation pieces (26 mpg guard, 17 mpg center, 22 mpg forward); without this the rotation buries them
+    if player.name in PRIORITY_RESERVES_2018.get(team.name, ()):
+        return True  # real bench rotation pieces on the calibrated 2018 teams; without this the rotation buries them
     if team.name == "2018 Oklahoma City Thunder" and player.name in (
         "Jerami Grant", "Raymond Felton", "Patrick Patterson",
         "Alex Abrines", "Terrance Ferguson",
