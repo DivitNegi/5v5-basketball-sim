@@ -39,6 +39,14 @@ def team_display_name(name):
     return base
 
 
+def team_sort_key(name):
+    """Alphabetical by team name; the season year only breaks ties between the same franchise (2016 vs 2017 Warriors)."""
+    if not isinstance(name, str):
+        return ("", "")
+    match = _TEAM_YEAR_PATTERN.match(name)
+    return ((match.group(2) if match else name).lower(), name)
+
+
 def table_player_name(name, width=PLAYER_NAME_COL_WIDTH):
     return _engine_table_player_name(team_display_name(name), width)
 
@@ -3435,7 +3443,7 @@ def run_gui_app():
         team_names = list(players_by_team.keys())
         for side in ("a", "b"):
             refs = compare_vars[side]
-            refs["team_box"].configure(values=[team_display_name(n) for n in team_names])
+            refs["team_box"].configure(values=sorted((team_display_name(n) for n in team_names), key=team_sort_key))
         lookup = {team_display_name(n): n for n in team_names}
         for idx, side in enumerate(("a", "b")):
             refs = compare_vars[side]
@@ -3571,7 +3579,7 @@ def run_gui_app():
         games = sections.get("_season_games") or []
         standings = sections.get("_season_standings") or []
         names = [row["team"] for row in standings] or sorted({g["home"] for g in games} | {g["away"] for g in games})
-        team_recap_dropdown.configure(values=[team_display_name(n) for n in names])
+        team_recap_dropdown.configure(values=sorted((team_display_name(n) for n in names), key=team_sort_key))
         lookup = {team_display_name(n): n for n in names}
         shown = team_recap_var.get()
         if shown not in lookup:
@@ -3734,7 +3742,7 @@ def run_gui_app():
 
     def update_advanced_widgets(sections: Dict):
         series_totals, series_team_totals, _source_label = stat_totals_for_source(sections)
-        teams = ["All Teams"] + list(series_team_totals.keys() or series_totals.keys())
+        teams = ["All Teams"] + sorted(series_team_totals.keys() or series_totals.keys(), key=team_sort_key)
         current_team = advanced_team_var.get()
         advanced_team_dropdown.configure(values=teams or ("All Teams",))
         if current_team not in teams:
@@ -3934,7 +3942,7 @@ def run_gui_app():
             if var.get() not in values:
                 var.set("All Games")
         active_totals = game_diet_totals(sections, shot_filter_var.get(), "shot", shot_quarter_filter_var.get())
-        team_values = tuple(["All Teams"] + list(active_totals.keys()))
+        team_values = tuple(["All Teams"] + sorted(active_totals.keys(), key=team_sort_key))
         shot_team_filter_dropdown.configure(values=team_values or ("All Teams",))
         if shot_team_filter_var.get() not in team_values:
             shot_team_filter_var.set("All Teams")
@@ -4268,7 +4276,7 @@ def run_gui_app():
 
     def update_series_average_widgets(sections: Dict):
         series_totals, series_team_totals, _source_label = stat_totals_for_source(sections)
-        teams = ["All Teams"] + list(series_team_totals.keys())
+        teams = ["All Teams"] + sorted(series_team_totals.keys(), key=team_sort_key)
         current = series_avg_team_var.get()
         series_avg_team_dropdown.configure(values=teams or ("All Teams",))
         if current not in teams:
@@ -4535,7 +4543,7 @@ def run_gui_app():
         playoff_sections_state["sections"] = sections
         series_totals = sections.get("_playoff_player_totals") or sections.get("_series_totals") or {}
         series_team_totals = sections.get("_playoff_team_totals") or sections.get("_series_team_totals") or {}
-        teams = ["All Teams"] + list(series_team_totals.keys())
+        teams = ["All Teams"] + sorted(series_team_totals.keys(), key=team_sort_key)
         current = playoff_avg_team_var.get()
         playoff_avg_team_dropdown.configure(values=teams)
         if current not in teams:
