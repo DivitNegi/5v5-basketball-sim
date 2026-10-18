@@ -1,13 +1,695 @@
 """
-2017-18 NBA teams (the 2018 season) -- every team that is not already in players_data.py.
+NBA teams for the 2017-18 season (moved out of players_data.py, which imports everything defined here).
 
-Built from real Basketball-Reference 2017-18 regular-season data (per-game, advanced and shooting-split
-tables). Each player's tendencies and ratings were derived from his real shot profile, efficiency, usage,
-passing, rebounding and defensive rates, then calibrated by simulating full 82-game seasons until his
-simulated per-minute line matched the real one (points, rebounds, assists, steals, blocks, FG%, 3PA, 3P%,
-FT%). `real_mpg` carries each player's real rotation minutes (scaled so a roster adds up to one game).
+The first eight factories were hand-entered. The remaining 22 were built from real Basketball-Reference
+2017-18 data (per-game, advanced and shooting-split tables) and then calibrated by simulating full
+82-game seasons until each player's per-minute line matched the real one. `real_mpg` carries each
+player's real rotation minutes (scaled so a roster adds up to one game).
 """
-from sim_engine import Player, Team
+from sim_engine import *
+
+
+def make_cavs_2018() -> Team:
+    players = [
+        Player("George Hill", "PG",
+               0.42, 0.26, 0.22, 0.10,   0.10, 0.259,
+               0.84, 0.80, 0.80, 0.62, 0.80,
+               0.14, 0.58, 0.60,
+               0.88, 0.29, 0.32, 0.43, 0.467, 0.600,
+               0.93, 0.38, stamina=0.74),
+
+        Player("JR Smith", "SG",
+               0.56, 0.24, 0.14, 0.06,   0.10, 0.292,
+               0.86, 0.82, 0.78, 0.62, 0.76,
+               0.16, 0.42, 0.48,
+               0.63, 0.42, 0.35, 0.45, 0.467, 0.667,
+               0.78, 0.45, stamina=0.68),
+
+        Player("LeBron James", "SF",
+               0.30, 0.32, 0.30, 0.80,   0.50, 0.7,
+               0.85, 0.92, 0.99, 0.98, 0.74,
+               0.50, 0.98, 0.88,
+               0.60, 0.85, 0.38, 0.69, 0.733, 0.800,
+               0.88, 0.80,
+               clutchness=0.99, stamina=0.9),
+
+        Player("Kevin Love", "PF",
+               0.42, 0.28, 0.14, 0.16,   0.15, 0.250,
+               0.86, 0.82, 0.80, 0.68, 0.86,
+               0.15, 0.48, 0.48,
+               0.41, 0.62, 0.73, 0.94, 0.800, 0.733,
+               0.55, 0.74,
+               clutchness=0.76, stamina=0.6),
+
+        Player("Tristan Thompson", "C",
+               0.01, 0.10, 0.44, 0.45,   0.45, 0.220,
+               0.05, 0.66, 0.86, 0.82, 0.62,
+               0.12, 0.25, 0.25,
+               0.42, 0.66, 0.88, 0.79, 0.667, 0.867,
+               0.58, 0.79, stamina=0.72),
+
+        Player("Jordan Clarkson", "PG",
+               0.38, 0.30, 0.24, 0.08,   0.20, 0.343,
+               0.80, 0.80, 0.82, 0.72, 0.78,
+               0.22, 0.48, 0.62,
+               0.38, 0.42, 0.52, 0.38, 0.667, 0.667,
+               0.58, 0.43, stamina=0.8),
+
+        Player("Kyle Korver", "SG",
+               0.70, 0.20, 0.06, 0.04,   0.02, 0.239,
+               0.92, 0.84, 0.72, 0.40, 0.88,
+               0.17, 0.45, 0.42,
+               0.57, 0.50, 0.27, 0.52, 0.400, 0.533,
+               0.55, 0.47,
+               clutchness=0.82, stamina=0.62),
+
+        Player("Larry Nance Jr.", "PF",
+               0.12, 0.18, 0.36, 0.34,   0.62, 0.213,
+               0.62, 0.68, 0.86, 0.88, 0.70,
+               0.12, 0.45, 0.46,
+               0.79, 0.77, 0.55, 0.73, 0.600, 0.800,
+               0.64, 0.77, stamina=0.83),
+
+        Player("Jeff Green", "SF",
+               0.32, 0.28, 0.26, 0.14,   0.35, 0.273,
+               0.78, 0.80, 0.84, 0.82, 0.76,
+               0.16, 0.42, 0.48,
+               0.34, 0.64, 0.43, 0.51, 0.667, 0.733,
+               0.72, 0.71, stamina=0.64),
+
+        Player("Rodney Hood", "SG",
+               0.42, 0.32, 0.18, 0.08,   0.12, 0.281,
+               0.82, 0.82, 0.78, 0.62, 0.82,
+               0.16, 0.40, 0.46,
+               0.86, 0.28, 0.31, 0.43, 0.467, 0.600,
+               0.90, 0.37, stamina=0.75),
+    ]
+    t = Team("2018 Cleveland Cavaliers", players)
+    t.init_lineup()
+    return t
+
+
+def make_bucks_2018() -> Team:
+    players = [
+        # name, pos,
+        # three_t, mid_t, drive_t, post_t, dunk_t, shot_t,
+        # three_r, mid_r, rim_r, dunk_r, ft_r,
+        # usage, playmaking, handle,
+        # steal, block, oreb, dreb, foul_draw, foul_rate,
+        # perimeter_def, interior_def
+        Player("Eric Bledsoe", "PG",
+               0.34, 0.28, 0.30, 0.08, 0.34, 0.310,
+               0.80, 0.82, 0.88, 0.84, 0.78,
+               0.25, 0.70, 0.82,
+               0.86, 0.45, 0.46, 0.57, 0.733, 0.800,
+               0.83, 0.58,
+               clutchness=0.74, secondary_positions=("SG",),
+               badges=("transition_engine", "pest"), height=73, speed=0.84,
+               shot_iq=0.72, iso_tendency=0.30, archetype="downhill guard", stamina=0.76),
+
+        Player("Malcolm Brogdon", "SG",
+               0.42, 0.30, 0.20, 0.08, 0.10, 0.210,
+               0.86, 0.84, 0.82, 0.68, 0.86,
+               0.18, 0.66, 0.70,
+               0.62, 0.38, 0.39, 0.55, 0.533, 0.533,
+               0.78, 0.56,
+               clutchness=0.78, secondary_positions=("PG",),
+               badges=("connector", "catch_and_shoot_silver"), height=77, speed=0.68,
+               shot_iq=0.84, iso_tendency=0.12, archetype="connector", stamina=0.79),
+
+        Player("Khris Middleton", "SF",
+               0.40, 0.38, 0.16, 0.06, 0.16, 0.360,
+               0.88, 0.90, 0.84, 0.76, 0.88,
+               0.27, 0.62, 0.70,
+               0.57, 0.42, 0.47, 0.66, 0.667, 0.667,
+               0.78, 0.66,
+               clutchness=0.84, secondary_positions=("SG", "PF"),
+               badges=("shot_creator_gold", "clutch_silver", "catch_and_shoot_gold"), height=79, speed=0.64,
+               shot_iq=0.84, iso_tendency=0.34, archetype="shot creator", stamina=0.78),
+
+        Player("Giannis Antetokounmpo", "PF",
+               0.10, 0.22, 0.42, 0.26, 0.88, 0.560,
+               0.34, 0.74, 0.96, 0.96, 0.74,
+               0.34, 0.70, 0.76,
+               0.72, 0.78, 0.84, 0.93, 0.990, 0.867,
+               0.86, 0.88,
+               clutchness=0.84, secondary_positions=("SF", "C"),
+               badges=("posterizer_hof", "transition_engine", "chasedown_gold", "rebounder"), height=83, speed=0.86,
+               shot_iq=0.78, iso_tendency=0.56, archetype="downhill superstar", stamina=0.9),
+
+        Player("John Henson", "C",
+               0.02, 0.16, 0.34, 0.48, 0.45, 0.160,
+               0.12, 0.68, 0.86, 0.84, 0.60,
+               0.12, 0.30, 0.30,
+               0.46, 0.82, 0.78, 0.86, 0.533, 0.733,
+               0.48, 0.82,
+               clutchness=0.62, secondary_positions=("PF",),
+               badges=("rim_protector", "lob_threat"), height=83, speed=0.54,
+               shot_iq=0.72, iso_tendency=0.04, archetype="rim protector", stamina=0.65),
+
+        Player("Jabari Parker", "PF",
+               0.28, 0.34, 0.26, 0.12, 0.42, 0.300,
+               0.78, 0.84, 0.88, 0.86, 0.74,
+               0.24, 0.44, 0.58,
+               0.38, 0.44, 0.55, 0.66, 0.600, 0.667,
+               0.52, 0.58,
+               clutchness=0.70, secondary_positions=("SF",),
+               badges=("shot_creator_bronze", "posterizer_silver"), height=80, speed=0.70,
+               shot_iq=0.68, iso_tendency=0.26, archetype="scoring forward", stamina=0.6),
+
+        Player("Tony Snell", "SG",
+               0.58, 0.20, 0.14, 0.08, 0.10, 0.155,
+               0.86, 0.76, 0.76, 0.62, 0.78,
+               0.10, 0.34, 0.38,
+               0.58, 0.44, 0.37, 0.52, 0.333, 0.467,
+               0.74, 0.56,
+               clutchness=0.66, secondary_positions=("SF",),
+               badges=("catch_and_shoot_silver",), height=78, speed=0.64,
+               shot_iq=0.76, iso_tendency=0.04, archetype="3-and-D wing", stamina=0.75),
+
+        Player("Thon Maker", "C",
+               0.26, 0.18, 0.26, 0.30, 0.44, 0.145,
+               0.72, 0.66, 0.82, 0.82, 0.70,
+               0.10, 0.28, 0.32,
+               0.34, 0.80, 0.65, 0.72, 0.467, 0.800,
+               0.42, 0.80,
+               clutchness=0.66, secondary_positions=("PF",),
+               badges=("rim_protector",), height=84, speed=0.58,
+               shot_iq=0.62, iso_tendency=0.06, archetype="stretch rim big", stamina=0.68),
+
+        Player("Matthew Dellavedova", "PG",
+               0.42, 0.28, 0.20, 0.10, 0.02, 0.110,
+               0.80, 0.78, 0.74, 0.48, 0.82,
+               0.08, 0.62, 0.58,
+               0.60, 0.30, 0.30, 0.42, 0.333, 0.600,
+               0.70, 0.42,
+               clutchness=0.68, secondary_positions=("SG",),
+               badges=("connector", "pest"), height=76, speed=0.54,
+               shot_iq=0.76, iso_tendency=0.02, archetype="connector", stamina=0.78),
+
+        Player("Sterling Brown", "SF",
+               0.42, 0.24, 0.24, 0.10, 0.24, 0.120,
+               0.78, 0.74, 0.80, 0.76, 0.74,
+               0.08, 0.34, 0.42,
+               0.58, 0.44, 0.48, 0.58, 0.333, 0.533,
+               0.70, 0.56,
+               clutchness=0.62, secondary_positions=("SG",),
+               badges=("catch_and_shoot_bronze",), height=77, speed=0.62,
+               shot_iq=0.70, iso_tendency=0.04, archetype="3-and-D wing", stamina=0.74),
+    ]
+    t = Team("2018 Milwaukee Bucks", players)
+    t.init_lineup()
+    return t
+
+
+def make_rockets_2018() -> Team:
+    players = [
+        Player("James Harden", "SG",
+               0.80, 0.05, 0.18, 0.02, 0.20, 0.900,
+               0.95, 0.84, 0.98, 0.78, 0.90,
+               0.38, 0.93, 0.96,
+               0.75, 0.54, 0.37, 0.73, 0.990, 0.933,
+               0.65, 0.55, shot_iq = .45, stamina=0.85, clutchness=0.40),
+        Player("Chris Paul", "PG",
+               0.35, 0.35, 0.20, 0.10, 0.05, 0.384,
+               0.85, 0.89, 0.89, 0.70, 0.88,
+               0.26, 0.94, 0.95,
+               0.73, 0.52, 0.39, 0.56, 0.40, 0.800,
+               0.85, 0.64, stamina=0.68),
+
+        Player("Trevor Ariza", "SF",
+               0.45, 0.20, 0.20, 0.05, 0.20, 0.258,
+               0.82, 0.76, 0.78, 0.72, 0.74,
+               0.14, 0.45, 0.45,
+               0.79, 0.56, 0.55, 0.70, 0.533, 0.667,
+               0.85, 0.71, stamina=0.8),
+
+        Player("PJ Tucker", "PF",
+               0.40, 0.15, 0.20, 0.25, 0.20, 0.05,
+               0.76, 0.74, 0.80, 0.80, 0.76,
+               0.10, 0.40, 0.40,
+               0.48, 0.54, 0.60, 0.59, 0.533, 0.733,
+               0.82, 0.79, stamina=0.86),
+
+        Player("Clint Capela", "C",
+               0.01, 0.00, 0.45, 0.45, 0.75, 0.303,
+               0.05, 0.60, 0.92, 0.95, 0.62,
+               0.18, 0.30, 0.30,
+               0.61, 0.94, 0.99, 0.85, 0.933, 0.933,
+               0.75, 0.92, stamina=0.78),
+                # --- BENCH ---
+
+        Player("Eric Gordon", "SG",
+               0.55, 0.20, 0.15, 0.10, 0.18, 0.399,
+               0.94, 0.82, 0.78, 0.70, 0.80,
+               0.30, 0.55, 0.60,
+               0.49, 0.59, 0.33, 0.42, 0.733, 0.667,
+               0.76, 0.45, shot_iq = .90, stamina=0.72),
+
+        Player("Luc Mbah a Moute", "SF",
+               0.15, 0.20, 0.30, 0.35, 0.35, 0.254,
+               0.55, 0.72, 0.84, 0.82, 0.68,
+               0.14, 0.35, 0.35,
+               0.79, 0.58, 0.56, 0.73, 0.600, 0.800,
+               0.85, 0.73, stamina=0.75),
+
+        Player("Gerald Green", "SG",
+               0.65, 0.15, 0.10, 0.10, 0.15, 0.320,
+               0.90, 0.74, 0.72, 0.65, 0.78,
+               0.18, 0.30, 0.30,
+               0.87, 0.29, 0.32, 0.43, 0.667, 0.600,
+               0.92, 0.38, stamina=0.73),
+
+        Player("Nene", "C",
+               0.05, 0.25, 0.30, 0.40, 0.45, 0.279,
+               0.20, 0.72, 0.88, 0.85, 0.62,
+               0.16, 0.30, 0.30,
+               0.73, 0.58, 0.80, 0.86, 0.733, 0.867,
+               0.47, 0.79, stamina=0.58),
+
+        Player("Ryan Anderson", "PF",
+               0.45, 0.30, 0.15, 0.10, 0.25, 0.305,
+               0.84, 0.74, 0.68, 0.62, 0.76,
+               0.18, 0.30, 0.30,
+               0.67, 0.76, 0.79, 0.92, 0.667, 0.667,
+               0.68, 0.96, stamina=0.62),
+
+    ]
+    t = Team("2018 Houston Rockets", players)
+    t.init_lineup()
+    return t
+
+
+def make_celtics_2018() -> Team:
+    players = [
+        Player("Kyrie Irving", "PG",
+               0.30, 0.40, 0.22, 0.50, 0.05, 0.469,
+               0.92, 0.95, 0.99, 0.25, 0.90,
+               0.30, 0.80, 0.99,
+               0.53, 0.51, 0.43, 0.51, 0.667, 0.667,
+               0.67, 0.32,
+               clutchness=0.92, stamina=0.68),
+
+        Player("Jaylen Brown", "SG",
+               0.34, 0.28, 0.28, 0.10, 0.45, 0.318,
+               0.82, 0.80, 0.86, 0.86, 0.66,
+               0.20, 0.45, 0.58,
+               0.43, 0.51, 0.43, 0.70, 0.667, 0.800,
+               0.89, 0.78, stamina=0.87),
+
+        Player("Jayson Tatum", "SF",
+               0.38, 0.32, 0.22, 0.08, 0.30, 0.343,
+               0.84, 0.86, 0.86, 0.80, 0.82,
+               0.22, 0.55, 0.78,
+               0.63, 0.37, 0.34, 0.89, 0.733, 0.733,
+               0.87, 0.81,
+               clutchness=0.74, stamina=0.85),
+
+        Player("Al Horford", "PF",
+               0.36, 0.34, 0.14, 0.16, 0.12, 0.298,
+               0.86, 0.87, 0.89, 0.68, 0.78,
+               0.18, 0.72, 0.62,
+               0.50, 0.88, 0.54, 0.90, 0.467, 0.733,
+               0.72, 0.86, stamina=0.58),
+
+        Player("Aron Baynes", "C",
+               0.18, 0.18, 0.28, 0.36, 0.30, 0.191,
+               0.70, 0.70, 0.80, 0.78, 0.74,
+               0.10, 0.28, 0.28,
+               0.33, 0.73, 0.76, 0.72, 0.533, 0.933,
+               0.37, 0.68, stamina=0.66),
+
+        Player("Terry Rozier", "PG",
+               0.42, 0.28, 0.22, 0.08, 0.20, 0.324,
+               0.82, 0.80, 0.82, 0.74, 0.78,
+               0.20, 0.62, 0.70,
+               0.38, 0.52, 0.41, 0.58, 0.600, 0.667,
+               0.76, 0.56,
+               clutchness=0.72, stamina=0.8),
+
+        Player("Marcus Smart", "SG",
+               0.38, 0.20, 0.28, 0.14, 0.18, 0.278,
+               0.72, 0.72, 0.78, 0.70, 0.72,
+               0.16, 0.66, 0.68,
+               0.80, 0.51, 0.37, 0.46, 0.667, 0.933,
+               0.86, 0.74, stamina=0.88),
+
+        Player("Marcus Morris", "PF",
+               0.40, 0.34, 0.14, 0.12, 0.20, 0.301,
+               0.82, 0.84, 0.78, 0.72, 0.82,
+               0.18, 0.38, 0.42,
+               0.68, 0.76, 0.79, 0.93, 0.600, 0.800,
+               0.69, 0.96, stamina=0.76),
+
+        Player("Gordon Hayward", "SF",
+               0.34, 0.34, 0.22, 0.10, 0.18, 0.275,
+               0.80, 0.92, 0.90, 0.70, 0.82,
+               0.30, 0.62, 0.62,
+               0.66, 0.50, 0.77, 0.69, 0.533, 0.600,
+               0.84, 0.56, stamina=0.62),
+
+        Player("Daniel Theis", "C",
+               0.12, 0.18, 0.34, 0.36, 0.40, 0.191,
+               0.64, 0.70, 0.82, 0.82, 0.72,
+               0.10, 0.35, 0.35,
+               0.65, 0.83, 0.85, 0.99, 0.533, 0.933,
+               0.67, 0.76, stamina=0.71),
+    ]
+    t = Team("2018 Boston Celtics", players)
+    t.init_lineup()
+    return t
+
+
+def make_raptors_2018() -> Team:
+    players = [
+        Player("Kyle Lowry", "PG",
+               0.42, 0.24, 0.24, 0.10, 0.08, 0.320,
+               0.86, 0.82, 0.82, 0.62, 0.82,
+               0.22, 0.82, 0.78,
+               0.82, 0.62, 0.40, 0.54, 0.733, 0.800,
+               0.86, 0.66,
+               clutchness=0.82, stamina=0.68),
+        Player("DeMar DeRozan", "SG",
+               0.14, 0.42, 0.32, 0.12, 0.34, 0.450,
+               0.68, 0.90, 0.90, 0.84, 0.84,
+               0.25, 0.66, 0.78,
+               0.48, 0.47, 0.35, 0.49, 0.990, 0.733,
+               0.66, 0.60,
+               clutchness=0.82, stamina=0.78),
+        Player("OG Anunoby", "SF",
+               0.40, 0.18, 0.24, 0.18, 0.34, 0.175,
+               0.78, 0.72, 0.80, 0.80, 0.66,
+               0.08, 0.32, 0.38,
+               0.68, 0.57, 0.41, 0.54, 0.400, 0.733,
+               0.85, 0.76, stamina=0.84),
+        Player("Serge Ibaka", "PF",
+               0.32, 0.32, 0.18, 0.18, 0.36, 0.265,
+               0.82, 0.82, 0.84, 0.82, 0.76,
+               0.16, 0.34, 0.34,
+               0.68, 0.78, 0.80, 0.95, 0.533, 0.800,
+               0.69, 0.90, stamina=0.68),
+        Player("Jonas Valanciunas", "C",
+               0.04, 0.24, 0.30, 0.42, 0.38, 0.285,
+               0.20, 0.78, 0.88, 0.84, 0.78,
+               0.18, 0.28, 0.28,
+               0.38, 0.84, 0.88, 0.91, 0.733, 0.933,
+               0.43, 0.72, stamina=0.62),
+        Player("Fred VanVleet", "PG",
+               0.50, 0.24, 0.20, 0.06, 0.04, 0.240,
+               0.84, 0.80, 0.76, 0.55, 0.84,
+               0.14, 0.66, 0.70,
+               0.66, 0.51, 0.33, 0.49, 0.467, 0.667,
+               0.80, 0.27, stamina=0.82),
+        Player("Pascal Siakam", "PF",
+               0.12, 0.24, 0.38, 0.26, 0.46, 0.225,
+               0.66, 0.76, 0.86, 0.86, 0.68,
+               0.14, 0.48, 0.58,
+               0.46, 0.50, 0.47, 0.69, 0.733, 0.800,
+               0.79, 0.85, stamina=0.83),
+        Player("Delon Wright", "PG",
+               0.34, 0.26, 0.30, 0.10, 0.16, 0.205,
+               0.78, 0.78, 0.82, 0.70, 0.78,
+               0.12, 0.66, 0.70,
+               0.85, 0.60, 0.50, 0.44, 0.533, 0.667,
+               0.86, 0.51, stamina=0.76),
+        Player("CJ Miles", "SF",
+               0.64, 0.20, 0.10, 0.06, 0.08, 0.215,
+               0.86, 0.76, 0.74, 0.60, 0.82,
+               0.12, 0.32, 0.36,
+               0.75, 0.54, 0.53, 0.68, 0.333, 0.600,
+               0.80, 0.69, stamina=0.7),
+        Player("Jakob Poeltl", "C",
+               0.00, 0.08, 0.38, 0.54, 0.42, 0.160,
+               0.05, 0.62, 0.84, 0.82, 0.60,
+               0.08, 0.34, 0.30,
+               0.44, 0.65, 0.75, 0.78, 0.467, 0.867,
+               0.43, 0.79, stamina=0.67),
+    ]
+    t = Team("2018 Toronto Raptors", players)
+    t.init_lineup()
+    return t
+
+
+def make_pelicans_2018() -> Team:
+    players = [
+        Player("Rajon Rondo", "PG",
+               0.22, 0.30, 0.34, 0.14, 0.12, 0.100,
+               0.74, 0.80, 0.84, 0.66, 0.58,
+               0.29, 0.99, 0.82,
+               0.95, 0.37, 0.46, 0.54, 0.467, 0.667,
+               0.92, 0.36,
+               clutchness=0.80, stamina=0.6),
+        Player("Jrue Holiday", "SG",
+               0.34, 0.30, 0.28, 0.08, 0.24, 0.4,
+               0.84, 0.86, 0.88, 0.80, 0.78,
+               0.26, 0.68, 0.82,
+               0.81, 0.33, 0.49, 0.56, 0.800, 0.733,
+               0.91, 0.67,
+               clutchness=0.82, stamina=0.78),
+        Player("E'Twaun Moore", "SF",
+               0.50, 0.26, 0.18, 0.06, 0.08, 0.205,
+               0.88, 0.82, 0.78, 0.58, 0.70,
+               0.12, 0.38, 0.46,
+               0.77, 0.55, 0.53, 0.68, 0.333, 0.600,
+               0.82, 0.70, stamina=0.78),
+        Player("Anthony Davis", "PF",
+               0.18, 0.34, 0.28, 0.20, 0.62, 0.480,
+               0.65, 0.89, 0.96, 0.94, 0.82,
+               0.25, 0.36, 0.64,
+               0.53, 0.92, 0.7482, 0.99, 0.88, 0.800,
+               0.85, 0.99,
+               clutchness=0.88, shot_iq = .99, stamina=0.82),
+        Player("DeMarcus Cousins", "C",
+               0.26, 0.30, 0.20, 0.24, 0.42, 0.430,
+               0.82, 0.84, 0.90, 0.88, 0.76,
+               0.20, 0.66, 0.62,
+               0.65, 0.72, 0.70, 0.98, 0.880, 0.990,
+               0.42, 0.79,
+               clutchness=0.82, stamina=0.68),
+        Player("Nikola Mirotic", "PF",
+               0.54, 0.24, 0.12, 0.10, 0.16, 0.240,
+               0.86, 0.80, 0.78, 0.68, 0.82,
+               0.16, 0.36, 0.38,
+               0.66, 0.76, 0.79, 0.93, 0.467, 0.733,
+               0.67, 0.96, stamina=0.72),
+        Player("Darius Miller", "SF",
+               0.62, 0.18, 0.14, 0.06, 0.08, 0.170,
+               0.86, 0.76, 0.76, 0.58, 0.82,
+               0.10, 0.34, 0.36,
+               0.75, 0.54, 0.53, 0.68, 0.267, 0.533,
+               0.80, 0.69, stamina=0.71),
+        Player("Ian Clark", "SG",
+               0.46, 0.26, 0.22, 0.06, 0.08, 0.165,
+               0.82, 0.82, 0.78, 0.58, 0.76,
+               0.10, 0.42, 0.48,
+               0.85, 0.28, 0.31, 0.42, 0.333, 0.533,
+               0.89, 0.37, stamina=0.75),
+        Player("Solomon Hill", "SF",
+               0.34, 0.22, 0.28, 0.16, 0.26, 0.130,
+               0.74, 0.72, 0.80, 0.76, 0.70,
+               0.08, 0.42, 0.44,
+               0.78, 0.56, 0.55, 0.71, 0.400, 0.733,
+               0.83, 0.71, stamina=0.73),
+        Player("Emeka Okafor", "C",
+               0.00, 0.12, 0.32, 0.56, 0.35, 0.115,
+               0.05, 0.66, 0.82, 0.78, 0.58,
+               0.08, 0.24, 0.22,
+               0.65, 0.84, 0.85, 0.99, 0.400, 0.933,
+               0.66, 0.82, stamina=0.58),
+    ]
+    t = Team("2018 New Orleans Pelicans", players)
+    t.init_lineup()
+    return t
+
+
+def make_thunder_2018() -> Team:
+    players = [
+        Player("Russell Westbrook", "PG",
+               0.36, 0.24, 0.32, 0.08, 0.34, 0.720,
+               0.60, 0.76, 0.88, 0.90, 0.76,
+               0.38, 0.88, 0.90,
+               0.62, 0.38, 0.54, 0.62, 0.55, 0.68,
+               0.74, 0.42,
+               clutchness=0.86, stamina=0.90, shot_iq=0.72,
+               iso_tendency=0.66, archetype="floor_general"),
+        Player("Andre Roberson", "SG",
+               0.21, 0.12, 0.44, 0.23, 0.45, 0.085,
+               0.44, 0.55, 0.86, 0.88, 0.32,
+               0.07, 0.38, 0.42,
+               0.45, 0.75, 0.38, 0.47, 0.08, 0.62,
+               0.98, 0.67, stamina=0.72,
+               shot_iq=0.70, iso_tendency=0.03, archetype="lockdown",
+               secondary_positions=("SF",)),
+        Player("Paul George", "SF",
+               0.45, 0.27, 0.22, 0.06, 0.26, 0.290,
+               0.91, 0.84, 0.86, 0.82, 0.82,
+               0.25, 0.54, 0.86,
+               0.75, 0.44, 0.25, 0.32, 0.82, 0.58,
+               0.96, 0.73,
+               clutchness=0.84, stamina=0.84, shot_iq=0.86,
+               iso_tendency=0.59, archetype="two_way_wing",
+               secondary_positions=("SG", "PF")),
+        Player("Carmelo Anthony", "PF",
+               0.34, 0.40, 0.16, 0.10, 0.10, 0.310,
+               0.81, 0.80, 0.75, 0.60, 0.77,
+               0.24, 0.38, 0.66,
+               0.48, 0.60, 0.32, 0.30, 0.58, 0.54,
+               0.62, 0.58,
+               clutchness=0.80, stamina=0.70, shot_iq=0.74,
+               iso_tendency=0.56, archetype="isolation_scorer",
+               secondary_positions=("SF",)),
+        Player("Steven Adams", "C",
+               0.00, 0.03, 0.39, 0.28, 0.61, 0.180,
+               0.05, 0.55, 0.91, 0.90, 0.60,
+               0.15, 0.35, 0.30,
+               0.70, 0.76, 0.55, 0.38, 0.55, 0.72,
+               0.69, 0.88, stamina=0.82,
+               shot_iq=0.93, iso_tendency=0.02, archetype="rim_runner"),
+        Player("Jerami Grant", "PF",
+               0.25, 0.12, 0.43, 0.20, 0.57, 0.145,
+               0.66, 0.69, 0.91, 0.93, 0.71,
+               0.12, 0.34, 0.45,
+               0.40, 0.80, 0.25, 0.38, 0.99, 0.68,
+               0.75, 0.79, stamina=0.86,
+               shot_iq=0.80, iso_tendency=0.08, archetype="slasher",
+               secondary_positions=("SF", "C")),
+        Player("Raymond Felton", "PG",
+               0.42, 0.27, 0.26, 0.05, 0.05, 0.450,
+               0.79, 0.73, 0.74, 0.51, 0.82,
+               0.18, 0.72, 0.72,
+               0.70, 0.34, 0.32, 0.42, 0.50, 0.47,
+               0.53, 0.35, stamina=0.66,
+               shot_iq=0.76, iso_tendency=0.20, archetype="playmaker"),
+        Player("Patrick Patterson", "PF",
+               0.66, 0.13, 0.10, 0.11, 0.12, 0.025,
+               0.83, 0.68, 0.72, 0.62, 0.87,
+               0.05, 0.34, 0.35,
+               0.60, 0.58, 0.12, 0.22, 0.42, 0.42,
+               0.64, 0.69, stamina=0.68,
+               shot_iq=0.83, iso_tendency=0.02, archetype="stretch_big",
+               secondary_positions=("C",)),
+        Player("Alex Abrines", "SG",
+               0.74, 0.12, 0.10, 0.04, 0.06, 0.065,
+               0.84, 0.68, 0.68, 0.56, 0.85,
+               0.08, 0.31, 0.39,
+               0.78, 0.34, 0.18, 0.25, 0.42, 0.36,
+               0.55, 0.31, stamina=0.75,
+               shot_iq=0.82, iso_tendency=0.02, archetype="movement_shooter",
+               secondary_positions=("SF",)),
+        Player("Terrance Ferguson", "SG",
+               0.71, 0.10, 0.13, 0.06, 0.17, 0.045,
+               0.77, 0.63, 0.78, 0.73, 0.90,
+               0.06, 0.30, 0.38,
+               0.45, 0.46, 0.16, 0.16, 0.20, 0.31,
+               0.67, 0.39, stamina=0.77,
+               shot_iq=0.70, iso_tendency=0.02, archetype="three_and_d",
+               secondary_positions=("SF",)),
+    ]
+    t = Team("2018 Oklahoma City Thunder", players)
+    # Real 2017-18 per-game shot hierarchy. These are paced soft targets:
+    # matchup, fatigue, game state, and hot/cold streaks still move attempts.
+    fga_targets = {
+        "Russell Westbrook": 21.1,
+        "Paul George": 17.0,
+        "Carmelo Anthony": 15.0,
+        "Steven Adams": 9.4,
+        "Andre Roberson": 4.2,
+        "Jerami Grant": 5.6,
+        "Raymond Felton": 6.7,
+        "Patrick Patterson": 3.2,
+        "Alex Abrines": 3.9,
+        "Terrance Ferguson": 2.8,
+    }
+    for player in t.roster:
+        player.target_fga_soft_cap = fga_targets[player.name]
+        player.target_fga_per_game = fga_targets[player.name]
+        player.target_fga_precision = 0.85
+        if player.name == "Russell Westbrook":
+            player.turnover_risk = 1.50
+            # Westbrook led the league in usage while still creating 10.3
+            # assists a night. This keeps him score-first without turning the
+            # offense into a pure isolation attack.
+            player.score_first_bias = 0.85
+        elif player.name == "Raymond Felton":
+            player.turnover_risk = 1.0
+            player.score_first_bias = 0.32
+        elif player.name == "Paul George":
+            player.turnover_risk = 1.05
+        elif player.name == "Steven Adams":
+            player.turnover_risk = 1.50
+        else:
+            player.turnover_risk = 1.0
+    t.init_lineup()
+    return t
+
+
+def make_jazz_2018() -> Team:
+    players = [
+        Player("Ricky Rubio", "PG",
+               0.30, 0.32, 0.28, 0.10, 0.08, 0.235,
+               0.78, 0.82, 0.82, 0.58, 0.82,
+               0.18, 0.84, 0.78,
+               0.90, 0.35, 0.35, 0.61, 0.667, 0.733,
+               0.81, 0.32, stamina=0.65),
+        Player("Donovan Mitchell", "SG",
+               0.42, 0.30, 0.22, 0.06, 0.36, 0.470,
+               0.86, 0.86, 0.90, 0.86, 0.82,
+               0.34, 0.66, 0.82,
+               0.58, 0.37, 0.28, 0.48, 0.990, 0.733,
+               0.67, 0.60,
+               clutchness=0.88, stamina=0.87),
+        Player("Joe Ingles", "SF",
+               0.50, 0.26, 0.14, 0.10, 0.04, 0.215,
+               0.88, 0.82, 0.78, 0.50, 0.80,
+               0.14, 0.72, 0.58,
+               0.56, 0.38, 0.37, 0.59, 0.333, 0.600,
+               0.83, 0.61, stamina=0.68),
+        Player("Derrick Favors", "PF",
+               0.02, 0.24, 0.32, 0.42, 0.42, 0.190,
+               0.10, 0.74, 0.86, 0.86, 0.66,
+               0.12, 0.30, 0.30,
+               0.66, 0.78, 0.80, 0.95, 0.600, 0.867,
+               0.67, 0.85, stamina=0.66),
+        Player("Rudy Gobert", "C",
+               0.00, 0.04, 0.34, 0.62, 0.70, 0.210,
+               0.05, 0.54, 0.90, 0.94, 0.68,
+               0.12, 0.22, 0.20,
+               0.41, 0.83, 0.91, 0.88, 0.733, 0.933,
+               0.65, 0.98, stamina=0.78),
+        Player("Jae Crowder", "PF",
+               0.50, 0.18, 0.16, 0.16, 0.18, 0.170,
+               0.78, 0.72, 0.78, 0.72, 0.76,
+               0.10, 0.38, 0.40,
+               0.48, 0.44, 0.61, 0.61, 0.467, 0.867,
+               0.80, 0.72, stamina=0.84),
+        Player("Dante Exum", "PG",
+               0.30, 0.24, 0.34, 0.12, 0.24, 0.120,
+               0.74, 0.74, 0.82, 0.76, 0.76,
+               0.08, 0.58, 0.66,
+               0.62, 0.50, 0.29, 0.46, 0.467, 0.667,
+               0.77, 0.26, stamina=0.66),
+        Player("Royce O'Neale", "SF",
+               0.46, 0.20, 0.22, 0.12, 0.18, 0.110,
+               0.80, 0.74, 0.80, 0.72, 0.76,
+               0.06, 0.36, 0.40,
+               0.55, 0.52, 0.37, 0.65, 0.333, 0.667,
+               0.79, 0.67, stamina=0.72),
+        Player("Alec Burks", "SG",
+               0.38, 0.28, 0.26, 0.08, 0.18, 0.130,
+               0.80, 0.78, 0.82, 0.72, 0.78,
+               0.08, 0.44, 0.54,
+               0.44, 0.46, 0.36, 0.62, 0.533, 0.600,
+               0.73, 0.46, stamina=0.75),
+        Player("Raul Neto", "PG",
+               0.42, 0.26, 0.24, 0.08, 0.04, 0.095,
+               0.78, 0.76, 0.76, 0.50, 0.78,
+               0.06, 0.58, 0.62,
+               0.86, 0.28, 0.31, 0.42, 0.333, 0.533,
+               0.91, 0.37, stamina=0.73),
+    ]
+    t = Team("2018 Utah Jazz", players)
+    t.init_lineup()
+    return t
 
 
 def _team(name, players, minutes):
@@ -1884,32 +2566,3 @@ def make_wizards_2018() -> Team:
                stamina=0.55, archetype="movement_shooter", height=76),
     ]
     return _team("2018 Washington Wizards", players, (36.3, 25.3, 31.6, 27.0, 34.4, 22.5, 27.5, 8.1, 10.5, 8.5, 8.3))
-
-
-def register(namespace):
-    """Publish every make_*_2018 factory in this module into players_data's namespace."""
-    for name in (
-        "make_hawks_2018",
-        "make_nets_2018",
-        "make_hornets_2018",
-        "make_bulls_2018",
-        "make_mavs_2018",
-        "make_nuggets_2018",
-        "make_pistons_2018",
-        "make_warriors_2018",
-        "make_pacers_2018",
-        "make_clippers_2018",
-        "make_lakers_2018",
-        "make_grizzlies_2018",
-        "make_heat_2018",
-        "make_timberwolves_2018",
-        "make_knicks_2018",
-        "make_magic_2018",
-        "make_sixers_2018",
-        "make_suns_2018",
-        "make_blazers_2018",
-        "make_kings_2018",
-        "make_spurs_2018",
-        "make_wizards_2018",
-    ):
-        namespace[name] = globals()[name]

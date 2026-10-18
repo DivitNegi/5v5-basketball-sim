@@ -14,8 +14,11 @@ Originally a single ~43,000-line script; split into modules by concern:
   play-by-play commentary, the full 5-on-5 game loop (`simulate_game`), the
   1-on-1 mode (`simulate_1v1_game`), and the season/playoff/fantasy-draft
   subsystem.
-- **`players_data.py`** — every team roster (`make_*` factory functions),
-  the fantasy player pool builder, and the team-factory registries
+- **`teams/teams_YYYY.py`** — one file per season holding that season's team
+  rosters (`make_*_YYYY` factory functions), e.g. `teams/teams_2018.py`.
+- **`players_data.py`** — imports every `teams/teams_YYYY.py`, applies the
+  real-stat calibration overrides, and holds the fantasy player pool builder,
+  the postseason/season runners and the team-factory registries
   (`gui_team_factories`, `fantasy_team_factories`).
 - **`gui_app.py`** — the primary Tkinter desktop GUI.
 - **`web_app.py`** — a secondary, browser-based GUI served over local HTTP
