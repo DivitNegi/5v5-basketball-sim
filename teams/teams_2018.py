@@ -769,8 +769,15 @@ def make_hawks_2018() -> Team:
                0.35, 0.12, 0.27, 0.40, 0.87, 0.50,
                0.76, 0.44,
                stamina=0.58, archetype="playmaker", height=75),
+        Player("Miles Plumlee", "C",
+               0.04, 0.13, 0.30, 0.14, 0.55, 0.080,
+               0.19, 0.60, 0.93, 0.93, 0.45,
+               0.050, 0.45, 0.29,
+               0.40, 0.80, 0.62, 0.65, 0.750, 0.500,
+               0.29, 0.57,
+               stamina=0.55, archetype="rim_runner", height=83),
     ]
-    return _team("2018 Atlanta Hawks", players, (30.0, 31.0, 27.5, 24.9, 24.1, 12.7, 14.6, 12.7, 13.7))
+    return _team("2018 Atlanta Hawks", players, (30.0, 31.0, 27.5, 24.9, 24.1, 12.7, 14.6, 12.7, 13.7, 19.0))
 
 
 def make_nets_2018() -> Team:
