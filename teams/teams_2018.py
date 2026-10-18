@@ -206,9 +206,9 @@ def make_rockets_2018() -> Team:
     players = [
         Player("James Harden", "SG",
                0.32, 0.05, 0.18, 0.02, 0.20, 0.990,
-               0.94, 0.68, 0.76, 0.66, 0.86,
-               0.445, 0.82, 0.96,
-               0.99, 0.63, 0.38, 0.60, 0.990, 0.933,
+               0.88, 0.78, 0.88, 0.66, 0.86,
+               0.445, 0.81, 0.96,
+               0.99, 0.63, 0.38, 0.60, 0.72, 0.933,
                0.65, 0.55, shot_iq = .45, stamina=0.85, clutchness=0.40),
         Player("Chris Paul", "PG",
                0.70, 0.35, 0.20, 0.10, 0.05, 0.582,
@@ -277,7 +277,7 @@ def make_rockets_2018() -> Team:
     ]
     # Real 2017-18 per-game minutes (scaled to a 240-minute game); the inputs are fitted so the engine's rotation lands on them.
     # Ratings were calibrated by simulating full seasons until each player's per-minute line matched his real one.
-    return _team("2018 Houston Rockets", players, (26.9, 16.2, 28.9, 18.0, 19.4, 29.2, 23.0, 37.8, 25.3, 36.8))
+    return _team("2018 Houston Rockets", players, (35.0, 16.2, 28.9, 18.0, 19.4, 29.2, 23.0, 37.8, 25.3, 36.8))
 
 
 def make_celtics_2018() -> Team:
