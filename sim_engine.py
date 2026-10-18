@@ -8176,6 +8176,8 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name == "Luke Kennard" and team.name == "2026 Los Angeles Lakers":
         return True
+    if player.name in ("Wayne Ellington", "Bam Adebayo", "Justise Winslow") and team.name == "2018 Miami Heat":
+        return True  # real rotation pieces (26 mpg guard, 17 mpg center, 22 mpg forward); without this the rotation buries them
     if team.name == "2018 Oklahoma City Thunder" and player.name in (
         "Jerami Grant", "Raymond Felton", "Patrick Patterson",
         "Alex Abrines", "Terrance Ferguson",

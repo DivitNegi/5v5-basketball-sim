@@ -1811,7 +1811,11 @@ def make_heat_2018() -> Team:
                0.82, 0.65,
                stamina=0.64, archetype="playmaker", height=76),
     ]
-    return _team("2018 Miami Heat", players, (33.2, 31.7, 25.3, 26.6, 28.5, 30.6, 10.3, 9.8, 8.3, 26.5, 9.3))
+    # Season-average rotation: each player's real mpg weighted by the share of the 82 games he was on the roster
+    # (Waiters 30 G, Wade 21 G, Whiteside 54 G), scaled to 240. Realized in the sim: Richardson 35, Dragic 31,
+    # T. Johnson 27, J. Johnson 25, Ellington 24, Winslow 23, Olynyk 23, Whiteside 18, Adebayo 18, Waiters 12, Wade 6.
+    # These inputs are fitted so the engine's rotation lands on those minutes, so they are not the raw mpg figures.
+    return _team("2018 Miami Heat", players, (23.3, 20.7, 7.5, 14.7, 20.2, 13.6, 17.8, 3.7, 9.6, 40.1, 4.2))
 
 
 def make_timberwolves_2018() -> Team:
