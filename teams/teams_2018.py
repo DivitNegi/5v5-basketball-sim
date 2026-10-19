@@ -2349,13 +2349,13 @@ def make_spurs_2018() -> Team:
                0.38, 0.83, 0.90, 0.66, 0.81, 0.43,
                0.44, 0.81,
                stamina=0.83, archetype="post_scorer", height=83),
-        Player("Kyle Anderson", "SF",
-               0.19, 0.37, 0.35, 0.06, 0.18, 0.127,
-               0.68, 0.87, 0.99, 0.61, 0.70,
-               0.085, 0.71, 0.58,
-               0.73, 0.76, 0.50, 0.66, 0.91, 0.40,
-               0.99, 0.72,
-               stamina=0.72, archetype="balanced", height=80),
+        Player("Kawhi Leonard", "SF",
+               0.39, 0.55, 0.22, 0.06, 0.16, 0.472,
+               0.88, 0.92, 0.92, 0.75, 0.85,
+               0.290, 0.62, 0.62,
+               0.90, 0.78, 0.44, 0.70, 0.950, 0.350,
+               0.92, 0.65,
+               stamina=0.80, archetype="isolation_scorer", height=78),
         Player("Pau Gasol", "C",
                0.05, 0.47, 0.29, 0.11, 0.18, 0.294,
                0.79, 0.77, 0.78, 0.45, 0.77,
@@ -2419,20 +2419,20 @@ def make_spurs_2018() -> Team:
                0.59, 0.41, 0.45, 0.60, 0.78, 0.56,
                0.79, 0.53,
                stamina=0.60, archetype="balanced", height=78),
-        Player("Kawhi Leonard", "SF",
-               0.39, 0.55, 0.22, 0.06, 0.16, 0.472,
-               0.88, 0.92, 0.92, 0.75, 0.85,
-               0.290, 0.62, 0.62,
-               0.90, 0.78, 0.44, 0.70, 0.950, 0.350,
-               0.92, 0.65,
-               stamina=0.80, archetype="isolation_scorer", height=78),
+        Player("Kyle Anderson", "SF",
+               0.19, 0.37, 0.35, 0.06, 0.18, 0.127,
+               0.68, 0.87, 0.99, 0.61, 0.70,
+               0.085, 0.71, 0.58,
+               0.73, 0.76, 0.50, 0.66, 0.91, 0.40,
+               0.99, 0.72,
+               stamina=0.72, archetype="balanced", height=80),
     ]
     # Real 2017-18 turnover rates, relative to the league: a per-player multiplier on how often he gives the ball away
     # (the engine allows 0.70-2.20). Calibrated by simulating full seasons.
     turnover_risk = {"LaMarcus Aldridge": 0.70, "Kyle Anderson": 0.74, "Pau Gasol": 1.25, "Danny Green": 0.70, "Dejounte Murray": 1.25, "Patty Mills": 0.89, "Tony Parker": 0.87, "Davis Bertans": 0.83, "Rudy Gay": 1.03, "Manu Ginóbili": 1.05}
     for player in players:
         player.turnover_risk = turnover_risk.get(player.name, 1.0)
-    return _team("2018 San Antonio Spurs", players, (33.5, 26.7, 23.5, 25.6, 21.5, 25.7, 16.6, 16.2, 12.0, 21.6, 17.1, 30.0))
+    return _team("2018 San Antonio Spurs", players, (33.5, 34.0, 23.5, 25.6, 21.5, 25.7, 16.6, 16.2, 12.0, 21.6, 17.1, 26.7))
 
 
 def make_wizards_2018() -> Team:
