@@ -107,15 +107,15 @@ def make_bucks_2018() -> Team:
                badges=("transition_engine", "pest"), height=73, speed=0.84,
                shot_iq=0.72, iso_tendency=0.30, archetype="downhill guard", stamina=0.76),
 
-        Player("Malcolm Brogdon", "SG",
-               0.09, 0.30, 0.20, 0.08, 0.10, 0.356,
-               0.86, 0.89, 0.95, 0.93, 0.86,
-               0.251, 0.65, 0.70,
-               0.50, 0.57, 0.29, 0.59, 0.533, 0.533,
-               0.78, 0.56,
-               clutchness=0.78, secondary_positions=("PG",),
-               badges=("connector", "catch_and_shoot_silver"), height=77, speed=0.68,
-               shot_iq=0.84, iso_tendency=0.12, archetype="connector", stamina=0.79),
+        Player("Tony Snell", "SG",
+               0.23, 0.20, 0.14, 0.08, 0.10, 0.062,
+               0.89, 0.89, 0.89, 0.73, 0.78,
+               0.033, 0.48, 0.38,
+               0.34, 0.63, 0.19, 0.40, 0.333, 0.467,
+               0.74, 0.56,
+               clutchness=0.66, secondary_positions=("SF",),
+               badges=("catch_and_shoot_silver",), height=78, speed=0.64,
+               shot_iq=0.76, iso_tendency=0.04, archetype="3-and-D wing", stamina=0.75),
 
         Player("Khris Middleton", "SF",
                0.32, 0.38, 0.16, 0.06, 0.16, 0.463,
@@ -157,15 +157,15 @@ def make_bucks_2018() -> Team:
                badges=("shot_creator_bronze", "posterizer_silver"), height=80, speed=0.70,
                shot_iq=0.68, iso_tendency=0.26, archetype="scoring forward", stamina=0.6),
 
-        Player("Tony Snell", "SG",
-               0.23, 0.20, 0.14, 0.08, 0.10, 0.062,
-               0.89, 0.89, 0.89, 0.73, 0.78,
-               0.033, 0.48, 0.38,
-               0.34, 0.63, 0.19, 0.40, 0.333, 0.467,
-               0.74, 0.56,
-               clutchness=0.66, secondary_positions=("SF",),
-               badges=("catch_and_shoot_silver",), height=78, speed=0.64,
-               shot_iq=0.76, iso_tendency=0.04, archetype="3-and-D wing", stamina=0.75),
+        Player("Malcolm Brogdon", "SG",
+               0.09, 0.30, 0.20, 0.08, 0.10, 0.356,
+               0.86, 0.89, 0.95, 0.93, 0.86,
+               0.251, 0.65, 0.70,
+               0.50, 0.57, 0.29, 0.59, 0.533, 0.533,
+               0.78, 0.56,
+               clutchness=0.78, secondary_positions=("PG",),
+               badges=("connector", "catch_and_shoot_silver"), height=77, speed=0.68,
+               shot_iq=0.84, iso_tendency=0.12, archetype="connector", stamina=0.79),
 
         Player("Thon Maker", "C",
                0.17, 0.18, 0.26, 0.30, 0.44, 0.242,
@@ -199,7 +199,7 @@ def make_bucks_2018() -> Team:
     ]
     # Real 2017-18 per-game minutes (scaled to a 240-minute game); the inputs are fitted so the engine's rotation lands on them.
     # Ratings were calibrated by simulating full seasons until each player's per-minute line matched his real one.
-    return _team("2018 Milwaukee Bucks", players, (22.4, 21.6, 29.7, 29.4, 18.5, 38.5, 20.9, 10.1, 20.2, 28.9))
+    return _team("2018 Milwaukee Bucks", players, (22.4, 20.9, 29.7, 29.4, 18.5, 38.5, 21.6, 10.1, 20.2, 28.9))
 
 
 def make_rockets_2018() -> Team:
@@ -224,12 +224,12 @@ def make_rockets_2018() -> Team:
                0.56, 0.41, 0.35, 0.45, 0.533, 0.667,
                0.85, 0.54, stamina=0.8),
 
-        Player("PJ Tucker", "PF",
-               0.62, 0.15, 0.20, 0.25, 0.20, 0.020,
-               0.78, 0.61, 0.62, 0.71, 0.76,
-               0.040, 0.62, 0.40,
-               0.52, 0.58, 0.55, 0.61, 0.533, 0.733,
-               0.82, 0.56, stamina=0.86),
+        Player("Ryan Anderson", "PF",
+               0.80, 0.30, 0.15, 0.10, 0.25, 0.207,
+               0.80, 0.72, 0.66, 0.61, 0.77,
+               0.126, 0.60, 0.30,
+               0.37, 0.46, 0.45, 0.59, 0.667, 0.667,
+               0.68, 0.61, stamina=0.62),
 
         Player("Clint Capela", "C",
                0.01, 0.00, 0.45, 0.45, 0.75, 0.247,
@@ -267,17 +267,17 @@ def make_rockets_2018() -> Team:
                0.88, 0.72, 0.46, 0.53, 0.733, 0.867,
                0.47, 0.79, stamina=0.58),
 
-        Player("Ryan Anderson", "PF",
-               0.80, 0.30, 0.15, 0.10, 0.25, 0.207,
-               0.80, 0.72, 0.66, 0.61, 0.77,
-               0.126, 0.60, 0.30,
-               0.37, 0.46, 0.45, 0.59, 0.667, 0.667,
-               0.68, 0.61, stamina=0.62),
+        Player("PJ Tucker", "PF",
+               0.62, 0.15, 0.20, 0.25, 0.20, 0.020,
+               0.78, 0.61, 0.62, 0.71, 0.76,
+               0.040, 0.62, 0.40,
+               0.52, 0.58, 0.55, 0.61, 0.533, 0.733,
+               0.82, 0.56, stamina=0.86),
 
     ]
     # Real 2017-18 per-game minutes (scaled to a 240-minute game); the inputs are fitted so the engine's rotation lands on them.
     # Ratings were calibrated by simulating full seasons until each player's per-minute line matched his real one.
-    return _team("2018 Houston Rockets", players, (35.0, 16.2, 28.9, 18.0, 19.4, 29.2, 23.0, 37.8, 25.3, 36.8))
+    return _team("2018 Houston Rockets", players, (35.0, 16.2, 28.9, 36.8, 19.4, 29.2, 23.0, 37.8, 25.3, 18.0))
 
 
 def make_celtics_2018() -> Team:
