@@ -190,7 +190,7 @@ def make_knicks_2013() -> Team:
         Player("Carmelo Anthony", "PF",
                0.38, 0.42, 0.14, 0.16, 0.28, 0.570,
                0.88, 0.92, 0.88, 0.82, 0.84,
-               0.36, 0.55, 0.72,
+               0.29, 0.55, 0.72,
                0.69, 0.55, 0.81, 0.84, 0.990, 0.800,
                0.77, 0.75,
                clutchness=0.88, badges=("clutch_silver", "closer_silver", "iso_scorer"), stamina=0.68),

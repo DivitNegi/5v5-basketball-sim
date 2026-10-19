@@ -14921,8 +14921,9 @@ def playmaking_hub_score(player: Player) -> float:
 
 
 def assist_load_factor(player: Player, team: Team) -> float:
-    if team.name == "2018 Golden State Warriors" and player.name in WARRIORS_2018_ASSIST_BIAS:
-        return _assist_load_factor_core(player, team) * WARRIORS_2018_ASSIST_BIAS[player.name]
+    bias = TEAM_ASSIST_BIAS.get(team.name)
+    if bias and player.name in bias:
+        return _assist_load_factor_core(player, team) * bias[player.name]
     return _assist_load_factor_core(player, team)
 
 
@@ -17252,6 +17253,11 @@ SYSTEM_PLAYMAKERS = {
 WARRIORS_2018_HANDLER_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.75}
 WARRIORS_2018_ASSIST_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.65}   # who gets the passing looks / assist credit
 
+# 2023-24 Nuggets: Jokic was the hub (9.0 assists a night) and Murray the scorer off him (6.3).
+NUGGETS_2024_ASSIST_BIAS = {"Nikola Jokić": 2.0, "Jamal Murray": 0.75}
+NUGGETS_2024_HANDLER_SHARE = 0.70     # share of possessions Jokic initiates while on the floor
+TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS}
+
 
 def choose_ballhandler(team: Team) -> Player:
     """
@@ -17319,6 +17325,12 @@ def choose_ballhandler(team: Team) -> Player:
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
+
+    if team.name == "2024 Denver Nuggets":
+        jokic = player_by_name(team.on_floor, ("Nikola Jokić", "Nikola Jokic"))
+        # Jokic ran the offense from the elbow and the post; Murray and Jackson initiated the rest.
+        if jokic is not None and not jokic.fouled_out and random.random() < NUGGETS_2024_HANDLER_SHARE:
+            return jokic
 
     if team.name == "2014 San Antonio Spurs":
         preferred = [p for p in team.on_floor if p.name in ("Tony Parker", "Manu Ginobili", "Boris Diaw", "Patty Mills")]
