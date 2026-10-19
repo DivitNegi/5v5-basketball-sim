@@ -6735,7 +6735,7 @@ def run_gui_app():
 
     def set_team_dropdown_state():
         mode = mode_var.get()
-        state = "disabled" if mode in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "Full 2018 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
+        state = "disabled" if mode in ("Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "Full 2018 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
         team_a_dropdown.configure(values=team_names, state=state)
         team_b_dropdown.configure(values=team_names, state=state)
         if team_a_var.get() not in factories and team_names:
@@ -9100,7 +9100,7 @@ def run_gui_app():
                 status_var.set(f"{_players_data_module.POSTSEASON_YEAR_LABEL} play-in and playoffs running...")
                 run_2027_postseason(postseason_state["standings"], postseason_state.get("factories"))
             else:
-                run_2016_playoffs()
+                print(f"Unknown mode: {mode}")
             sim_completed = True
         except sim_engine.FantasyDraftCancelled:
             print("Fantasy draft cancelled.")
@@ -9129,7 +9129,7 @@ def run_gui_app():
             builtins.input = original_input
             sys.stdout = original_stdout
             running["active"] = False
-            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2016 playoffs", "Full 2027 playoffs", "Full 2018 playoffs", "2027 play-in & playoffs", "Fantasy draft playoffs", "Olympic tournament"):
+            if mode in ("Playoff series", "Custom 16-team playoffs", "Full playoffs", "Full 2027 playoffs", "Full 2018 playoffs", "2027 play-in & playoffs", "Fantasy draft playoffs", "Olympic tournament"):
                 scoreboard_queue.put({"reset_series_score": True, "series_status": "Series reset: 0-0"})
             if sim_completed:
                 pass
@@ -9161,7 +9161,7 @@ def run_gui_app():
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2016 playoffs", "Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and mode not in FANTASY_SEASON_MODES and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and mode not in FANTASY_SEASON_MODES and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()
@@ -9357,7 +9357,8 @@ def run_gui_app():
             stand_open = False
         # The Stand tab stays uncovered during a season so its standings can
         # update live; every other tab shows the plain "Simulating season" notice.
-        cover_tabs = want and not stand_open
+        # While the season is paused every stats tab shows the season so far (the sim publishes a snapshot).
+        cover_tabs = want and not stand_open and not paused_now
         if want and not season_view["shown"]:
             season_notice_box.place(x=0, y=0, relwidth=1.0, relheight=1.0)
             season_notice_box.lift()

@@ -245,147 +245,6 @@ def infer_custom_player_archetype(player: Player) -> str:
  
 
 
-def playoff_2016_factory(team_name: str):
-    return lambda name=team_name: make_2016_playoff_team(name)
-
-
-PLAYOFF_2016_TEAM_FACTORIES = {
-    "2016 Cleveland Cavaliers": make_cavs_2016,
-    "2016 Toronto Raptors": make_raptors_2016,
-    "2016 Miami Heat": make_heat_2016,
-    "2016 Atlanta Hawks": make_hawks_2016,
-    "2016 Boston Celtics": make_celtics_2016,
-    "2016 Charlotte Hornets": make_hornets_2016,
-    "2016 Indiana Pacers": make_pacers_2016,
-    "2016 Detroit Pistons": make_pistons_2016,
-    "2016 Golden State Warriors": make_warriors_2016,
-    "2016 San Antonio Spurs": make_spurs_2016,
-    "2016 Oklahoma City Thunder": make_thunder_2016,
-    "2016 Los Angeles Clippers": make_clippers_2016,
-    "2016 Portland Trail Blazers": make_blazers_2016,
-    "2016 Dallas Mavericks": make_mavs_2016,
-    "2016 Memphis Grizzlies": make_grizzlies_2016,
-    "2016 Houston Rockets": make_rockets_2016,
-}
-
-
-def run_2016_playoff_series(team_a_name: str, team_b_name: str) -> str:
-    print("\n" + "=" * 100)
-    print(f"2016 PLAYOFF SERIES: {team_a_name} vs {team_b_name}")
-    print("=" * 100)
-    winner_name = run_best_of_7_series(playoff_2016_factory(team_a_name), playoff_2016_factory(team_b_name))
-    return winner_name
-
-
-def print_2016_playoff_standings():
-    print("\n2015-16 PLAYOFF SEEDS")
-    for conference, rows in PLAYOFF_2016_STANDINGS.items():
-        print(f"\n{conference}")
-        for name, seed, wins, losses in rows:
-            print(f"  {seed}. {name} ({wins}-{losses})")
-
-
-def print_2016_bracket_state(rounds: Dict[str, Dict[str, List]]):
-    print("\n" + "=" * 100)
-    print("2016 PLAYOFF BRACKET")
-    print("=" * 100)
-    for conference in ("East", "West"):
-        print(f"\n{conference}")
-        for label in ("First Round", "Semifinals", "Conference Finals"):
-            entries = rounds.get(conference, {}).get(label, [])
-            if not entries:
-                continue
-            print(f"  {label}:")
-            for entry in entries:
-                if len(entry) == 3:
-                    a, b, winner = entry
-                    print(f"    {a} vs {b} -> {winner}")
-                else:
-                    a, b = entry
-                    print(f"    {a} vs {b}")
-    finals = rounds.get("Finals", {}).get("NBA Finals", [])
-    if finals:
-        print("\nNBA Finals:")
-        for entry in finals:
-            if len(entry) == 3:
-                a, b, winner = entry
-                print(f"  {a} vs {b} -> {winner}")
-            else:
-                a, b = entry
-                print(f"  {a} vs {b}")
-    print("=" * 100)
-
-
-def run_2016_playoffs():
-    print_2016_playoff_standings()
-    bracket_state = {
-        "East": [
-            ("2016 Cleveland Cavaliers", "2016 Detroit Pistons"),
-            ("2016 Atlanta Hawks", "2016 Boston Celtics"),
-            ("2016 Miami Heat", "2016 Charlotte Hornets"),
-            ("2016 Toronto Raptors", "2016 Indiana Pacers"),
-        ],
-        "West": [
-            ("2016 Golden State Warriors", "2016 Houston Rockets"),
-            ("2016 Los Angeles Clippers", "2016 Portland Trail Blazers"),
-            ("2016 Oklahoma City Thunder", "2016 Dallas Mavericks"),
-            ("2016 San Antonio Spurs", "2016 Memphis Grizzlies"),
-        ],
-    }
-    rounds = {
-        "East": {"First Round": list(bracket_state["East"])},
-        "West": {"First Round": list(bracket_state["West"])},
-        "Finals": {},
-    }
-    print_2016_bracket_state(rounds)
-
-    conference_champions = []
-    for conference, first_round in bracket_state.items():
-        print("\n" + "#" * 100)
-        print(f"{conference.upper()} PLAYOFFS")
-        print("#" * 100)
-        round_winners = []
-        for a, b in first_round:
-            winner = run_2016_playoff_series(a, b)
-            round_winners.append(winner)
-            rounds[conference]["First Round"] = [
-                (*matchup, round_winners[i]) if i < len(round_winners) else matchup
-                for i, matchup in enumerate(first_round)
-            ]
-            print_2016_bracket_state(rounds)
-        semifinals = [
-            (round_winners[0], round_winners[1]),
-            (round_winners[2], round_winners[3]),
-        ]
-        rounds[conference]["Semifinals"] = semifinals
-        print_2016_bracket_state(rounds)
-        semi_winners = []
-        for a, b in semifinals:
-            winner = run_2016_playoff_series(a, b)
-            semi_winners.append(winner)
-            rounds[conference]["Semifinals"] = [
-                (*matchup, semi_winners[i]) if i < len(semi_winners) else matchup
-                for i, matchup in enumerate(semifinals)
-            ]
-            print_2016_bracket_state(rounds)
-        rounds[conference]["Conference Finals"] = [(semi_winners[0], semi_winners[1])]
-        print_2016_bracket_state(rounds)
-        conference_champion = run_2016_playoff_series(semi_winners[0], semi_winners[1])
-        rounds[conference]["Conference Finals"] = [(semi_winners[0], semi_winners[1], conference_champion)]
-        print_2016_bracket_state(rounds)
-        conference_champions.append(conference_champion)
-        print(f"{conference} champion: {conference_champion}")
-
-    rounds["Finals"]["NBA Finals"] = [(conference_champions[0], conference_champions[1])]
-    print_2016_bracket_state(rounds)
-    champion = run_2016_playoff_series(conference_champions[0], conference_champions[1])
-    rounds["Finals"]["NBA Finals"] = [(conference_champions[0], conference_champions[1], champion)]
-    print_2016_bracket_state(rounds)
-    print("\n" + "#" * 100)
-    print(f"2016 PLAYOFF SIM CHAMPION: {champion}")
-    print("#" * 100)
-
-
 # ============================================================
 # 2027 PLAYOFFS
 # Top 8 teams per conference by roster strength, 1v8 / 4v5 / 3v6 / 2v7,
@@ -790,6 +649,10 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     print(f"Quiet-simming {total_games} games. No play-by-play during the regular season.")
     if progress_queue is not None:
         progress_queue.put({"season_progress": True, "completed": 0, "total": total_games})
+    def snap():
+        import sim_engine as _snap_engine
+        _snap_engine.season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, None, total_games)
+
     def parallel_results():
         # Games are independent, so they are spread over worker processes
         # (each returns the finished Team objects) and aggregated here.
@@ -804,8 +667,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
             # season between batches instead of the pool racing ahead.
             batch = workers * 6
             for start in range(0, len(games), batch):
-                while _engine.SIM_PAUSED:
-                    _time.sleep(0.1)
+                _engine.hold_season_while_paused(snap)
                 for result in pool.imap_unordered(_run_2027_season_game, games[start:start + batch], chunksize=2):
                     yield result
         finally:
@@ -816,8 +678,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         import time as _time
         import sim_engine as _engine
         for home_key, away_key, order in games:
-            while _engine.SIM_PAUSED:
-                _time.sleep(0.1)
+            _engine.hold_season_while_paused(snap)
             yield _run_2027_season_game((home_key, away_key, order))
 
     try:
@@ -828,9 +689,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     results = parallel_results() if use_parallel else sequential_results()
     for done, (home_key, away_key, team_a, team_b, order) in enumerate(results, start=1):
         import sim_engine as _pause_engine
-        while _pause_engine.SIM_PAUSED:
-            import time as _pause_time
-            _pause_time.sleep(0.1)
+        _pause_engine.hold_season_while_paused(snap)
         add_player_to_series_totals(player_totals, team_a)
         add_player_to_series_totals(player_totals, team_b)
         add_team_to_series_totals(team_totals, team_a)

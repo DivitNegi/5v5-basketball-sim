@@ -23606,6 +23606,44 @@ def live_season_standings_payload(entries: List[Dict], completed: int, total: in
     return {"season_standings": rows, "completed": completed, "total": total}
 
 
+def season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, completed=None, total=None,
+                          include_rookies: bool = True, positional: bool = False):
+    """Give the GUI the season so far (every stats tab) while the sim is paused.
+
+    Works on copies of the running totals, so the season keeps adding to its own dicts after Resume."""
+    if section_queue is None:
+        return
+    import copy
+    global SEASON_POSITIONAL_AWARDS
+    if completed is None:
+        completed = sum(t.get("games", 0) for t in team_totals.values()) // 2
+    saved = SEASON_POSITIONAL_AWARDS
+    SEASON_POSITIONAL_AWARDS = positional
+    try:
+        sections = build_season_sections(
+            [dict(e) for e in entries], copy.deepcopy(player_totals), copy.deepcopy(team_totals),
+            game_log=list(game_log.rows), game_extras=dict(game_log.extras), game_meta=dict(game_log.games),
+            include_rookies=include_rookies)
+        sections["_season_paused"] = {"completed": completed, "total": total}
+        section_queue.put(sections)
+    except Exception:
+        pass   # a failed snapshot must never stop the pause itself
+    finally:
+        SEASON_POSITIONAL_AWARDS = saved
+
+
+def hold_season_while_paused(snapshot, poll: float = 0.05):
+    """Called between games: if Pause is on, publish the stats so far once, then wait for Resume."""
+    if not SIM_PAUSED:
+        return
+    try:
+        snapshot()
+    except Exception:
+        pass
+    while SIM_PAUSED:
+        _REAL_SLEEP(poll)
+
+
 def _quiet_season_worker(task):
     """Worker entry point for the custom season: play one game between copies of two team templates."""
     import copy
@@ -23644,6 +23682,10 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     if progress_queue is not None:
         progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
 
+    def season_snapshot():
+        season_pause_snapshot(section_queue, entries, season_player_totals, season_team_totals, season_game_log,
+                              None, total_games, include_rookies=False)
+
     # Games are independent, so they are spread over worker processes by sending
     # each worker copies of the two (picklable) team templates. Anything that
     # cannot be pickled, or too few CPUs, falls back to one process.
@@ -23666,8 +23708,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         try:
             batch = workers * 6
             for start_index in range(0, total_games, batch):
-                while SIM_PAUSED:
-                    _REAL_SLEEP(0.05)
+                hold_season_while_paused(season_snapshot)
                 tasks = [
                     (templates[ea["name"]], templates[eb["name"]], order)
                     for order, (ea, eb) in enumerate(schedule[start_index:start_index + batch], start=start_index)
@@ -23680,8 +23721,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
 
     def sequential_results():
         for order, (entry_a, entry_b) in enumerate(schedule):
-            while SIM_PAUSED:
-                _REAL_SLEEP(0.05)
+            hold_season_while_paused(season_snapshot)
             team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"])
             yield team_a, team_b, order
 
@@ -23689,8 +23729,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     try:
         results = parallel_results() if templates is not None else sequential_results()
         for team_a, team_b, order in results:
-            while SIM_PAUSED:
-                _REAL_SLEEP(0.05)
+            hold_season_while_paused(season_snapshot)
             entry_a, entry_b = schedule[order]
             add_player_to_series_totals(season_player_totals, team_a)
             add_player_to_series_totals(season_player_totals, team_b)

@@ -67,6 +67,10 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
     if progress_queue is not None:
         progress_queue.put({"season_progress": True, "completed": 0, "total": total_games})
 
+    def snap():
+        sim_engine.season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, None, total_games,
+                                         positional=True)   # the 2018 All-NBA / All-Defensive teams are picked by position
+
     def parallel_results():
         import multiprocessing
         import os
@@ -76,8 +80,7 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
         try:
             batch = workers * 6
             for start in range(0, len(games), batch):
-                while sim_engine.SIM_PAUSED:
-                    _time.sleep(0.1)
+                sim_engine.hold_season_while_paused(snap)
                 for result in pool.imap_unordered(_run_2018_season_game, games[start:start + batch], chunksize=2):
                     yield result
         finally:
@@ -87,8 +90,7 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
     def sequential_results():
         import time as _time
         for home_key, away_key, order in games:
-            while sim_engine.SIM_PAUSED:
-                _time.sleep(0.1)
+            sim_engine.hold_season_while_paused(snap)
             yield _run_2018_season_game((home_key, away_key, order))
 
     try:
@@ -98,9 +100,7 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
         use_parallel = False
     results = parallel_results() if use_parallel else sequential_results()
     for done, (home_key, away_key, team_a, team_b, order) in enumerate(results, start=1):
-        while sim_engine.SIM_PAUSED:
-            import time as _pause_time
-            _pause_time.sleep(0.1)
+        sim_engine.hold_season_while_paused(snap)
         add_player_to_series_totals(player_totals, team_a)
         add_player_to_series_totals(player_totals, team_b)
         add_team_to_series_totals(team_totals, team_a)
