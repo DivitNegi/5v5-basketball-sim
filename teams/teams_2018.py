@@ -466,7 +466,7 @@ def make_pelicans_2018() -> Team:
                0.75, 0.92, 0.60, 0.95, 0.950, 0.990,
                0.42, 0.79,
                clutchness=0.82, stamina=0.68),
-        Player("Nikola Mirotic", "PF",
+        Player("Nikola Mirotić", "PF",
                0.89, 0.24, 0.12, 0.10, 0.16, 0.425,
                0.76, 0.83, 0.88, 0.73, 0.83,
                0.256, 0.65, 0.38,

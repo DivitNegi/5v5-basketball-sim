@@ -13,7 +13,7 @@ from sim_engine import *
         # perimeter_def, interior_def
 def make_mavs_2024() -> Team:
     players = [
-        Player("Luka Doncic", "PG",
+        Player("Luka Dončić", "PG",
                0.99, 0.20, 0.20, 0.40,   0.00, 0.99,
                0.88, 0.96, 0.99, 0.78, 0.78,
                0.99, 0.92, 0.95,
@@ -278,7 +278,7 @@ def make_nuggets_2024() -> Team:
                0.18, 0.60, 0.60,
                0.39, 0.48, 0.56, 0.68, 0.733, 0.867,
                0.85, 0.81, stamina=0.82),
-        Player("Nikola Jokic", "C",
+        Player("Nikola Jokić", "C",
                0.20, 0.35, 0.20, 0.20,   0.20, 0.488,
                0.75, 0.94, 0.99, 0.70, 0.86,
                0.32, 0.93, 0.90,

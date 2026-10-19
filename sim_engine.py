@@ -1952,6 +1952,9 @@ DEFAULT_GO_TO_SHOTS = {
 def default_player_go_to_shot(player_or_name, position: str = "") -> str:
     name = getattr(player_or_name, "name", player_or_name)
     key = str(name or "").strip().lower()
+    if key not in DEFAULT_GO_TO_SHOTS:
+        import unicodedata  # Luka Dončić / Nikola Jokić: the table is keyed without accents
+        key = unicodedata.normalize("NFKD", key).encode("ascii", "ignore").decode()
     if key in DEFAULT_GO_TO_SHOTS:
         return DEFAULT_GO_TO_SHOTS[key]
     pos = str(getattr(player_or_name, "position", position) or position).upper()
@@ -3489,13 +3492,13 @@ PLAYER_HEIGHTS = {
     "Kobe Bryant": 78, "Kristaps Porzingis": 86, "Kyle Korver": 79, "Kyle Kuzma": 81,
     "Kyle Lowry": 72, "Kyrie Irving": 74, "Lamar Odom": 82, "Landry Shamet": 76, "Larry Bird": 81,
     "Larry Nance Jr.": 79, "LeBron James": 81, "Leon Powe": 80, "Luc Longley": 86,
-    "Luc Mbah a Moute": 80, "Luguentz Dort": 75, "Luka Doncic": 79, "Luke Kennard": 77,
+    "Luc Mbah a Moute": 80, "Luguentz Dort": 75, "Luka Dončić": 79, "Luke Kennard": 77,
     "Luke Kornet": 86, "Luke Walton": 80, "Magic Johnson": 81, "Manu Ginobili": 78, "Marc Gasol": 83,
     "Marco Belinelli": 77, "Marcus Morris": 80, "Marcus Smart": 76, "Mario Chalmers": 74,
     "Mark Madsen": 81, "Markelle Fultz": 76, "Markieff Morris": 81, "Matthew Dellavedova": 75, "Maxi Kleber": 82,
     "Mikal Bridges": 78, "Michael Jordan": 78, "Michael Porter Jr.": 82, "Mike Miller": 80, "Mike Scott": 80, "Moses Malone": 82,
     "Mo Williams": 73, "Nazr Mohammed": 82, "Nene": 83, "Nick Collison": 82, "Nicolas Claxton": 83,
-    "Nikola Jokic": 83, "Norman Powell": 76, "Norris Cole": 74, "OG Anunoby": 79,
+    "Nikola Jokić": 83, "Norman Powell": 76, "Norris Cole": 74, "OG Anunoby": 79,
     "Oscar Robertson": 77, "P.J. Washington": 79, "PJ Tucker": 77, "Pascal Siakam": 80,
     "Pat Connaughton": 77, "Patrick McCaw": 79, "Patty Mills": 72, "Pau Gasol": 84,
     "Paul George": 80, "Paul Pierce": 79, "Payton Pritchard": 73, "Peyton Watson": 79,
@@ -3647,7 +3650,7 @@ PLAYER_HEIGHTS.update({
     "Jason Kapono": 80,
     "Derek Anderson": 77,
     "E'Twaun Moore": 76,
-    "Nikola Mirotic": 82,
+    "Nikola Mirotić": 82,
     "Darius Miller": 80,
     "Solomon Hill": 79,
     "Emeka Okafor": 82,
@@ -3771,7 +3774,7 @@ PLAYER_SPEED_OVERRIDES = {
     "Jayson Tatum": 0.82, "Derrick Jones Jr.": 0.90, "Aaron Gordon": 0.86,
     "Andre Iguodala": 0.86, "Manu Ginobili": 0.84, "Klay Thompson": 0.76,
     "Danny Green": 0.72, "Ray Allen": 0.78, "Reggie Miller": 0.76,
-    "James Harden": 0.80, "Luka Doncic": 0.70, "Nikola Jokic": 0.66,
+    "James Harden": 0.80, "Luka Dončić": 0.70, "Nikola Jokić": 0.66,
     "Tim Duncan": 0.66, "Shaquille O'Neal": 0.68, "Hakeem Olajuwon": 0.80,
     "Anderson Varejao": 0.70, "Ben Wallace": 0.70, "Zydrunas Ilgauskas": 0.46,
     "David Robinson": 0.82, "Anthony Davis": 0.84, "Victor Wembanyama": 0.78,
@@ -3820,13 +3823,13 @@ for _player_name, _player_speed in {
     "Klay Thompson": 0.760, "Kobe Bryant": 0.900, "Kristaps Porzingis": 0.600, "Kyle Korver": 0.780,
     "Kyle Kuzma": 0.680, "Kyle Lowry": 0.820, "Kyrie Irving": 0.910, "Lamar Odom": 0.780, "Landry Shamet": 0.780,
     "Larry Bird": 0.740, "Larry Nance Jr.": 0.680, "LeBron James": 0.910, "Leon Powe": 0.680, "Luc Longley": 0.600,
-    "Luc Mbah a Moute": 0.740, "Luguentz Dort": 0.740, "Luka Doncic": 0.700, "Luke Kennard": 0.780,
+    "Luc Mbah a Moute": 0.740, "Luguentz Dort": 0.740, "Luka Dončić": 0.700, "Luke Kennard": 0.780,
     "Luke Kornet": 0.600, "Luke Walton": 0.680, "Magic Johnson": 0.820, "Manu Ginobili": 0.840,
     "Marc Gasol": 0.580, "Marco Belinelli": 0.780, "Marcus Morris": 0.680, "Marcus Smart": 0.820,
     "Mario Chalmers": 0.820, "Mark Madsen": 0.680, "Markieff Morris": 0.680, "Matthew Dellavedova": 0.820,
     "Maxi Kleber": 0.680, "Michael Jordan": 0.940, "Michael Porter Jr.": 0.740, "Mikal Bridges": 0.740,
     "Mike Miller": 0.740, "Mike Scott": 0.680, "Mo Williams": 0.820, "Moses Malone": 0.600, "Nazr Mohammed": 0.600,
-    "Nene": 0.600, "Nick Collison": 0.680, "Nicolas Claxton": 0.600, "Nikola Jokic": 0.660, "Norman Powell": 0.780,
+    "Nene": 0.600, "Nick Collison": 0.680, "Nicolas Claxton": 0.600, "Nikola Jokić": 0.660, "Norman Powell": 0.780,
     "Norris Cole": 0.820, "OG Anunoby": 0.740, "Oscar Robertson": 0.820, "P.J. Washington": 0.680,
     "PJ Tucker": 0.680, "Pascal Siakam": 0.680, "Pat Connaughton": 0.780, "Patrick McCaw": 0.780,
     "Patty Mills": 0.880, "Pau Gasol": 0.670, "Paul George": 0.820, "Paul Pierce": 0.740,
@@ -3980,7 +3983,7 @@ PLAYER_SPEED_OVERRIDES.update({
     "Jason Kapono": 0.70,
     "Derek Anderson": 0.76,
     "E'Twaun Moore": 0.76,
-    "Nikola Mirotic": 0.64,
+    "Nikola Mirotić": 0.64,
     "Darius Miller": 0.72,
     "Solomon Hill": 0.74,
     "Emeka Okafor": 0.56,
@@ -4092,8 +4095,8 @@ def default_player_speed(name: str, pos: str) -> float:
 
 
 PLAYER_SHOT_IQ_OVERRIDES = {
-    "Nikola Jokic": 0.96, "LeBron James": 0.99, "Chris Paul": 0.94, "Stephen Curry": 0.93,
-    "Luka Doncic": 0.70, "Kevin Durant": 0.99, "Michael Jordan": 0.91, "Larry Bird": 0.91,
+    "Nikola Jokić": 0.96, "LeBron James": 0.99, "Chris Paul": 0.94, "Stephen Curry": 0.93,
+    "Luka Dončić": 0.70, "Kevin Durant": 0.99, "Michael Jordan": 0.91, "Larry Bird": 0.91,
     "Kawhi Leonard": 0.90, "Jalen Brunson": 0.90, "Tim Duncan": 0.90, "Dirk Nowitzki": 0.90,
     "Shai G-Alexander": 0.92, "Kyrie Irving": 0.95, "Jamal Murray": 0.88, "James Harden": 0.40,
     "Damian Lillard": 0.88, "Jimmy Butler": 0.88, "Tony Parker": 0.87, "Manu Ginobili": 0.87,
@@ -4115,7 +4118,7 @@ PLAYER_ISO_TENDENCY_OVERRIDES = {
     "Kevin Durant": 0.95,
     "Kyrie Irving": 0.90,
     "James Harden": 0.99,
-    "Luka Doncic": 0.98,
+    "Luka Dončić": 0.98,
     "Jayson Tatum": 0.85,
     "Jaylen Brown": 0.70,
     "Kawhi Leonard": 0.82,
@@ -4142,7 +4145,7 @@ PLAYER_ISO_TENDENCY_OVERRIDES = {
     "Giannis Antetokounmpo": 0.64,
     "Anthony Davis": 0.58,
     "Karl-Anthony Towns": 0.56,
-    "Nikola Jokic": 0.38,
+    "Nikola Jokić": 0.38,
     "Chris Paul": 0.48,
     "Magic Johnson": 0.34,
     "Russell Westbrook": 0.66,
@@ -4743,8 +4746,8 @@ PLAYOFF_MOMENT_BADGES = {
     "Shaquille O'Neal": {"clutch": "gold", "elimination": "silver", "closer": "gold"},
     "Hakeem Olajuwon": {"clutch": "gold", "elimination": "gold", "closer": "gold"},
     "Jimmy Butler": {"clutch": "gold", "elimination": "gold", "closer": "silver"},
-    "Luka Doncic": {"clutch": "gold", "elimination": "gold", "closer": "silver"},
-    "Nikola Jokic": {"clutch": "gold", "elimination": "silver", "closer": "gold"},
+    "Luka Dončić": {"clutch": "gold", "elimination": "gold", "closer": "silver"},
+    "Nikola Jokić": {"clutch": "gold", "elimination": "silver", "closer": "gold"},
     "Stephen Curry": {"clutch": "gold", "elimination": "silver", "closer": "gold"},
     "Kevin Durant": {"clutch": "gold", "elimination": "silver", "closer": "gold"},
     "Kyrie Irving": {"clutch": "gold", "elimination": "silver", "closer": "gold", "ankle_breaker": "hof"},
@@ -5197,7 +5200,7 @@ def apply_star_clutchness(*teams: Team):
             "Byron Scott": 0.80, "Michael Cooper": 0.78,
         },
         "2026 Los Angeles Lakers": {
-            "Luka Doncic": 0.94, "LeBron James": 0.92, "Austin Reaves": 0.80, "Marcus Smart": 0.76,
+            "Luka Dončić": 0.94, "LeBron James": 0.92, "Austin Reaves": 0.80, "Marcus Smart": 0.76,
         },
         "2024 Boston Celtics": {
             "Jayson Tatum": 0.82, "Jaylen Brown": 0.78, "Jrue Holiday": 0.76, "Derrick White": 0.74,
@@ -5241,7 +5244,7 @@ def apply_star_clutchness(*teams: Team):
             "Naz Reid": 0.76,
         },
         "2024 Denver Nuggets": {
-            "Nikola Jokic": 0.94, "Jamal Murray": 0.88,
+            "Nikola Jokić": 0.94, "Jamal Murray": 0.88,
         },
         "1996 Chicago Bulls": {
             "Michael Jordan": 0.99, "Scottie Pippen": 0.82, "Steve Kerr": 0.86,
@@ -5341,7 +5344,7 @@ def apply_star_clutchness(*teams: Team):
             "Steve Nash": 0.90, "Amar'e Stoudemire": 0.84, "Shawn Marion": 0.78, "Joe Johnson": 0.78,
         },
         "2023 Denver Nuggets": {
-            "Nikola Jokic": 0.94, "Jamal Murray": 0.90, "Aaron Gordon": 0.78, "Kentavious Caldwell-Pope": 0.76,
+            "Nikola Jokić": 0.94, "Jamal Murray": 0.90, "Aaron Gordon": 0.78, "Kentavious Caldwell-Pope": 0.76,
         },
         "2018 Philadelphia 76ers": {
             "Joel Embiid": 0.84, "JJ Redick": 0.82, "Ben Simmons": 0.76,
@@ -5405,7 +5408,7 @@ def apply_star_clutchness(*teams: Team):
             "Trae Young": 0.90, "John Collins": 0.78, "Bogdan Bogdanovic": 0.76,
         },
         "2022 Dallas Mavericks": {
-            "Luka Doncic": 0.94, "Jalen Brunson": 0.86, "Spencer Dinwiddie": 0.80,
+            "Luka Dončić": 0.94, "Jalen Brunson": 0.86, "Spencer Dinwiddie": 0.80,
         },
         "2026 Dallas Mavericks": {
             "Kyrie Irving": 0.94, "Cooper Flagg": 0.82, "Klay Thompson": 0.84,
@@ -8153,7 +8156,7 @@ PRIORITY_RESERVES_2018 = {
     "2018 Houston Rockets": ("Luc Mbah a Moute", "Gerald Green"),
     "2018 Boston Celtics": ("Terry Rozier", "Marcus Morris", "Marcus Smart"),
     "2018 Toronto Raptors": ("Fred VanVleet", "Jakob Poeltl"),
-    "2018 New Orleans Pelicans": ("Darius Miller", "Nikola Mirotic"),
+    "2018 New Orleans Pelicans": ("Darius Miller", "Nikola Mirotić"),
     "2018 Utah Jazz": ("Jae Crowder",),
 }
 
@@ -8246,7 +8249,7 @@ def mandatory_closers(team: Team) -> Tuple[str, ...]:
     if team.name == "2018 Oklahoma City Thunder":
         return ("Russell Westbrook", "Paul George", "Carmelo Anthony", "Steven Adams")
     if team.name == "2024 Dallas Mavericks":
-        return ("Luka Doncic", "Kyrie Irving")
+        return ("Luka Dončić", "Kyrie Irving")
     return tuple()
 
 
@@ -8667,7 +8670,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2024 Dallas Mavericks":
         target_ranges = {
-            "Luka Doncic": (40, 44),
+            "Luka Dončić": (40, 44),
             "Kyrie Irving": (38, 42),
             "P.J. Washington": (32, 36),
             "Derrick Jones Jr.": (27, 32),
@@ -8743,7 +8746,7 @@ def _initialize_minute_targets_core(team: Team):
         # the roster again (injuries don't matter here), so the minutes below
         # are the healthy rotation, not the real injury-hit box score.
         target_ranges = {
-            "Luka Doncic": (36, 36),
+            "Luka Dončić": (36, 36),
             "LeBron James": (34, 34),
             "Austin Reaves": (34, 34),
             "Rui Hachimura": (28, 28),
@@ -8794,7 +8797,7 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Los Angeles Lakers":
         target_ranges = {
-            "Luka Doncic": (34, 38), "Austin Reaves": (32, 36),
+            "Luka Dončić": (34, 38), "Austin Reaves": (32, 36),
             "Walker Kessler": (30, 34), "Quentin Grimes": (26, 30),
             "Sandro Mamukelashvili": (24, 28), "Collin Sexton": (24, 28),
             "Jarred Vanderbilt": (14, 20), "Ziaire Williams": (10, 16),
@@ -8809,7 +8812,7 @@ def _initialize_minute_targets_core(team: Team):
         target_ranges = {
             "Jamal Murray": (32, 36), "Christian Braun": (22, 26),
             "Cameron Johnson": (28, 32), "Aaron Gordon": (28, 33),
-            "Nikola Jokic": (36, 40), "DeMar DeRozan": (30, 34),
+            "Nikola Jokić": (36, 40), "DeMar DeRozan": (30, 34),
             "Marvin Bagley III": (8, 12), "Julian Strawther": (22, 26),
             "Tyus Jones": (6, 10), "Cam Whitmore": (8, 14),
         }
@@ -9076,7 +9079,7 @@ def _initialize_minute_targets_core(team: Team):
             "Jalen Suggs": (20, 26), "Desmond Bane": (26, 31),
             "Franz Wagner": (28, 33), "Paolo Banchero": (32, 36),
             "Wendell Carter Jr.": (18, 24), "Anthony Black": (18, 24),
-            "Nikola Vucevic": (16, 22), "Tristan da Silva": (14, 20),
+            "Nikola Vučević": (16, 22), "Tristan da Silva": (14, 20),
             "Goga Bitadze": (10, 16), "Jevon Carter": (10, 16),
         }
         for p in team.roster:
@@ -9159,9 +9162,9 @@ def _initialize_minute_targets_core(team: Team):
             "Stephen Curry": (24, 29),
             "Joel Embiid": (21, 27),
             "Anthony Davis": (22, 28),
-            "Nikola Jokic": (30, 34),
+            "Nikola Jokić": (30, 34),
             "Shai G-Alexander": (29, 33),
-            "Luka Doncic": (30, 34),
+            "Luka Dončić": (30, 34),
             "Giannis Antetokounmpo": (30, 34),
         }
         ranked_olympic = sorted(team.roster, key=overall_rating, reverse=True)
@@ -15131,7 +15134,7 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
             return target, lebron, "drive_kick" if target.three_tendency >= 0.25 else "high_pnr"
 
     if play_type in ("lakers_luka_iso", "lakers_luka_spread", "lakers_luka_create"):
-        luka = player_by_name(off.on_floor, ("Luka Doncic",))
+        luka = player_by_name(off.on_floor, ("Luka Dončić",))
         if luka is not None and play_type == "lakers_luka_iso" and can_be_designed_shooter(luka) and has_shot_volume_left(luka):
             print(f"{off.name} clear the side for {luka.name} and let him hunt the matchup.")
             return luka, None, "iso"
@@ -15192,7 +15195,7 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
         return target, passer, play_type
 
     if play_type in ("nuggets_jokic_elbow", "nuggets_murray_jokic_two_man", "nuggets_gordon_dunker"):
-        passer = choose_play_hub(off, ("Nikola Jokic", "Jamal Murray"))
+        passer = choose_play_hub(off, ("Nikola Jokić", "Jamal Murray"))
         options = designed_shooter_options([p for p in off.on_floor if p is not passer], current_shooter)
         target = best_play_target(options, lambda p: 0.35 * p.rim_rating + 0.35 * p.three_rating + 0.20 * p.usage + 0.10 * p.dunk_tendency, current_shooter)
         lines = [
@@ -15360,7 +15363,7 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
 
     if play_type in ("mavs_luka_spread", "mavs_brunson_second", "mavs_corner_lift", "mavs_kyrie_spread", "mavs_flagg_delay"):
         if play_type == "mavs_luka_spread":
-            luka = player_by_name(off.on_floor, ("Luka Doncic",))
+            luka = player_by_name(off.on_floor, ("Luka Dončić",))
             if luka is not None and can_be_designed_shooter(luka) and has_shot_volume_left(luka):
                 print(f"{luka.name} brings the floor wide and keeps the matchup for himself.")
                 return luka, None, play_type
@@ -15369,7 +15372,7 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
             if kyrie is not None and can_be_designed_shooter(kyrie) and has_shot_volume_left(kyrie):
                 print(f"{kyrie.name} clears a side and works from the slot.")
                 return kyrie, None, play_type
-        passer = choose_play_hub(off, ("Luka Doncic", "Kyrie Irving", "Jalen Brunson", "Cooper Flagg"))
+        passer = choose_play_hub(off, ("Luka Dončić", "Kyrie Irving", "Jalen Brunson", "Cooper Flagg"))
         options = designed_shooter_options([p for p in off.on_floor if p is not passer], current_shooter)
         target = best_play_target(
             options,
@@ -16514,7 +16517,7 @@ LATE_GAME_SCORER_MODIFIERS = {
         "Kyle Korver": 0.78,
     },
     "2024 Dallas Mavericks": {
-        "Luka Doncic": 1.16,
+        "Luka Dončić": 1.16,
         "Kyrie Irving": 1.24,
     },
     "2026 Dallas Mavericks": {
@@ -16614,7 +16617,7 @@ def apply_mavs_2024_quarter_scoring_roles(team: Team, period: int):
     """
     if team.name != "2024 Dallas Mavericks" or period not in (1, 2, 3, 4):
         return
-    luka = player_by_name(team.roster, ("Luka Doncic",))
+    luka = player_by_name(team.roster, ("Luka Dončić",))
     kyrie = player_by_name(team.roster, ("Kyrie Irving",))
     if luka is None or kyrie is None:
         return
@@ -16636,17 +16639,17 @@ def mavs_2024_closer_balance_multiplier(player: Player, team: Team) -> float:
     bury Kyrie's shot diet. Use fourth-quarter attempts to keep the two closers
     connected while nudging the split a little toward Kyrie.
     """
-    if team.name != "2024 Dallas Mavericks" or player.name not in ("Luka Doncic", "Kyrie Irving"):
+    if team.name != "2024 Dallas Mavericks" or player.name not in ("Luka Dončić", "Kyrie Irving"):
         return 1.0
 
-    partner_name = "Kyrie Irving" if player.name == "Luka Doncic" else "Luka Doncic"
+    partner_name = "Kyrie Irving" if player.name == "Luka Dončić" else "Luka Dončić"
     partner = player_by_name(getattr(team, "on_floor", []), (partner_name,))
     if partner is None:
         return 1.0
 
     player_fga = getattr(player, "fourth_fga", 0)
     partner_fga = getattr(partner, "fourth_fga", 0)
-    base = 0.98 if player.name == "Luka Doncic" else 1.18
+    base = 0.98 if player.name == "Luka Dončić" else 1.18
     balance = 1.0 + (partner_fga - player_fga) * 0.18
     return max(0.56, min(1.72, base * balance))
 
@@ -16655,7 +16658,7 @@ def choose_mavs_2024_fourth_star(team: Team, need_three: bool = False) -> Player
     if team.name != "2024 Dallas Mavericks":
         return None
 
-    luka = player_by_name(team.on_floor, ("Luka Doncic",))
+    luka = player_by_name(team.on_floor, ("Luka Dončić",))
     kyrie = player_by_name(team.on_floor, ("Kyrie Irving",))
     stars = [
         p for p in (luka, kyrie)
@@ -16679,7 +16682,7 @@ def choose_mavs_2024_fourth_star(team: Team, need_three: bool = False) -> Player
         choice = luka
     else:
         last = getattr(team, "last_mavs_2024_fourth_star", None)
-        if last == "Luka Doncic":
+        if last == "Luka Dončić":
             choice = kyrie if random.random() < 0.68 else luka
         elif last == "Kyrie Irving":
             choice = luka if random.random() < 0.48 else kyrie
@@ -16943,7 +16946,7 @@ def clutch_shot_package_type(player: Player, defender: Player, team: Team, oppon
         "Damian Lillard": ("three", "three", "rim"),
         "Ray Allen": ("three", "three", "mid"),
         "Reggie Miller": ("three", "three", "mid"),
-        "Luka Doncic": ("three", "mid", "rim", "post"),
+        "Luka Dončić": ("three", "mid", "rim", "post"),
         "James Harden": ("three", "rim", "mid"),
         "Kyrie Irving": ("mid", "rim", "three"),
         "Chris Paul": ("mid", "mid", "three"),
@@ -16956,7 +16959,7 @@ def clutch_shot_package_type(player: Player, defender: Player, team: Team, oppon
         "Jimmy Butler": ("rim", "mid", "post"),
         "Jayson Tatum": ("three", "mid", "rim"),
         "Jaylen Brown": ("rim", "mid", "three"),
-        "Nikola Jokic": ("post", "mid", "three"),
+        "Nikola Jokić": ("post", "mid", "three"),
         "Joel Embiid": ("post", "mid", "rim"),
         "Shaquille O'Neal": ("post", "rim", "dunk"),
         "Anthony Davis": ("rim", "post", "mid"),
@@ -17412,11 +17415,11 @@ def choose_ballhandler(team: Team) -> Player:
         # in the 2nd and 4th -- an explicit quarter-by-quarter alternation
         # of who initiates (and therefore scores) the Mavs' offense.
         period = SIM_CONTEXT.get("period", 1)
-        primary_name = "Luka Doncic" if period in (1, 3) else "Kyrie Irving"
+        primary_name = "Luka Dončić" if period in (1, 3) else "Kyrie Irving"
         primary = player_by_name(team.on_floor, (primary_name,))
         if primary is not None and not primary.fouled_out and random.random() < 0.80:
             return primary
-        preferred = [p for p in team.on_floor if p.name in ("Luka Doncic", "Kyrie Irving")]
+        preferred = [p for p in team.on_floor if p.name in ("Luka Dončić", "Kyrie Irving")]
         if preferred:
             weights = [
                 max(0.01, playmaking_hub_score(p) ** 1.50)
@@ -17470,7 +17473,7 @@ def choose_ballhandler(team: Team) -> Player:
             return random.choices(preferred, weights=weights, k=1)[0]
 
     if team.name == "2027 Denver Nuggets":
-        jokic = player_by_name(team.on_floor, ("Nikola Jokic",))
+        jokic = player_by_name(team.on_floor, ("Nikola Jokić",))
         # Jokic's playmaking doesn't come from bringing the ball up like a
         # guard -- it comes from elbow and high-post touches, dribble
         # hand-offs, and short-roll reads. The generic PG/SG-gated handler
@@ -17481,14 +17484,14 @@ def choose_ballhandler(team: Team) -> Player:
         # of fewer possessions to initiate, not from any rating or cap.
         if jokic is not None and not jokic.fouled_out and random.random() < 0.62:
             return jokic
-        preferred = [p for p in team.on_floor if p.name in ("Nikola Jokic", "Jamal Murray", "Aaron Gordon")]
+        preferred = [p for p in team.on_floor if p.name in ("Nikola Jokić", "Jamal Murray", "Aaron Gordon")]
         if preferred:
             weights = [
                 max(0.01, playmaking_hub_score(p) ** 1.60)
                 * assist_load_factor(p, team)
                 * coach_handler_multiplier(team, p)
                 * fatigue_touch_multiplier(p)
-                * (2.10 if p.name == "Nikola Jokic" else 1.0)
+                * (2.10 if p.name == "Nikola Jokić" else 1.0)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
@@ -22103,7 +22106,9 @@ def choose_fantasy_player_version(candidate: Player) -> Player:
 def find_fantasy_candidate_by_name(pools: Dict[str, List[Tuple[Player, str]]],
                                    query: str,
                                    taken_names: set) -> Player:
-    needle = query.strip().lower()
+    import unicodedata  # typing "luka doncic" must find "Luka Dončić"
+    _plain = lambda s: unicodedata.normalize("NFKD", str(s)).encode("ascii", "ignore").decode().lower()
+    needle = _plain(query.strip())
     if not needle:
         return None
 
@@ -22116,7 +22121,7 @@ def find_fantasy_candidate_by_name(pools: Dict[str, List[Tuple[Player, str]]],
             if key in seen or key in taken_names:
                 continue
             seen.add(key)
-            name = candidate.name.lower()
+            name = _plain(candidate.name)
             if name == needle:
                 exact_matches.append(candidate)
             elif needle in name:
@@ -22443,7 +22448,7 @@ def fantasy_ai_candidate_score(candidate: Player, ai_players: List[Player], user
         "Shaquille O'Neal": 12,
         "Kareem Abdul-Jabbar": 10,
         "Stephen Curry": 9,
-        "Nikola Jokic": 8,
+        "Nikola Jokić": 8,
         "Kevin Durant": 8,
     }
     score += draft_priority.get(candidate.name, 0)
@@ -23323,8 +23328,8 @@ def build_season_sections(entries: List[Dict],
         # the star is and the market he plays in. The coaches (reserves) lean on
         # production but are still swayed by it.
         FAME = {
-            "LeBron James": 1.0, "Stephen Curry": 0.95, "Kevin Durant": 0.85, "Luka Doncic": 0.8,
-            "Giannis Antetokounmpo": 0.8, "Victor Wembanyama": 0.8, "Nikola Jokic": 0.65, "Shai G-Alexander": 0.6,
+            "LeBron James": 1.0, "Stephen Curry": 0.95, "Kevin Durant": 0.85, "Luka Dončić": 0.8,
+            "Giannis Antetokounmpo": 0.8, "Victor Wembanyama": 0.8, "Nikola Jokić": 0.65, "Shai G-Alexander": 0.6,
             "Anthony Edwards": 0.65, "Jayson Tatum": 0.6, "Jimmy Butler": 0.45, "Kyrie Irving": 0.7,
             "Kawhi Leonard": 0.55, "Joel Embiid": 0.55, "Devin Booker": 0.55, "Jalen Brunson": 0.5,
             "Cooper Flagg": 0.7, "LaMelo Ball": 0.55, "Trae Young": 0.5, "Ja Morant": 0.5, "Zion Williamson": 0.5,

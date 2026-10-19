@@ -36,7 +36,7 @@ def make_nuggets_2027() -> Team:
                        0.88, 0.86,
                        clutchness=0.70, height=80, speed=0.61,
                        shot_iq=0.84, archetype='big', stamina=0.77),
-        Player('Nikola Jokic', 'C',
+        Player('Nikola Jokić', 'C',
                        0.28, 0.15, 0.18, 0.39, 0.58, 0.44,
                        0.83, 0.97, 0.99, 0.75, 0.84,
                        0.50, 0.98, 0.65,
@@ -897,7 +897,7 @@ def make_lakers_2027() -> Team:
         # usage, playmaking, handle,
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
-        Player('Luka Doncic', 'PG',
+        Player('Luka Dončić', 'PG',
                        0.90, 0.320, 0.200, 0.040, 0.080, 0.860,
                        0.850, 0.960, 0.990, 0.780, 0.780,
                        0.400, 0.960, 0.920,
@@ -989,7 +989,7 @@ def make_lakers_2027() -> Team:
     t = Team('2027 Los Angeles Lakers', players)
     # Luka remains the engine and owns elite usage, but the 2027 offense uses
     # his passing more often instead of treating every touch as a clear-out.
-    luka = next((p for p in t.roster if p.name == 'Luka Doncic'), None)
+    luka = next((p for p in t.roster if p.name == 'Luka Dončić'), None)
     if luka is not None:
         luka.usage = max(luka.usage, 0.40)
         luka.playmaking = max(luka.playmaking, 0.96)
@@ -2478,7 +2478,7 @@ def make_magic_2027() -> Team:
                0.840, 0.630,
                clutchness=0.650, secondary_positions=('SG',), height=79, speed=0.750,
                shot_iq=0.850, archetype='playmaking guard', stamina=0.80),
-        Player('Nikola Vucevic', 'C',
+        Player('Nikola Vučević', 'C',
                0.42, 0.30, 0.10, 0.20, 0.20, 0.24,
                0.810, 0.830, 0.970, 0.650, 0.810,
                0.16, 0.730, 0.350,

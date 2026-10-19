@@ -329,7 +329,7 @@ def make_grizzlies_2022() -> Team:
 
 def make_mavs_2022() -> Team:
     players = [
-        Player("Luka Doncic", "PG",
+        Player("Luka Dončić", "PG",
                0.85, 0.30, 0.22, 0.06, 0.00, 0.9,
                0.89, 0.95, 0.98, 0.78, 0.76,
                0.60, 0.90, 0.92,

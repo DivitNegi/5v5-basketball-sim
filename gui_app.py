@@ -529,8 +529,8 @@ def run_gui_app():
 
     PLAYER_HEADSHOT_IDS = {
         "LeBron James": "2544", "Stephen Curry": "201939", "Kevin Durant": "201142",
-        "James Harden": "201935", "Kyrie Irving": "202681", "Luka Doncic": "1629029",
-        "Nikola Jokic": "203999", "Giannis Antetokounmpo": "203507", "Jayson Tatum": "1628369",
+        "James Harden": "201935", "Kyrie Irving": "202681", "Luka Dončić": "1629029",
+        "Nikola Jokić": "203999", "Giannis Antetokounmpo": "203507", "Jayson Tatum": "1628369",
         "Jaylen Brown": "1627759", "Shai G-Alexander": "1628983", "Victor Wembanyama": "1641705",
         "De'Aaron Fox": "1628368", "Anthony Davis": "203076", "Kawhi Leonard": "202695",
         "Jimmy Butler": "202710", "Damian Lillard": "203081", "Joel Embiid": "203954",
@@ -591,7 +591,7 @@ def run_gui_app():
         "Payton Pritchard": "1630202", "Sam Hauser": "1630573", "Neemias Queta": "1629674",
         "Jordan Walsh": "1641775", "Baylor Scheierman": "1631248", "Davion Mitchell": "1630558",
         "Norman Powell": "1626181", "Bobby Portis": "1626171", "Tim Hardaway Jr.": "203501",
-        "Nikola Jovic": "1631107", "Nikola Jović": "1631107", "Duncan Robinson": "1629130",
+        "Nikola Jović": "1631107", "Nikola Jović": "1631107", "Duncan Robinson": "1629130",
         "Pelle Larsson": "1641796", "VJ Edgecombe": "1641744", "Dean Wade": "1629731",
         "Kelly Oubre Jr.": "1626162", "Ariel Hukporti": "1630574", "Adem Bona": "1641737",
         "Justin Edwards": "1642267", "Immanuel Quickley": "1630193", "Jakob Poeltl": "1627751",
@@ -603,7 +603,7 @@ def run_gui_app():
         "Derrick Jones Jr.": "1627884", "Nicolas Claxton": "1629651", "Bruce Brown": "1628971",
         "Seth Curry": "203552", "Andre Drummond": "203083", "Goran Dragic": "201609",
         "Marcus Smart": "203935", "Robert Williams": "1629057", "Malcolm Brogdon": "1627763",
-        "Luka Doncic": "1629029", "Austin Reaves": "1630559", "Walker Kessler": "1631117",
+        "Luka Dončić": "1629029", "Austin Reaves": "1630559", "Walker Kessler": "1631117",
         "Collin Sexton": "1629012", "Quentin Grimes": "1629656", "Sandro Mamukelashvili": "1630572",
         "Ziaire Williams": "1630533", "Jarred Vanderbilt": "1629020", "Jaden Hardy": "1630702", "Bronny James": "1642355",
         "Grant Williams": "1629684", "Neemias Queta": "1629674", "OG Anunoby": "1628384",
