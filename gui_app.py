@@ -3296,10 +3296,14 @@ def run_gui_app():
             bracket_scroll.grid_remove()
             bracket_canvas.grid(row=1, column=0, columnspan=2, sticky="nsew")
             bracket_mode_bar.grid(row=0, column=1, sticky="e", pady=(0, 6))
+            if state.get("play_in"):
+                bracket_playin_button.grid(row=0, column=1)
+            else:
+                bracket_playin_button.grid_remove()  # seasons without a play-in (2018) have nothing to show
             bracket_detail_label.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
             bracket_summary_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(6, 0))
             if not bracket_detail_var.get():
-                bracket_info_var.set("Click any series to see the game-by-game results. Use Play-In to see the play-in games behind the tree.")
+                bracket_info_var.set("Click any series to see the game-by-game results." + (" Use Play-In to see the play-in games behind the tree." if state.get("play_in") else ""))
             selected_key = bracket_ui.get("selected") or ""
             if selected_key.startswith("s::") and bracket_ui.get("view") == "tree":
                 select_bracket_item(selected_key)  # refresh the selected series: header, games, awards (also redraws)
@@ -5545,6 +5549,7 @@ def run_gui_app():
         rotation_tree_west.delete(*rotation_tree_west.get_children())
         final = (playoff_sections_state.get("sections") or {}).get("_season_standings") or []
         rows_all = final or live_standings["rows"]
+        standings_play_in = getattr(_players_data_module, "POSTSEASON_PLAY_IN", True)
         if rows_all:
             for conference, tree in (("East", rotation_tree), ("West", rotation_tree_west)):
                 rows = sorted(
@@ -5558,7 +5563,7 @@ def run_gui_app():
                     w, l = row.get("wins", 0), row.get("losses", 0)
                     games = max(1, w + l)
                     gb = ((lead_w - w) + (l - lead_l)) / 2
-                    tag = ("playin",) if 7 <= seed <= 10 else (("out",) if seed > 10 else ())
+                    tag = ("playin",) if (standings_play_in and 7 <= seed <= 10) else (("out",) if seed > (10 if standings_play_in else 8) else ())
                     tree.insert(
                         "", "end",
                         values=(
@@ -5568,16 +5573,17 @@ def run_gui_app():
                         ),
                         tags=tag,
                     )
-                    if seed == 6:
+                    if standings_play_in and seed == 6:
                         tree.insert("", "end", values=("", "-- play-in zone (7-10) --", "", "", "", "", "", "", "", ""), tags=("line",))
-                    elif seed == 10:
+                    elif seed == (10 if standings_play_in else 8):
                         tree.insert("", "end", values=("", "-- out of the playoffs --", "", "", "", "", "", "", "", ""), tags=("line",))
             if final:
-                rotation_status_var.set("Final regular-season standings.  Seeds 1-6 are in, 7-10 go to the play-in.")
+                rotation_status_var.set("Final regular-season standings.  Seeds 1-6 are in, 7-10 go to the play-in." if standings_play_in
+                                        else "Final regular-season standings.  The top 8 in each conference make the playoffs.")
             else:
                 rotation_status_var.set(
                     f"LIVE: {live_standings['completed']} of {live_standings['total']} games simulated.  "
-                    "Seeds 1-6 are in, 7-10 go to the play-in."
+                    + ("Seeds 1-6 are in, 7-10 go to the play-in." if standings_play_in else "The top 8 in each conference make the playoffs.")
                 )
             return
         teams = [SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")]
@@ -8993,6 +8999,8 @@ def run_gui_app():
         sim_factories = active_team_factories()
         sim_completed = False
         sim_error = None
+        if mode not in ("2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs"):
+            _players_data_module.POSTSEASON_PLAY_IN = True
         try:
             if mode == "Game":
                 team_a = sim_factories[team_a_var.get()]()
@@ -9086,7 +9094,7 @@ def run_gui_app():
                 season_sections = run_2018_season(section_queue, scoreboard_queue)
                 postseason_state["standings"] = (season_sections or {}).get("_season_standings")
                 postseason_state["factories"] = factories_2018()
-                scoreboard_status_var.set("Season complete. Press Next for the play-in and playoffs, or browse standings, averages, advanced, shots/defense, awards and highs.")
+                scoreboard_status_var.set("Season complete. Press Next for the playoffs, or browse standings, averages, advanced, shots/defense, awards and highs.")
                 scoreboard_queue.put({"postseason_ready": True})
             elif mode == "2027 play-in & playoffs":
                 status_var.set(f"{_players_data_module.POSTSEASON_YEAR_LABEL} play-in and playoffs running...")

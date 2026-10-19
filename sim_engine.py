@@ -23007,6 +23007,36 @@ class SeasonGameLog:
                 ))
 
 
+SEASON_POSITIONAL_AWARDS = False   # True for seasons that picked All-NBA / All-Defensive teams by position (2018)
+
+
+def positional_award_teams(ranked: List[Tuple[str, str, Dict]], player_lookup: Dict, n_teams: int):
+    """Fill n_teams of two guards, two forwards and a center from a best-first list. A rim-protecting power forward 6'10"+ may take the center slot."""
+    slots = {"G": 2, "F": 2, "C": 1}
+    teams = [{"G": [], "F": [], "C": []} for _ in range(n_teams)]
+
+    def groups_for(player):
+        pos = (getattr(player, "position", "") or "").upper()
+        if pos in ("PG", "SG"):
+            return ("G",)
+        if pos == "C":
+            return ("C",)
+        if pos == "PF" and getattr(player, "height", 0) >= 82 and getattr(player, "interior_def", 0) >= 0.85 and getattr(player, "ball_handle", 0) < 0.70:
+            return ("C", "F")   # a rim-protecting big (Anthony Davis) is voted at center; a ball-handling forward (Giannis) is not
+        return ("F",)
+
+    for item in ranked:
+        player = player_lookup.get((item[0], item[1]))
+        for group in groups_for(player):
+            slot_team = next((tm for tm in teams if len(tm[group]) < slots[group]), None)
+            if slot_team is not None:
+                slot_team[group].append(item)
+                break
+        if all(len(tm[g]) >= n for tm in teams for g, n in slots.items()):
+            break
+    return [[(group, it) for group in ("G", "F", "C") for it in tm[group]] for tm in teams]
+
+
 def build_season_sections(entries: List[Dict],
                           series_totals: Dict | None = None,
                           series_team_totals: Dict | None = None,
@@ -23425,15 +23455,25 @@ def build_season_sections(entries: List[Dict],
                 for idx, (team_name, name, stats) in enumerate(ranked_rookies[start:start + 5], start=1):
                     all_rookie_rows.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": stat_line(team_name, stats)})
 
-        for team_no, start in enumerate((0, 5, 10), start=1):
-            label = {1: "All-NBA First Team", 2: "All-NBA Second Team", 3: "All-NBA Third Team"}[team_no]
-            for idx, (team_name, name, stats) in enumerate(all_nba[start:start + 5], start=1):
-                awards_table.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": stat_line(team_name, stats)})
+        if SEASON_POSITIONAL_AWARDS:
+            nba_teams = positional_award_teams(all_nba, player_lookup, 3)
+            def_teams = positional_award_teams(defenders, player_lookup, 2)
+        else:
+            nba_teams = [[(None, it) for it in all_nba[s:s + 5]] for s in (0, 5, 10)]
+            def_teams = [[(None, it) for it in defenders[s:s + 5]] for s in (0, 5)]
 
-        for team_no, start in enumerate((0, 5), start=1):
+        def award_name(idx: int, group, name: str) -> str:
+            return f"{idx}. {name}" + (f" ({group})" if group else "")
+
+        for team_no, members in enumerate(nba_teams, start=1):
+            label = {1: "All-NBA First Team", 2: "All-NBA Second Team", 3: "All-NBA Third Team"}[team_no]
+            for idx, (group, (team_name, name, stats)) in enumerate(members, start=1):
+                awards_table.append({"award": label, "player": award_name(idx, group, name), "team": team_name, "stats": stat_line(team_name, stats)})
+
+        for team_no, members in enumerate(def_teams, start=1):
             label = "All-Defensive First Team" if team_no == 1 else "All-Defensive Second Team"
-            for idx, (team_name, name, stats) in enumerate(defenders[start:start + 5], start=1):
-                awards_table.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": defense_stat_line(team_name, stats)})
+            for idx, (group, (team_name, name, stats)) in enumerate(members, start=1):
+                awards_table.append({"award": label, "player": award_name(idx, group, name), "team": team_name, "stats": defense_stat_line(team_name, stats)})
         awards_table.extend(all_star_rows)
         awards_table.extend(all_rookie_rows)
     top_lines = ["82-GAME SEASON COMPLETE", "", "Standings"]

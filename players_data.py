@@ -394,6 +394,7 @@ def run_2016_playoffs():
 
 POSTSEASON_YEAR_LABEL = "2027"      # which season the play-in / playoff screens are labelled with
 POSTSEASON_SEASON_LABEL = "2026-27"
+POSTSEASON_PLAY_IN = True            # False for seasons before the play-in existed (2018): seeds 1-8 go straight to the bracket
 
 PLAYOFF_2027_CONFERENCES = {
     "East": [
@@ -493,9 +494,9 @@ def print_2027_bracket_state(rounds):
 
 
 def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, clear_state: bool = True, stage: Dict = None):
-    global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL
+    global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN
     if field is None:
-        POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL = "2027", "2026-27"
+        POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN = "2027", "2026-27", True
     if clear_state:
         BRACKET_STATE.clear()
     if stage is None:
@@ -661,11 +662,13 @@ def run_2027_postseason(standings, custom_factories=None):
                     factory_names[team.name] = factory_name
                     strengths[team.name] = team_strength_2027(team)
 
+    play_in = POSTSEASON_PLAY_IN
     print("\n" + "#" * 100)
-    print(f"{POSTSEASON_YEAR_LABEL} PLAY-IN TOURNAMENT")
+    print(f"{POSTSEASON_YEAR_LABEL} PLAY-IN TOURNAMENT" if play_in else f"{POSTSEASON_YEAR_LABEL} PLAYOFF SEEDING (no play-in)")
     print("#" * 100)
     BRACKET_STATE.clear()
-    stage = {"players": {}, "teams": {}, "lines": [f"{POSTSEASON_YEAR_LABEL} PLAY-IN AND PLAYOFFS", "=" * 60, "PLAY-IN"]}
+    stage = {"players": {}, "teams": {}, "lines": [f"{POSTSEASON_YEAR_LABEL} PLAY-IN AND PLAYOFFS", "=" * 60, "PLAY-IN"] if play_in
+             else [f"{POSTSEASON_YEAR_LABEL} PLAYOFFS", "=" * 60]}
     push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"])  # tabs reset to play-in/playoff stats
     bracket_teams = BRACKET_STATE.setdefault("teams", {})
     for row in standings:
@@ -679,23 +682,26 @@ def run_2027_postseason(standings, custom_factories=None):
         )
         ranked = [r["team"] for r in rows]
         record = {r["team"]: f"{r['wins']}-{r['losses']}" for r in rows}
-        print(f"\n{conference.upper()} STANDINGS (seeds 1-10)")
-        for seed, name in enumerate(ranked[:10], start=1):
-            tag = "  <- play-in" if seed >= 7 else ""
+        print(f"\n{conference.upper()} STANDINGS (seeds 1-{10 if play_in else 8})")
+        for seed, name in enumerate(ranked[:10 if play_in else 8], start=1):
+            tag = "  <- play-in" if (play_in and seed >= 7) else ""
             print(f"  {seed:>2}. {name} ({record[name]}){tag}")
         for seed, name in enumerate(ranked, start=1):
             bracket_teams[name]["seed"] = seed
-        seven, eight, nine, ten = ranked[6], ranked[7], ranked[8], ranked[9]
-        record_2027_play_in(conference, "7v8", seven, eight)
-        record_2027_play_in(conference, "9v10", nine, ten)
-        winner_78, loser_78 = run_2027_play_in_game(seven, eight, factories, f"{conference} 7 vs 8 (winner is the 7 seed)", conference, "7v8", stage)
-        winner_910, _eliminated = run_2027_play_in_game(nine, ten, factories, f"{conference} 9 vs 10 (loser is out)", conference, "9v10", stage)
-        winner_final, _out = run_2027_play_in_game(loser_78, winner_910, factories, f"{conference} 8-seed game", conference, "8seed", stage)
-        seeds = ranked[:6] + [winner_78, winner_final]
+        if play_in:
+            seven, eight, nine, ten = ranked[6], ranked[7], ranked[8], ranked[9]
+            record_2027_play_in(conference, "7v8", seven, eight)
+            record_2027_play_in(conference, "9v10", nine, ten)
+            winner_78, loser_78 = run_2027_play_in_game(seven, eight, factories, f"{conference} 7 vs 8 (winner is the 7 seed)", conference, "7v8", stage)
+            winner_910, _eliminated = run_2027_play_in_game(nine, ten, factories, f"{conference} 9 vs 10 (loser is out)", conference, "9v10", stage)
+            winner_final, _out = run_2027_play_in_game(loser_78, winner_910, factories, f"{conference} 8-seed game", conference, "8seed", stage)
+            seeds = ranked[:6] + [winner_78, winner_final]
+        else:
+            seeds = ranked[:8]  # 2018 and earlier: the top eight in each conference are in
         field[conference] = [(name, seed, strengths[name], factory_names[name]) for seed, name in enumerate(seeds, start=1)]
         print(f"\n{conference} playoff seeds: " + ", ".join(f"{seed}. {name}" for seed, name in enumerate(seeds, start=1)))
 
-    print(f"\n{POSTSEASON_YEAR_LABEL} PLAYOFFS (seeded from the regular season and play-in)")
+    print(f"\n{POSTSEASON_YEAR_LABEL} PLAYOFFS (seeded from the regular season" + (" and play-in)" if play_in else ")"))
     stage["lines"].extend(["", "PLAYOFFS"])
     run_2027_playoffs(field, factories, announce_seeds=False, clear_state=False, stage=stage)
 
@@ -766,8 +772,8 @@ def _run_2027_season_game(task):
 
 
 def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
-    global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL
-    POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL = "2027", "2026-27"
+    global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN
+    POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN = "2027", "2026-27", True
     games, conf_of = build_2027_season_schedule()
     games = [(home, away, order) for order, (home, away) in enumerate(games)]
     entries = []

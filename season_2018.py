@@ -2,8 +2,9 @@
 2017-18 NBA regular season (82 games, real NBA schedule structure) and a "Full 2018 playoffs" bracket.
 
 Mirrors run_2027_season / run_2027_playoffs in players_data.py for the 30 `make_*_2018` teams; the
-play-in tournament and playoffs after the season reuse run_2027_postseason with this season's
-factories, so the standings -> play-in -> bracket flow is identical.
+playoffs after the season reuse run_2027_postseason with this season's factories. There is no play-in for
+2018 (it started in 2020-21): seeds 1-8 in each conference go straight to the bracket, and the All-NBA and
+All-Defensive teams are picked by position (two guards, two forwards, one center), as they were then.
 """
 import random
 from typing import Dict
@@ -48,6 +49,7 @@ def _run_2018_season_game(task):
 def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
     pd.POSTSEASON_YEAR_LABEL = "2018"
     pd.POSTSEASON_SEASON_LABEL = "2017-18"
+    pd.POSTSEASON_PLAY_IN = False   # the play-in tournament did not exist in 2017-18
     games, conf_of = pd.build_2027_season_schedule()
     games = [(home, away, order) for order, (home, away) in enumerate(games)]
     entries = []
@@ -135,8 +137,12 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
             print(f"Season sim progress: {done}/{total_games} games.")
 
     sim_engine.SEASON_STAR_MINUTES_CAP = None
-    sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,
-                                     game_extras=game_log.extras, game_meta=game_log.games)
+    sim_engine.SEASON_POSITIONAL_AWARDS = True
+    try:
+        sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,
+                                         game_extras=game_log.extras, game_meta=game_log.games)
+    finally:
+        sim_engine.SEASON_POSITIONAL_AWARDS = False
     if section_queue is not None:
         section_queue.put(sections)
 
@@ -173,6 +179,7 @@ def playoff_2018_field():
 def run_2018_playoffs():
     pd.POSTSEASON_YEAR_LABEL = "2018"
     pd.POSTSEASON_SEASON_LABEL = "2017-18"
+    pd.POSTSEASON_PLAY_IN = False   # the play-in tournament did not exist in 2017-18
     field = playoff_2018_field()
     factories = {name: getattr(pd, factory) for rows in field.values() for name, _s, _st, factory in rows}
     pd.run_2027_playoffs(field, factories)
