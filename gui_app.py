@@ -1291,19 +1291,26 @@ def run_gui_app():
     team_adv_source_dropdown.grid(row=0, column=1, sticky="w", padx=(0, 16))
     team_adv_source_dropdown.bind("<<ComboboxSelected>>", lambda _e: on_stat_source_change())
     ttk.Label(team_adv_top, text="Rank by").grid(row=0, column=2, sticky="w", padx=(0, 8))
-    TEAM_ADV_SORTS = ("Net Rtg", "Off Rtg", "Def Rtg", "Pace", "eFG%", "TS%", "TOV%", "ORB%", "DRB%", "FTr", "3PAr", "AST%", "Opp eFG%", "Opp TOV%", "Win%")
+    TEAM_ADV_SORTS = (
+        "Net Rtg", "Off Rtg", "Def Rtg", "Pace", "eFG%", "TS%", "TOV%", "ORB%", "DRB%", "FTr", "3PAr", "AST%", "Opp eFG%", "Opp TOV%", "Win%",
+        "PPG", "Opp PPG", "FG%", "3P%", "FT%", "RPG", "APG", "SPG", "BPG", "TOPG", "PF", "Opp FG%", "Opp 3P%",
+    )
     team_adv_sort_var = tk.StringVar(value="Net Rtg")
     team_adv_sort_dropdown = ttk.Combobox(team_adv_top, textvariable=team_adv_sort_var, values=TEAM_ADV_SORTS, state="readonly", width=12)
     team_adv_sort_dropdown.grid(row=0, column=3, sticky="w")
     team_adv_sort_dropdown.bind("<<ComboboxSelected>>", lambda _e: update_team_advanced_widgets(playoff_sections_state.get("sections") or {}))
-    team_adv_columns = ("rank", "team", "gp", "w", "l", "pts", "opp", "ortg", "drtg", "net", "pace", "efg", "ts", "tov", "orb", "drb", "ftr", "tpar", "ast", "oefg", "ots", "otov", "oorb")
+    team_adv_columns = ("rank", "team", "gp", "w", "l", "pts", "opp", "fgm", "fga", "fgp", "tpm", "tpa", "tpp", "ftm", "fta", "ftp", "rpg", "apg", "spg", "bpg", "topg", "pfpg", "ortg", "drtg", "net", "pace", "efg", "ts", "tov", "orb", "drb", "ftr", "tpar", "ast", "oefg", "ots", "otov", "oorb")
     team_adv_tree = ttk.Treeview(team_adv_frame, columns=team_adv_columns, show="headings", height=14, style="Series.Treeview")
     team_adv_scroll_y = ttk.Scrollbar(team_adv_frame, orient="vertical", command=team_adv_tree.yview)
     team_adv_scroll_x = ttk.Scrollbar(team_adv_frame, orient="horizontal", command=team_adv_tree.xview)
     team_adv_tree.configure(yscrollcommand=team_adv_scroll_y.set, xscrollcommand=team_adv_scroll_x.set)
     for col, label, width in (
         ("rank", "#", 40), ("team", "Team", 190), ("gp", "GP", 48), ("w", "W", 44), ("l", "L", 44),
-        ("pts", "PTS", 60), ("opp", "OPP", 60), ("ortg", "OFF RTG", 80), ("drtg", "DEF RTG", 80), ("net", "NET", 66),
+        ("pts", "PTS", 60), ("opp", "OPP", 60),
+        ("fgm", "FGM", 52), ("fga", "FGA", 52), ("fgp", "FG%", 58), ("tpm", "3PM", 52), ("tpa", "3PA", 52), ("tpp", "3P%", 58),
+        ("ftm", "FTM", 52), ("fta", "FTA", 52), ("ftp", "FT%", 58), ("rpg", "REB", 52), ("apg", "AST", 52), ("spg", "STL", 52),
+        ("bpg", "BLK", 52), ("topg", "TOV", 52), ("pfpg", "PF", 48),
+        ("ortg", "OFF RTG", 80), ("drtg", "DEF RTG", 80), ("net", "NET", 66),
         ("pace", "PACE", 62), ("efg", "eFG%", 62), ("ts", "TS%", 62), ("tov", "TOV%", 62), ("orb", "ORB%", 62),
         ("drb", "DRB%", 62), ("ftr", "FTr", 58), ("tpar", "3PAr", 58), ("ast", "AST%", 62),
         ("oefg", "OPP eFG%", 84), ("ots", "OPP TS%", 80), ("otov", "OPP TOV%", 84), ("oorb", "OPP ORB%", 84),
@@ -3632,6 +3639,15 @@ def run_gui_app():
         poss = fga - oreb + tov + 0.44 * fta
         row = {"gp": gp, "w": team.get("wins", 0), "l": team.get("games", 0) - team.get("wins", 0)}
         row["pts"] = pts / gp
+        row["fgm"], row["fga"] = fgm / gp, fga / gp
+        row["tpm"], row["tpa"] = tpm / gp, tpa / gp
+        row["ftm"], row["fta"] = team.get("ftm", 0) / gp, fta / gp
+        row["fgp"] = 100 * fgm / max(1, fga)
+        row["tpp"] = 100 * tpm / max(1, tpa)
+        row["ftp"] = 100 * team.get("ftm", 0) / max(1, fta)
+        row["rpg"] = team.get("reb", oreb + dreb) / gp
+        row["apg"], row["spg"], row["bpg"] = ast / gp, team.get("stl", 0) / gp, team.get("blk", 0) / gp
+        row["topg"], row["pfpg"] = tov / gp, team.get("pf", 0) / gp
         row["poss"] = poss
         row["efg"] = 100 * (fgm + 0.5 * tpm) / max(1, fga)
         row["ts"] = 100 * pts / max(1.0, 2 * (fga + 0.44 * fta))
@@ -3655,6 +3671,8 @@ def run_gui_app():
             row["net"] = row["ortg"] - row["drtg"]
             row["orb"] = 100 * oreb / max(1, oreb + o_dreb)
             row["drb"] = 100 * dreb / max(1, dreb + o_oreb)
+            row["ofgp"] = 100 * o_fgm / max(1, o_fga)
+            row["otpp"] = 100 * o_tpm / max(1, team.get("opp_tpa", 0))
             row["oefg"] = 100 * (o_fgm + 0.5 * o_tpm) / max(1, o_fga)
             row["ots"] = 100 * o_pts / max(1.0, 2 * (o_fga + 0.44 * o_fta))
             row["otov"] = 100 * o_tov / max(1.0, o_poss)
@@ -3676,9 +3694,13 @@ def run_gui_app():
             "Net Rtg": "net", "Off Rtg": "ortg", "Def Rtg": "drtg", "Pace": "pace", "eFG%": "efg", "TS%": "ts",
             "TOV%": "tov", "ORB%": "orb", "DRB%": "drb", "FTr": "ftr", "3PAr": "tpar", "AST%": "ast",
             "Opp eFG%": "oefg", "Opp TOV%": "otov", "Win%": "win",
+            "PPG": "pts", "Opp PPG": "opp", "FG%": "fgp", "3P%": "tpp", "FT%": "ftp", "RPG": "rpg", "APG": "apg", "SPG": "spg",
+            "BPG": "bpg", "TOPG": "topg", "PF": "pfpg", "Opp FG%": "ofgp", "Opp 3P%": "otpp",
         }.get(team_adv_sort_var.get(), "net")
-        low_is_better = sort_key in ("drtg", "tov", "oefg")  # defense / ball security: lower ranks higher
-        rows.sort(key=lambda item: item[1].get(sort_key, 0.0), reverse=not low_is_better)
+        # defense / ball security / fouling: lower ranks higher
+        low_is_better = sort_key in ("drtg", "tov", "oefg", "opp", "topg", "pfpg", "ofgp", "otpp")
+        missing = float("inf") if low_is_better else float("-inf")
+        rows.sort(key=lambda item: item[1].get(sort_key, missing), reverse=not low_is_better)
 
         def fmt(row, key, spec="{:.1f}"):
             return spec.format(row[key]) if key in row else "-"
@@ -3686,6 +3708,9 @@ def run_gui_app():
         for rank, (name, row) in enumerate(rows, start=1):
             team_adv_tree.insert("", "end", values=(
                 rank, team_display_name(name), row["gp"], row["w"], row["l"], f"{row['pts']:.1f}", fmt(row, "opp"),
+                f"{row['fgm']:.1f}", f"{row['fga']:.1f}", f"{row['fgp']:.1f}", f"{row['tpm']:.1f}", f"{row['tpa']:.1f}", f"{row['tpp']:.1f}",
+                f"{row['ftm']:.1f}", f"{row['fta']:.1f}", f"{row['ftp']:.1f}", f"{row['rpg']:.1f}", f"{row['apg']:.1f}", f"{row['spg']:.1f}",
+                f"{row['bpg']:.1f}", f"{row['topg']:.1f}", f"{row['pfpg']:.1f}",
                 fmt(row, "ortg"), fmt(row, "drtg"), fmt(row, "net", "{:+.1f}"), f"{row['pace']:.1f}",
                 f"{row['efg']:.1f}", f"{row['ts']:.1f}", f"{row['tov']:.1f}", fmt(row, "orb"), fmt(row, "drb"),
                 f"{row['ftr']:.2f}", f"{row['tpar']:.2f}", f"{row['ast']:.1f}",
