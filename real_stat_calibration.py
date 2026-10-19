@@ -23,14 +23,6 @@ OVERRIDES = {
         # 30+ a night on ~23 shots that keep the possession when behind pace.
         "James Harden": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
-    "2020 Houston Rockets": {
-        # Harden's ratings are the hand-entered ones; this keeps only his attempt role (~23 shots a night).
-        "James Harden": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
-    },
-    "2024 Dallas Mavericks": {
-        # Luka's ratings are the hand-entered ones; this keeps only his attempt role (~23 shots a night).
-        "Luka Doncic": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 22.6, "target_fga_precision": 1.0, "keep_pace_shots": True},
-    },
 }
 
 
