@@ -10362,6 +10362,9 @@ def should_rest_for_stint(player: Player, team: Team, period: int, period_time: 
         if period < 4:
             return elapsed_period_minutes >= 8.0 and played_minutes >= target * 0.72
         if period >= 4 and period_time > 6 * 60:
+            opponent = getattr(team, "game_opponent", None)
+            if opponent is not None and abs(team.score - opponent.score) <= STAR_CLOSE_GAME_MARGIN:
+                return False  # playoffs too: a close 4th quarter keeps the stars on the floor
             return played_minutes >= target and elapsed_period_minutes >= 5.0
         return False
 
