@@ -23,6 +23,18 @@ OVERRIDES = {
         # 30+ a night on ~23 shots that keep the possession when behind pace.
         "James Harden": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
+    "2020 Houston Rockets": {
+        # Harden's 2019-20 scoring title: ~34 points on ~23 shots and 11+ free throws. His hand-entered row had him
+        # at a 0.30 usage / 0.64 foul draw / 0.40 shot IQ, which left him at ~19 points.
+        "James Harden": {"usage": 0.45, "shot_tendency": 0.95, "foul_draw": 0.95, "shot_iq": 0.62, "three_rating": 0.91,
+                         "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
+    },
+    "2024 Dallas Mavericks": {
+        # Volume (usage / shot_tendency / three_tendency) is left to the hand-entered row; he takes ~23 shots a night.
+        "Luka Doncic": {"block": 0.67, "dreb": 0.96, "dunk_rating": 0.93, "ft_rating": 0.784, "mid_rating": 0.99, "oreb": 0.617, "playmaking": 0.80, "foul_draw": 0.80, "rim_rating": 0.99, "steal": 0.77, "three_rating": 0.84,
+                        # ~23 shots a night: an explicit attempt role plus opt-in "keep the possession when behind pace".
+                        "target_fga_soft_cap": 25.0, "target_fga_per_game": 22.6, "target_fga_precision": 1.0, "keep_pace_shots": True},
+    },
 }
 
 
