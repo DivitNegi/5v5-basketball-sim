@@ -9327,6 +9327,7 @@ def initialize_game_flow(teamA: Team, teamB: Team):
         t.last_stealer = None
         t.garbage_time_pending = False
         t.garbage_time_locked = False
+        t.game_opponent = teamB if idx == 0 else teamA   # lets the rotation logic see the score margin
         t.quarter_fouls = 0
         t.challenge_available = True
         t.defensive_focus = getattr(t, "series_defensive_focus", None)
@@ -10334,6 +10335,9 @@ def period_length_seconds(period: int) -> int:
     return rules_quarter_seconds() if period <= 4 else rules_ot_seconds()
 
 
+STAR_CLOSE_GAME_MARGIN = 12   # points; in the 4th quarter a game this close keeps the stars on the floor
+
+
 def should_rest_for_stint(player: Player, team: Team, period: int, period_time: int, stars: set[Player]) -> bool:
     if player.fouled_out:
         return False
@@ -10348,6 +10352,9 @@ def should_rest_for_stint(player: Player, team: Team, period: int, period_time: 
             # game instead of being left on the floor until the 4th quarter.
             if period >= 4 and period_time <= 6 * 60:
                 return False
+            opponent = getattr(team, "game_opponent", None)
+            if period >= 4 and opponent is not None and abs(team.score - opponent.score) <= STAR_CLOSE_GAME_MARGIN:
+                return False  # a close 4th quarter: stars stay in regardless of their paced minutes
             game_elapsed = min(period, 4) - 1
             game_elapsed = game_elapsed * (period_length_seconds(1) / 60) + elapsed_period_minutes
             allowed = target * min(1.0, game_elapsed / 48.0) + 1.5
