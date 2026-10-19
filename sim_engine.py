@@ -9352,7 +9352,7 @@ def initialize_game_flow(teamA: Team, teamB: Team):
         else:
             t.timeouts = min(getattr(t, "timeouts", rules_timeout_count()), rules_timeout_count())
             t.rules_profile = current_rules().get("label", "NBA rules")
-        if t.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors"):
+        if t.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2018 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors"):
             t.coach_style["ball_movement"] = 1.46
             t.coach_style["three_preference"] = max(t.coach_style["three_preference"], 1.16)
         elif "Cavaliers" in t.name and any(p.name == "LeBron James" for p in t.roster):
@@ -14918,6 +14918,12 @@ def playmaking_hub_score(player: Player) -> float:
 
 
 def assist_load_factor(player: Player, team: Team) -> float:
+    if team.name == "2018 Golden State Warriors" and player.name in WARRIORS_2018_ASSIST_BIAS:
+        return _assist_load_factor_core(player, team) * WARRIORS_2018_ASSIST_BIAS[player.name]
+    return _assist_load_factor_core(player, team)
+
+
+def _assist_load_factor_core(player: Player, team: Team) -> float:
     if player.name == "Rajon Rondo":
         if player.ast < 11:
             return 1.12
@@ -15053,8 +15059,8 @@ def choose_play_hub(team: Team, names: Tuple[str, ...] = tuple(), exclude: Playe
         max(0.01, playmaking_hub_score(p) ** 1.75)
         * assist_load_factor(p, team)
         * coach_handler_multiplier(team, p)
-        * (0.68 if team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors") and p.name == "Stephen Curry" else 1.0)
-        * (1.28 if team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors") and p.name in ("Draymond Green", "Andre Iguodala") else 1.0)
+        * (0.68 if team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2018 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors") and p.name == "Stephen Curry" else 1.0)
+        * (1.28 if team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2018 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors") and p.name in ("Draymond Green", "Andre Iguodala") else 1.0)
         for p in candidates
     ]
     return random.choices(candidates, weights=weights, k=1)[0]
@@ -17239,6 +17245,11 @@ SYSTEM_PLAYMAKERS = {
 }
 
 
+# 2017-18 Warriors: Draymond was the main ball handler (7.3 assists a night) with Curry the finisher (6.1).
+WARRIORS_2018_HANDLER_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.75}
+WARRIORS_2018_ASSIST_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.65}   # who gets the passing looks / assist credit
+
+
 def choose_ballhandler(team: Team) -> Player:
     """
     Default: initiate through the best creators, prioritizing playmaking.
@@ -17253,7 +17264,7 @@ def choose_ballhandler(team: Team) -> Player:
         if westbrook is not None and not westbrook.fouled_out and random.random() < 0.88:
             return westbrook
 
-    if team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors"):
+    if team.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2018 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors"):
         preferred = [p for p in team.on_floor if p.name in ("Stephen Curry", "Draymond Green", "Andre Iguodala", "Shaun Livingston")]
         if preferred:
             weights = [
@@ -17263,6 +17274,7 @@ def choose_ballhandler(team: Team) -> Player:
                 * fatigue_touch_multiplier(p)
                 * (0.72 if p.name == "Stephen Curry" else 1.0)
                 * (1.28 if p.name in ("Draymond Green", "Andre Iguodala") else 1.0)
+                * WARRIORS_2018_HANDLER_BIAS.get(p.name if team.name == "2018 Golden State Warriors" else "", 1.0)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
@@ -18964,7 +18976,7 @@ def simulate_possession(off: Team, dff: Team,
         movement_base = 0.24 + max(0.0, ball_movement - 1.0) * 0.78
         if play_context in ("floppy", "elevator", "handoff", "horns", "drive_kick", "post_split") or play_context in PLAYBOOK_CONTEXTS:
             movement_base += 0.14
-        if off.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors"):
+        if off.name in ("2016 Golden State Warriors", "2017 Golden State Warriors", "2018 Golden State Warriors", "2019 Golden State Warriors", "2022 Golden State Warriors"):
             movement_base += 0.10
         elif "Spurs" in off.name:
             movement_base += 0.12
