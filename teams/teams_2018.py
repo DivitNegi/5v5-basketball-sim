@@ -284,7 +284,7 @@ def make_celtics_2018() -> Team:
     players = [
         Player("Kyrie Irving", "PG",
                0.53, 0.40, 0.22, 0.50, 0.05, 0.378,
-               0.94, 0.89, 0.91, 0.31, 0.88,
+               0.89, 0.86, 0.90, 0.31, 0.88,
                0.231, 0.71, 0.99,
                0.65, 0.50, 0.38, 0.62, 0.667, 0.667,
                0.67, 0.32,
@@ -357,7 +357,7 @@ def make_celtics_2018() -> Team:
     ]
     # Real 2017-18 per-game minutes (scaled to a 240-minute game); the inputs are fitted so the engine's rotation lands on them.
     # Ratings were calibrated by simulating full seasons until each player's per-minute line matched his real one.
-    return _team("2018 Boston Celtics", players, (11.2, 5.7, 2.8, 2.0, 4.1, 44.0, 44.0, 42.2, 2.0, 9.7))
+    return _team("2018 Boston Celtics", players, (13.0, 5.7, 2.8, 2.0, 4.1, 44.0, 44.0, 42.2, 2.0, 9.7))
 
 
 def make_raptors_2018() -> Team:

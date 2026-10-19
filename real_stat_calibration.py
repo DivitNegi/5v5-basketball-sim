@@ -146,6 +146,10 @@ OVERRIDES = {
         "Klay Thompson": {"block": 0.567, "dreb": 0.444, "dunk_rating": 0.845, "ft_rating": 0.901, "mid_rating": 0.844, "oreb": 0.306, "playmaking": 0.478, "rim_rating": 0.85, "shot_tendency": 0.449, "steal": 0.63, "three_rating": 0.912, "three_tendency": 0.6, "usage": 0.273},
         "Stephen Curry": {"block": 0.468, "dreb": 0.571, "dunk_rating": 0.658, "ft_rating": 0.889, "mid_rating": 0.98, "oreb": 0.344, "playmaking": 0.743, "rim_rating": 0.896, "shot_tendency": 0.617, "steal": 0.61, "three_rating": 0.957, "three_tendency": 0.667, "usage": 0.318},
     },
+    "2018 Boston Celtics": {
+        # Kyrie's ratings are in teams/teams_2018.py; this keeps only his attempt role (~20 shots a night).
+        "Kyrie Irving": {"target_fga_soft_cap": 22.0, "target_fga_per_game": 20.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
+    },
     "2018 Houston Rockets": {
         # Harden's ratings are calibrated in teams/teams_2018.py; this keeps only his attempt role:
         # 30+ a night on ~23 shots that keep the possession when behind pace.
