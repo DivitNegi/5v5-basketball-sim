@@ -147,8 +147,8 @@ OVERRIDES = {
         "Stephen Curry": {"block": 0.468, "dreb": 0.571, "dunk_rating": 0.658, "ft_rating": 0.889, "mid_rating": 0.98, "oreb": 0.344, "playmaking": 0.743, "rim_rating": 0.896, "shot_tendency": 0.617, "steal": 0.61, "three_rating": 0.957, "three_tendency": 0.667, "usage": 0.318},
     },
     "2018 Boston Celtics": {
-        # Kyrie's ratings are in teams/teams_2018.py; this keeps only his attempt role (~20 shots a night).
-        "Kyrie Irving": {"target_fga_soft_cap": 22.0, "target_fga_per_game": 20.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
+        # Kyrie's ratings are in teams/teams_2018.py; this keeps only his attempt role (~18 shots a night, no extra pace-keeping).
+        "Kyrie Irving": {"target_fga_soft_cap": 19.0, "target_fga_per_game": 18.0, "target_fga_precision": 0.9, "keep_pace_shots": False},
     },
     "2018 Houston Rockets": {
         # Harden's ratings are calibrated in teams/teams_2018.py; this keeps only his attempt role:
