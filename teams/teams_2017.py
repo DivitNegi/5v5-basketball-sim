@@ -80,9 +80,9 @@ def make_cavs_2017() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player("Kyrie Irving", "PG",
-               0.42, 0.40, 0.25, 0.22,   0.00, 0.540,
+               0.42, 0.40, 0.25, 0.22,   0.00, 0.740,
                0.95, 0.98, 0.97, 0.35, 0.91,
-               0.35, 0.70, 0.99,
+               0.38, 0.70, 0.99,
                0.65, 0.49, 0.41, 0.50, 0.533, 0.733,
                0.65, 0.30,
                clutchness=0.95, secondary_positions=("SG",),

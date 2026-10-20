@@ -10342,13 +10342,21 @@ def is_foul_rest_locked(player: Player, period: int) -> bool:
 def starter_minute_need(player: Player, team: Team) -> float:
     if not getattr(player, "is_starter", False):
         return -999.0
-    return target_minutes(player, team) - player.minutes / 60
+    target = target_minutes(player, team)
+    ctx = SIM_CONTEXT if isinstance(globals().get("SIM_CONTEXT"), dict) else {}
+    period = ctx.get("period")
+    if isinstance(period, int) and period < 4:
+        # Through three quarters a starter only has to reach his pre-4th share; the rest is saved for the 4th of a close game.
+        target *= STARTER_PRE_Q4_SHARE
+    return target - player.minutes / 60
 
 
 def period_length_seconds(period: int) -> int:
     return rules_quarter_seconds() if period <= 4 else rules_ot_seconds()
 
 
+STAR_PRE_Q4_SHARE = 0.72      # same for stars, who then play the 4th of a close game
+STARTER_PRE_Q4_SHARE = 0.66   # share of his target a non-star starter uses by the end of Q3
 STAR_CLOSE_GAME_MARGIN = 12   # points; in the 4th quarter a game this close keeps the stars on the floor
 
 
@@ -10372,6 +10380,9 @@ def should_rest_for_stint(player: Player, team: Team, period: int, period_time: 
             game_elapsed = min(period, 4) - 1
             game_elapsed = game_elapsed * (period_length_seconds(1) / 60) + elapsed_period_minutes
             allowed = target * min(1.0, game_elapsed / 48.0) + 1.5
+            if period < 4:
+                # bank minutes for a close finish (see STARTER_PRE_Q4_SHARE)
+                allowed = min(allowed, target * STAR_PRE_Q4_SHARE * game_elapsed / 36.0 + 1.5)
             return elapsed_period_minutes >= 3.0 and played_minutes > allowed
         if period < 4:
             return elapsed_period_minutes >= 8.0 and played_minutes >= target * 0.72
@@ -10385,6 +10396,12 @@ def should_rest_for_stint(player: Player, team: Team, period: int, period_time: 
     if getattr(player, "is_starter", False):
         if is_close_late_game(team, period):
             return False  # a close 4th quarter (or OT): the starters stay in
+        if period < 4 and elapsed_period_minutes >= 3.0:
+            # Bank minutes for a close finish: through three quarters a starter uses only STARTER_PRE_Q4_SHARE of his
+            # target, so the bench gets the Q2/Q3 minutes the starters then play in the 4th.
+            game_elapsed = (period - 1) * (period_length_seconds(1) / 60) + elapsed_period_minutes
+            if played_minutes > target_minutes(player, team) * STARTER_PRE_Q4_SHARE * game_elapsed / 36.0 + 1.5:
+                return True
         if played_minutes >= target_minutes(player, team):
             return True
         if period in (1, 3) and elapsed_period_minutes >= 6.5 and played_minutes >= 6.5:
@@ -10901,6 +10918,9 @@ def set_quarter_lineup(team: Team, next_period: int):
 
     if next_period in (1, 3):
         desired = ranked[:5]
+        if next_period == 3:
+            fresh = [p for p in ranked if not over_pre_q4_pace(p, team, 3)]
+            desired = (fresh + [p for p in ranked if p not in fresh])[:5]
     elif next_period == 2:
         desired = [stars[0]]
     elif next_period == 4:
@@ -11230,13 +11250,22 @@ def should_restore_fourth_core(teamA: Team, teamB: Team, period: int, period_tim
 MINUTES_OVERAGE_LIMIT = 5.0  # minutes past his target before a player is held out of forced lineups
 
 
+def over_pre_q4_pace(player: Player, team: Team, next_period: int) -> bool:
+    """Ahead of the pace that leaves him his share of the 4th: used at the start of Q2/Q3 so the reserves get those
+    minutes and the starters are fresh to close out a tight game."""
+    if next_period not in (2, 3):
+        return False
+    elapsed = (next_period - 1) * (period_length_seconds(1) / 60)
+    return player.minutes / 60 > target_minutes(player, team) * STAR_PRE_Q4_SHARE * elapsed / 36.0 + 1.5
+
+
 def is_overworked(player: Player, team: Team) -> bool:
     """Past target + 5 minutes: the forced starter / closing lineups leave him
     out, except in the last couple of minutes of a one-possession game."""
-    if player.minutes / 60 - target_minutes(player, team) <= MINUTES_OVERAGE_LIMIT:
-        return False
     ctx = SIM_CONTEXT if isinstance(globals().get("SIM_CONTEXT"), dict) else {}
     period, clock = ctx.get("period"), ctx.get("period_time")
+    if player.minutes / 60 - target_minutes(player, team) <= MINUTES_OVERAGE_LIMIT:
+        return False
     teamA, teamB = ctx.get("teamA"), ctx.get("teamB")
     if isinstance(period, int) and period >= 4 and teamA is not None and teamB is not None:
         if abs(teamA.score - teamB.score) <= STAR_CLOSE_GAME_MARGIN:
