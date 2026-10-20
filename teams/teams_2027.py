@@ -1138,7 +1138,7 @@ def make_nets_2027() -> Team:
                0.460, 0.420, 0.470, 0.800, 0.550, 0.533,
                0.640, 0.600,
                clutchness=0.620, secondary_positions=('PF',), height=82, speed=0.800,
-               shot_iq=0.700, archetype='scoring forward', badges=('movement_shooter',), stamina=0.64),
+               shot_iq=0.890, archetype='scoring forward', badges=('movement_shooter',), stamina=0.64),
         Player('Julius Randle', 'PF',
                0.36, 0.28, 0.36, 0.22, 0.34, 0.36,
                0.760, 0.790, 0.910, 0.800, 0.760,

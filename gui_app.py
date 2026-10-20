@@ -6,6 +6,7 @@ from players_data import *
 import players_data as _players_data_module
 from season_2018 import run_2018_season, run_2018_playoffs, factories_2018
 from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
+from real_wins import real_wins_per_82
 from web_app import run_web_gui_app
 from broadcast import BroadcastBooth
 
@@ -7418,6 +7419,9 @@ def run_gui_app():
             selected_names = []
 
             def refresh_lists():
+                # Rebuilding a Listbox jumps it back to the top; keep both lists exactly where they were scrolled.
+                available_top = available_list.yview()[0]
+                selected_top = selected_list.yview()[0]
                 available_list.delete(0, "end")
                 for name in team_names:
                     if name not in selected_names:
@@ -7426,6 +7430,8 @@ def run_gui_app():
                 for idx, name in enumerate(selected_names, start=1):
                     selected_list.insert("end", f"{idx}. {name}")
                 selected_label_var.set(f"Selected Teams ({len(selected_names)}/30)")
+                available_list.yview_moveto(available_top)
+                selected_list.yview_moveto(selected_top)
 
             def selected_raw_name() -> str | None:
                 selection = selected_list.curselection()
@@ -7441,14 +7447,24 @@ def run_gui_app():
                 if len(selected_names) >= 30:
                     title_var.set("You already have 30 teams. Remove one before adding another.")
                     return
-                selected_names.append(available_list.get(selection[0]))
+                picked_index = selection[0]
+                selected_names.append(available_list.get(picked_index))
                 refresh_lists()
+                if available_list.size():
+                    # the next team slides into the picked row: highlight it so you can keep adding from the same spot
+                    next_index = min(picked_index, available_list.size() - 1)
+                    available_list.selection_set(next_index)
+                    available_list.activate(next_index)
+                    available_list.see(next_index)
 
             def remove_team():
                 name = selected_raw_name()
                 if name:
+                    removed_index = selected_names.index(name)
                     selected_names.remove(name)
                     refresh_lists()
+                    if selected_names:
+                        selected_list.selection_set(min(removed_index, len(selected_names) - 1))
 
             FRANCHISE_ALIASES = {"SuperSonics": "Thunder", "Sonics": "Thunder", "Bobcats": "Hornets", "Bullets": "Wizards"}
             FRANCHISE_NICKNAMES = tuple(SEASON_EAST_NICKNAMES) + tuple(SEASON_WEST_NICKNAMES)
@@ -7494,6 +7510,34 @@ def run_gui_app():
                 )
                 refresh_lists()
 
+            def pick_strongest():
+                # Keeps what is already picked; every open slot gets the best real regular-season record of a franchise
+                # that is not on the list yet (win percentage scaled to 82 games, so short seasons compare fairly).
+                needed = 30 - len(selected_names)
+                if needed <= 0:
+                    title_var.set("You already have 30 teams. Remove some to pick the strongest again.")
+                    return
+                used = {franchise_key(name) for name in selected_names}
+                best: Dict[str, Tuple[float, str]] = {}
+                for name in team_names:
+                    value = real_wins_per_82(name)
+                    key = franchise_key(name)
+                    if value is None or key in used or "Olympic" in name or "Dream Team" in name or "Redeem Team" in name:
+                        continue
+                    if key not in best or value > best[key][0]:
+                        best[key] = (value, name)
+                ranked = sorted(best.values(), key=lambda item: item[0], reverse=True)
+                if len(ranked) < needed:
+                    title_var.set(f"Only {len(ranked)} franchises with a real record are left for {needed} open slots.")
+                    return
+                for _value, name in ranked[:needed]:
+                    selected_names.append(name)
+                title_var.set(
+                    f"Strongest teams: kept your {30 - needed} pick(s) and added the best real record of {needed} more franchises "
+                    "(most wins in real life). Add or remove to edit."
+                )
+                refresh_lists()
+
             def start():
                 if len(selected_names) != 30:
                     title_var.set(f"Need exactly 30 teams. You currently have {len(selected_names)}.")
@@ -7509,7 +7553,8 @@ def run_gui_app():
             button_frame.grid(row=2, column=1, sticky="ns", pady=(32, 10))
             ttk.Button(button_frame, text="Add >", command=add_team).pack(fill="x", pady=(0, 8))
             ttk.Button(button_frame, text="< Remove", command=remove_team).pack(fill="x", pady=(0, 16))
-            ttk.Button(button_frame, text="Random fill (all different)", command=auto_fill).pack(fill="x")
+            ttk.Button(button_frame, text="Random fill (all different)", command=auto_fill).pack(fill="x", pady=(0, 8))
+            ttk.Button(button_frame, text="Pick strongest (real wins)", command=pick_strongest).pack(fill="x")
 
             footer_buttons = ttk.Frame(dialog)
             footer_buttons.grid(row=3, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 16))
