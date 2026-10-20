@@ -23096,13 +23096,17 @@ def positional_award_teams(ranked: List[Tuple[str, str, Dict]], player_lookup: D
     return [[(group, it) for group in ("G", "F", "C") for it in tm[group]] for tm in teams]
 
 
+_RACE_QUALITY_CACHE: Dict = {}   # (team, player) -> (games, quality_defended result) for the live award races
+
+
 def build_season_sections(entries: List[Dict],
                           series_totals: Dict | None = None,
                           series_team_totals: Dict | None = None,
                           game_log: List[Tuple] | None = None,
                           game_extras: Dict | None = None,
                           game_meta: Dict | None = None,
-                          include_rookies: bool = True) -> Dict:
+                          include_rookies: bool = True,
+                          races_only: bool = False) -> Dict:
     def season_ts(stats: Dict) -> float:
         denom = 2 * (stats.get("fga", 0) + 0.44 * stats.get("fta", 0))
         return 0.0 if denom == 0 else 100 * stats.get("pts", 0) / denom
@@ -23161,6 +23165,7 @@ def build_season_sections(entries: List[Dict],
             player_lookup[(entry["name"], player_stat_key(team, player))] = player
     awards = []
     awards_table = []
+    season_races = {"mvp": [], "dpoy": []}
     if all_players:
         def stat_line(team_name: str, stats: Dict) -> str:
             gp = max(1, stats.get("games", 1))
@@ -23210,8 +23215,19 @@ def build_season_sections(entries: List[Dict],
         for _i, (_t, _n, _st) in enumerate(_ranked_for_quality):
             shooter_quality[_n] = 0.50 + 1.80 * (1.0 - _i / max(1, len(_ranked_for_quality) - 1)) ** 1.6
 
-        def quality_defended(stats: Dict) -> Tuple[float, float, float]:
+        def quality_defended(stats: Dict, cache_key=None) -> Tuple[float, float, float]:
             """(quality-weighted attempts, quality-weighted makes, attempts vs star shooters)."""
+            if races_only and cache_key is not None:
+                # live race: a player who did not play since the last call keeps his last result
+                hit = _RACE_QUALITY_CACHE.get(cache_key)
+                if hit is not None and hit[0] == stats.get("games", 0):
+                    return hit[1]
+            result = _quality_defended_uncached(stats)
+            if races_only and cache_key is not None:
+                _RACE_QUALITY_CACHE[cache_key] = (stats.get("games", 0), result)
+            return result
+
+        def _quality_defended_uncached(stats: Dict) -> Tuple[float, float, float]:
             core_keys = ("three", "mid", "rim", "post", "dunk")
             w_att = w_made = star_att = 0.0
             for shooter_name, diet in (stats.get("defended_matchup_diet", {}) or {}).items():
@@ -23269,7 +23285,7 @@ def build_season_sections(entries: List[Dict],
             if mpg < 22.0:
                 low_min_penalty += 8.0 + (22.0 - mpg) * 2.2
             low_work_penalty = max(0.0, 5.0 - defended_pg) * 0.32
-            w_att, w_made, star_att = quality_defended(stats)
+            w_att, w_made, star_att = quality_defended(stats, (team_name, _name))
             quality_defended_pg = w_att / gp
             star_defended_pg = star_att / gp
             if w_att > 0:
@@ -23306,10 +23322,31 @@ def build_season_sections(entries: List[Dict],
 
         # MVP comes from the playoff teams (top 8 in a conference), same pool as All-NBA.
         mvp_pool = [item for item in all_players if item[0] in all_nba_eligible_teams] or all_players
-        mvp = max(mvp_pool, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0))
+        def mvp_key(item):
+            return series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0)
+
+        mvp = max(mvp_pool, key=mvp_key)
         scorer = max(all_players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
         passer = max(all_players, key=lambda item: item[2].get("ast", 0) / max(1, item[2].get("games", 1)))
         defenders = sorted(all_players, key=defensive_score, reverse=True)
+
+        # The two award races shown on the Season tab: the top five right now, re-ranked after every game.
+        team_gp = {row["team"]: row["wins"] + row["losses"] for row in standings}
+
+        def in_race(item) -> bool:
+            gp = team_gp.get(item[0], 0)
+            games = item[2].get("games", 0)
+            if games < max(1, int(0.4 * gp)):
+                return False
+            return gp < 10 or item[2].get("minutes", 0) / 60 / max(1, games) >= 15
+        season_races = {
+            "mvp": [{"rank": i, "player": it[1], "team": it[0], "stats": stat_line(it[0], it[2])}
+                    for i, it in enumerate(sorted([x for x in mvp_pool if in_race(x)], key=mvp_key, reverse=True)[:5], start=1)],
+            "dpoy": [{"rank": i, "player": it[1], "team": it[0], "stats": defense_stat_line(it[0], it[2])}
+                     for i, it in enumerate([x for x in defenders if in_race(x)][:5], start=1)],
+        }
+        if races_only:
+            return {"_season_races": season_races}
         all_nba = sorted(
             [item for item in all_players if item[0] in all_nba_eligible_teams],
             key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0),
@@ -23535,6 +23572,8 @@ def build_season_sections(entries: List[Dict],
                 awards_table.append({"award": label, "player": award_name(idx, group, name), "team": team_name, "stats": defense_stat_line(team_name, stats)})
         awards_table.extend(all_star_rows)
         awards_table.extend(all_rookie_rows)
+    if races_only:
+        return {"_season_races": season_races}
     top_lines = ["82-GAME SEASON COMPLETE", "", "Standings"]
     for row in standings:
         top_lines.append(f"{row['seed']:>2}. {row['team']:<34} {row['wins']:>2}-{row['losses']:<2}  {row['pct']:.3f}  DIFF {row['diff']:+.1f}")
@@ -23549,6 +23588,7 @@ def build_season_sections(entries: List[Dict],
         "_season_standings": standings,
         "_season_awards": awards,
         "_season_awards_table": awards_table,
+        "_season_races": season_races,
         "_all_star_game": all_star_game,
         "_season_player_totals": series_totals,
         "_season_team_totals": series_team_totals,
@@ -23658,6 +23698,14 @@ def live_season_standings_payload(entries: List[Dict], completed: int, total: in
             "pf": e["pf"] / games, "pa": e["pa"] / games, "diff": (e["pf"] - e["pa"]) / games, "strength": e["strength"],
         })
     return {"season_standings": rows, "completed": completed, "total": total}
+
+
+def live_season_races_payload(entries, player_totals, team_totals, completed: int, total: int) -> Dict:
+    """Top-5 MVP and DPOY races from the season so far (cheap enough to send after every game)."""
+    if completed <= 1:
+        _RACE_QUALITY_CACHE.clear()
+    sections = build_season_sections(entries, player_totals, team_totals, include_rookies=False, races_only=True)
+    return {"season_races": sections.get("_season_races") or {"mvp": [], "dpoy": []}, "completed": completed, "total": total}
 
 
 def season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, completed=None, total=None,
@@ -23813,6 +23861,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
                 if completed_games % 6 == 0 or completed_games == total_games:
                     progress_queue.put(live_season_standings_payload(entries, completed_games, total_games))
+                progress_queue.put(live_season_races_payload(entries, season_player_totals, season_team_totals, completed_games, total_games))
             if completed_games % 300 == 0:
                 print(f"Season sim progress: {completed_games}/{total_games} games.")
     finally:

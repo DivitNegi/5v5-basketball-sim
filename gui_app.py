@@ -3394,7 +3394,7 @@ def run_gui_app():
             name_var.set("Waiting for series...")
             stat_var.set("")
         season_awards_tree.delete(*season_awards_tree.get_children())
-        season_awards_tree.insert("", "end", values=("Season awards will appear here after Season mode.", "", "", ""))
+        season_awards_tree.insert("", "end", values=("The MVP and DPOY races will appear here during Season mode.", "", "", ""))
 
     playoff_sections_state = {"sections": {}, "revision": 0}
 
@@ -4911,33 +4911,25 @@ def run_gui_app():
     season_back_button.configure(command=close_season_box_score)
     season_awards_tree.bind("<<TreeviewSelect>>", show_all_star_box_score)
 
-    def update_season_awards_table(sections: Dict):
+    def show_season_races(races: Dict, completed=None):
+        """Season tab: only the MVP race and the DPOY race, the top five of each, re-ranked as games finish."""
         season_awards_tree.delete(*season_awards_tree.get_children())
-        rows = sections.get("_season_awards_table") or []
-        if not rows:
-            season_awards_tree.insert("", "end", values=("Season awards will appear here after Season mode.", "", "", ""))
-            return
-        last_award = None
         season_all_star_rows.clear()
-        for row in rows:
-            award = row.get("award", "")
-            if award != last_award:
-                section_id = season_awards_tree.insert("", "end", values=(award, "", "", ""), tags=("section",))
-                if award == "All-Star Game":
-                    season_all_star_rows.add(section_id)
-                last_award = award
-            item_id = season_awards_tree.insert(
-                "",
-                "end",
-                values=(
-                    "",
-                    row.get("player", ""),
-                    team_display_name(row.get("team", "")) if award != "All-Star Game" else row.get("team", ""),
-                    row.get("stats", "") + ("   (click to view the box score)" if award == "All-Star Game" else ""),
-                ),
-            )
-            if award == "All-Star Game":
-                season_all_star_rows.add(item_id)
+        mvp_rows = (races or {}).get("mvp") or []
+        dpoy_rows = (races or {}).get("dpoy") or []
+        if not mvp_rows and not dpoy_rows:
+            season_awards_tree.insert("", "end", values=("The MVP and DPOY races will appear here during Season mode.", "", "", ""))
+            return
+        after = f"  (after {completed} games)" if completed else ""
+        for title, rows in (("MVP Race" + after, mvp_rows), ("DPOY Race" + after, dpoy_rows)):
+            season_awards_tree.insert("", "end", values=(title, "", "", ""), tags=("section",))
+            for row in rows:
+                season_awards_tree.insert("", "end", values=(
+                    f"{row.get('rank', '')}.", row.get("player", ""), team_display_name(row.get("team", "")), row.get("stats", ""),
+                ))
+
+    def update_season_awards_table(sections: Dict):
+        show_season_races(sections.get("_season_races") or {})
 
     def live_quarter_team_row(team: Team) -> Dict[str, float]:
         keys = (
@@ -9352,11 +9344,11 @@ def run_gui_app():
             season_view["paused_shown"] = paused_now
             update_season_progress(*season_view["progress"])
         try:
-            stand_open = str(series_tabs.tab(series_tabs.select(), "text")) == "Stand"
+            stand_open = str(series_tabs.tab(series_tabs.select(), "text")) in ("Stand", "Season")
         except Exception:
             stand_open = False
-        # The Stand tab stays uncovered during a season so its standings can
-        # update live; every other tab shows the plain "Simulating season" notice.
+        # The Stand and Season tabs stay uncovered during a season so the standings and the MVP / DPOY
+        # races can update live; every other tab shows the plain "Simulating season" notice.
         # While the season is paused every stats tab shows the season so far (the sim publishes a snapshot).
         cover_tabs = want and not stand_open and not paused_now
         if want and not season_view["shown"]:
@@ -9394,9 +9386,13 @@ def run_gui_app():
             # stale queued possession made the live table appear to stutter
             # or reload.
             latest_scoreboard = None
+            latest_races = None
             try:
                 while True:
                     message = scoreboard_queue.get_nowait()
+                    if isinstance(message, dict) and "season_races" in message:
+                        latest_races = message
+                        continue
                     if isinstance(message, dict) and "season_standings" in message:
                         live_standings.update(
                             rows=message["season_standings"], completed=message.get("completed", 0),
@@ -9432,6 +9428,8 @@ def run_gui_app():
                         update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
             except queue.Empty:
                 pass
+            if latest_races is not None:
+                show_season_races(latest_races.get("season_races"), latest_races.get("completed"))
             if bracket_ui["dirty"]:
                 try:
                     if str(series_tabs.tab(series_tabs.select(), "text")) == "Brkt":
@@ -9470,6 +9468,10 @@ def run_gui_app():
                     update_extra_gui_tabs()
                     gui_refresh_state["heavy_at"] = now
                     gui_refresh_state["heavy_dirty"] = False
+            elif running["active"] and sim_engine.SIM_PAUSED and gui_refresh_state["heavy_dirty"]:
+                # Paused: the sim published the season so far, so paint the tab that is open (the others refresh when opened).
+                update_extra_gui_tabs()
+                gui_refresh_state["heavy_dirty"] = False
             elif status_var.get() == "Finished" and not gui_refresh_state["finish_refreshed"]:
                 refresh_live_widgets(include_heavy=True)
                 gui_refresh_state["finish_refreshed"] = True

@@ -133,6 +133,7 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
                     ],
                     "completed": done, "total": total_games,
                 })
+            progress_queue.put(sim_engine.live_season_races_payload(entries, player_totals, team_totals, done, total_games))
         if done % 300 == 0:
             print(f"Season sim progress: {done}/{total_games} games.")
 
