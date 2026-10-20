@@ -9914,6 +9914,11 @@ def enter_garbage_time(teamA: Team, teamB: Team, period: int, period_time: int):
     time.sleep(SLEEP * 0.8)
 
 
+def is_close_late_game(team: Team, period: int) -> bool:
+    opponent = getattr(team, "game_opponent", None)
+    return period >= 4 and opponent is not None and abs(team.score - opponent.score) <= STAR_CLOSE_GAME_MARGIN
+
+
 def force_mandatory_closer_lineup(team: Team, period: int):
     closer_names = set(mandatory_closers(team))
     if not closer_names or getattr(team, "garbage_time_locked", False):
@@ -9929,6 +9934,12 @@ def force_mandatory_closer_lineup(team: Team, period: int):
         available = [p for p in team.roster if not p.fouled_out]
 
     desired = [p for p in available if p.name in closer_names]
+    if is_close_late_game(team, period):
+        # A close finish: the starters close it out (best closing scores first), whatever the paced minutes say.
+        desired.extend(
+            p for p in sorted(available, key=lambda p: closing_lineup_score_for_team(team, p), reverse=True)
+            if getattr(p, "is_starter", False) and p not in desired
+        )
     desired.extend(
         p for p in sorted(available, key=lambda p: closing_lineup_score_for_team(team, p), reverse=True)
         if p not in desired
@@ -10372,6 +10383,8 @@ def should_rest_for_stint(player: Player, team: Team, period: int, period_time: 
         return False
 
     if getattr(player, "is_starter", False):
+        if is_close_late_game(team, period):
+            return False  # a close 4th quarter (or OT): the starters stay in
         if played_minutes >= target_minutes(player, team):
             return True
         if period in (1, 3) and elapsed_period_minutes >= 6.5 and played_minutes >= 6.5:
@@ -11225,9 +11238,9 @@ def is_overworked(player: Player, team: Team) -> bool:
     ctx = SIM_CONTEXT if isinstance(globals().get("SIM_CONTEXT"), dict) else {}
     period, clock = ctx.get("period"), ctx.get("period_time")
     teamA, teamB = ctx.get("teamA"), ctx.get("teamB")
-    if isinstance(period, int) and period >= 4 and isinstance(clock, int) and clock <= 150 and teamA is not None and teamB is not None:
-        if abs(teamA.score - teamB.score) <= 5:
-            return False
+    if isinstance(period, int) and period >= 4 and teamA is not None and teamB is not None:
+        if abs(teamA.score - teamB.score) <= STAR_CLOSE_GAME_MARGIN:
+            return False   # a close 4th quarter (or OT): the starters play it out whatever their minutes
     return True
 
 
