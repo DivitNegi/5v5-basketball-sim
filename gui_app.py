@@ -6,7 +6,6 @@ from players_data import *
 import players_data as _players_data_module
 from season_2018 import run_2018_season, run_2018_playoffs, factories_2018
 from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
-from real_wins import real_wins_per_82
 from web_app import run_web_gui_app
 from broadcast import BroadcastBooth
 
@@ -7510,31 +7509,41 @@ def run_gui_app():
                 )
                 refresh_lists()
 
+            strongest_scores: Dict[str, float] = {}
+
             def pick_strongest():
-                # Keeps what is already picked; every open slot gets the best real regular-season record of a franchise
-                # that is not on the list yet (win percentage scaled to 82 games, so short seasons compare fairly).
+                # Keeps what is already picked; every open slot gets the strongest team (team strength plus star power,
+                # star power weighing a little more) of a franchise that is not on the list yet.
                 needed = 30 - len(selected_names)
                 if needed <= 0:
                     title_var.set("You already have 30 teams. Remove some to pick the strongest again.")
                     return
+                if not strongest_scores:
+                    title_var.set("Rating every team's strength and star power...")
+                    dialog.update_idletasks()
+                    live_factories = active_team_factories()
+                    candidates = {
+                        name: live_factories[name] for name in team_names
+                        if name in live_factories and "Olympic" not in name and "Dream Team" not in name and "Redeem Team" not in name
+                    }
+                    strongest_scores.update(sim_engine.strongest_team_scores(candidates))
                 used = {franchise_key(name) for name in selected_names}
                 best: Dict[str, Tuple[float, str]] = {}
-                for name in team_names:
-                    value = real_wins_per_82(name)
+                for name, value in strongest_scores.items():
                     key = franchise_key(name)
-                    if value is None or key in used or "Olympic" in name or "Dream Team" in name or "Redeem Team" in name:
+                    if key in used:
                         continue
                     if key not in best or value > best[key][0]:
                         best[key] = (value, name)
                 ranked = sorted(best.values(), key=lambda item: item[0], reverse=True)
                 if len(ranked) < needed:
-                    title_var.set(f"Only {len(ranked)} franchises with a real record are left for {needed} open slots.")
+                    title_var.set(f"Only {len(ranked)} franchises are left for {needed} open slots.")
                     return
                 for _value, name in ranked[:needed]:
                     selected_names.append(name)
                 title_var.set(
-                    f"Strongest teams: kept your {30 - needed} pick(s) and added the best real record of {needed} more franchises "
-                    "(most wins in real life). Add or remove to edit."
+                    f"Strongest teams: kept your {30 - needed} pick(s) and added the strongest team (strength + star power) of "
+                    f"{needed} more franchises. Add or remove to edit."
                 )
                 refresh_lists()
 
@@ -7554,7 +7563,7 @@ def run_gui_app():
             ttk.Button(button_frame, text="Add >", command=add_team).pack(fill="x", pady=(0, 8))
             ttk.Button(button_frame, text="< Remove", command=remove_team).pack(fill="x", pady=(0, 16))
             ttk.Button(button_frame, text="Random fill (all different)", command=auto_fill).pack(fill="x", pady=(0, 8))
-            ttk.Button(button_frame, text="Pick strongest (real wins)", command=pick_strongest).pack(fill="x")
+            ttk.Button(button_frame, text="Pick strongest (strength + stars)", command=pick_strongest).pack(fill="x")
 
             footer_buttons = ttk.Frame(dialog)
             footer_buttons.grid(row=3, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 16))

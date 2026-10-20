@@ -22680,6 +22680,39 @@ def fantasy_season_strength(team: Team) -> float:
     )
 
 
+STRONGEST_STRENGTH_WEIGHT = 0.45
+STRONGEST_STAR_WEIGHT = 0.55     # star power counts a little more than overall team strength
+
+
+def team_star_power(team: Team) -> float:
+    """How good the team's best three players are (the best counts most)."""
+    ovr = sorted((fantasy_ovr(p) for p in team.roster), reverse=True)[:3]
+    weights = (0.45, 0.35, 0.20)[:len(ovr)]
+    return sum(o * w for o, w in zip(ovr, weights)) / max(1e-9, sum(weights))
+
+
+def strongest_team_scores(factories: Dict[str, object]) -> Dict[str, float]:
+    """Score every team on team strength plus star power (each standardised across the teams given)."""
+    import statistics
+    raw = {}
+    for name, factory in factories.items():
+        team = factory()
+        team.init_lineup()
+        apply_star_clutchness(team)
+        assign_player_badges(team)
+        raw[name] = (fantasy_season_strength(team), team_star_power(team))
+    if not raw:
+        return {}
+    strengths = [v[0] for v in raw.values()]
+    stars = [v[1] for v in raw.values()]
+    s_mean, s_dev = statistics.mean(strengths), statistics.pstdev(strengths) or 1.0
+    t_mean, t_dev = statistics.mean(stars), statistics.pstdev(stars) or 1.0
+    return {
+        name: STRONGEST_STRENGTH_WEIGHT * (s - s_mean) / s_dev + STRONGEST_STAR_WEIGHT * (t - t_mean) / t_dev
+        for name, (s, t) in raw.items()
+    }
+
+
 def fantasy_quick_game_result(team_a: Dict, team_b: Dict) -> Dict:
     diff = team_a["strength"] - team_b["strength"]
     win_prob = max(0.18, min(0.82, 0.50 + diff / 70.0))
