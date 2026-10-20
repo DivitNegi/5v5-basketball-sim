@@ -4928,8 +4928,38 @@ def run_gui_app():
                     f"{row.get('rank', '')}.", row.get("player", ""), team_display_name(row.get("team", "")), row.get("stats", ""),
                 ))
 
+    def show_full_season_awards(rows: List[Dict]):
+        season_awards_tree.delete(*season_awards_tree.get_children())
+        last_award = None
+        season_all_star_rows.clear()
+        for row in rows:
+            award = row.get("award", "")
+            if award != last_award:
+                section_id = season_awards_tree.insert("", "end", values=(award, "", "", ""), tags=("section",))
+                if award == "All-Star Game":
+                    season_all_star_rows.add(section_id)
+                last_award = award
+            item_id = season_awards_tree.insert(
+                "",
+                "end",
+                values=(
+                    "",
+                    row.get("player", ""),
+                    team_display_name(row.get("team", "")) if award != "All-Star Game" else row.get("team", ""),
+                    row.get("stats", "") + ("   (click to view the box score)" if award == "All-Star Game" else ""),
+                ),
+            )
+            if award == "All-Star Game":
+                season_all_star_rows.add(item_id)
+
     def update_season_awards_table(sections: Dict):
-        show_season_races(sections.get("_season_races") or {})
+        partial = sections.get("_season_paused")
+        rows = sections.get("_season_awards_table") or []
+        if partial or not rows:
+            # Season still being played (or paused): only the two award races. The full awards come when it ends.
+            show_season_races(sections.get("_season_races") or {}, (partial or {}).get("completed") if isinstance(partial, dict) else None)
+            return
+        show_full_season_awards(rows)
 
     def live_quarter_team_row(team: Team) -> Dict[str, float]:
         keys = (
@@ -6691,7 +6721,22 @@ def run_gui_app():
         sim_engine.SIM_SLEEP_SCALE = 1.0 / gui_speed["value"]
         speed_var.set(f"Speed {gui_speed['value']:.2f}x")
 
+    # While a whole season is being simmed the speed buttons set how long each game takes (20x = as fast as possible).
+    SEASON_SPEEDS = (0.5, 1.0, 2.0, 5.0, 10.0, 20.0)
+    season_speed = {"value": 20.0}
+
+    def apply_season_speed():
+        v = season_speed["value"]
+        sim_engine.SEASON_GAME_DELAY = 0.0 if v >= 20.0 else max(0.0, 0.25 / v - 0.0125)
+        speed_var.set("Season speed: max" if v >= 20.0 else f"Season speed {v:g}x")
+
     def change_gui_speed(delta: float):
+        if running["active"] and season_view.get("quiet"):
+            idx = min(range(len(SEASON_SPEEDS)), key=lambda i: abs(SEASON_SPEEDS[i] - season_speed["value"]))
+            idx = max(0, min(len(SEASON_SPEEDS) - 1, idx + (1 if delta > 0 else -1)))
+            season_speed["value"] = SEASON_SPEEDS[idx]
+            apply_season_speed()
+            return
         gui_speed["value"] = max(0.50, min(20.00, round(gui_speed["value"] + delta, 2)))
         apply_gui_speed()
 
@@ -9350,7 +9395,15 @@ def run_gui_app():
         # The Stand and Season tabs stay uncovered during a season so the standings and the MVP / DPOY
         # races can update live; every other tab shows the plain "Simulating season" notice.
         # While the season is paused every stats tab shows the season so far (the sim publishes a snapshot).
-        cover_tabs = want and not stand_open and not paused_now
+        cover_tabs = False   # the tabs update live during the season, so they are never covered
+        if want and not season_view.get("speed_on"):
+            season_view["speed_on"] = True
+            season_speed["value"] = 20.0
+            apply_season_speed()
+        elif not want and season_view.get("speed_on"):
+            season_view["speed_on"] = False
+            sim_engine.SEASON_GAME_DELAY = 0.0
+            apply_gui_speed()
         if want and not season_view["shown"]:
             season_notice_box.place(x=0, y=0, relwidth=1.0, relheight=1.0)
             season_notice_box.lift()
@@ -9428,7 +9481,7 @@ def run_gui_app():
                         update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
             except queue.Empty:
                 pass
-            if latest_races is not None:
+            if latest_races is not None and running["active"]:
                 show_season_races(latest_races.get("season_races"), latest_races.get("completed"))
             if bracket_ui["dirty"]:
                 try:
@@ -9468,6 +9521,14 @@ def run_gui_app():
                     update_extra_gui_tabs()
                     gui_refresh_state["heavy_at"] = now
                     gui_refresh_state["heavy_dirty"] = False
+            elif (running["active"] and not sim_engine.SIM_PAUSED and season_view["quiet"] and gui_refresh_state["heavy_dirty"]
+                  and now - gui_refresh_state["heavy_at"] >= season_view.get("refresh_gap", 2.0)):
+                # Season in progress: repaint the open tab with the latest "season so far" (never more than ~25% of the time).
+                started = time.monotonic()
+                update_extra_gui_tabs()
+                gui_refresh_state["heavy_at"] = time.monotonic()
+                gui_refresh_state["heavy_dirty"] = False
+                season_view["refresh_gap"] = max(2.0, 4.0 * (time.monotonic() - started))
             elif running["active"] and sim_engine.SIM_PAUSED and gui_refresh_state["heavy_dirty"]:
                 # Paused: the sim published the season so far, so paint the tab that is open (the others refresh when opened).
                 update_extra_gui_tabs()

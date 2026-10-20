@@ -71,6 +71,8 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
         sim_engine.season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, None, total_games,
                                          positional=True)   # the 2018 All-NBA / All-Defensive teams are picked by position
 
+    live_tick = sim_engine.make_season_live_updater(snap)
+
     def parallel_results():
         import multiprocessing
         import os
@@ -134,6 +136,8 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
                     "completed": done, "total": total_games,
                 })
             progress_queue.put(sim_engine.live_season_races_payload(entries, player_totals, team_totals, done, total_games))
+        live_tick()
+        sim_engine.season_game_pace()
         if done % 300 == 0:
             print(f"Season sim progress: {done}/{total_games} games.")
 

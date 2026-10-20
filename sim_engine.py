@@ -23734,6 +23734,36 @@ def season_pause_snapshot(section_queue, entries, player_totals, team_totals, ga
         SEASON_POSITIONAL_AWARDS = saved
 
 
+SEASON_GAME_DELAY = 0.0          # seconds each game takes while a season is simmed; the GUI's speed buttons set it
+SEASON_LIVE_MIN_INTERVAL = 2.0   # seconds between live "season so far" refreshes of the stats tabs
+
+
+def make_season_live_updater(snapshot):
+    """Returns a function to call after every game: now and then it publishes the season so far so the open tab
+    updates by itself (never more than ~20% of the sim's time, and not while paused)."""
+    state = {"last": time.monotonic(), "cost": 0.0}
+
+    def tick():
+        if SIM_PAUSED:
+            return
+        now = time.monotonic()
+        if now - state["last"] < max(SEASON_LIVE_MIN_INTERVAL, 4.0 * state["cost"]):
+            return
+        try:
+            snapshot()
+        except Exception:
+            pass
+        state["cost"] = time.monotonic() - now
+        state["last"] = time.monotonic()
+    return tick
+
+
+def season_game_pace():
+    delay = SEASON_GAME_DELAY
+    if delay > 0:
+        _REAL_SLEEP(delay)
+
+
 def hold_season_while_paused(snapshot, poll: float = 0.05):
     """Called between games: if Pause is on, publish the stats so far once, then wait for Resume."""
     if not SIM_PAUSED:
@@ -23787,6 +23817,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     def season_snapshot():
         season_pause_snapshot(section_queue, entries, season_player_totals, season_team_totals, season_game_log,
                               None, total_games, include_rookies=False)
+
+    season_live_tick = make_season_live_updater(season_snapshot)
 
     # Games are independent, so they are spread over worker processes by sending
     # each worker copies of the two (picklable) team templates. Anything that
@@ -23862,6 +23894,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 if completed_games % 6 == 0 or completed_games == total_games:
                     progress_queue.put(live_season_standings_payload(entries, completed_games, total_games))
                 progress_queue.put(live_season_races_payload(entries, season_player_totals, season_team_totals, completed_games, total_games))
+            season_live_tick()
+            season_game_pace()
             if completed_games % 300 == 0:
                 print(f"Season sim progress: {completed_games}/{total_games} games.")
     finally:
