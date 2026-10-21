@@ -23631,14 +23631,33 @@ def build_season_sections(entries: List[Dict],
     }
 
 
-def simulate_silent_season_game(factory_a, factory_b) -> Tuple[Team, Team]:
-    import builtins
-    import contextlib
-    import io
+# Every season game is played from its own random seed, so the exact same game can be replayed later (play by play,
+# box score, ratings, cards): order -> (home name, away name, seed), and team name -> a function that builds a fresh team.
+SEASON_REPLAY: Dict = {"games": {}, "makers": {}}
 
-    global SLEEP, SIM_FAST_FORWARD, SIM_JUMP_TARGET, SIM_PAUSED, SIM_SLEEP_SCALE
-    global GUI_SERIES_UPDATE_QUEUE, GUI_SCOREBOARD_QUEUE
 
+def season_replay_reset():
+    SEASON_REPLAY["games"].clear()
+    SEASON_REPLAY["makers"].clear()
+
+
+def season_replay_register_maker(name: str, maker):
+    SEASON_REPLAY["makers"][name] = maker
+
+
+def season_replay_register_game(order: int, name_a: str, name_b: str, seed: int):
+    SEASON_REPLAY["games"][order] = (name_a, name_b, seed)
+
+
+def season_replay_available(order) -> bool:
+    spec = SEASON_REPLAY["games"].get(order)
+    return bool(spec) and spec[0] in SEASON_REPLAY["makers"] and spec[1] in SEASON_REPLAY["makers"]
+
+
+def build_season_game_teams(factory_a, factory_b, seed=None) -> Tuple[Team, Team]:
+    """The two teams of a season game, set up exactly as the quiet season sim sets them up."""
+    if seed is not None:
+        random.seed(seed)
     team_a = factory_a()
     team_b = factory_b()
     team_a.init_lineup()
@@ -23646,6 +23665,24 @@ def simulate_silent_season_game(factory_a, factory_b) -> Tuple[Team, Team]:
     apply_star_clutchness(team_a, team_b)
     assign_player_badges(team_a)
     assign_player_badges(team_b)
+    return team_a, team_b
+
+
+def build_season_replay_teams(order) -> Tuple[Team, Team]:
+    """Teams for replaying a finished season game: same rosters, same random seed, so the game plays out identically."""
+    name_a, name_b, seed = SEASON_REPLAY["games"][order]
+    return build_season_game_teams(SEASON_REPLAY["makers"][name_a], SEASON_REPLAY["makers"][name_b], seed)
+
+
+def simulate_silent_season_game(factory_a, factory_b, seed=None) -> Tuple[Team, Team]:
+    import builtins
+    import contextlib
+    import io
+
+    global SLEEP, SIM_FAST_FORWARD, SIM_JUMP_TARGET, SIM_PAUSED, SIM_SLEEP_SCALE
+    global GUI_SERIES_UPDATE_QUEUE, GUI_SCOREBOARD_QUEUE
+
+    team_a, team_b = build_season_game_teams(factory_a, factory_b, seed)
 
     original_sleep = SLEEP
     original_fast = SIM_FAST_FORWARD
@@ -23812,10 +23849,11 @@ def hold_season_while_paused(snapshot, poll: float = 0.05):
 def _quiet_season_worker(task):
     """Worker entry point for the custom season: play one game between copies of two team templates."""
     import copy
-    template_a, template_b, order = task
+    template_a, template_b, order = task[0], task[1], task[2]
+    seed = task[3] if len(task) > 3 else None
     global SEASON_STAR_MINUTES_CAP
     SEASON_STAR_MINUTES_CAP = 34
-    team_a, team_b = simulate_silent_season_game(lambda: copy.deepcopy(template_a), lambda: copy.deepcopy(template_b))
+    team_a, team_b = simulate_silent_season_game(lambda: copy.deepcopy(template_a), lambda: copy.deepcopy(template_b), seed)
     return team_a, team_b, order
 
 
@@ -23841,6 +23879,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         for idx in range(0, len(round_entries), 2):
             schedule.append((round_entries[idx], round_entries[idx + 1]))
     total_games = len(schedule)
+    seeds = [random.getrandbits(32) for _ in schedule]
     completed_games = 0
     print("\n=== SEASON MODE ===")
     print(f"Quiet-simming 82 games for {len(entries)} teams with the full playoff game engine hidden from the GUI. No play-by-play will be printed during the regular season.")
@@ -23867,6 +23906,17 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     except Exception:
         templates = None
 
+    # Everything needed to replay any of these games later (same rosters, same seed).
+    import copy as _copy
+    season_replay_reset()
+    for entry in entries:
+        if templates is not None:
+            season_replay_register_maker(entry["name"], (lambda t=templates[entry["name"]]: _copy.deepcopy(t)))
+        else:
+            season_replay_register_maker(entry["name"], entry["factory"])
+    for order, (entry_a, entry_b) in enumerate(schedule):
+        season_replay_register_game(order, entry_a["name"], entry_b["name"], seeds[order])
+
     def parallel_results():
         import multiprocessing
         import os
@@ -23877,7 +23927,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             for start_index in range(0, total_games, batch):
                 hold_season_while_paused(season_snapshot)
                 tasks = [
-                    (templates[ea["name"]], templates[eb["name"]], order)
+                    (templates[ea["name"]], templates[eb["name"]], order, seeds[order])
                     for order, (ea, eb) in enumerate(schedule[start_index:start_index + batch], start=start_index)
                 ]
                 for result in pool.imap_unordered(_quiet_season_worker, tasks, chunksize=2):
@@ -23889,7 +23939,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     def sequential_results():
         for order, (entry_a, entry_b) in enumerate(schedule):
             hold_season_while_paused(season_snapshot)
-            team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"])
+            team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"], seeds[order])
             yield team_a, team_b, order
 
     SEASON_STAR_MINUTES_CAP = 34

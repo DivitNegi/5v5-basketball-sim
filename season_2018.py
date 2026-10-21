@@ -39,9 +39,10 @@ def _run_2018_season_game(task):
     """Worker entry point: simulate one silent season game and return the finished teams."""
     home_key, away_key = task[0], task[1]
     order = task[2] if len(task) > 2 else None
+    seed = task[3] if len(task) > 3 else None
     sim_engine.SEASON_STAR_MINUTES_CAP = 34
     team_a, team_b = simulate_silent_season_game(
-        getattr(pd, f"make_{home_key}_2018"), getattr(pd, f"make_{away_key}_2018")
+        getattr(pd, f"make_{home_key}_2018"), getattr(pd, f"make_{away_key}_2018"), seed
     )
     return home_key, away_key, team_a, team_b, order
 
@@ -51,13 +52,19 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
     pd.POSTSEASON_SEASON_LABEL = "2017-18"
     pd.POSTSEASON_PLAY_IN = False   # the play-in tournament did not exist in 2017-18
     games, conf_of = pd.build_2027_season_schedule()
-    games = [(home, away, order) for order, (home, away) in enumerate(games)]
+    games = [(home, away, order, random.getrandbits(32)) for order, (home, away) in enumerate(games)]
     entries = []
+    name_of_key = {}
+    sim_engine.season_replay_reset()
     for key, conference in conf_of.items():
         factory = getattr(pd, f"make_{key}_2018")
         entry = season_entry_from_factory(factory().name, factory)
         entry["conference"] = conference
         entries.append(entry)
+        name_of_key[key] = entry["name"]
+        sim_engine.season_replay_register_maker(entry["name"], factory)
+    for home_key, away_key, order, seed in games:
+        sim_engine.season_replay_register_game(order, name_of_key[home_key], name_of_key[away_key], seed)
     entry_by_name = {entry["name"]: entry for entry in entries}
     player_totals, team_totals = {}, {}
     game_log = SeasonGameLog()
@@ -91,9 +98,9 @@ def run_2018_season(section_queue=None, progress_queue=None) -> Dict:
 
     def sequential_results():
         import time as _time
-        for home_key, away_key, order in games:
+        for task in games:
             sim_engine.hold_season_while_paused(snap)
-            yield _run_2018_season_game((home_key, away_key, order))
+            yield _run_2018_season_game(task)
 
     try:
         import os as _os

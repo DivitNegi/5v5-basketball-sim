@@ -10,9 +10,13 @@ needs is known for the current event):
   {pts} {fgm} {fga} {tpm} {tpa} {reb} {ast} {pf}   the player's game totals
   {lead} margin of the leading team   {run} the team's current run   {score} "89-96"
 """
-import random
+import random as _random_module
 import re
 import string
+
+# The booth's own random numbers: the sim's game results are seeded, and the booth runs on the GUI thread, so it must
+# not draw from (and disturb) the shared generator or a replayed game would play out differently.
+random = _random_module.Random()
 from collections import deque
 
 

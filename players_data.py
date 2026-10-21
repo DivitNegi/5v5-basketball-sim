@@ -621,11 +621,12 @@ def _run_2027_season_game(task):
     """Worker entry point: simulate one silent season game and return the finished teams."""
     home_key, away_key = task[0], task[1]
     order = task[2] if len(task) > 2 else None
+    seed = task[3] if len(task) > 3 else None
     # Regular season: first options play ~34-36 minutes, not playoff minutes.
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = 34
     team_a, team_b = simulate_silent_season_game(
-        globals()[f"make_{home_key}_2027"], globals()[f"make_{away_key}_2027"]
+        globals()[f"make_{home_key}_2027"], globals()[f"make_{away_key}_2027"], seed
     )
     return home_key, away_key, team_a, team_b, order
 
@@ -634,14 +635,22 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN
     POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN = "2027", "2026-27", True
     games, conf_of = build_2027_season_schedule()
-    games = [(home, away, order) for order, (home, away) in enumerate(games)]
+    import random as _random
+    games = [(home, away, order, _random.getrandbits(32)) for order, (home, away) in enumerate(games)]
     entries = []
+    _name_of_key = {}
+    import sim_engine as _replay_engine
+    _replay_engine.season_replay_reset()
     for key, conference in conf_of.items():
         factory = globals()[f"make_{key}_2027"]
         entry = season_entry_from_factory(factory().name, factory)
+        _name_of_key[key] = entry["name"]
+        _replay_engine.season_replay_register_maker(entry["name"], factory)
         entry["conference"] = conference
         entries.append(entry)
     entry_by_name = {entry["name"]: entry for entry in entries}
+    for _home, _away, _order, _seed in games:
+        _replay_engine.season_replay_register_game(_order, _name_of_key[_home], _name_of_key[_away], _seed)
     player_totals, team_totals = {}, {}
     game_log = SeasonGameLog()
     total_games = len(games)
@@ -680,9 +689,9 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     def sequential_results():
         import time as _time
         import sim_engine as _engine
-        for home_key, away_key, order in games:
+        for task in games:
             _engine.hold_season_while_paused(snap)
-            yield _run_2027_season_game((home_key, away_key, order))
+            yield _run_2027_season_game(task)
 
     try:
         import os as _os

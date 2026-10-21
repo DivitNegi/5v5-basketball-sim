@@ -6,6 +6,8 @@ from players_data import *
 import players_data as _players_data_module
 from season_2018 import run_2018_season, run_2018_playoffs, factories_2018
 from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
+import random as _random_for_cast
+_cast_rng = _random_for_cast.Random()   # the cast filter must not draw from the sim's seeded generator
 from web_app import run_web_gui_app
 from broadcast import BroadcastBooth
 
@@ -1820,6 +1822,8 @@ def run_gui_app():
     highs_back_button = ttk.Button(highs_box_bar, text="<  Back to highs")
     highs_back_button.grid(row=0, column=0, sticky="w", padx=(0, 16))
     ttk.Label(highs_box_bar, textvariable=highs_box_title_var, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w")
+    highs_replay_button = ttk.Button(highs_box_bar, text="Replay this game")
+    highs_replay_button.grid(row=0, column=2, sticky="w", padx=(18, 0))
     highs_box_columns = tuple(col for col, _label, _width, _anchor in FULL_BOX_COLUMNS)
     highs_box_tree = ttk.Treeview(highs_box_frame, columns=highs_box_columns, show="headings", height=10, style="Series.Treeview")
     highs_box_scroll_y = ttk.Scrollbar(highs_box_frame, orient="vertical", command=highs_box_tree.yview)
@@ -1875,6 +1879,8 @@ def run_gui_app():
     schedule_back_button.grid(row=0, column=0, sticky="w", padx=(0, 16))
     schedule_box_title_var = tk.StringVar(value="")
     ttk.Label(schedule_box_bar, textvariable=schedule_box_title_var, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w")
+    schedule_replay_button = ttk.Button(schedule_box_bar, text="Replay this game")
+    schedule_replay_button.grid(row=0, column=2, sticky="w", padx=(18, 0))
     schedule_box_tree = ttk.Treeview(
         schedule_box_frame, columns=tuple(col for col, _l, _w, _a in FULL_BOX_COLUMNS), show="headings", height=10, style="Series.Treeview",
     )
@@ -1886,6 +1892,7 @@ def run_gui_app():
     schedule_box_scroll_y.grid(row=1, column=1, sticky="ns")
     schedule_box_scroll_x.grid(row=2, column=0, sticky="ew")
     schedule_row_game: Dict[str, int] = {}
+    replay_target = {"sched": None, "highs": None}   # schedule order (0-based) of the game whose box score is open
     schedule_cache = {"rows_id": None, "top": {}}
     series_tabs.add(schedule_frame, text="Sched")
 
@@ -2357,6 +2364,8 @@ def run_gui_app():
         _schedule_dropdown.bind("<<ComboboxSelected>>", lambda _event: update_schedule_table(playoff_sections_state.get("sections") or {}))
     schedule_tree.bind("<<TreeviewSelect>>", lambda _event: show_schedule_box_score())
     schedule_back_button.configure(command=lambda: close_schedule_box_score())
+    schedule_replay_button.configure(command=lambda: start_replay(replay_target["sched"]))
+    highs_replay_button.configure(command=lambda: start_replay(replay_target["highs"]))
     highs_tree.bind("<Double-1>", lambda event: show_highs_box_score(event))
     highs_tree.bind("<Return>", lambda _event: show_highs_box_score(None))
     highs_back_button.configure(command=lambda: close_highs_box_score())
@@ -2490,7 +2499,7 @@ def run_gui_app():
         if len(events) > 80:
             events = events[-80:]
         calls = broadcast_booth.process(events, (team_a, team_b))
-        calls = [c for c in calls if random.random() < cast_keep_rate.get(c[0], 1.0)]
+        calls = [c for c in calls if _cast_rng.random() < cast_keep_rate.get(c[0], 1.0)]
         if not calls:
             return
         period = SIM_CONTEXT.get("period", 1)
@@ -4644,6 +4653,9 @@ def run_gui_app():
         return top
 
     def update_schedule_table(sections: Dict):
+        if sections.get("_season_paused") and schedule_box_frame.winfo_ismapped():
+            return   # a live refresh while you are reading a box score: leave it open
+        scroll_position = schedule_tree.yview()[0]
         close_schedule_box_score()
         schedule_tree.delete(*schedule_tree.get_children())
         schedule_row_game.clear()
@@ -4712,6 +4724,7 @@ def run_gui_app():
             for game in ordered:
                 add(game)
         schedule_count_var.set(f"{len(games)} games")
+        schedule_tree.yview_moveto(scroll_position)
 
     def close_schedule_box_score():
         schedule_box_frame.grid_remove()
@@ -4736,6 +4749,7 @@ def run_gui_app():
         if not game_rows:
             return
         meta = next((g for g in sections.get("_season_games") or [] if g["gid"] == gid), None)
+        replay_target["sched"] = (meta["order"] - 1) if meta else None
         extras_map = (sections.get("_season_game_extras") or {}).get(gid, {})
         names = [meta["home"], meta["away"]] if meta else sorted({r[ix["team"]] for r in game_rows})
         teams = []
@@ -4815,6 +4829,8 @@ def run_gui_app():
             ]
             teams.append({"name": name, "score": score, "players": players, "extras": extras_map.get(name, {})})
         game_no = game_rows[0][idx["game"]]
+        highs_meta = next((g for g in sections.get("_season_games") or [] if g["gid"] == gid), None)
+        replay_target["highs"] = (highs_meta["order"] - 1) if highs_meta else None
         highs_box_title_var.set(
             "  -  ".join(f"{table_player_name(tm['name'], 30)} {tm['score']}" for tm in teams) + f"    (team game {game_no})"
         )
@@ -4826,6 +4842,8 @@ def run_gui_app():
         highs_box_frame.grid(row=0, column=0, rowspan=3, columnspan=2, sticky="nsew")
 
     def update_season_highs_table(sections: Dict):
+        if sections.get("_season_paused") and highs_box_frame.winfo_ismapped():
+            return
         close_highs_box_score()
         highs_tree.delete(*highs_tree.get_children())
         highs_row_game.clear()
@@ -9090,7 +9108,7 @@ def run_gui_app():
         sim_factories = active_team_factories()
         sim_completed = False
         sim_error = None
-        if mode not in ("2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs"):
+        if mode not in ("2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Replay season game"):
             _players_data_module.POSTSEASON_PLAY_IN = True
         try:
             if mode == "Game":
@@ -9100,6 +9118,15 @@ def run_gui_app():
                 assign_player_badges(team_a)
                 assign_player_badges(team_b)
                 simulate_game(team_a, team_b)
+            elif mode == "Replay season game":
+                # The same game, from the same random seed and rosters, played live: play by play, box, ratings, cards.
+                previous_cap = sim_engine.SEASON_STAR_MINUTES_CAP
+                sim_engine.SEASON_STAR_MINUTES_CAP = 34   # set before the teams are built, as in the season
+                try:
+                    team_a, team_b = sim_engine.build_season_replay_teams(replay_state["order"])
+                    simulate_game(team_a, team_b)
+                finally:
+                    sim_engine.SEASON_STAR_MINUTES_CAP = previous_cap
             elif mode == "1-on-1":
                 team_name_a, player_name_a = picked_1v1["team_a"], picked_1v1["player_a"]
                 team_name_b, player_name_b = picked_1v1["team_b"], picked_1v1["player_b"]
@@ -9269,6 +9296,40 @@ def run_gui_app():
         scoreboard_status_var.set("Starting simulation...")
         thread = threading.Thread(target=run_selected_sim, args=(mode_override,), daemon=True)
         thread.start()
+
+    replay_state = {"order": None}
+
+    def start_replay(order):
+        """Replay a finished season game live. Works once the season sim has finished."""
+        if order is None:
+            return
+        if running["active"]:
+            status_var.set("Replays are available when no sim is running: let the season finish first.")
+            return
+        if not sim_engine.season_replay_available(order):
+            status_var.set("That game cannot be replayed (its replay data is not in this session).")
+            return
+        name_a, name_b, _seed = sim_engine.SEASON_REPLAY["games"][order]
+        replay_state["order"] = order
+        kept_sections = playoff_sections_state.get("sections")
+        clear_log()                                       # empties the live game widgets...
+        playoff_sections_state["sections"] = kept_sections   # ...but the season's data stays
+        season_view["quiet"] = False
+        for var, name in ((team_a_var, name_a), (team_b_var, name_b)):
+            if name in team_names:
+                var.set(name)
+        running["active"] = True
+        pause_button.configure(text="Pause")
+        status_var.set(f"Replaying game {order + 1}...")
+        set_scoreboard_teams(name_a, name_b)
+        scoreboard_status_var.set(f"Replaying game {order + 1} of the season: {team_display_name(name_a)} vs {team_display_name(name_b)}.")
+        try:
+            for tab_id in series_tabs.tabs():
+                if str(series_tabs.tab(tab_id, "text")) == "PBP":
+                    series_tabs.select(tab_id)
+        except Exception:
+            pass
+        threading.Thread(target=run_selected_sim, args=("Replay season game",), daemon=True).start()
 
     def send_gui_input():
         value = gui_input_var.get()
