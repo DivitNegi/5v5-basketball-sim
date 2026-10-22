@@ -29,6 +29,13 @@ OVERRIDES = {
         "James Harden": {"usage": 0.45, "shot_tendency": 0.95, "foul_draw": 0.95, "shot_iq": 0.62, "three_rating": 0.91,
                          "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
+    "2027 Philadelphia 76ers": {
+        # Scoring order: Maxey first option (~27), Jaylen Brown second (~23), Embiid third (~21). Attempt roles only;
+        # the hand-entered ratings are left alone.
+        "Tyrese Maxey": {"target_fga_soft_cap": 26.0, "target_fga_per_game": 24.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
+        "Jaylen Brown": {"target_fga_soft_cap": 20.0, "target_fga_per_game": 18.0, "target_fga_precision": 0.9, "keep_pace_shots": False},
+        "Joel Embiid": {"target_fga_soft_cap": 14.0, "target_fga_per_game": 12.5, "target_fga_precision": 0.9, "keep_pace_shots": False},
+    },
     "2024 Dallas Mavericks": {
         # Volume (usage / shot_tendency / three_tendency) is left to the hand-entered row; he takes ~23 shots a night.
         "Luka Dončić": {"block": 0.67, "dreb": 0.96, "dunk_rating": 0.93, "ft_rating": 0.784, "mid_rating": 0.99, "oreb": 0.617, "playmaking": 0.80, "foul_draw": 0.80, "rim_rating": 0.99, "steal": 0.77, "three_rating": 0.84,
