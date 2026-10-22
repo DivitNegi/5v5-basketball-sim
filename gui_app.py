@@ -9320,7 +9320,7 @@ def run_gui_app():
                 var.set(name)
         running["active"] = True
         pause_button.configure(text="Pause")
-        status_var.set(f"Replaying game {order + 1}...")
+        status_var.set("Running...")   # a normal live game's status: when it ends the widgets get their final refresh
         set_scoreboard_teams(name_a, name_b)
         scoreboard_status_var.set(f"Replaying game {order + 1} of the season: {team_display_name(name_a)} vs {team_display_name(name_b)}.")
         try:
