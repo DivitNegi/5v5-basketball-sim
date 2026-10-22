@@ -12252,7 +12252,9 @@ def elite_interior_scorer(player: Player) -> bool:
     )
 
 
-OPEN_SHOT_SKILL_POINTS = ((0.70, 0.45), (0.75, 0.60), (0.80, 0.82), (0.85, 1.0), (0.90, 1.0), (0.95, 1.0), (0.99, 1.0))
+OPEN_SHOT_SKILL_POINTS = ((0.70, 0.45), (0.75, 0.60), (0.80, 0.82), (0.85, 1.0))
+OPEN_SHOT_TOP_SLOPE = 0.028   # above 85 the open-look bonus keeps growing, exponentially and with no ceiling
+OPEN_SHOT_TOP_RATE = 10.0
 
 
 def open_shot_skill(rating: float) -> float:
@@ -12264,7 +12266,8 @@ def open_shot_skill(rating: float) -> float:
     for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
         if rating <= x1:
             return y0 + (y1 - y0) * (rating - x0) / (x1 - x0)
-    return pts[-1][1]
+    # 85+: 1.0 at an 85, about 1.02 at a 90, 1.05 at a 95 and 1.09 at a 99, and it keeps climbing past that
+    return 1.0 + OPEN_SHOT_TOP_SLOPE * (math.exp(OPEN_SHOT_TOP_RATE * (rating - 0.85)) - 1.0)
 
 
 def wide_open_jumper_floor(shooter: Player, shot_type: str, defender: Player | None = None) -> float:
@@ -12483,6 +12486,9 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
             p *= 1.03 + min(0.06, getattr(shooter, "confidence", 0.0) * 0.02)
 
     shot_iq_efficiency = 0.99 + max(0.0, shooter.shot_iq - 0.82) * 0.02
+    if shooter.shot_iq > 0.85:
+        # past an 85 shot IQ keeps paying off, on a curve that has no ceiling
+        shot_iq_efficiency += 0.004 * (math.exp(8.0 * (shooter.shot_iq - 0.85)) - 1.0)
     if shot_type in ("three", "mid") and shooter.shot_iq < 0.72:
         shot_iq_efficiency -= (0.72 - shooter.shot_iq) * 0.30
     if is_paint_shot(shot_type) and shooter.shot_iq < 0.62:
