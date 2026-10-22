@@ -4861,15 +4861,16 @@ def assign_player_badges(team: Team):
             p.three_rating * 0.68 + p.three_tendency * 0.32,
             0.70, 0.76, 0.82, 0.90
         )
-        if movement_level and p.three_tendency >= 0.38:
+        if movement_level and p.three_tendency >= 0.38 and p.three_rating >= 0.85:
             add_badge(p, "movement_shooter", movement_level)
 
         limitless_tier = limitless_range_badge_tier(p)
         if limitless_tier:
             add_badge(p, "limitless_range", limitless_tier)
 
-        catch_score = p.three_rating * 0.76 + p.shot_iq * 0.16 + p.three_tendency * 0.08
-        catch_level = badge_level_from_rating(catch_score, 0.76, 0.82, 0.88, 0.94)
+        # A catch-and-shoot specialist cashes in open looks: a 75 is not good enough, 85 is the bare minimum (bronze),
+        # 90+ is silver, 95+ gold and a 99 is elite.
+        catch_level = badge_level_from_rating(p.three_rating, 0.85, 0.90, 0.95, 0.99)
         if catch_level and p.three_tendency >= 0.24 and p.iso_tendency < 0.82:
             add_badge(p, "catch_shoot", catch_level)
 
@@ -12251,6 +12252,21 @@ def elite_interior_scorer(player: Player) -> bool:
     )
 
 
+OPEN_SHOT_SKILL_POINTS = ((0.70, 0.45), (0.75, 0.60), (0.80, 0.82), (0.85, 1.0), (0.90, 1.0), (0.95, 1.0), (0.99, 1.0))
+
+
+def open_shot_skill(rating: float) -> float:
+    """How much of an open-look bonus (catch-and-shoot, kickouts) a jump shooter of this rating cashes in. A 75 is not
+    a reliable open shooter; 85 is the bare minimum (full bonus), 90+ is better and a 99 is elite."""
+    pts = OPEN_SHOT_SKILL_POINTS
+    if rating <= pts[0][0]:
+        return pts[0][1]
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if rating <= x1:
+            return y0 + (y1 - y0) * (rating - x0) / (x1 - x0)
+    return pts[-1][1]
+
+
 def wide_open_jumper_floor(shooter: Player, shot_type: str, defender: Player | None = None) -> float:
     # This floor used to be shooter-only, which meant a great closeout
     # defender and a poor one produced the exact same catch-and-shoot make
@@ -12267,7 +12283,8 @@ def wide_open_jumper_floor(shooter: Player, shot_type: str, defender: Player | N
 
         floor = 0.33 + max(0.0, shooter.three_rating - 0.70) * 0.36
         floor += max(0.0, shooter.shot_iq - 0.78) * 0.025
-        return min(0.51, floor) - defense_shave
+        # below an 85 the floor shrinks: a mediocre shooter is not a reliable open-shot maker
+        return min(0.51, floor) * (0.88 + 0.12 * min(1.0, open_shot_skill(shooter.three_rating))) - defense_shave
 
     if shot_type == "mid":
         if shooter.mid_rating >= 0.90:
@@ -12277,7 +12294,7 @@ def wide_open_jumper_floor(shooter: Player, shot_type: str, defender: Player | N
 
         floor = 0.38 + max(0.0, shooter.mid_rating - 0.70) * 0.50
         floor += max(0.0, shooter.shot_iq - 0.78) * 0.035
-        return min(0.58, floor) - defense_shave
+        return min(0.58, floor) * (0.88 + 0.12 * min(1.0, open_shot_skill(shooter.mid_rating))) - defense_shave
 
     return 0.0
 
@@ -12446,6 +12463,10 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
             # engaged perimeter defender should still meaningfully cut into
             # it, not just the shooter's own touch.
             good_look_bonus = max(0.50, good_look_bonus * 0.86 - soft_defense_rating(effective_perimeter_def(defender)) * 0.18)
+        if shot_type == "three":
+            good_look_bonus *= open_shot_skill(shooter.three_rating)
+        elif shot_type == "mid":
+            good_look_bonus *= open_shot_skill(shooter.mid_rating)
         quality_mult = 1.0 + (quality_mult - 1.0) * good_look_bonus
     p *= quality_mult
     open_jumper_floor = wide_open_jumper_floor(shooter, shot_type, defender) if quality_mult >= 1.08 else 0.0
