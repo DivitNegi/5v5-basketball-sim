@@ -21949,8 +21949,11 @@ def fantasy_ovr(player: Player) -> int:
             stretched = max(stretched, soft)
         else:
             if mpt >= 88 and tpt >= 80:
-                # a big who is elite from mid-range and from three (Towns, Turner) is not just his core either
-                soft = raw if raw <= 93 else 93 + (raw - 93) * 0.38
+                # a big who is elite from mid-range and from three (Towns, Turner) is not just his core either: his shooting
+                # is a real advantage, worth about a point for every point his blended mid/three rating is above 85
+                shooter_bonus = max(0.0, 0.6 * mpt + 0.4 * tpt - 85.0) * 1.0
+                shooting_raw = raw + shooter_bonus
+                soft = shooting_raw if shooting_raw <= 93 else 93 + (shooting_raw - 93) * 0.38
                 stretched = max(stretched, soft)
             if stretched > CENTER_TOP_TIER:
                 # in the top tier a big is ranked on his core: only a near-perfect core stays above the tier line
