@@ -613,7 +613,7 @@ def build_2027_season_schedule():
     for (a, b), count in games_between.items():
         for g in range(count):
             games.append((a, b) if g % 2 == 0 else (b, a))
-    random.shuffle(games)
+    games = order_games_in_rounds(games)   # every team plays about the same number of games at any point
     return games, conf_of
 
 

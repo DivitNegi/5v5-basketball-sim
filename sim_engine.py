@@ -23708,6 +23708,35 @@ def build_season_sections(entries: List[Dict],
 SEASON_REPLAY: Dict = {"games": {}, "makers": {}}
 
 
+def order_games_in_rounds(games):
+    """Order a season's (home, away) games into rounds in which every team plays about once, so at any point of the season
+    every team has played nearly the same number of games. Teams with the most games left are paired first, which keeps the
+    rounds full to the end."""
+    remaining = list(games)
+    from collections import Counter
+    left = Counter()
+    for home, away in remaining:
+        left[home] += 1
+        left[away] += 1
+    ordered = []
+    while remaining:
+        keyed = sorted(remaining, key=lambda g: -(left[g[0]] + left[g[1]]) - random.random() * 0.9)
+        used = set()
+        chosen = []
+        for game in keyed:
+            if game[0] in used or game[1] in used:
+                continue
+            chosen.append(game)
+            used.update(game)
+        random.shuffle(chosen)
+        for game in chosen:
+            remaining.remove(game)
+            left[game[0]] -= 1
+            left[game[1]] -= 1
+        ordered.extend(chosen)
+    return ordered
+
+
 def season_replay_reset():
     SEASON_REPLAY["games"].clear()
     SEASON_REPLAY["makers"].clear()
