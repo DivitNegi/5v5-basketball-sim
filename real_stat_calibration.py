@@ -34,7 +34,9 @@ OVERRIDES = {
         # Maxey brings the ball up (see SIXERS_2027_MAXEY_HANDLER_SHARE); LeBron stays pass-first (~9 assists) but shoots
         # ~13 times a night at a lower efficiency than his hand-entered ratings gave (63% FG / 70 TS% on 8 shots).
         "Tyrese Maxey": {"target_fga_soft_cap": 29.0, "target_fga_per_game": 27.0, "target_fga_precision": 0.7, "keep_pace_shots": True},
-        "Jaylen Brown": {"shot_tendency": 0.74, "usage": 0.31, "target_fga_soft_cap": 23.0, "target_fga_per_game": 20.0, "target_fga_precision": 0.6, "keep_pace_shots": False},
+        "Jaylen Brown": {"shot_tendency": 0.84, "usage": 0.32, "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
+        # VJ Edgecombe is a real third-wing option: ~9-10 shots a night (he took ~5 with his hand-entered tendencies).
+        "VJ Edgecombe": {"shot_tendency": 0.85, "usage": 0.30, "target_fga_soft_cap": 16.0, "target_fga_per_game": 14.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
         "Joel Embiid": {"shot_tendency": 0.46, "usage": 0.18, "target_fga_soft_cap": 14.0, "target_fga_per_game": 12.0, "target_fga_precision": 0.6},
         "LeBron James": {"shot_tendency": 0.85, "usage": 0.32, "extra_pass_scale": 0.6,
                          "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 1.0, "keep_pace_shots": True,
