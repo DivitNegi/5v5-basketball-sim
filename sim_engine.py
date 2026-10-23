@@ -21646,6 +21646,7 @@ def fantasy_block_rating(player: Player) -> float:
 
 CENTER_RAW_FOR_99 = 97.4          # raw score of a peak, all-99-core center (Shaq 2001): that is a 99 with no special case
 CENTER_STRETCH_SLOPE = 1.9        # overall points per raw point below that, down to CENTER_STRETCH_FLOOR
+CENTER_TOP_TIER = 94.0            # above this a center is limited by his core rating (see center_core_path)
 CENTER_STRETCH_FLOOR = 85.0       # below this raw score the scale is 1:1 again (weak bigs are not pushed any lower)
 CENTER_CREATOR_BONUS_SCALE = 0.9  # passing bigs keep nearly all of their creator bonus (it sits outside the stretch)
 
@@ -21667,6 +21668,7 @@ def fantasy_ovr(player: Player) -> int:
     rebound = (0.45 * player.oreb + 0.55 * player.dreb) * 100
 
     center_creator_bonus = 0.0
+    center_core_path = 0.0
     if player.position == "C":
         # A center who finishes, protects the rim and rebounds is already a
         # complete big -- not being a shooter shouldn't drag him down, it
@@ -21676,6 +21678,10 @@ def fantasy_ovr(player: Player) -> int:
         if lpt >= 88 and idef >= 80 and rebound >= 74:
             mpt = max(mpt, core_average - 14)
             tpt = max(tpt, core_average - 14)
+        # The very top is ranked on the core alone (each point below a perfect core costs 2.2), plus a little for shooting,
+        # clutch and passing, so only a complete, all-99 core reaches 99.
+        skill_average = (0.08 * cpt + 0.08 * mpt + 0.05 * pl + 0.02 * tpt) / 0.23
+        center_core_path = 99.0 - (99.0 - core_average) * 2.2 + (skill_average - 55.0) * 0.06
         raw = (
             0.24 * lpt + 0.17 * idef + 0.14 * dk + 0.11 * bl +
             0.11 * rebound + 0.08 * cpt + 0.08 * mpt + 0.05 * pl +
@@ -21915,6 +21921,9 @@ def fantasy_ovr(player: Player) -> int:
             # blend, tops softened above 93, still applies to him
             soft = raw if raw <= 93 else 93 + (raw - 93) * 0.38
             stretched = max(stretched, soft)
+        elif stretched > CENTER_TOP_TIER:
+            # in the top tier a big is ranked on his core: only a near-perfect core stays above the tier line
+            stretched = min(stretched, max(center_core_path, CENTER_TOP_TIER))
         raw = stretched
     elif player.position == "PG" and raw > 93:
         raw = 93 + (raw - 93) * 0.68
