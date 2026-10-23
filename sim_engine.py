@@ -14762,9 +14762,8 @@ TEAM_PLAYBOOKS = {
     "2018 Philadelphia 76ers": ["sixers_embiid_elbow", "sixers_redick_chase", "sixers_simmons_dunker"],
     "2019 Philadelphia 76ers": ["sixers_embiid_elbow", "sixers_redick_chase", "sixers_butler_slot", "sixers_simmons_dunker"],
     "2027 Philadelphia 76ers": [
-        "sixers_lebron_create", "sixers_lebron_create", "sixers_lebron_create",
         "sixers_lebron_create", "sixers_lebron_create",
-        "sixers_maxey_slot", "sixers_embiid_elbow",
+        "sixers_maxey_slot", "sixers_maxey_slot", "sixers_embiid_elbow",
     ],
     "2013 Indiana Pacers": ["pacers_pg_wing", "pacers_hibbert_duckin", "pacers_west_elbow"],
     "2025 Indiana Pacers": ["pacers_hali_drag", "pacers_siakam_delay", "pacers_turner_pop"],
@@ -16964,8 +16963,8 @@ def clutch_package_play(team: Team, need_three: bool = False) -> str | None:
         "2027 Dallas Mavericks": ("mavs_kyrie_spread", "mavs_flagg_delay", "mavs_corner_lift"),
         "2027 Los Angeles Lakers": ("lakers_luka_create", "lakers_luka_spread", "lakers_luka_iso"),
         "2027 Philadelphia 76ers": (
-            "sixers_lebron_create", "sixers_lebron_create",
-            "sixers_maxey_slot", "sixers_embiid_elbow",
+            "sixers_lebron_create",
+            "sixers_maxey_slot", "sixers_maxey_slot", "sixers_embiid_elbow",
         ),
         "2018 Houston Rockets": ("rockets_harden_iso_kick", "rockets_spread_lob"),
         "2020 Houston Rockets": ("rockets_harden_iso_kick", "rockets_corner_shake"),
@@ -17324,6 +17323,7 @@ WARRIORS_2018_ASSIST_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.65}   # w
 
 # 2023-24 Nuggets: Jokic was the hub (9.0 assists a night) and Murray the scorer off him (6.3).
 NUGGETS_2024_ASSIST_BIAS = {"Nikola Jokić": 2.0, "Jamal Murray": 0.75}
+SIXERS_2027_MAXEY_HANDLER_SHARE = 0.60   # share of possessions Maxey brings the ball up while on the floor
 NUGGETS_2024_HANDLER_SHARE = 0.70     # share of possessions Jokic initiates while on the floor
 TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS}
 
@@ -17415,12 +17415,11 @@ def choose_ballhandler(team: Team) -> Player:
             return random.choices(preferred, weights=weights, k=1)[0]
 
     if team.name == "2027 Philadelphia 76ers":
-        lebron = player_by_name(team.on_floor, ("LeBron James",))
-        # LeBron is Philadelphia's point forward. Keep a little secondary
-        # initiation for Maxey/Simons, but have LeBron bring up and organize
-        # the large majority of possessions throughout the entire game.
-        if lebron is not None and not lebron.fouled_out and random.random() < 0.84:
-            return lebron
+        maxey = player_by_name(team.on_floor, ("Tyrese Maxey",))
+        # Maxey brings the ball up and runs the offense; LeBron is a pass-first forward who initiates off the
+        # catch and in the half court (he keeps the passing looks and the assist credit) rather than the point guard.
+        if maxey is not None and not maxey.fouled_out and random.random() < SIXERS_2027_MAXEY_HANDLER_SHARE:
+            return maxey
         preferred = [p for p in team.on_floor if p.name in ("LeBron James", "Tyrese Maxey", "Anfernee Simons")]
         if preferred:
             weights = [
@@ -17428,7 +17427,7 @@ def choose_ballhandler(team: Team) -> Player:
                 * assist_load_factor(p, team)
                 * coach_handler_multiplier(team, p)
                 * fatigue_touch_multiplier(p)
-                * (2.15 if p.name == "LeBron James" else 1.0)
+                * (1.0 if p.name == "LeBron James" else 1.30 if p.name == "Tyrese Maxey" else 0.8)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
@@ -19004,6 +19003,7 @@ def simulate_possession(off: Team, dff: Team,
         extra_pass_chance *= 0.40
     if getattr(shooter, "keep_pace_shots", False) and paced_attempt_gap(shooter) > 1.0:
         extra_pass_chance *= 0.35
+    extra_pass_chance *= getattr(shooter, "extra_pass_scale", 1.0)   # a role setting: how often this player swings it instead of shooting
     if play_context not in ("deep_paint_touch", "iso") and random.random() < extra_pass_chance:
         secondary = choose_shooter_excluding(off, shooter, allow_non_spacers=False)
         if secondary is not shooter:

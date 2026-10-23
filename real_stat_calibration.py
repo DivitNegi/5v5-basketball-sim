@@ -30,11 +30,15 @@ OVERRIDES = {
                          "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
     "2027 Philadelphia 76ers": {
-        # Scoring order: Maxey first option (~27), Jaylen Brown second (~23), Embiid third (~21). Attempt roles only;
-        # the hand-entered ratings are left alone.
-        "Tyrese Maxey": {"target_fga_soft_cap": 26.0, "target_fga_per_game": 24.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
-        "Jaylen Brown": {"target_fga_soft_cap": 20.0, "target_fga_per_game": 18.0, "target_fga_precision": 0.9, "keep_pace_shots": False},
-        "Joel Embiid": {"target_fga_soft_cap": 14.0, "target_fga_per_game": 12.5, "target_fga_precision": 0.9, "keep_pace_shots": False},
+        # Scoring order: Maxey first option (~26), Jaylen Brown second (~20), Embiid third (~19), LeBron fourth (~17).
+        # Maxey brings the ball up (see SIXERS_2027_MAXEY_HANDLER_SHARE); LeBron stays pass-first (~9 assists) but shoots
+        # ~13 times a night at a lower efficiency than his hand-entered ratings gave (63% FG / 70 TS% on 8 shots).
+        "Tyrese Maxey": {"target_fga_soft_cap": 29.0, "target_fga_per_game": 27.0, "target_fga_precision": 0.7, "keep_pace_shots": True},
+        "Jaylen Brown": {"shot_tendency": 0.74, "usage": 0.31, "target_fga_soft_cap": 23.0, "target_fga_per_game": 20.0, "target_fga_precision": 0.6, "keep_pace_shots": False},
+        "Joel Embiid": {"shot_tendency": 0.46, "usage": 0.18, "target_fga_soft_cap": 14.0, "target_fga_per_game": 12.0, "target_fga_precision": 0.6},
+        "LeBron James": {"shot_tendency": 0.85, "usage": 0.32, "extra_pass_scale": 0.6,
+                         "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 1.0, "keep_pace_shots": True,
+                         "rim_rating": 0.88, "dunk_rating": 0.78, "mid_rating": 0.76, "three_rating": 0.72, "ft_rating": 0.72},
     },
     "2024 Dallas Mavericks": {
         # Volume (usage / shot_tendency / three_tendency) is left to the hand-entered row; he takes ~23 shots a night.
