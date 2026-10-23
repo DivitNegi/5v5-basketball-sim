@@ -8442,6 +8442,24 @@ def initialize_minute_targets(team: Team):
         }
         for p in team.roster:
             p.target_minutes = exact_rotation.get(p.name, p.target_minutes)
+    if team.name == "2027 Philadelphia 76ers":
+        # VJ Edgecombe is the fifth starter and plays like one (the stars' season cap had him at 25 minutes).
+        exact_rotation = {
+            "Tyrese Maxey": 32, "Jaylen Brown": 31, "Joel Embiid": 27, "LeBron James": 30, "VJ Edgecombe": 35,
+            "Anfernee Simons": 20, "Kentavious Caldwell-Pope": 17, "Justin Edwards": 12, "Dean Wade": 10,
+            "Ariel Hukporti": 9, "Adem Bona": 8, "Labaron Philon Jr.": 9,
+        }
+        for p in team.roster:
+            p.target_minutes = exact_rotation.get(p.name, p.target_minutes)
+    if team.name == "2027 Minnesota Timberwolves":
+        # The season cap kept Edwards at 32 while McDaniels led the team in minutes. The stars play the most.
+        exact_rotation = {
+            "Anthony Edwards": 36, "LaMelo Ball": 34, "Rudy Gobert": 31, "Jonathan Kuminga": 30,
+            "Jaden McDaniels": 29, "Ayo Dosunmu": 22, "Josh Green": 18, "Mike Conley": 17,
+            "Terrence Shannon Jr.": 14, "Zyon Pullin": 9,
+        }
+        for p in team.roster:
+            p.target_minutes = exact_rotation.get(p.name, p.target_minutes)
     apply_gui_minutes_overrides(team)
 
 
