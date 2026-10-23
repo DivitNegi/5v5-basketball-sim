@@ -21906,10 +21906,14 @@ def fantasy_ovr(player: Player) -> int:
         elif pl >= 82 and handle >= 86 and creator_scoring_peak >= 90:
             raw += 0.5
 
-    # Drawing fouls only ever helps. Up to a 90 it is a small plus; from 90 up it is a big one (a 99 foul-drawer, a Harden or
-    # a Westbrook at his peak, is worth about 4 overall points). An ordinary or poor foul-drawer is neither rewarded nor penalized.
+    # Drawing fouls only ever helps. For wings and guards: up to a 90 it is a small plus; from 90 up it is a big one (a 99
+    # foul-drawer is worth about 4 overall points). Bigs keep the original rule: a plus only for genuine foul-drawers (85+),
+    # up to 2.2. An ordinary or poor foul-drawer is neither rewarded nor penalized.
     foul_draw_value = player.foul_draw * 100
-    if foul_draw_value > 70 and not is_true_big(player):   # a big's foul drawing is not part of his overall
+    if is_true_big(player):
+        if foul_draw_value > 85:
+            raw += min(2.2, 0.15 * (foul_draw_value - 85))
+    elif foul_draw_value > 70:
         raw += (min(foul_draw_value, 90.0) - 70.0) * FOUL_DRAW_SMALL_PER_POINT
         if foul_draw_value > 90:
             raw += (foul_draw_value - 90.0) * FOUL_DRAW_BIG_PER_POINT
