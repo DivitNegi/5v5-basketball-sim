@@ -21943,13 +21943,18 @@ def fantasy_ovr(player: Player) -> int:
             stretched = 99.0 - (CENTER_RAW_FOR_99 - CENTER_STRETCH_FLOOR) * CENTER_STRETCH_SLOPE - (CENTER_STRETCH_FLOOR - base)
         stretched += center_creator_bonus * CENTER_CREATOR_BONUS_SCALE
         if center_creator_bonus > 0:
-            # a passing / shooting big (Jokic, Sabonis) is valued on his skills, not his rim-and-glass core: the original
-            # blend, tops softened above 93, still applies to him
+            # a passing big (Jokic, Sabonis) is valued on his skills, not his rim-and-glass core: the original blend,
+            # tops softened above 93, still applies to him
             soft = raw if raw <= 93 else 93 + (raw - 93) * 0.38
             stretched = max(stretched, soft)
-        elif stretched > CENTER_TOP_TIER:
-            # in the top tier a big is ranked on his core: only a near-perfect core stays above the tier line
-            stretched = min(stretched, max(center_core_path, CENTER_TOP_TIER))
+        else:
+            if mpt >= 88 and tpt >= 80:
+                # a big who is elite from mid-range and from three (Towns, Turner) is not just his core either
+                soft = raw if raw <= 93 else 93 + (raw - 93) * 0.38
+                stretched = max(stretched, soft)
+            if stretched > CENTER_TOP_TIER:
+                # in the top tier a big is ranked on his core: only a near-perfect core stays above the tier line
+                stretched = min(stretched, max(center_core_path, CENTER_TOP_TIER))
         raw = stretched
     elif player.position == "PG" and raw > 93:
         raw = 93 + (raw - 93) * 0.68
