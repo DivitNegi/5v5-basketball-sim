@@ -42,6 +42,16 @@ OVERRIDES = {
                          "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 1.0, "keep_pace_shots": True,
                          "rim_rating": 0.88, "dunk_rating": 0.78, "mid_rating": 0.76, "three_rating": 0.72, "ft_rating": 0.72},
     },
+    # 2027 rookie class shot volume (tendencies only, no caps): Peterson ~14 shots, Boozer ~15, AJ Dybantsa ~15.
+    "2027 Utah Jazz": {
+        "Darryn Peterson": {"shot_tendency": 0.34, "usage": 0.26},
+    },
+    "2027 Memphis Grizzlies": {
+        "Cameron Boozer": {"shot_tendency": 0.30, "usage": 0.24},
+    },
+    "2027 Washington Wizards": {
+        "AJ Dybantsa": {"shot_tendency": 0.60, "usage": 0.33},
+    },
     "2024 Dallas Mavericks": {
         # Volume (usage / shot_tendency / three_tendency) is left to the hand-entered row; he takes ~23 shots a night.
         "Luka Dončić": {"block": 0.67, "dreb": 0.96, "dunk_rating": 0.93, "ft_rating": 0.784, "mid_rating": 0.99, "oreb": 0.617, "playmaking": 0.80, "foul_draw": 0.80, "rim_rating": 0.99, "steal": 0.77, "three_rating": 0.84,
