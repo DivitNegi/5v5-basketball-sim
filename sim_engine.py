@@ -21644,6 +21644,12 @@ def fantasy_block_rating(player: Player) -> float:
     return max(0.0, min(100.0, player.block * 100.0))
 
 
+CENTER_RAW_FOR_99 = 97.4          # raw score of a peak, all-99-core center (Shaq 2001): that is a 99 with no special case
+CENTER_STRETCH_SLOPE = 1.9        # overall points per raw point below that, down to CENTER_STRETCH_FLOOR
+CENTER_STRETCH_FLOOR = 85.0       # below this raw score the scale is 1:1 again (weak bigs are not pushed any lower)
+CENTER_CREATOR_BONUS_SCALE = 0.9  # passing bigs keep nearly all of their creator bonus (it sits outside the stretch)
+
+
 def fantasy_ovr(player: Player) -> int:
     tpt = player.three_rating * 100
     mpt = player.mid_rating * 100
@@ -21660,6 +21666,7 @@ def fantasy_ovr(player: Player) -> int:
     speed = player.speed * 100
     rebound = (0.45 * player.oreb + 0.55 * player.dreb) * 100
 
+    center_creator_bonus = 0.0
     if player.position == "C":
         # A center who finishes, protects the rim and rebounds is already a
         # complete big -- not being a shooter shouldn't drag him down, it
@@ -21687,9 +21694,10 @@ def fantasy_ovr(player: Player) -> int:
         elif idef < 68:
             raw -= 1.5
         if pl >= 90 and mpt >= 90 and lpt >= 90:
-            raw += 13
+            center_creator_bonus = 13.0
         elif pl >= 78 and (mpt >= 84 or tpt >= 80):
-            raw += 7
+            center_creator_bonus = 7.0
+        raw += center_creator_bonus
         if "post_hub" in getattr(player, "badges", ()):
             raw += 4
     elif player.position == "SG":
@@ -21893,19 +21901,29 @@ def fantasy_ovr(player: Player) -> int:
         if mpt >= 90 and lpt >= 90 and (mpt + lpt) / 2 >= 92 and pdef >= 90 and stl >= 80:
             raw += 3
 
-    if player.position == "C" and raw > 93:
-        raw = 93 + (raw - 93) * 0.38
+    if player.position == "C":
+        # Stretch the old blend (passing bonus kept outside it): 99 - (97.4 - raw) * 1.9 down to a raw of 85, 1:1 below. A
+        # role-player big's 90 raw becomes a low 80s overall; a peak, all-99-core Shaq is a 99 on the formula itself.
+        base = raw - center_creator_bonus
+        if base >= CENTER_STRETCH_FLOOR:
+            stretched = 99.0 - (CENTER_RAW_FOR_99 - base) * CENTER_STRETCH_SLOPE
+        else:
+            stretched = 99.0 - (CENTER_RAW_FOR_99 - CENTER_STRETCH_FLOOR) * CENTER_STRETCH_SLOPE - (CENTER_STRETCH_FLOOR - base)
+        stretched += center_creator_bonus * CENTER_CREATOR_BONUS_SCALE
+        if center_creator_bonus > 0:
+            # a passing / shooting big (Jokic, Sabonis) is valued on his skills, not his rim-and-glass core: the original
+            # blend, tops softened above 93, still applies to him
+            soft = raw if raw <= 93 else 93 + (raw - 93) * 0.38
+            stretched = max(stretched, soft)
+        raw = stretched
     elif player.position == "PG" and raw > 93:
         raw = 93 + (raw - 93) * 0.68
     elif (can_play_position(player, "SF") or can_play_position(player, "PF")) and raw > 93:
         raw = 93 + (raw - 93) * 0.55
 
     ovr = round(raw)
-    # A center who is maxed out at the rim, on the glass, and as a rim
-    # protector and shot blocker is a 99 no matter how the compression
-    # above treats his raw score.
-    if player.position == "C" and lpt >= 98.5 and idef >= 98.5 and bl >= 98.5 and rebound >= 98.5:
-        ovr = max(ovr, 99)
+    if player.position == "C":
+        ovr = min(ovr, 99)   # the scale tops out at 99
     return max(40, int(ovr))
 
 
