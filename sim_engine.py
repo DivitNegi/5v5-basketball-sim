@@ -23201,7 +23201,13 @@ def positional_award_teams(ranked: List[Tuple[str, str, Dict]], player_lookup: D
     return [[(group, it) for group in ("G", "F", "C") for it in tm[group]] for tm in teams]
 
 
+_RACE_ADVANCED_CACHE: Dict = {}   # (team, player) -> (games, advanced-numbers award bonus) for the live award races
 _RACE_QUALITY_CACHE: Dict = {}   # (team, player) -> (games, quality_defended result) for the live award races
+
+
+REL_TS_WEIGHT = 0.6        # weight of true shooting relative to position in the season awards
+ADV_BPM_WEIGHT = 0.8       # advanced numbers: box plus/minus, points of award score per point of BPM
+DEF_IMPACT_WEIGHT = 0.8    # defense: extra weight on the defensive half of BPM (on top of steals and blocks)
 
 
 def build_season_sections(entries: List[Dict],
@@ -23268,6 +23274,55 @@ def build_season_sections(entries: List[Dict],
             continue
         for player in getattr(team, "roster", []):
             player_lookup[(entry["name"], player_stat_key(team, player))] = player
+    # True shooting counts relative to the player's position: a center's 62% and a guard's 56% are both league-average.
+    # The bonus is the points per game a player scores above what an average shooter at his position would from the same
+    # shots (2 * (TS - position TS) * scoring attempts per game), weighted REL_TS_WEIGHT.
+    _pos_pts, _pos_att = {}, {}
+    for _team_name, _name, _st in all_players:
+        _pl = player_lookup.get((_team_name, _name))
+        if _pl is None:
+            continue
+        _pos_pts[_pl.position] = _pos_pts.get(_pl.position, 0) + _st.get("pts", 0)
+        _pos_att[_pl.position] = _pos_att.get(_pl.position, 0) + _st.get("fga", 0) + 0.44 * _st.get("fta", 0)
+    position_ts = {pos: _pos_pts[pos] / (2 * _pos_att[pos]) for pos in _pos_att if _pos_att[pos] > 500}
+
+    _award_cache: Dict = {}
+
+    def award_score(item) -> float:
+        """Box-score score + true shooting relative to position + the advanced numbers (BPM) and defensive impact (DBPM)."""
+        key = (item[0], item[1])
+        cached = _award_cache.get(key)
+        if cached is not None:
+            return cached
+        stats = item[2]
+        score = series_player_score(stats)
+        player = player_lookup.get(key)
+        avg_ts = position_ts.get(player.position) if player is not None else None
+        attempts = stats.get("fga", 0) + 0.44 * stats.get("fta", 0)
+        if avg_ts is not None and attempts > 0:
+            ts = stats.get("pts", 0) / (2 * attempts)
+            score += REL_TS_WEIGHT * 2 * (ts - avg_ts) * attempts / max(1, stats.get("games", 1))
+        adv_bonus = None
+        if races_only:
+            # live race: a player who has not played since the last call keeps his last advanced-numbers bonus
+            hit = _RACE_ADVANCED_CACHE.get(key)
+            if hit is not None and hit[0] == stats.get("games", 0):
+                adv_bonus = hit[1]
+        if adv_bonus is None:
+            try:
+                adv = season_advanced_for(item[0], stats)
+                bpm, dbpm = adv[20], adv[19]
+            except Exception:
+                bpm = dbpm = 0.0
+            # a player who barely played is not trusted on his per-possession numbers
+            trust = max(0.3, min(1.0, stats.get("minutes", 0) / 60 / max(1, stats.get("games", 1)) / 28.0))
+            adv_bonus = trust * (ADV_BPM_WEIGHT * bpm + DEF_IMPACT_WEIGHT * dbpm)
+            if races_only:
+                _RACE_ADVANCED_CACHE[key] = (stats.get("games", 0), adv_bonus)
+        score += adv_bonus
+        _award_cache[key] = score
+        return score
+
     awards = []
     awards_table = []
     season_races = {"mvp": [], "dpoy": []}
@@ -23428,7 +23483,7 @@ def build_season_sections(entries: List[Dict],
         # MVP comes from the playoff teams (top 8 in a conference), same pool as All-NBA.
         mvp_pool = [item for item in all_players if item[0] in all_nba_eligible_teams] or all_players
         def mvp_key(item):
-            return series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0)
+            return award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0)
 
         mvp = max(mvp_pool, key=mvp_key)
         scorer = max(all_players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
@@ -23454,7 +23509,7 @@ def build_season_sections(entries: List[Dict],
             return {"_season_races": season_races}
         all_nba = sorted(
             [item for item in all_players if item[0] in all_nba_eligible_teams],
-            key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0),
+            key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0),
             reverse=True,
         )
         # The MVP is always on the All-NBA First Team (as its first name).
@@ -23482,7 +23537,7 @@ def build_season_sections(entries: List[Dict],
             and item[2].get("minutes", 0) / 60 / max(1, item[2].get("games", 1)) >= 14
         ]
         if bench_pool:
-            sixth = max(bench_pool, key=lambda item: series_player_score(item[2]) + standings_bonus(item[0], 4.0))
+            sixth = max(bench_pool, key=lambda item: award_score(item) + standings_bonus(item[0], 4.0))
             awards.append(("Sixth Man", sixth[1], f"{sixth[0]} | {sixth[2].get('pts', 0) / max(1, sixth[2].get('games', 1)):.1f} PPG, {sixth[2].get('reb', 0) / max(1, sixth[2].get('games', 1)):.1f} RPG, {sixth[2].get('ast', 0) / max(1, sixth[2].get('games', 1)):.1f} APG"))
             awards_table.append({"award": "Sixth Man", "player": sixth[1], "team": sixth[0], "stats": stat_line(sixth[0], sixth[2])})
 
@@ -23554,7 +23609,7 @@ def build_season_sections(entries: List[Dict],
             )
 
         def production_score(item) -> float:
-            return series_player_score(item[2]) + standings_bonus(item[0], 6.0)
+            return award_score(item) + standings_bonus(item[0], 6.0)
 
         def all_star_score(item) -> float:
             # coaches' reserves: 70% production, 30% popularity (rescaled to points)
@@ -23643,12 +23698,12 @@ def build_season_sections(entries: List[Dict],
         rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026] if include_rookies else []
         all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams
         if rookies:
-            roy = max(rookies, key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
+            roy = max(rookies, key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
             awards.append(("Rookie of the Year", roy[1], f"{roy[0]} | {roy[2].get('pts', 0) / max(1, roy[2].get('games', 1)):.1f} PPG, {roy[2].get('reb', 0) / max(1, roy[2].get('games', 1)):.1f} RPG, {roy[2].get('ast', 0) / max(1, roy[2].get('games', 1)):.1f} APG"))
             awards_table.append({"award": "Rookie of the Year", "player": roy[1], "team": roy[0], "stats": stat_line(roy[0], roy[2])})
             ranked_rookies = sorted(
                 rookies,
-                key=lambda item: series_player_score(item[2]) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05,
+                key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05,
                 reverse=True,
             )
             for team_no, start in enumerate((0, 5), start=1):
@@ -23875,6 +23930,7 @@ def live_season_races_payload(entries, player_totals, team_totals, completed: in
     """Top-5 MVP and DPOY races from the season so far (cheap enough to send after every game)."""
     if completed <= 1:
         _RACE_QUALITY_CACHE.clear()
+        _RACE_ADVANCED_CACHE.clear()
     sections = build_season_sections(entries, player_totals, team_totals, include_rookies=False, races_only=True)
     return {"season_races": sections.get("_season_races") or {"mvp": [], "dpoy": []}, "completed": completed, "total": total}
 
