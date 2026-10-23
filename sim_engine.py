@@ -3204,10 +3204,10 @@ from dataclasses import dataclass, field
 FEATURED_ROOKIE_ROLES_2027: Dict[str, Tuple[float, float]] = {
     # (usage, shot_tendency) floors. Volume comes from these tendencies and the
     # player's ratings through the normal shooter weighting -- no FGA cap.
-    "Darryn Peterson": (0.29, 0.42),
+    "Darryn Peterson": (0.26, 0.34),
     "Darius Acuff Jr.": (0.28, 0.40),
-    "AJ Dybantsa": (0.22, 0.32),
-    "Cameron Boozer": (0.26, 0.38),
+    "AJ Dybantsa": (0.33, 0.60),
+    "Cameron Boozer": (0.24, 0.30),
     "Caleb Wilson": (0.24, 0.34),
     "Keaton Wagler": (0.24, 0.35),
     "Mikel Brown Jr.": (0.24, 0.34),

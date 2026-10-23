@@ -291,25 +291,25 @@ def make_sixers_2027() -> Team:
                clutchness=0.81, height=74, speed=0.84,
                shot_iq=0.66, archetype='defender', stamina=0.8),
         Player('VJ Edgecombe', 'SG',
-               0.43, 0.23, 0.28, 0.060, 0.23, 0.40,
+               0.43, 0.23, 0.28, 0.060, 0.23, 0.85,
                0.80, 0.80, 0.92, 0.67, 0.80,
-               0.20, 0.62, 0.69,
+               0.30, 0.62, 0.69,
                0.59, 0.53, 0.50, 0.56, 0.467, 0.667,
                0.83, 0.53,
                clutchness=0.68, height=76, speed=0.77,
                shot_iq=0.53, archetype='balanced', stamina=0.82),
         Player('Jaylen Brown', 'SF',
-                       0.28, 0.32, 0.30, 0.10, 0.31, 0.62,
+                       0.28, 0.32, 0.30, 0.10, 0.31, 0.84,
                        0.83, 0.92, 0.95, 0.95, 0.79,
-                       0.28, 0.68, 0.72,
+                       0.32, 0.68, 0.72,
                        0.43, 0.51, 0.43, 0.70, 0.933, 0.667,
                        0.92, 0.78,
                        clutchness=0.82, height=78, speed=0.71,
                        shot_iq=0.85, archetype='balanced', stamina=0.85),
         Player('LeBron James', 'PF',
-               0.30, 0.28, 0.30, 0.12, 0.34, 0.27,
-               0.78, 0.85, 0.93, 0.86, 0.76,
-               0.29, 0.99, 0.84,
+               0.30, 0.28, 0.30, 0.12, 0.34, 0.85,
+               0.72, 0.76, 0.88, 0.78, 0.72,
+               0.32, 0.99, 0.84,
                0.75, 0.68, 0.44, 0.74, 0.800, 0.667,
                0.80, 0.82,
                clutchness=0.99, secondary_positions=('PG', 'SG', 'SF'),
@@ -317,9 +317,9 @@ def make_sixers_2027() -> Team:
                height=81, speed=0.76, shot_iq=0.85, iso_tendency=0.34,
                archetype='floor_general', stamina=0.82),
         Player('Joel Embiid', 'C',
-               0.25, 0.19, 0.19, 0.37, 0.57, 0.50,
+               0.25, 0.19, 0.19, 0.37, 0.57, 0.46,
                0.75, 0.90, 0.95, 0.89, 0.85,
-               0.20, 0.68, 0.70,
+               0.18, 0.68, 0.70,
                0.36, 0.73, 0.62, 0.90, 0.990, 0.600,
                0.68, 0.88,
                clutchness=0.80, height=84, speed=0.51,
@@ -391,12 +391,12 @@ def make_sixers_2027() -> Team:
         if player.name == 'Jaylen Brown':
             player.playmaking = 0.48
             player.ball_handle = 0.70
-            player.usage = 0.38
-            player.shot_tendency = 0.62
+            player.usage = 0.32
+            player.shot_tendency = 0.84
             player.target_fga_soft_cap = 18.5
         elif player.name == 'Joel Embiid':
-            player.usage = 0.43
-            player.shot_tendency = 0.63
+            player.usage = 0.18
+            player.shot_tendency = 0.46
             player.target_fga_soft_cap = 18.5
         elif player.name == 'Tyrese Maxey':
             player.usage = 0.36
@@ -404,7 +404,7 @@ def make_sixers_2027() -> Team:
             player.target_fga_soft_cap = 18.5
             add_badge(player, 'catch_shoot', 'gold')
             add_badge(player, 'movement_shooter', 'gold')
-        elif player.name in ('VJ Edgecombe', 'Kentavious Caldwell-Pope', 'Dean Wade', 'Anfernee Simons', 'Justin Edwards'):
+        elif player.name in ('Kentavious Caldwell-Pope', 'Dean Wade', 'Anfernee Simons', 'Justin Edwards'):
             player.shot_tendency = round(player.shot_tendency * 0.80, 3)
     t.init_lineup()
     return t
@@ -666,9 +666,9 @@ def make_wizards_2027() -> Team:
                clutchness=0.62, height=80, speed=0.70,
                shot_iq=0.54, archetype='balanced', stamina=0.77),
         Player('AJ Dybantsa', 'SF',
-               0.28, 0.14, 0.42, 0.06, 0.38, 0.32,
+               0.28, 0.14, 0.42, 0.06, 0.38, 0.60,
                0.74, 0.83, 0.95, 0.85, 0.80,
-               0.22, 0.55, 0.68,
+               0.33, 0.55, 0.68,
                0.55, 0.45, 0.40, 0.60, 0.650, 0.450,
                0.75, 0.50,
                clutchness=0.60, secondary_positions=('PF',), height=81, speed=0.78,
@@ -1975,9 +1975,9 @@ def make_grizzlies_2027() -> Team:
                clutchness=0.500, secondary_positions=('PF',), height=79, speed=0.770,
                shot_iq=0.700, archetype='stretch forward', stamina=0.73),
         Player('Cameron Boozer', 'PF',
-               0.24, 0.24, 0.24, 0.24, 0.32, 0.24,
+               0.24, 0.24, 0.24, 0.24, 0.32, 0.30,
                0.790, 0.810, 0.850, 0.700, 0.790,
-               0.16, 0.667, 0.670,
+               0.24, 0.667, 0.670,
                0.470, 0.410, 0.700, 0.790, 0.680, 0.567,
                0.590, 0.640,
                clutchness=0.650, secondary_positions=('C',), height=81, speed=0.680,
@@ -2903,9 +2903,9 @@ def make_jazz_2027() -> Team:
                clutchness=0.650, secondary_positions=('SG',), height=76, speed=0.790,
                shot_iq=0.850, archetype='scoring guard', stamina=0.78),
         Player('Darryn Peterson', 'SG',
-               0.40, 0.24, 0.28, 0.02, 0.24, 0.26,
+               0.40, 0.24, 0.28, 0.02, 0.24, 0.34,
                0.810, 0.830, 0.830, 0.850, 0.830,
-               0.18, 0.630, 0.860,
+               0.26, 0.630, 0.860,
                0.690, 0.420, 0.390, 0.490, 0.720, 0.467,
                0.730, 0.490,
                clutchness=0.650, secondary_positions=('PG',), height=78, speed=0.840,

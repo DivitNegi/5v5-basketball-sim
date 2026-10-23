@@ -14,49 +14,31 @@ and wrap_factories() applies it every time a make_*_YYYY team is built.
 import functools
 
 OVERRIDES = {
+    # Only attempt ROLES live here (shots per game, keep-the-possession-when-behind-pace, how often a player swings it instead of
+    # shooting). Every rating and tendency is in the team files (teams/teams_YYYY.py), so the row you edit by hand is the value used.
     "2018 Boston Celtics": {
-        # Kyrie's ratings are in teams/teams_2018.py; this keeps only his attempt role (~18 shots a night, no extra pace-keeping).
+        # Kyrie: ~18 shots a night, no extra pace-keeping.
         "Kyrie Irving": {"target_fga_soft_cap": 19.0, "target_fga_per_game": 18.0, "target_fga_precision": 0.9, "keep_pace_shots": False},
     },
     "2018 Houston Rockets": {
-        # Harden's ratings are calibrated in teams/teams_2018.py; this keeps only his attempt role:
-        # 30+ a night on ~23 shots that keep the possession when behind pace.
+        # Harden: 30+ a night on ~23 shots that keep the possession when behind pace.
         "James Harden": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
     "2020 Houston Rockets": {
-        # Harden's 2019-20 scoring title: ~34 points on ~23 shots and 11+ free throws. His hand-entered row had him
-        # at a 0.30 usage / 0.64 foul draw / 0.40 shot IQ, which left him at ~19 points.
-        "James Harden": {"usage": 0.45, "shot_tendency": 0.95, "foul_draw": 0.95, "shot_iq": 0.62, "three_rating": 0.91,
-                         "target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
-    },
-    "2027 Philadelphia 76ers": {
-        # Scoring order: Maxey first option (~26), Jaylen Brown second (~20), Embiid third (~19), LeBron fourth (~17).
-        # Maxey brings the ball up (see SIXERS_2027_MAXEY_HANDLER_SHARE); LeBron stays pass-first (~9 assists) but shoots
-        # ~13 times a night at a lower efficiency than his hand-entered ratings gave (63% FG / 70 TS% on 8 shots).
-        "Tyrese Maxey": {"target_fga_soft_cap": 29.0, "target_fga_per_game": 27.0, "target_fga_precision": 0.7, "keep_pace_shots": True},
-        "Jaylen Brown": {"shot_tendency": 0.84, "usage": 0.32, "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
-        # VJ Edgecombe is a real third-wing option: ~9-10 shots a night (he took ~5 with his hand-entered tendencies).
-        "VJ Edgecombe": {"shot_tendency": 0.85, "usage": 0.30, "target_fga_soft_cap": 16.0, "target_fga_per_game": 14.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
-        "Joel Embiid": {"shot_tendency": 0.46, "usage": 0.18, "target_fga_soft_cap": 14.0, "target_fga_per_game": 12.0, "target_fga_precision": 0.6},
-        "LeBron James": {"shot_tendency": 0.85, "usage": 0.32, "extra_pass_scale": 0.6,
-                         "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 1.0, "keep_pace_shots": True,
-                         "rim_rating": 0.88, "dunk_rating": 0.78, "mid_rating": 0.76, "three_rating": 0.72, "ft_rating": 0.72},
-    },
-    # 2027 rookie class shot volume (tendencies only, no caps): Peterson ~14 shots, Boozer ~15, AJ Dybantsa ~15.
-    "2027 Utah Jazz": {
-        "Darryn Peterson": {"shot_tendency": 0.34, "usage": 0.26},
-    },
-    "2027 Memphis Grizzlies": {
-        "Cameron Boozer": {"shot_tendency": 0.30, "usage": 0.24},
-    },
-    "2027 Washington Wizards": {
-        "AJ Dybantsa": {"shot_tendency": 0.60, "usage": 0.33},
+        # Harden's 2019-20 scoring title: ~34 points on ~23 shots and 11+ free throws.
+        "James Harden": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 23.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
     "2024 Dallas Mavericks": {
-        # Volume (usage / shot_tendency / three_tendency) is left to the hand-entered row; he takes ~23 shots a night.
-        "Luka Dončić": {"block": 0.67, "dreb": 0.96, "dunk_rating": 0.93, "ft_rating": 0.784, "mid_rating": 0.99, "oreb": 0.617, "playmaking": 0.80, "foul_draw": 0.80, "rim_rating": 0.99, "steal": 0.77, "three_rating": 0.84,
-                        # ~23 shots a night: an explicit attempt role plus opt-in "keep the possession when behind pace".
-                        "target_fga_soft_cap": 25.0, "target_fga_per_game": 22.6, "target_fga_precision": 1.0, "keep_pace_shots": True},
+        # Luka: ~23 shots a night, with opt-in "keep the possession when behind pace".
+        "Luka Dončić": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 22.6, "target_fga_precision": 1.0, "keep_pace_shots": True},
+    },
+    "2027 Philadelphia 76ers": {
+        # Scoring order: Maxey (~26), Jaylen Brown (~20), Embiid (~18), LeBron (~17, pass-first), VJ Edgecombe (~9-10 shots).
+        "Tyrese Maxey": {"target_fga_soft_cap": 29.0, "target_fga_per_game": 27.0, "target_fga_precision": 0.7, "keep_pace_shots": True},
+        "Jaylen Brown": {"target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
+        "Joel Embiid": {"target_fga_soft_cap": 14.0, "target_fga_per_game": 12.0, "target_fga_precision": 0.6},
+        "LeBron James": {"extra_pass_scale": 0.6, "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
+        "VJ Edgecombe": {"target_fga_soft_cap": 16.0, "target_fga_per_game": 14.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
 }
 
