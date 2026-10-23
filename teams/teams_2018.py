@@ -297,6 +297,13 @@ def make_celtics_2018() -> Team:
                0.36, 0.48, 0.46, 0.67, 0.667, 0.800,
                0.92, 0.57, stamina=0.87),
 
+        Player("Gordon Hayward", "SF",
+               0.34, 0.34, 0.22, 0.10, 0.18, 0.220,
+               0.80, 0.92, 0.90, 0.70, 0.82,
+               0.229, 0.62, 0.62,
+               0.66, 0.50, 0.40, 0.60, 0.533, 0.600,
+               0.84, 0.56, stamina=0.62),
+
         Player("Jayson Tatum", "SF",
                0.16, 0.32, 0.22, 0.08, 0.30, 0.299,
                0.91, 0.87, 0.89, 0.76, 0.81,
@@ -341,13 +348,6 @@ def make_celtics_2018() -> Team:
                0.43, 0.46, 0.55, 0.68, 0.600, 0.800,
                0.69, 0.58, stamina=0.76),
 
-        Player("Gordon Hayward", "SF",
-               0.34, 0.34, 0.22, 0.10, 0.18, 0.220,
-               0.80, 0.92, 0.90, 0.70, 0.82,
-               0.229, 0.62, 0.62,
-               0.66, 0.50, 0.40, 0.60, 0.533, 0.600,
-               0.84, 0.56, stamina=0.62),
-
         Player("Daniel Theis", "C",
                0.12, 0.18, 0.34, 0.36, 0.40, 0.087,
                0.64, 0.93, 0.92, 0.93, 0.74,
@@ -357,7 +357,7 @@ def make_celtics_2018() -> Team:
     ]
     # Real 2017-18 per-game minutes (scaled to a 240-minute game); the inputs are fitted so the engine's rotation lands on them.
     # Ratings were calibrated by simulating full seasons until each player's per-minute line matched his real one.
-    return _team("2018 Boston Celtics", players, (13.0, 5.7, 2.8, 2.0, 4.1, 44.0, 44.0, 42.2, 2.0, 9.7))
+    return _team("2018 Boston Celtics", players, (31.8, 22.6, 36.4, 23.5, 20.1, 36.7, 18.8, 17.9, 16.5, 8.4))
 
 
 def make_raptors_2018() -> Team:
