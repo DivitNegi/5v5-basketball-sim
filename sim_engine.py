@@ -21662,6 +21662,8 @@ def fantasy_block_rating(player: Player) -> float:
     return max(0.0, min(100.0, player.block * 100.0))
 
 
+FOUL_DRAW_SMALL_PER_POINT = 0.03   # overall points per foul-draw point between 70 and 90 (0.6 at 90)
+FOUL_DRAW_BIG_PER_POINT = 0.35     # per point above 90 (about +4.2 in total at 99)
 CENTER_RAW_FOR_99 = 97.4          # raw score of a peak, all-99-core center (Shaq 2001): that is a 99 with no special case
 CENTER_STRETCH_SLOPE = 1.9        # overall points per raw point below that, down to CENTER_STRETCH_FLOOR
 CENTER_TOP_TIER = 94.0            # above this a center is limited by his core rating (see center_core_path)
@@ -21904,11 +21906,13 @@ def fantasy_ovr(player: Player) -> int:
         elif pl >= 82 and handle >= 86 and creator_scoring_peak >= 90:
             raw += 0.5
 
-    # Drawing fouls only helps, and only for genuine foul-drawers (85+);
-    # an ordinary or poor foul-drawer is neither rewarded nor penalized.
+    # Drawing fouls only ever helps. Up to a 90 it is a small plus; from 90 up it is a big one (a 99 foul-drawer, a Harden or
+    # a Westbrook at his peak, is worth about 4 overall points). An ordinary or poor foul-drawer is neither rewarded nor penalized.
     foul_draw_value = player.foul_draw * 100
-    if foul_draw_value > 85:
-        raw += min(2.2, 0.15 * (foul_draw_value - 85))
+    if foul_draw_value > 70:
+        raw += (min(foul_draw_value, 90.0) - 70.0) * FOUL_DRAW_SMALL_PER_POINT
+        if foul_draw_value > 90:
+            raw += (foul_draw_value - 90.0) * FOUL_DRAW_BIG_PER_POINT
 
     # Score-first guards (elite scoring at all three levels plus an elite
     # handle) were being marked down just for not being playmakers: the
@@ -23206,8 +23210,8 @@ _RACE_QUALITY_CACHE: Dict = {}   # (team, player) -> (games, quality_defended re
 
 
 REL_TS_WEIGHT = 0.6        # weight of true shooting relative to position in the season awards
-ADV_BPM_WEIGHT = 0.8       # advanced numbers: box plus/minus, points of award score per point of BPM
-DEF_IMPACT_WEIGHT = 0.8    # defense: extra weight on the defensive half of BPM (on top of steals and blocks)
+ADV_BPM_WEIGHT = 0.5       # advanced numbers: box plus/minus, points of award score per point of BPM
+DEF_IMPACT_WEIGHT = 0.5    # defense: extra weight on the defensive half of BPM (on top of steals and blocks)
 
 
 def build_season_sections(entries: List[Dict],
@@ -23348,10 +23352,31 @@ def build_season_sections(entries: List[Dict],
             made = sum(int(diet.get(f"{key}_made", 0) or 0) for key in core_keys)
             return made, attempts
 
+        _opponent_cache: Dict = {}
+
+        def season_opponent_for(team_name: str) -> Dict:
+            """The league-average opponent of this team over its games (every other team, scaled to his games).
+            This used to be whichever team happened to come first in the dict, which skewed every advanced number."""
+            cached = _opponent_cache.get(team_name)
+            if cached is not None:
+                return cached
+            team = series_team_totals.get(team_name, {})
+            others = [t for n, t in series_team_totals.items() if n != team_name and t.get("games", 0) > 0]
+            if not team or not others:
+                return team
+            avg_games = sum(t["games"] for t in others) / len(others)
+            scale = team.get("games", 0) / max(1.0, avg_games)
+            opp = {
+                key: sum(t.get(key, 0) for t in others) / len(others) * scale
+                for key, value in team.items() if isinstance(value, (int, float))
+            }
+            opp["games"] = team.get("games", 0)
+            _opponent_cache[team_name] = opp
+            return opp
+
         def season_advanced_for(team_name: str, stats: Dict) -> Tuple:
             team = series_team_totals.get(team_name, {})
-            opp_name = next((name for name in series_team_totals if name != team_name), None)
-            opp = series_team_totals.get(opp_name, team)
+            opp = season_opponent_for(team_name)
             if not team or not opp:
                 return (0.0,) * 25
             return calc_series_advanced(stats, team, opp)
