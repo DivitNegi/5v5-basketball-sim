@@ -8350,23 +8350,28 @@ QUARTER_STARTER_SWAPS = {
     "2027 Dallas Mavericks": ("Dereck Lively II", "Daniel Gafford", (2, 3, 4)),
     "2027 New York Knicks": ("Karl-Anthony Towns", "Andre Drummond", (2, 4)),
     "2027 Denver Nuggets": ("Christian Braun", "DeMar DeRozan", (2, 4)),
-    "2027 Boston Celtics": ("Baylor Scheierman", "Payton Pritchard", (2, 4)),
+    "2027 Boston Celtics": (
+        ("Jordan Walsh", "Payton Pritchard", (2, 4)),
+        ("Mitchell Robinson", "Neemias Queta", (2, 4)),
+    ),
 }
 
 
 def apply_quarter_starter_swaps(team: Team, period: int):
-    swap = QUARTER_STARTER_SWAPS.get(team.name)
-    if not swap:
+    swaps = QUARTER_STARTER_SWAPS.get(team.name)
+    if not swaps:
         return
-    starter_name, backup_name, quarters = swap
-    starter = next((p for p in team.roster if p.name == starter_name), None)
-    backup = next((p for p in team.roster if p.name == backup_name), None)
-    if starter is None or backup is None:
-        return
-    if period in quarters:
-        starter.is_starter, backup.is_starter = False, True
-    else:
-        starter.is_starter, backup.is_starter = True, False
+    if isinstance(swaps[0], str):
+        swaps = (swaps,)   # a single (starter, backup, quarters) entry
+    for starter_name, backup_name, quarters in swaps:
+        starter = next((p for p in team.roster if p.name == starter_name), None)
+        backup = next((p for p in team.roster if p.name == backup_name), None)
+        if starter is None or backup is None:
+            continue
+        if period in quarters:
+            starter.is_starter, backup.is_starter = False, True
+        else:
+            starter.is_starter, backup.is_starter = True, False
 
 
 def normalize_minute_targets(team: Team, game_minutes: int = 240):
@@ -8784,11 +8789,11 @@ def _initialize_minute_targets_core(team: Team):
 
     if team.name == "2027 Boston Celtics":
         target_ranges = {
-            "Derrick White": (30, 34), "Baylor Scheierman": (20, 24),
+            "Derrick White": (30, 34), "Baylor Scheierman": (23, 27),
             "Paul George": (30, 34), "Jayson Tatum": (36, 40),
-            "Neemias Queta": (22, 26), "Mitchell Robinson": (22, 27),
-            "Payton Pritchard": (26, 30), "Jordan Walsh": (12, 18),
-            "Ron Harper Jr.": (4, 8), "Hugo Gonzalez": (6, 10),
+            "Neemias Queta": (23, 27), "Mitchell Robinson": (22, 27),
+            "Payton Pritchard": (26, 30), "Jordan Walsh": (9, 14),
+            "Ron Harper Jr.": (2, 6), "Hugo Gonzalez": (5, 8),
             "Sam Hauser": (10, 14),
         }
         for p in team.roster:
