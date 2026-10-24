@@ -1931,6 +1931,19 @@ def run_gui_app():
 
     rotation_tree = build_conference_tree(0, "EASTERN CONFERENCE")
     rotation_tree_west = build_conference_tree(1, "WESTERN CONFERENCE")
+
+    def open_team_schedule(event):
+        """Click a team in the standings to see its games in the Sched tab."""
+        iid = event.widget.identify_row(event.y)
+        if not iid or not iid.startswith("team|"):
+            return
+        team = iid[len("team|"):]
+        schedule_team_var.set(team)   # update_schedule_table falls back to All Teams if the schedule has no such team yet
+        update_schedule_table(playoff_sections_state.get("sections") or {})
+        series_tabs.select(schedule_frame)
+
+    for _standings_tree in (rotation_tree, rotation_tree_west):
+        _standings_tree.bind("<ButtonRelease-1>", open_team_schedule)
     tk.Label(
         rotation_widget_frame, textvariable=rotation_status_var, bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11), anchor="w",
     ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(6, 0))
@@ -4671,6 +4684,14 @@ def run_gui_app():
         team_filter = schedule_team_var.get()
         order = schedule_order_var.get()
         top = season_game_top_scorers(sections)
+        by_team = team_filter != "All Teams" or order == "Group by team (A-Z)"
+        schedule_tree.heading("home", text="Team" if by_team else "Home")
+        schedule_tree.heading("away", text="Opponent" if by_team else "Away")
+        team_game_no = {}   # (team, gid) -> that team's own game number
+        if by_team:
+            for team in teams:
+                for number, game in enumerate(sorted((g for g in games if team in (g["home"], g["away"])), key=lambda g: g["order"]), start=1):
+                    team_game_no[(team, game["gid"])] = number
 
         def row_values(game, perspective=None):
             hs, as_ = game["home_score"], game["away_score"]
@@ -4679,6 +4700,15 @@ def run_gui_app():
             result = ""
             if perspective:
                 result = ("W " if winner == perspective else "L ") + (f"{max(hs, as_)}-{min(hs, as_)}")
+                # the team being viewed is always on the left, its opponent on the right, regardless of home or away
+                at_home = game["home"] == perspective
+                own, other = (hs, as_) if at_home else (as_, hs)
+                opponent = game["away"] if at_home else game["home"]
+                return (
+                    team_game_no.get((perspective, game["gid"]), game["order"]), table_player_name(perspective, 30), f"{own} - {other}",
+                    table_player_name(opponent, 30), table_player_name(winner, 30), abs(hs - as_),
+                    f"{scorer[0]} ({scorer[1]})" if scorer else "", result,
+                )
             return (
                 game["order"], table_player_name(game["home"], 30), f"{hs} - {as_}", table_player_name(game["away"], 30),
                 table_player_name(winner, 30), abs(hs - as_),
@@ -5605,7 +5635,7 @@ def run_gui_app():
                     gb = ((lead_w - w) + (l - lead_l)) / 2
                     tag = ("playin",) if (standings_play_in and 7 <= seed <= 10) else (("out",) if seed > (10 if standings_play_in else 8) else ())
                     tree.insert(
-                        "", "end",
+                        "", "end", iid="team|" + row.get("team", ""),
                         values=(
                             seed, table_player_name(row.get("team", ""), 30), w, l, f"{w / games:.3f}",
                             "-" if gb <= 0 else f"{gb:.1f}", f"{row.get('diff', 0):+.1f}",
