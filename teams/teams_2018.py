@@ -370,10 +370,10 @@ def make_raptors_2018() -> Team:
                0.86, 0.48,
                clutchness=0.82, stamina=0.68),
         Player("DeMar DeRozan", "SG",
-               0.26, 0.42, 0.32, 0.12, 0.34, 0.557,
-               0.70, 0.99, 0.85, 0.81, 0.81,
-               0.303, 0.64, 0.78,
-               0.70, 0.46, 0.41, 0.56, 0.990, 0.733,
+               0.26, 0.42, 0.32, 0.12, 0.34, 0.53,
+               0.84, 0.90, 0.85, 0.81, 0.81,
+               0.28, 0.64, 0.78,
+               0.70, 0.46, 0.41, 0.56, 0.92, 0.733,
                0.66, 0.60,
                clutchness=0.82, stamina=0.78),
         Player("OG Anunoby", "SF",
@@ -395,15 +395,15 @@ def make_raptors_2018() -> Team:
                0.37, 0.75, 0.75, 0.85, 0.733, 0.933,
                0.43, 0.75, stamina=0.62),
         Player("Fred VanVleet", "PG",
-               0.25, 0.24, 0.20, 0.06, 0.04, 0.399,
-               0.92, 0.73, 0.67, 0.50, 0.81,
+               0.25, 0.08, 0.20, 0.06, 0.04, 0.35,
+               0.97, 0.73, 0.74, 0.50, 0.81,
                0.227, 0.65, 0.70,
                0.65, 0.59, 0.43, 0.59, 0.467, 0.667,
                0.80, 0.27, stamina=0.82),
         Player("Pascal Siakam", "PF",
-               0.12, 0.24, 0.38, 0.26, 0.46, 0.159,
-               0.66, 0.92, 0.91, 0.93, 0.68,
-               0.189, 0.78, 0.58,
+               0.65, 0.24, 0.38, 0.26, 0.46, 0.24,
+               0.66, 0.78, 0.86, 0.93, 0.68,
+               0.21, 0.78, 0.58,
                0.57, 0.72, 0.46, 0.63, 0.733, 0.800,
                0.79, 0.67, stamina=0.83),
         Player("Delon Wright", "PG",
@@ -427,7 +427,7 @@ def make_raptors_2018() -> Team:
     ]
     # Real 2017-18 per-game minutes (scaled to a 240-minute game); the inputs are fitted so the engine's rotation lands on them.
     # Ratings were calibrated by simulating full seasons until each player's per-minute line matched his real one.
-    return _team("2018 Toronto Raptors", players, (24.9, 27.4, 11.0, 17.1, 11.8, 15.9, 10.6, 29.6, 44.0, 11.4))
+    return _team("2018 Toronto Raptors", players, (18.4, 21.6, 6.2, 8.6, 4.6, 6.4, 11.0, 14.7, 20.0, 5.2))
 
 
 def make_pelicans_2018() -> Team:
