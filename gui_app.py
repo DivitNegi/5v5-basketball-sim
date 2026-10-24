@@ -1853,6 +1853,9 @@ def run_gui_app():
     schedule_order_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 16))
     schedule_count_var = tk.StringVar(value="")
     ttk.Label(schedule_top, textvariable=schedule_count_var).grid(row=0, column=4, sticky="w")
+    schedule_back_to_standings = ttk.Button(schedule_top, text="<  Back to standings")
+    schedule_back_to_standings.grid(row=0, column=5, sticky="w", padx=(16, 0))
+    schedule_back_to_standings.grid_remove()   # only shown after jumping here from a standings row
     schedule_columns = ("num", "home", "score", "away", "winner", "margin", "top", "result")
     schedule_tree = ttk.Treeview(schedule_frame, columns=schedule_columns, show="headings", height=14, style="Series.Treeview")
     schedule_scroll_y = ttk.Scrollbar(schedule_frame, orient="vertical", command=schedule_tree.yview)
@@ -1940,10 +1943,17 @@ def run_gui_app():
         team = iid[len("team|"):]
         schedule_team_var.set(team)   # update_schedule_table falls back to All Teams if the schedule has no such team yet
         update_schedule_table(playoff_sections_state.get("sections") or {})
+        schedule_back_to_standings.grid()
         series_tabs.select(schedule_frame)
 
     for _standings_tree in (rotation_tree, rotation_tree_west):
         _standings_tree.bind("<ButtonRelease-1>", open_team_schedule)
+
+    def back_to_standings():
+        schedule_back_to_standings.grid_remove()
+        series_tabs.select(rotation_widget_frame)
+
+    schedule_back_to_standings.configure(command=back_to_standings)
     tk.Label(
         rotation_widget_frame, textvariable=rotation_status_var, bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11), anchor="w",
     ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(6, 0))
