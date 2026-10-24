@@ -1905,6 +1905,7 @@ def run_gui_app():
     rotation_widget_frame.rowconfigure(1, weight=1)
     rotation_columns = ("seed", "team", "w", "l", "pct", "gb", "diff", "pf", "pa", "str")
     live_standings = {"rows": [], "completed": 0, "total": 0, "dirty": False}
+    trade_dialog = {"win": None}
     rotation_status_var = tk.StringVar(value="")
 
     def build_conference_tree(column: int, title: str):
@@ -1928,6 +1929,7 @@ def run_gui_app():
         tree.tag_configure("playin", foreground="#fbbf24")
         tree.tag_configure("out", foreground="#94a3b8")
         tree.tag_configure("line", foreground="#64748b")
+        tree.tag_configure("mine", foreground=GOLD, background=CARD_ALT, font=("Segoe UI", 10, "bold"))   # your fantasy team
         tree.grid(row=0, column=0, sticky="nsew")
         scroll.grid(row=0, column=1, sticky="ns")
         return tree
@@ -5630,6 +5632,7 @@ def run_gui_app():
         final = (playoff_sections_state.get("sections") or {}).get("_season_standings") or []
         rows_all = final or live_standings["rows"]
         standings_play_in = getattr(_players_data_module, "POSTSEASON_PLAY_IN", True)
+        my_team = sim_engine.FANTASY_TRADE_STATE.get("user_team")   # in a fantasy season, your franchise is highlighted
         if rows_all:
             for conference, tree in (("East", rotation_tree), ("West", rotation_tree_west)):
                 rows = sorted(
@@ -5644,10 +5647,13 @@ def run_gui_app():
                     games = max(1, w + l)
                     gb = ((lead_w - w) + (l - lead_l)) / 2
                     tag = ("playin",) if (standings_play_in and 7 <= seed <= 10) else (("out",) if seed > (10 if standings_play_in else 8) else ())
+                    is_mine = bool(my_team) and row.get("team") == my_team
+                    if is_mine:
+                        tag = tag + ("mine",)
                     tree.insert(
                         "", "end", iid="team|" + row.get("team", ""),
                         values=(
-                            seed, table_player_name(row.get("team", ""), 30), w, l, f"{w / games:.3f}",
+                            seed, ("\u2605 " if is_mine else "") + table_player_name(row.get("team", ""), 30), w, l, f"{w / games:.3f}",
                             "-" if gb <= 0 else f"{gb:.1f}", f"{row.get('diff', 0):+.1f}",
                             f"{row.get('pf', 0):.1f}", f"{row.get('pa', 0):.1f}", f"{row.get('strength', 0):.1f}",
                         ),
@@ -8343,6 +8349,164 @@ def run_gui_app():
         pool_list.bind("<<ListboxSelect>>", select_pool_player)
         refresh_pool()
 
+    def open_trade_dialog():
+        """Fantasy trades: pause the season, then trade with any AI team. The AI accepts a good deal, explains a refusal, and sometimes counters."""
+        state = sim_engine.FANTASY_TRADE_STATE
+        if not sim_engine.fantasy_trade_available():
+            status_var.set("Trades are only available in the fantasy season modes, after the draft.")
+            return
+        if running["active"] and not sim_engine.SIM_PAUSED:
+            status_var.set("Pause the season first, then open Trade.")
+            return
+        existing = trade_dialog.get("win")
+        if existing is not None:
+            try:
+                existing.lift()
+                existing.focus_force()
+                return
+            except tk.TclError:
+                trade_dialog["win"] = None
+        user_team = state["user_team"]
+        ai_teams = sorted(name for name in state["factories"] if name != user_team)
+        dialog = tk.Toplevel(root)
+        trade_dialog["win"] = dialog
+        dialog.title(f"Trade - {user_team}")
+        dialog.geometry("1100x760")
+        dialog.configure(bg=APP_BG)
+        dialog.transient(root)
+        dialog.protocol("WM_DELETE_WINDOW", lambda: (trade_dialog.update(win=None), dialog.destroy()))
+
+        partner_var = tk.StringVar(value=ai_teams[0])
+        note_var = tk.StringVar(value="Select the players you give (left) and the players you want (right), then press Propose.")
+        proposal = {"counter": None}
+
+        top = ttk.Frame(dialog, padding=10)
+        top.pack(fill="x")
+        ttk.Label(top, text="Trade with").grid(row=0, column=0, padx=(0, 8), sticky="w")
+        partner_box = ttk.Combobox(top, textvariable=partner_var, values=ai_teams, state="readonly", width=34)
+        partner_box.grid(row=0, column=1, padx=(0, 14), sticky="w")
+        ttk.Label(top, textvariable=note_var, foreground=GOLD, wraplength=720, justify="left").grid(row=0, column=2, sticky="w")
+        top.columnconfigure(2, weight=1)
+
+        body = ttk.Frame(dialog, padding=(10, 0, 10, 0))
+        body.pack(fill="both", expand=True)
+        body.columnconfigure(0, weight=1, uniform="trade")
+        body.columnconfigure(1, weight=1, uniform="trade")
+        body.rowconfigure(1, weight=1)
+        left_title, right_title = tk.StringVar(), tk.StringVar()
+        ttk.Label(body, textvariable=left_title, font=("Segoe UI", 12, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(body, textvariable=right_title, font=("Segoe UI", 12, "bold")).grid(row=0, column=1, sticky="w", pady=(0, 4), padx=(10, 0))
+
+        def roster_tree(column):
+            holder = ttk.Frame(body)
+            holder.grid(row=1, column=column, sticky="nsew", padx=(0, 6) if column == 0 else (6, 0))
+            holder.columnconfigure(0, weight=1)
+            holder.rowconfigure(0, weight=1)
+            tree = ttk.Treeview(holder, columns=("pos", "ovr", "name"), show="headings", height=14, style="Series.Treeview", selectmode="extended")
+            for col, label, width, anchor in (("pos", "Pos", 56, "center"), ("ovr", "OVR", 60, "center"), ("name", "Player", 330, "w")):
+                tree.heading(col, text=label)
+                tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col == "name")
+            scroll = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
+            tree.configure(yscrollcommand=scroll.set)
+            tree.grid(row=0, column=0, sticky="nsew")
+            scroll.grid(row=0, column=1, sticky="ns")
+            return tree
+
+        mine_tree = roster_tree(0)
+        theirs_tree = roster_tree(1)
+
+        response = tk.Text(dialog, height=9, wrap="word", bg=PANEL, fg=TEXT, relief="flat", font=("Segoe UI", 11), padx=10, pady=8)
+        response.pack(fill="x", padx=10, pady=(10, 0))
+        response.tag_configure("accept", foreground="#4ade80", font=("Segoe UI", 12, "bold"))
+        response.tag_configure("reject", foreground="#f87171", font=("Segoe UI", 12, "bold"))
+        response.tag_configure("counter", foreground=GOLD, font=("Segoe UI", 12, "bold"))
+        response.configure(state="disabled")
+
+        buttons = ttk.Frame(dialog, padding=10)
+        buttons.pack(fill="x")
+        propose_button = ttk.Button(buttons, text="Propose trade")
+        propose_button.grid(row=0, column=0, padx=(0, 10))
+        accept_counter_button = ttk.Button(buttons, text="Accept counter-offer")
+        accept_counter_button.grid(row=0, column=1, padx=(0, 10))
+        accept_counter_button.grid_remove()
+        history_var = tk.StringVar(value="")
+        ttk.Label(buttons, textvariable=history_var, foreground=MUTED, wraplength=560, justify="left").grid(row=0, column=2, sticky="w", padx=(10, 0))
+        ttk.Button(buttons, text="Close", command=lambda: (trade_dialog.update(win=None), dialog.destroy())).grid(row=0, column=3, padx=(10, 0), sticky="e")
+        buttons.columnconfigure(2, weight=1)
+
+        def show_response(headline, tag, lines):
+            response.configure(state="normal")
+            response.delete("1.0", "end")
+            response.insert("end", headline + "\n", tag)
+            for line in lines:
+                response.insert("end", "  - " + line + "\n")
+            response.configure(state="disabled")
+
+        def fill(tree, team_name):
+            tree.delete(*tree.get_children())
+            roster = sorted(sim_engine.fantasy_trade_roster(team_name), key=sim_engine.fantasy_ovr, reverse=True)
+            for player in roster:
+                tree.insert("", "end", iid=player.name, values=(player.position, sim_engine.fantasy_ovr(player), player.name))
+
+        def refresh_rosters():
+            partner = partner_var.get()
+            left_title.set(f"{user_team} (you)")
+            right_title.set(partner)
+            fill(mine_tree, user_team)
+            fill(theirs_tree, partner)
+            proposal["counter"] = None
+            accept_counter_button.grid_remove()
+            history = sim_engine.FANTASY_TRADE_STATE["log"]
+            history_var.set("Trades so far: " + "; ".join(f"{', '.join(t['user_gives'])} to {t['ai_team']} for {', '.join(t['ai_gives'])}" for t in history) if history else "")
+
+        def finish(ai_team, give, get):
+            result = sim_engine.fantasy_trade_submit(ai_team, give, get)
+            if not result.get("ok"):
+                show_response("The trade could not be completed.", "reject", [result.get("error") or "Unknown error."])
+                return False
+            when = result.get("effective_order")
+            note_var.set(
+                f"Trade done. Your new roster plays from game {when + 1} on (games already handed out keep the old roster)." if when is not None
+                else "Trade done. The new rosters are set for the playoffs."
+            )
+            refresh_rosters()
+            return True
+
+        def propose():
+            give, get = list(mine_tree.selection()), list(theirs_tree.selection())
+            partner = partner_var.get()
+            outcome = sim_engine.evaluate_fantasy_trade(partner, give, get)
+            proposal["counter"] = None
+            accept_counter_button.grid_remove()
+            decision = outcome["decision"]
+            if decision == "accept":
+                if finish(partner, give, get):
+                    show_response(outcome["headline"], "accept", outcome["reasons"] + [f"Trade completed: you send {', '.join(give)} and receive {', '.join(get)}."])
+            elif decision == "counter":
+                proposal["counter"] = outcome["counter"]
+                show_response(outcome["headline"], "counter", outcome["reasons"])
+                accept_counter_button.grid()
+            else:
+                show_response(outcome["headline"], "reject", outcome["reasons"])
+
+        def accept_counter():
+            counter = proposal.get("counter")
+            if not counter:
+                return
+            partner = partner_var.get()
+            outcome = sim_engine.evaluate_fantasy_trade(partner, counter["user_gives"], counter["ai_gives"], allow_counter=False)
+            if outcome["decision"] != "accept":
+                show_response("That counter is no longer available.", "reject", outcome["reasons"])
+                return
+            if finish(partner, counter["user_gives"], counter["ai_gives"]):
+                show_response("Deal. We accept.", "accept", [f"Trade completed: you send {', '.join(counter['user_gives'])} and receive {', '.join(counter['ai_gives'])}."])
+
+        propose_button.configure(command=propose)
+        accept_counter_button.configure(command=accept_counter)
+        partner_box.bind("<<ComboboxSelected>>", lambda _event: (refresh_rosters(), show_response("Pick players on both sides.", "counter", [])))
+        refresh_rosters()
+        show_response("Pick players on both sides.", "counter", ["The AI accepts a deal that helps its rotation, explains a refusal, and sometimes counters a close one."])
+
     def open_roster_swap_dialog():
         if running["active"]:
             status_var.set("Finish or clear the current sim before changing rosters.")
@@ -9309,6 +9473,7 @@ def run_gui_app():
         )
         next_button.configure(state="disabled")
         live_standings.update(rows=[], completed=0, total=0, dirty=False)
+        sim_engine.fantasy_trade_setup(None, None)   # the fantasy draft sets this again; other modes have no user franchise
         bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False, box_open=False)
         bracket_box_frame.grid_remove()
         bracket_avg_frame.grid_remove()
@@ -9716,6 +9881,7 @@ def run_gui_app():
     ttk.Button(controls, text="Create Player", command=open_create_player_dialog).grid(row=3, column=0, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Edit Player", command=open_edit_player_picker).grid(row=3, column=2, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Play 1-on-1", command=open_1v1_player_picker).grid(row=3, column=4, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
+    ttk.Button(controls, text="Trade", command=open_trade_dialog).grid(row=3, column=6, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Sim Series", command=lambda: gui_sim_stage("series")).grid(row=4, column=0, columnspan=3, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Sim All Playoffs", command=lambda: gui_sim_stage("playoffs")).grid(row=4, column=3, columnspan=3, padx=(0, 6), pady=(6, 0), sticky="ew")
     next_button = ttk.Button(controls, text="Next: Play-in & Playoffs", state="disabled", command=lambda: start_sim("2027 play-in & playoffs"))

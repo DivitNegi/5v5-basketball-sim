@@ -22741,7 +22741,234 @@ def make_fantasy_team_factory(team_name: str, drafted_players: List[Player], use
         build_best_lineup_by_overall(team)
         return team
 
+    factory.drafted_players = drafted_players   # trades edit this list in place
     return factory
+
+
+# ============================================================
+# FANTASY TRADES
+# ============================================================
+# During a fantasy season the user can pause and trade with any AI team. The AI judges a deal by how much it changes its own
+# rotation (top ten players, weighted by rank, with value growing steeply with overall, so a star is worth more than two good
+# players) and by whether it would be left thin at guard or big. It accepts a good deal, turns down a bad one with the reasons,
+# and sometimes counters a close one by asking for one more player or by offering less.
+FANTASY_TRADE_STATE: Dict = {"user_team": None, "factories": None, "pending": [], "active": False, "next_order": 0, "hook": None, "log": []}
+FANTASY_TRADE_MIN_ROSTER = 9
+FANTASY_TRADE_MAX_ROSTER = 14
+FANTASY_TRADE_ROTATION_WEIGHTS = (1.0, 1.0, 1.0, 1.0, 1.0, 0.85, 0.7, 0.5, 0.35, 0.2)
+FANTASY_TRADE_ACCEPT_NET = 0.01      # the AI's rotation value must not fall (plus a little for itself)
+FANTASY_TRADE_COUNTER_NET = -0.08    # a deal this close gets a counter-offer instead of a flat no
+FANTASY_TRADE_GROUP_NAMES = {"G": "guards", "W": "wings", "B": "bigs"}
+
+
+def fantasy_trade_setup(user_team: str, factories: Dict[str, object]):
+    FANTASY_TRADE_STATE.update(user_team=user_team, factories=factories, pending=[], active=False, next_order=0, hook=None, log=[])
+
+
+def fantasy_trade_roster(team_name: str) -> List[Player]:
+    """The live drafted roster of a fantasy team (the same list its factory builds games from)."""
+    factory = (FANTASY_TRADE_STATE.get("factories") or {}).get(team_name)
+    return getattr(factory, "drafted_players", [])
+
+
+def fantasy_trade_available() -> bool:
+    return bool(FANTASY_TRADE_STATE.get("user_team")) and bool(FANTASY_TRADE_STATE.get("factories"))
+
+
+def fantasy_trade_value(player: Player) -> float:
+    return 1.12 ** (fantasy_ovr(player) - 60)
+
+
+def fantasy_trade_group(player: Player) -> str:
+    pos = str(player.position).upper()
+    return "G" if pos in ("PG", "SG") else ("W" if pos == "SF" else "B")
+
+
+def fantasy_trade_rotation_value(players: List[Player]) -> float:
+    ranked = sorted(players, key=fantasy_ovr, reverse=True)
+    return sum(fantasy_trade_value(p) * w for p, w in zip(ranked, FANTASY_TRADE_ROTATION_WEIGHTS))
+
+
+def fantasy_trade_shortfall(players: List[Player]) -> Dict[str, int]:
+    """How many guards / bigs short of two a team's top eight is."""
+    top = sorted(players, key=fantasy_ovr, reverse=True)[:8]
+    counts = {"G": 0, "W": 0, "B": 0}
+    for p in top:
+        counts[fantasy_trade_group(p)] += 1
+    return {group: max(0, 2 - counts[group]) for group in ("G", "B")}
+
+
+def fantasy_trade_describe(player: Player) -> str:
+    return f"{player.name} ({fantasy_ovr(player)} {player.position})"
+
+
+def _fantasy_trade_net(ai_name: str, ai_roster: List[Player], ai_after: List[Player]) -> Tuple[float, float, Dict[str, int], Dict[str, int]]:
+    before = fantasy_trade_rotation_value(ai_roster)
+    after = fantasy_trade_rotation_value(ai_after)
+    short_before, short_after = fantasy_trade_shortfall(ai_roster), fantasy_trade_shortfall(ai_after)
+    worse = sum(max(0, short_after[g] - short_before[g]) for g in short_after)
+    mood = random.Random("trade-mood|" + ai_name).uniform(-0.012, 0.012)   # some teams are a little pickier than others
+    net = (after - before - worse * 0.10 * before) / max(before, 1e-9) + mood
+    return net, after / max(before, 1e-9) - 1.0, short_before, short_after
+
+
+def evaluate_fantasy_trade(ai_name: str, user_gives: List[str], ai_gives: List[str], allow_counter: bool = True) -> Dict:
+    """Judge a trade. user_gives / ai_gives are player names. Returns
+    {"decision": "accept" | "counter" | "reject" | "invalid", "headline", "reasons": [...], "counter": {...} | None}."""
+    state = FANTASY_TRADE_STATE
+    user_name = state["user_team"]
+    user_roster, ai_roster = list(fantasy_trade_roster(user_name)), list(fantasy_trade_roster(ai_name))
+    by_user = {p.name: p for p in user_roster}
+    by_ai = {p.name: p for p in ai_roster}
+
+    def answer(decision, headline, reasons, counter=None):
+        return {"decision": decision, "headline": headline, "reasons": reasons, "counter": counter}
+
+    if not user_gives and not ai_gives:
+        return answer("invalid", "Pick the players to trade.", ["Select at least one player on each side."])
+    if not user_gives or not ai_gives:
+        return answer("invalid", "A trade needs players going both ways.", ["Pick at least one player from each team."])
+    if any(n not in by_user for n in user_gives) or any(n not in by_ai for n in ai_gives):
+        return answer("invalid", "Those rosters have changed.", ["Reopen the trade window to see the current rosters."])
+    out_u = [by_user[n] for n in user_gives]
+    out_a = [by_ai[n] for n in ai_gives]
+    ai_after = [p for p in ai_roster if p.name not in set(ai_gives)] + out_u
+    user_after = [p for p in user_roster if p.name not in set(user_gives)] + out_a
+    limits = f"between {FANTASY_TRADE_MIN_ROSTER} and {FANTASY_TRADE_MAX_ROSTER}"
+    if not FANTASY_TRADE_MIN_ROSTER <= len(user_after) <= FANTASY_TRADE_MAX_ROSTER:
+        return answer("invalid", "That breaks your roster limit.", [f"You would have {len(user_after)} players; rosters must stay {limits}."])
+    if not FANTASY_TRADE_MIN_ROSTER <= len(ai_after) <= FANTASY_TRADE_MAX_ROSTER:
+        return answer("invalid", "That breaks their roster limit.", [f"They would have {len(ai_after)} players; rosters must stay {limits}."])
+
+    net, change, short_before, short_after = _fantasy_trade_net(ai_name, ai_roster, ai_after)
+    best_in, best_out = max(out_u, key=fantasy_ovr), max(out_a, key=fantasy_ovr)
+    top9_after = {p.name for p in sorted(ai_after, key=fantasy_ovr, reverse=True)[:9]}
+    new_bench = [p for p in out_u if p.name not in top9_after]
+
+    def reasons_for(accepted: bool) -> List[str]:
+        lines = []
+        gap = fantasy_ovr(best_out) - fantasy_ovr(best_in)
+        if accepted:
+            if gap < 0:
+                lines.append(f"{fantasy_trade_describe(best_in)} is a real upgrade on {fantasy_trade_describe(best_out)}.")
+            for g in short_before:
+                if short_after[g] < short_before[g]:
+                    lines.append(f"It fills a hole: we were short on {FANTASY_TRADE_GROUP_NAMES[g]} in our top eight.")
+            if not lines:
+                lines.append(f"{fantasy_trade_describe(best_in)} fits our rotation and we are not giving up more than we get.")
+            lines.append(f"Our top-ten rotation value changes by {change * 100:+.1f}%.")
+        else:
+            if gap >= 3:
+                lines.append(f"{fantasy_trade_describe(best_out)} is better than anything you are offering (your best: {fantasy_trade_describe(best_in)}).")
+            if len(out_u) > len(out_a) and new_bench:
+                lines.append(f"Extra bodies don't help: {', '.join(p.name for p in new_bench)} would not crack our top nine.")
+            for g in short_after:
+                if short_after[g] > short_before[g]:
+                    lines.append(f"We would be left without enough {FANTASY_TRADE_GROUP_NAMES[g]} in our top eight.")
+            if change < 0:
+                lines.append(f"Our top-ten rotation value would drop {abs(change) * 100:.1f}%.")
+            if not lines:
+                lines.append("The value is not there for us.")
+        return lines
+
+    if net >= FANTASY_TRADE_ACCEPT_NET:
+        return answer("accept", "Deal. We accept.", reasons_for(True))
+    if allow_counter and net >= FANTASY_TRADE_COUNTER_NET:
+        counter = fantasy_trade_counter(ai_name, user_roster, ai_roster, user_gives, ai_gives)
+        if counter:
+            return answer("counter", "Close, but here is our counter-offer.", reasons_for(False) + [counter["why"]], counter)
+        return answer("reject", "Close, but no deal.", reasons_for(False) + ["We could not find a version of this that works for both sides."])
+    return answer("reject", "No deal.", reasons_for(False))
+
+
+def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: List[Player], user_gives: List[str], ai_gives: List[str]):
+    """A counter to a close deal: ask for one more of the user's players, or keep one of ours back."""
+    options = []
+    # 1. ask for one more player: the cheapest one that makes it work
+    asks = []
+    for extra in user_roster:
+        if extra.name in user_gives:
+            continue
+        new_user_gives = user_gives + [extra.name]
+        ai_after = [p for p in ai_roster if p.name not in set(ai_gives)] + [p for p in user_roster if p.name in set(new_user_gives)]
+        user_after_size = len(user_roster) - len(new_user_gives) + len(ai_gives)
+        ai_after_size = len(ai_after)
+        if not (FANTASY_TRADE_MIN_ROSTER <= user_after_size <= FANTASY_TRADE_MAX_ROSTER and FANTASY_TRADE_MIN_ROSTER <= ai_after_size <= FANTASY_TRADE_MAX_ROSTER):
+            continue
+        net = _fantasy_trade_net(ai_name, ai_roster, ai_after)[0]
+        if net >= FANTASY_TRADE_ACCEPT_NET:
+            asks.append((fantasy_trade_value(extra), extra))
+    if asks:
+        extra = min(asks, key=lambda item: item[0])[1]
+        options.append({"user_gives": user_gives + [extra.name], "ai_gives": list(ai_gives),
+                        "why": f"Counter: add {fantasy_trade_describe(extra)} from your side and we have a deal."})
+    # 2. keep one of our lesser players back
+    if len(ai_gives) > 1:
+        by_ai = {p.name: p for p in ai_roster}
+        for keep in sorted(ai_gives, key=lambda n: fantasy_ovr(by_ai[n])):
+            new_ai_gives = [n for n in ai_gives if n != keep]
+            ai_after = [p for p in ai_roster if p.name not in set(new_ai_gives)] + [p for p in user_roster if p.name in set(user_gives)]
+            user_after_size = len(user_roster) - len(user_gives) + len(new_ai_gives)
+            if not (FANTASY_TRADE_MIN_ROSTER <= user_after_size <= FANTASY_TRADE_MAX_ROSTER and FANTASY_TRADE_MIN_ROSTER <= len(ai_after) <= FANTASY_TRADE_MAX_ROSTER):
+                continue
+            if _fantasy_trade_net(ai_name, ai_roster, ai_after)[0] >= FANTASY_TRADE_ACCEPT_NET:
+                options.append({"user_gives": list(user_gives), "ai_gives": new_ai_gives,
+                                "why": f"Counter: we keep {fantasy_trade_describe(by_ai[keep])} and the rest of the deal stands."})
+                break
+    return random.choice(options) if options else None
+
+
+def _fantasy_trade_execute(trade: Dict):
+    user_roster = fantasy_trade_roster(FANTASY_TRADE_STATE["user_team"])
+    ai_roster = fantasy_trade_roster(trade["ai_team"])
+    out_u = [p for p in user_roster if p.name in set(trade["user_gives"])]
+    out_a = [p for p in ai_roster if p.name in set(trade["ai_gives"])]
+    if len(out_u) != len(trade["user_gives"]) or len(out_a) != len(trade["ai_gives"]):
+        raise ValueError("Those rosters have changed.")
+    for p in out_u:
+        user_roster.remove(p)
+    for p in out_a:
+        ai_roster.remove(p)
+    user_roster.extend(out_a)
+    ai_roster.extend(out_u)
+    FANTASY_TRADE_STATE["log"].append({"ai_team": trade["ai_team"], "user_gives": list(trade["user_gives"]), "ai_gives": list(trade["ai_gives"])})
+
+
+def fantasy_trade_process_pending(on_applied=None):
+    """Called by the season thread while it is paused (and when it ends): carry out the trades the user has agreed to."""
+    state = FANTASY_TRADE_STATE
+    while state["pending"]:
+        trade = state["pending"].pop(0)
+        try:
+            _fantasy_trade_execute(trade)
+            if on_applied is not None:
+                on_applied(trade)
+            trade["ok"] = True
+            trade["effective_order"] = state["next_order"]
+        except Exception as exc:
+            trade["ok"] = False
+            trade["error"] = str(exc)
+        finally:
+            trade["done"].set()
+
+
+def fantasy_trade_submit(ai_team: str, user_gives: List[str], ai_gives: List[str], timeout: float = 5.0) -> Dict:
+    """Make an accepted trade happen. While a season is running it is carried out by the season thread at its next pause point
+    (the games already handed to the workers keep the old rosters); otherwise it is done at once."""
+    state = FANTASY_TRADE_STATE
+    trade = {"ai_team": ai_team, "user_gives": list(user_gives), "ai_gives": list(ai_gives), "done": threading.Event()}
+    if not state["active"]:
+        try:
+            _fantasy_trade_execute(trade)
+            return {"ok": True, "effective_order": None}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+    state["pending"].append(trade)
+    if not trade["done"].wait(timeout):
+        if trade in state["pending"]:
+            state["pending"].remove(trade)
+        return {"ok": False, "error": "The season did not respond. Make sure it is paused and try again."}
+    return {"ok": bool(trade.get("ok")), "error": trade.get("error"), "effective_order": trade.get("effective_order")}
 
 
 def fantasy_season_strength(team: Team) -> float:
@@ -22860,6 +23087,13 @@ def run_fantasy_82_game_season(drafted_rosters: Dict[str, List[Player]],
         mark = " <-- your team" if item["is_user"] else ""
         print(f"{seed:>2}. {item['name']:<32} {item['wins']:>2}-{item['losses']:<2}  STR {item['strength']:.1f}{mark}")
     return standings
+
+
+def refresh_season_entry(entry: Dict):
+    """Rebuild an entry's team and strength from its factory (after a trade changed the roster)."""
+    fresh = season_entry_from_factory(entry["name"], entry["factory"])
+    entry["team"] = fresh["team"]
+    entry["strength"] = fresh["strength"]
 
 
 def season_entry_from_factory(name: str, factory) -> Dict:
@@ -23802,7 +24036,7 @@ def build_season_sections(entries: List[Dict],
 
 # Every season game is played from its own random seed, so the exact same game can be replayed later (play by play,
 # box score, ratings, cards): order -> (home name, away name, seed), and team name -> a function that builds a fresh team.
-SEASON_REPLAY: Dict = {"games": {}, "makers": {}}
+SEASON_REPLAY: Dict = {"games": {}, "makers": {}, "versions": {}}
 
 
 def order_games_in_rounds(games):
@@ -23837,10 +24071,21 @@ def order_games_in_rounds(games):
 def season_replay_reset():
     SEASON_REPLAY["games"].clear()
     SEASON_REPLAY["makers"].clear()
+    SEASON_REPLAY["versions"].clear()
 
 
-def season_replay_register_maker(name: str, maker):
+def season_replay_register_maker(name: str, maker, from_order: int = 0):
+    """maker builds the team's roster for games from from_order on (a trade registers a newer one)."""
     SEASON_REPLAY["makers"][name] = maker
+    SEASON_REPLAY["versions"].setdefault(name, []).append((from_order, maker))
+
+
+def season_replay_maker(name: str, order: int):
+    chosen = SEASON_REPLAY["makers"].get(name)
+    for from_order, maker in SEASON_REPLAY["versions"].get(name, []):
+        if from_order <= order:
+            chosen = maker
+    return chosen
 
 
 def season_replay_register_game(order: int, name_a: str, name_b: str, seed: int):
@@ -23869,7 +24114,7 @@ def build_season_game_teams(factory_a, factory_b, seed=None) -> Tuple[Team, Team
 def build_season_replay_teams(order) -> Tuple[Team, Team]:
     """Teams for replaying a finished season game: same rosters, same random seed, so the game plays out identically."""
     name_a, name_b, seed = SEASON_REPLAY["games"][order]
-    return build_season_game_teams(SEASON_REPLAY["makers"][name_a], SEASON_REPLAY["makers"][name_b], seed)
+    return build_season_game_teams(season_replay_maker(name_a, order), season_replay_maker(name_b, order), seed)
 
 
 def simulate_silent_season_game(factory_a, factory_b, seed=None) -> Tuple[Team, Team]:
@@ -24035,6 +24280,9 @@ def season_game_pace():
 
 def hold_season_while_paused(snapshot, poll: float = 0.05):
     """Called between games: if Pause is on, publish the stats so far once, then wait for Resume."""
+    hook = FANTASY_TRADE_STATE.get("hook")
+    if hook is not None:
+        hook()   # carry out any trade the user agreed to
     if not SIM_PAUSED:
         return
     try:
@@ -24042,6 +24290,8 @@ def hold_season_while_paused(snapshot, poll: float = 0.05):
     except Exception:
         pass
     while SIM_PAUSED:
+        if hook is not None:
+            hook()
         _REAL_SLEEP(poll)
 
 
@@ -24067,6 +24317,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     season_player_totals = {}
     season_team_totals = {}
     season_game_log = SeasonGameLog()
+    fantasy_trades = FANTASY_TRADE_STATE.get("factories") is factories   # a fantasy season: the user may trade while paused
 
     # The whole schedule up front: 82 rounds of random pairings.
     schedule = []
@@ -24111,8 +24362,27 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     for entry in entries:
         if templates is not None:
             season_replay_register_maker(entry["name"], (lambda t=templates[entry["name"]]: _copy.deepcopy(t)))
+        elif fantasy_trades:
+            season_replay_register_maker(entry["name"], (lambda t=entry["factory"](): _copy.deepcopy(t)))   # a snapshot: trades will change the live roster
         else:
             season_replay_register_maker(entry["name"], entry["factory"])
+
+    def apply_trade_to_season(trade):
+        """Runs on the season thread: the traded teams play their new rosters from the next game that has not been handed out."""
+        for team_name in (FANTASY_TRADE_STATE["user_team"], trade["ai_team"]):
+            entry = entry_by_name.get(team_name)
+            if entry is None:
+                continue
+            refresh_season_entry(entry)
+            if templates is not None:
+                templates[team_name] = entry["factory"]()
+                season_replay_register_maker(team_name, (lambda t=templates[team_name]: _copy.deepcopy(t)), FANTASY_TRADE_STATE["next_order"])
+            else:
+                season_replay_register_maker(team_name, (lambda t=entry["factory"](): _copy.deepcopy(t)), FANTASY_TRADE_STATE["next_order"])
+
+    if fantasy_trades:
+        FANTASY_TRADE_STATE.update(active=True, next_order=0, pending=[],
+                                   hook=lambda: fantasy_trade_process_pending(apply_trade_to_season))
     for order, (entry_a, entry_b) in enumerate(schedule):
         season_replay_register_game(order, entry_a["name"], entry_b["name"], seeds[order])
 
@@ -24124,11 +24394,13 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         try:
             batch = workers * 6
             for start_index in range(0, total_games, batch):
+                FANTASY_TRADE_STATE["next_order"] = start_index
                 hold_season_while_paused(season_snapshot)
                 tasks = [
                     (templates[ea["name"]], templates[eb["name"]], order, seeds[order])
                     for order, (ea, eb) in enumerate(schedule[start_index:start_index + batch], start=start_index)
                 ]
+                FANTASY_TRADE_STATE["next_order"] = start_index + batch   # a trade made from here on starts with the next batch
                 for result in pool.imap_unordered(_quiet_season_worker, tasks, chunksize=2):
                     yield result
         finally:
@@ -24137,6 +24409,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
 
     def sequential_results():
         for order, (entry_a, entry_b) in enumerate(schedule):
+            FANTASY_TRADE_STATE["next_order"] = order
             hold_season_while_paused(season_snapshot)
             team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"], seeds[order])
             yield team_a, team_b, order
@@ -24182,6 +24455,9 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 print(f"Season sim progress: {completed_games}/{total_games} games.")
     finally:
         SEASON_STAR_MINUTES_CAP = None
+        if fantasy_trades:
+            FANTASY_TRADE_STATE.update(active=False, hook=None)
+            fantasy_trade_process_pending(apply_trade_to_season)   # a trade agreed as the season ended still goes through
     sections = build_season_sections(entries, season_player_totals, season_team_totals,
                                      game_log=season_game_log.rows, game_extras=season_game_log.extras,
                                      game_meta=season_game_log.games, include_rookies=False)
@@ -24823,6 +25099,7 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
         name: make_fantasy_team_factory(name, roster, user_controlled=False)
         for name, roster in drafted_rosters.items()
     }
+    fantasy_trade_setup(user_team_name, factories)
     return list(team_order), factories, user_team_name
 
 
