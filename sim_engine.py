@@ -10408,6 +10408,8 @@ STAR_CLOSE_GAME_MARGIN = 12   # points; in the 4th quarter a game this close kee
 def should_rest_for_stint(player: Player, team: Team, period: int, period_time: int, stars: set[Player]) -> bool:
     if player.fouled_out:
         return False
+    if getattr(player, "gui_target_minutes_override", None) is not None:
+        return False   # minutes set in the Coach tab are paced by enforce_pinned_minutes, not by the star-rest rules
 
     elapsed_period_minutes = (period_length_seconds(period) - period_time) / 60
     played_minutes = player.minutes / 60
@@ -10626,6 +10628,38 @@ def enforce_thunder_2018_rotation(team: Team, period: int, period_time: int, pro
     return swap_players(team, out_player, sub_in, " (2018 rotation)")
 
 
+def enforce_pinned_minutes(team: Team, period: int, period_time: int, protected: Player = None) -> bool:
+    """Minutes the user set in the Coach tab: pace every player toward his number, game clock by game clock, like a coach watching
+    the minutes sheet. A bench player who is behind his pace comes in for the player on the floor who is furthest ahead of his."""
+    if getattr(team, "garbage_time_locked", False):
+        return False
+    pinned = [p for p in team.roster if getattr(p, "gui_target_minutes_override", None) is not None]
+    if not pinned:
+        return False
+    elapsed = max(0.0, ((period - 1) * rules_quarter_seconds() + (rules_quarter_seconds() - period_time)) / 60)
+
+    def goal(p: Player) -> float:
+        return float(p.gui_target_minutes_override) * min(1.0, elapsed / 48.0) if getattr(p, "gui_target_minutes_override", None) is not None else 0.0
+
+    def behind(p: Player) -> float:
+        return goal(p) - p.minutes / 60
+
+    bench = [p for p in team.bench if getattr(p, "gui_target_minutes_override", None) not in (None, 0) and not p.fouled_out
+             and not is_foul_rest_locked(p, period)]
+    candidates = [p for p in team.on_floor if p is not protected and not p.fouled_out and not is_foul_rest_locked(p, period)]
+    if not bench or not candidates:
+        return False
+    sub_in = max(bench, key=behind)
+    out_player = min(candidates, key=behind)
+    ahead = -behind(out_player)
+    over_target = out_player.minutes / 60 >= float(getattr(out_player, "gui_target_minutes_override", 0) or 0) + 0.5
+    if not ((behind(sub_in) > 0.6 and ahead > 0.3) or (over_target and behind(sub_in) > -0.5)):
+        return False
+    if behind(sub_in) <= behind(out_player):
+        return False
+    return swap_players(team, out_player, sub_in, " (your minutes)")
+
+
 def enforce_spurs_rotation_map(team: Team, period: int, period_time: int, protected: Player = None) -> bool:
     """Keep the 2026 Spurs close to their intended playoff minute ladder."""
     if team.name != "2026 San Antonio Spurs" or getattr(team, "garbage_time_locked", False):
@@ -10763,6 +10797,12 @@ def dead_ball_rotation(team: Team, period: int, period_time: int,
 
     if not hasattr(team.roster[0], "target_minutes"):
         initialize_minute_targets(team)
+
+    if enforce_pinned_minutes(team, period, period_time, protected):
+        enforce_pinned_minutes(team, period, period_time, protected)   # a second swap when two players are due
+        team.last_sub_period = period
+        team.last_sub_time = period_time
+        return
 
     if enforce_thunder_2018_rotation(team, period, period_time, protected):
         team.last_sub_period = period
@@ -22762,9 +22802,17 @@ def make_fantasy_team_factory(team_name: str, drafted_players: List[Player], use
         team.user_controlled = user_controlled
         team.fantasy_control_enabled = user_controlled
         build_best_lineup_by_overall(team)
+        starters = getattr(factory, "starters", None)   # a starting five the user set in the Coach tab
+        if starters:
+            by_name = {p.name: p for p in team.roster}
+            first = [by_name[n] for n in starters if n in by_name]
+            if len(first) == 5:
+                team.roster = first + [p for p in team.roster if all(p is not f for f in first)]
+                team.lock_custom_starting_positions = True   # start them at the positions the user chose
         return team
 
     factory.drafted_players = drafted_players   # trades edit this list in place
+    factory.starters = None
     return factory
 
 
@@ -23160,7 +23208,63 @@ def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: Li
     return random.choice(options) if options else None
 
 
+def _fantasy_lineup_execute(change: Dict):
+    """Starters, positions and minutes the user chose in the Coach tab (or a reset to the automatic ones)."""
+    user_name = FANTASY_TRADE_STATE["user_team"]
+    roster = fantasy_trade_roster(user_name)
+    factory = FANTASY_TRADE_STATE["factories"][user_name]
+    if change.get("reset"):
+        for p in roster:
+            if hasattr(p, "auto_position"):
+                p.position = p.auto_position
+            if hasattr(p, "gui_target_minutes_override"):
+                del p.gui_target_minutes_override
+        factory.starters = None
+        return
+    for p in roster:
+        if p.name in change["positions"]:
+            if not hasattr(p, "auto_position"):
+                p.auto_position = p.position
+            p.position = change["positions"][p.name]
+        if p.name in change["minutes"]:
+            p.gui_target_minutes_override = int(change["minutes"][p.name])
+    factory.starters = list(change["starters"]) if len(change["starters"]) == 5 else None
+
+
+def fantasy_lineup_defaults() -> Dict:
+    """The user's team as the sim will play it right now: starters and target minutes per player."""
+    user_name = FANTASY_TRADE_STATE["user_team"]
+    team = FANTASY_TRADE_STATE["factories"][user_name]()
+    team.init_lineup()
+    initialize_minute_targets(team)
+    return {"starters": [p.name for p in team.on_floor], "minutes": {p.name: int(round(p.target_minutes)) for p in team.roster},
+            "positions": {p.name: p.position for p in team.roster}}
+
+
+def fantasy_lineup_submit(starters: List[str], positions: Dict[str, str], minutes: Dict[str, int], reset: bool = False, timeout: float = 5.0) -> Dict:
+    """Make a Coach-tab change. During a season it is carried out by the season thread, so the games already handed out keep the old
+    lineup; otherwise it is done at once."""
+    state = FANTASY_TRADE_STATE
+    change = {"kind": "lineup", "starters": list(starters), "positions": dict(positions), "minutes": dict(minutes), "reset": reset,
+              "ai_team": None, "user_gives": [], "ai_gives": [], "done": threading.Event()}
+    if not state["active"]:
+        try:
+            _fantasy_lineup_execute(change)
+            return {"ok": True, "effective_order": None}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+    state["pending"].append(change)
+    if not change["done"].wait(timeout):
+        if change in state["pending"]:
+            state["pending"].remove(change)
+        return {"ok": False, "error": "The season did not respond. Pause it and try again."}
+    return {"ok": bool(change.get("ok")), "error": change.get("error"), "effective_order": change.get("effective_order")}
+
+
 def _fantasy_trade_execute(trade: Dict):
+    if trade.get("kind") == "lineup":
+        _fantasy_lineup_execute(trade)
+        return
     user_roster = fantasy_trade_roster(FANTASY_TRADE_STATE["user_team"])
     ai_roster = fantasy_trade_roster(trade["ai_team"])
     out_u = [p for p in user_roster if p.name in set(trade["user_gives"])]
@@ -24675,12 +24779,16 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
 
     def apply_trade_to_season(trade):
         """Runs on the season thread: the traded teams play their new rosters from the next game that has not been handed out."""
-        for name in trade["user_gives"]:
-            traded_to[name] = trade["ai_team"]
-        for name in trade["ai_gives"]:
-            traded_to[name] = FANTASY_TRADE_STATE["user_team"]
-        reconcile_traded_stats(season_player_totals, traded_to)
-        for team_name in (FANTASY_TRADE_STATE["user_team"], trade["ai_team"]):
+        if trade.get("kind") == "lineup":
+            teams_changed = (FANTASY_TRADE_STATE["user_team"],)
+        else:
+            teams_changed = (FANTASY_TRADE_STATE["user_team"], trade["ai_team"])
+            for name in trade["user_gives"]:
+                traded_to[name] = trade["ai_team"]
+            for name in trade["ai_gives"]:
+                traded_to[name] = FANTASY_TRADE_STATE["user_team"]
+            reconcile_traded_stats(season_player_totals, traded_to)
+        for team_name in teams_changed:
             entry = entry_by_name.get(team_name)
             if entry is None:
                 continue
@@ -24735,6 +24843,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         pool = multiprocessing.get_context("spawn").Pool(processes=workers)
         try:
             batch = workers * 6
+            if fantasy_trades:
+                batch = max(2, len(entries) // 2)   # one game day (every team plays once): a trade or lineup change shows up the next day
             for start_index in range(0, total_games, batch):
                 FANTASY_TRADE_STATE["next_order"] = start_index
                 hold_season_while_paused(season_snapshot)
