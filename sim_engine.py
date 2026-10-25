@@ -21740,6 +21740,12 @@ CENTER_CREATOR_BONUS_SCALE = 0.9  # passing bigs keep nearly all of their creato
 
 
 def fantasy_ovr(player: Player) -> int:
+    """The overall everywhere in the game (draft board, trades, rosters, grades): the formula's value, capped at 99."""
+    return min(99, fantasy_ovr_uncapped(player))
+
+
+def fantasy_ovr_uncapped(player: Player) -> int:
+    """The formula's own value, which can pass 99 (a few players are 100 or 101). Only the Ratings tab shows this."""
     tpt = player.three_rating * 100
     mpt = player.mid_rating * 100
     lpt = player.rim_rating * 100
@@ -22052,7 +22058,7 @@ def fantasy_ovr(player: Player) -> int:
     return max(40, int(ovr))
 
 
-def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, period_time: int) -> int:
+def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, period_time: int, capped: bool = True) -> int:
     # Same authoritative OVR formula the player pool/picker uses --
     # computed against a shadow copy with each stat swapped for its live
     # (momentum/clutch/heat/series/fatigue-adjusted) value, so this is
@@ -22071,7 +22077,7 @@ def live_fantasy_ovr(player: Player, team: Team, opponent: Team, period: int, pe
     shadow.block = effective_rating(player.block, player, team, opponent, period, period_time, "block")
     shadow.oreb = effective_rating(player.oreb, player, team, opponent, period, period_time)
     shadow.dreb = effective_rating(player.dreb, player, team, opponent, period, period_time)
-    return fantasy_ovr(shadow)
+    return fantasy_ovr(shadow) if capped else fantasy_ovr_uncapped(shadow)
 
 
 
