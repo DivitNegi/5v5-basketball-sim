@@ -22777,8 +22777,11 @@ def fantasy_trade_available() -> bool:
     return bool(FANTASY_TRADE_STATE.get("user_team")) and bool(FANTASY_TRADE_STATE.get("factories"))
 
 
+FANTASY_TRADE_VALUE_BASE = 1.07   # every OVR point is worth 7% more than the one below (2K-style: a star is worth a few good players, not a whole roster)
+
+
 def fantasy_trade_value(player: Player) -> float:
-    return 1.12 ** (fantasy_ovr(player) - 60)
+    return FANTASY_TRADE_VALUE_BASE ** (fantasy_ovr(player) - 60)
 
 
 def fantasy_trade_group(player: Player) -> str:
