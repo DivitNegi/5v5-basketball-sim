@@ -10022,7 +10022,7 @@ def run_gui_app():
     ttk.Button(controls, text="Create Player", command=open_create_player_dialog).grid(row=3, column=0, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Edit Player", command=open_edit_player_picker).grid(row=3, column=2, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Play 1-on-1", command=open_1v1_player_picker).grid(row=3, column=4, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
-    ttk.Button(controls, text="Trade", command=open_trade_dialog).grid(row=3, column=6, columnspan=2, padx=(0, 6), pady=(6, 0), sticky="ew")
+    ttk.Button(controls, text="Trade", command=open_trade_dialog).grid(row=4, column=6, columnspan=4, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Sim Series", command=lambda: gui_sim_stage("series")).grid(row=4, column=0, columnspan=3, padx=(0, 6), pady=(6, 0), sticky="ew")
     ttk.Button(controls, text="Sim All Playoffs", command=lambda: gui_sim_stage("playoffs")).grid(row=4, column=3, columnspan=3, padx=(0, 6), pady=(6, 0), sticky="ew")
     next_button = ttk.Button(controls, text="Next: Play-in & Playoffs", state="disabled", command=lambda: start_sim("2027 play-in & playoffs"))
