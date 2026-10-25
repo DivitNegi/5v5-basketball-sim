@@ -22804,13 +22804,99 @@ def fantasy_trade_describe(player: Player) -> str:
     return f"{player.name} ({fantasy_ovr(player)} {player.position})"
 
 
+FANTASY_TRADE_FIT_WEIGHT = 0.05   # one full need met (or lost) moves the deal by about this share of the rotation's value
+FANTASY_TRADE_FIT_NAMES = {"creator": "creator", "spacing": "spacing", "rim": "rim protection", "boards": "rebounding",
+                           "scorer": "go-to scorer", "dominant": "too many ball-dominant scorers"}
+
+
+def fantasy_trade_profile(players: List[Player]) -> Dict:
+    """What a team's top eight can do: creation, shooting, rim protection, rebounding, a go-to scorer, and too many ball hogs."""
+    top = sorted(players, key=fantasy_ovr, reverse=True)[:8]
+    return {
+        "creators": sum(1 for p in top if p.playmaking >= 0.78 or p.ball_handle >= 0.84),
+        "spacers": sum(1 for p in top if p.three_rating >= 0.82 and p.three_tendency >= 0.25),
+        "rim": any(p.interior_def >= 0.82 or p.block >= 0.60 for p in top),
+        "boards": sum(1 for p in top if p.dreb >= 0.68 or p.oreb >= 0.60),
+        "scorer": any(p.usage >= 0.28 or fantasy_ovr(p) >= 92 for p in top),
+        "dominant": sum(1 for p in top if p.usage >= 0.30),
+    }
+
+
+def fantasy_trade_fit_points(profile: Dict) -> float:
+    """How well a roster is put together: it wants a creator (two is better), three shooters, a rim protector, rebounders,
+    a go-to scorer, and no more than two ball-dominant players."""
+    return (0.6 * (profile["creators"] >= 1) + 0.4 * (profile["creators"] >= 2) + min(profile["spacers"], 3) / 3.0
+            + (1.0 if profile["rim"] else 0.0) + min(profile["boards"], 2) / 2.0 + (1.0 if profile["scorer"] else 0.0)
+            - 0.5 * max(0, profile["dominant"] - 2))
+
+
+def fantasy_trade_fit_events(before: List[Player], after: List[Player], incoming: List[Player]) -> List[Tuple[str, int, str | None]]:
+    """What changes for a team's fit when `before` becomes `after`: (need, +1 better / -1 worse, the incoming player responsible)."""
+    b, a = fantasy_trade_profile(before), fantasy_trade_profile(after)
+    events = []
+
+    def star_of(test):
+        matches = [p for p in incoming if test(p)]
+        return max(matches, key=fantasy_ovr).name if matches else None
+
+    if b["creators"] == 0 and a["creators"] >= 1:
+        events.append(("creator", 1, star_of(lambda p: p.playmaking >= 0.78 or p.ball_handle >= 0.84)))
+    elif b["creators"] >= 1 and a["creators"] == 0:
+        events.append(("creator", -1, None))
+    if a["spacers"] > b["spacers"] and b["spacers"] < 3:
+        events.append(("spacing", 1, star_of(lambda p: p.three_rating >= 0.82 and p.three_tendency >= 0.25)))
+    elif a["spacers"] < b["spacers"] and a["spacers"] < 2:
+        events.append(("spacing", -1, None))
+    if not b["rim"] and a["rim"]:
+        events.append(("rim", 1, star_of(lambda p: p.interior_def >= 0.82 or p.block >= 0.60)))
+    elif b["rim"] and not a["rim"]:
+        events.append(("rim", -1, None))
+    if a["boards"] > b["boards"] and b["boards"] < 2:
+        events.append(("boards", 1, star_of(lambda p: p.dreb >= 0.68 or p.oreb >= 0.60)))
+    elif a["boards"] < b["boards"] and a["boards"] < 2:
+        events.append(("boards", -1, None))
+    if not b["scorer"] and a["scorer"]:
+        events.append(("scorer", 1, star_of(lambda p: p.usage >= 0.28 or fantasy_ovr(p) >= 92)))
+    elif b["scorer"] and not a["scorer"]:
+        events.append(("scorer", -1, None))
+    if a["dominant"] > 2 and a["dominant"] > b["dominant"]:
+        events.append(("dominant", -1, star_of(lambda p: p.usage >= 0.30)))
+    return events
+
+
+def fantasy_trade_fit_sentence(event: Tuple[str, int, str | None]) -> str:
+    need, sign, who = event
+    who = who or "He"
+    if sign > 0:
+        return {
+            "creator": f"{who} is the ball handler and creator we are missing.",
+            "spacing": f"{who} gives us the shooting we need.",
+            "rim": f"{who} is the rim protector we lack.",
+            "boards": f"{who} helps us on the glass.",
+            "scorer": f"{who} gives us the go-to scorer we lack.",
+        }[need]
+    return {
+        "creator": "We would lose our only real creator.",
+        "spacing": "We would lose too much floor spacing.",
+        "rim": "We would have no rim protector left.",
+        "boards": "We would be thin on the boards.",
+        "scorer": "We would lose our go-to scorer.",
+        "dominant": f"We already have enough ball-dominant scorers; {who} would cut into their touches.",
+    }[need]
+
+
+def fantasy_trade_fit_tags(events) -> str:
+    return ", ".join(("+" if sign > 0 else "-") + FANTASY_TRADE_FIT_NAMES[need] for need, sign, _who in events)
+
+
 def _fantasy_trade_net(ai_name: str, ai_roster: List[Player], ai_after: List[Player]) -> Tuple[float, float, Dict[str, int], Dict[str, int]]:
     before = fantasy_trade_rotation_value(ai_roster)
     after = fantasy_trade_rotation_value(ai_after)
     short_before, short_after = fantasy_trade_shortfall(ai_roster), fantasy_trade_shortfall(ai_after)
     worse = sum(max(0, short_after[g] - short_before[g]) for g in short_after)
     mood = random.Random("trade-mood|" + ai_name).uniform(-0.012, 0.012)   # some teams are a little pickier than others
-    net = (after - before - worse * 0.10 * before) / max(before, 1e-9) + mood
+    fit_delta = fantasy_trade_fit_points(fantasy_trade_profile(ai_after)) - fantasy_trade_fit_points(fantasy_trade_profile(ai_roster))
+    net = (after - before - worse * 0.10 * before) / max(before, 1e-9) + FANTASY_TRADE_FIT_WEIGHT * fit_delta + mood
     return net, after / max(before, 1e-9) - 1.0, short_before, short_after
 
 
@@ -22843,6 +22929,7 @@ def evaluate_fantasy_trade(ai_name: str, user_gives: List[str], ai_gives: List[s
         return answer("invalid", "That breaks their roster limit.", [f"They would have {len(ai_after)} players; rosters must stay {limits}."])
 
     net, change, short_before, short_after = _fantasy_trade_net(ai_name, ai_roster, ai_after)
+    fit_events = fantasy_trade_fit_events(ai_roster, ai_after, out_u)
     best_in, best_out = max(out_u, key=fantasy_ovr), max(out_a, key=fantasy_ovr)
     top9_after = {p.name for p in sorted(ai_after, key=fantasy_ovr, reverse=True)[:9]}
     new_bench = [p for p in out_u if p.name not in top9_after]
@@ -22856,6 +22943,7 @@ def evaluate_fantasy_trade(ai_name: str, user_gives: List[str], ai_gives: List[s
             for g in short_before:
                 if short_after[g] < short_before[g]:
                     lines.append(f"It fills a hole: we were short on {FANTASY_TRADE_GROUP_NAMES[g]} in our top eight.")
+            lines.extend(fantasy_trade_fit_sentence(e) for e in fit_events if e[1] > 0)
             if not lines:
                 lines.append(f"{fantasy_trade_describe(best_in)} fits our rotation and we are not giving up more than we get.")
             lines.append(f"Our top-ten rotation value changes by {change * 100:+.1f}%.")
@@ -22867,6 +22955,7 @@ def evaluate_fantasy_trade(ai_name: str, user_gives: List[str], ai_gives: List[s
             for g in short_after:
                 if short_after[g] > short_before[g]:
                     lines.append(f"We would be left without enough {FANTASY_TRADE_GROUP_NAMES[g]} in our top eight.")
+            lines.extend(fantasy_trade_fit_sentence(e) for e in fit_events if e[1] < 0)
             if change < 0:
                 lines.append(f"Our top-ten rotation value would drop {abs(change) * 100:.1f}%.")
             if not lines:
@@ -22881,6 +22970,55 @@ def evaluate_fantasy_trade(ai_name: str, user_gives: List[str], ai_gives: List[s
             return answer("counter", "Close, but here is our counter-offer.", reasons_for(False) + [counter["why"]], counter)
         return answer("reject", "Close, but no deal.", reasons_for(False) + ["We could not find a version of this that works for both sides."])
     return answer("reject", "No deal.", reasons_for(False))
+
+
+def fantasy_trade_find_offers(user_gives: List[str], limit: int = 16) -> List[Dict]:
+    """Trade finder: what would the other teams give for these players? Every offer returned is one the AI would accept, ranked by
+    how much it helps your team (rotation value plus fit), best first. Each team shows its best one or two offers."""
+    state = FANTASY_TRADE_STATE
+    user_name = state["user_team"]
+    user_roster = list(fantasy_trade_roster(user_name))
+    by_user = {p.name: p for p in user_roster}
+    if not user_gives or any(n not in by_user for n in user_gives):
+        return []
+    out_u = [by_user[n] for n in user_gives]
+    wanted = sum(fantasy_trade_value(p) for p in out_u)
+    user_before = fantasy_trade_rotation_value(user_roster)
+    user_fit_before = fantasy_trade_fit_points(fantasy_trade_profile(user_roster))
+    results = []
+    for ai_name in state["factories"]:
+        if ai_name == user_name:
+            continue
+        ai_roster = list(fantasy_trade_roster(ai_name))
+        pool = [p for p in ai_roster if fantasy_trade_value(p) <= 1.15 * wanted]   # a team will not offer a player worth far more than yours
+        packages = [[p] for p in pool] + [[a, b] for i, a in enumerate(pool) for b in pool[i + 1:]]
+        scored = []
+        for package in packages:
+            if not 0.45 <= sum(fantasy_trade_value(p) for p in package) / max(wanted, 1e-9) <= 1.6:
+                continue
+            give = {p.name for p in package}
+            ai_after = [p for p in ai_roster if p.name not in give] + out_u
+            user_after = [p for p in user_roster if p.name not in set(user_gives)] + package
+            if not (FANTASY_TRADE_MIN_ROSTER <= len(ai_after) <= FANTASY_TRADE_MAX_ROSTER and FANTASY_TRADE_MIN_ROSTER <= len(user_after) <= FANTASY_TRADE_MAX_ROSTER):
+                continue
+            if _fantasy_trade_net(ai_name, ai_roster, ai_after)[0] < FANTASY_TRADE_ACCEPT_NET:
+                continue
+            change = fantasy_trade_rotation_value(user_after) / max(user_before, 1e-9) - 1.0
+            fit_delta = fantasy_trade_fit_points(fantasy_trade_profile(user_after)) - user_fit_before
+            gain = change + FANTASY_TRADE_FIT_WEIGHT * fit_delta
+            if gain < -0.03:
+                continue   # the AI would take it, but it hurts you
+            events = fantasy_trade_fit_events(user_roster, user_after, package)
+            scored.append({
+                "ai_team": ai_name, "user_gives": list(user_gives), "ai_gives": [p.name for p in package],
+                "detail": [fantasy_trade_describe(p) for p in package], "user_change": change, "gain": gain,
+                "fit": fantasy_trade_fit_tags(events), "fit_score": sum(sign for _need, sign, _who in events),
+                "best_ovr": max(fantasy_ovr(p) for p in package),
+            })
+        scored.sort(key=lambda item: -item["gain"])
+        results.extend(scored[:2])
+    results.sort(key=lambda item: -item["gain"])
+    return results[:limit]
 
 
 def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: List[Player], user_gives: List[str], ai_gives: List[str]):
