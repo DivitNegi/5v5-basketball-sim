@@ -21848,7 +21848,7 @@ def fantasy_ovr(player: Player) -> int:
             raw += 1
         if can_play_position(player, "PF") and idef >= 84 and bl >= 35:
             raw += 2
-        if can_play_position(player, "PF") and tpt < 78:
+        if can_play_position(player, "PF"):
             interior_pf_score = (
                 0.34 * lpt
                 + 0.23 * dk
@@ -21872,6 +21872,9 @@ def fantasy_ovr(player: Player) -> int:
                 + 0.07 * pdef
                 + 0.04 * bl
                 + 0.04 * cpt
+                # a power forward who also shoots threes is worth more than one who does not: a tenth of a point per point of
+                # three-point rating over 60 (a 0.85 shooter gets 2.5), nothing for one who does not shoot them
+                + 0.10 * max(0.0, tpt - 60.0)
             )
             if lpt >= 90 and idef >= 90 and rebound >= 88:
                 traditional_pf_score += 4
