@@ -374,14 +374,19 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, c
         print_2027_playoff_standings(field)
 
     bracket_state = {}
+    seed_maps = {}
     for conference, rows in field.items():
         by_seed = {seed: name for name, seed, _strength, _factory in rows}
-        bracket_state[conference] = [
-            (by_seed[1], by_seed[8]),
-            (by_seed[4], by_seed[5]),
-            (by_seed[3], by_seed[6]),
-            (by_seed[2], by_seed[7]),
-        ]
+        seed_maps[conference] = by_seed
+        if len(by_seed) >= 8:
+            bracket_state[conference] = [
+                (by_seed[1], by_seed[8]),
+                (by_seed[4], by_seed[5]),
+                (by_seed[3], by_seed[6]),
+                (by_seed[2], by_seed[7]),
+            ]
+        else:
+            bracket_state[conference] = []   # a small league: four teams a side, straight to the semifinals
     rounds = {
         "East": {"First Round": list(bracket_state["East"])},
         "West": {"First Round": list(bracket_state["West"])},
@@ -402,10 +407,14 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, c
                 for i, matchup in enumerate(first_round)
             ]
             print_2027_bracket_state(rounds)
-        semifinals = [
-            (round_winners[0], round_winners[1]),
-            (round_winners[2], round_winners[3]),
-        ]
+        if first_round:
+            semifinals = [
+                (round_winners[0], round_winners[1]),
+                (round_winners[2], round_winners[3]),
+            ]
+        else:
+            seeds_here = seed_maps[conference]
+            semifinals = [(seeds_here[1], seeds_here[4]), (seeds_here[2], seeds_here[3])]
         rounds[conference]["Semifinals"] = semifinals
         print_2027_bracket_state(rounds)
         semi_winners = []
@@ -541,13 +550,15 @@ def run_2027_postseason(standings, custom_factories=None):
         )
         ranked = [r["team"] for r in rows]
         record = {r["team"]: f"{r['wins']}-{r['losses']}" for r in rows}
-        print(f"\n{conference.upper()} STANDINGS (seeds 1-{10 if play_in else 8})")
-        for seed, name in enumerate(ranked[:10 if play_in else 8], start=1):
-            tag = "  <- play-in" if (play_in and seed >= 7) else ""
+        conference_play_in = play_in and len(ranked) >= 10   # a small league has no play-in
+        field_size = 8 if len(ranked) >= 8 else 4            # and fewer than eight a side means a four-team bracket
+        print(f"\n{conference.upper()} STANDINGS (seeds 1-{10 if conference_play_in else field_size})")
+        for seed, name in enumerate(ranked[:10 if conference_play_in else field_size], start=1):
+            tag = "  <- play-in" if (conference_play_in and seed >= 7) else ""
             print(f"  {seed:>2}. {name} ({record[name]}){tag}")
         for seed, name in enumerate(ranked, start=1):
             bracket_teams[name]["seed"] = seed
-        if play_in:
+        if conference_play_in:
             seven, eight, nine, ten = ranked[6], ranked[7], ranked[8], ranked[9]
             record_2027_play_in(conference, "7v8", seven, eight)
             record_2027_play_in(conference, "9v10", nine, ten)
@@ -556,7 +567,7 @@ def run_2027_postseason(standings, custom_factories=None):
             winner_final, _out = run_2027_play_in_game(loser_78, winner_910, factories, f"{conference} 8-seed game", conference, "8seed", stage)
             seeds = ranked[:6] + [winner_78, winner_final]
         else:
-            seeds = ranked[:8]  # 2018 and earlier: the top eight in each conference are in
+            seeds = ranked[:field_size]  # 2018 and earlier (or a small league): the top eight (or four) in each conference are in
         field[conference] = [(name, seed, strengths[name], factory_names[name]) for seed, name in enumerate(seeds, start=1)]
         print(f"\n{conference} playoff seeds: " + ", ".join(f"{seed}. {name}" for seed, name in enumerate(seeds, start=1)))
 

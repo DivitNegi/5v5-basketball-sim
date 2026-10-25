@@ -22309,6 +22309,8 @@ def user_pick_from_pool(pools: Dict[str, List[Tuple[Player, str]]],
     """
     if GUI_FANTASY_PICKER is not None:
         picked = GUI_FANTASY_PICKER(pools, taken_names)
+        if isinstance(picked, str) and picked == FANTASY_DRAFT_AUTO:
+            return picked   # the season draft makes this and every later pick for you
         if picked == FANTASY_DRAFT_CANCEL or FANTASY_DRAFT_CANCEL_REQUESTED:
             raise FantasyDraftCancelled()
         while picked is None:
@@ -22752,7 +22754,7 @@ def make_fantasy_team_factory(team_name: str, drafted_players: List[Player], use
 # rotation (top ten players, weighted by rank, with value growing steeply with overall, so a star is worth more than two good
 # players) and by whether it would be left thin at guard or big. It accepts a good deal, turns down a bad one with the reasons,
 # and sometimes counters a close one by asking for one more player or by offering less.
-FANTASY_TRADE_STATE: Dict = {"user_team": None, "factories": None, "pending": [], "active": False, "next_order": 0, "hook": None, "log": []}
+FANTASY_TRADE_STATE: Dict = {"user_team": None, "factories": None, "pending": [], "active": False, "next_order": 0, "hook": None, "log": [], "offer": None}
 FANTASY_TRADE_MIN_ROSTER = 9
 FANTASY_TRADE_MAX_ROSTER = 14
 FANTASY_TRADE_ROTATION_WEIGHTS = (1.0, 1.0, 1.0, 1.0, 1.0, 0.85, 0.7, 0.5, 0.35, 0.2)
@@ -22762,7 +22764,7 @@ FANTASY_TRADE_GROUP_NAMES = {"G": "guards", "W": "wings", "B": "bigs"}
 
 
 def fantasy_trade_setup(user_team: str, factories: Dict[str, object]):
-    FANTASY_TRADE_STATE.update(user_team=user_team, factories=factories, pending=[], active=False, next_order=0, hook=None, log=[])
+    FANTASY_TRADE_STATE.update(user_team=user_team, factories=factories, pending=[], active=False, next_order=0, hook=None, log=[], offer=None)
 
 
 def fantasy_trade_roster(team_name: str) -> List[Player]:
@@ -22932,6 +22934,60 @@ def _fantasy_trade_execute(trade: Dict):
     user_roster.extend(out_a)
     ai_roster.extend(out_u)
     FANTASY_TRADE_STATE["log"].append({"ai_team": trade["ai_team"], "user_gives": list(trade["user_gives"]), "ai_gives": list(trade["ai_gives"])})
+
+
+# ---- offers from the AI teams: a team that wants one of your players proposes a deal and the season stops for you ----
+FANTASY_TRADE_OFFER_CHANCE = 0.45     # per block of games (about four rounds), once the season is under way
+FANTASY_TRADE_OFFER_MIN_USER_CHANGE = -0.06   # never an insulting offer: your rotation may not fall more than this
+
+
+def fantasy_trade_generate_offer() -> Dict | None:
+    """A trade an AI team would like to make with the user's team, or None. The AI picks a player it wants from your top seven
+    and offers one or two of its own; the deal has to pass the AI's own test and not be insulting for you."""
+    state = FANTASY_TRADE_STATE
+    user_name = state["user_team"]
+    user_roster = list(fantasy_trade_roster(user_name))
+    if len(user_roster) < FANTASY_TRADE_MIN_ROSTER:
+        return None
+    user_before = fantasy_trade_rotation_value(user_roster)
+    targets_all = sorted(user_roster, key=fantasy_ovr, reverse=True)[:7]
+    teams = [name for name in state["factories"] if name != user_name]
+    random.shuffle(teams)
+    for ai_name in teams[:12]:
+        ai_roster = list(fantasy_trade_roster(ai_name))
+        ai_ranked = sorted(ai_roster, key=fantasy_ovr, reverse=True)
+        shortfall = fantasy_trade_shortfall(ai_roster)
+        targets = targets_all[:]
+        random.shuffle(targets)
+        for target in targets:
+            wanted = fantasy_trade_value(target)
+            pool = ai_ranked[2:]   # a team keeps its two best players out of an offer
+            packages = [[p] for p in pool if 0.7 <= fantasy_trade_value(p) / wanted <= 1.15]
+            packages += [[a, b] for i, a in enumerate(pool) for b in pool[i + 1:] if 0.8 <= (fantasy_trade_value(a) + fantasy_trade_value(b)) / wanted <= 1.2]
+            random.shuffle(packages)
+            for package in packages[:6]:
+                give = [p.name for p in package]
+                outcome = evaluate_fantasy_trade(ai_name, [target.name], give, allow_counter=False)
+                if outcome["decision"] != "accept":
+                    continue
+                user_after = [p for p in user_roster if p.name != target.name] + package
+                if not FANTASY_TRADE_MIN_ROSTER <= len(user_after) <= FANTASY_TRADE_MAX_ROSTER:
+                    continue
+                change = fantasy_trade_rotation_value(user_after) / max(user_before, 1e-9) - 1.0
+                if change < FANTASY_TRADE_OFFER_MIN_USER_CHANGE:
+                    continue
+                group = fantasy_trade_group(target)
+                if shortfall.get(group, 0) > 0:
+                    pitch = f"We are thin at {FANTASY_TRADE_GROUP_NAMES[group]} and {target.name} would start for us."
+                elif fantasy_ovr(target) >= fantasy_ovr(ai_ranked[min(4, len(ai_ranked) - 1)]):
+                    pitch = f"{target.name} would crack our starting five."
+                else:
+                    pitch = f"We like how {target.name} fits our rotation."
+                return {
+                    "ai_team": ai_name, "user_gives": [target.name], "ai_gives": give, "pitch": pitch,
+                    "user_change": change, "detail": [fantasy_trade_describe(p) for p in package], "target": fantasy_trade_describe(target),
+                }
+    return None
 
 
 def fantasy_trade_process_pending(on_applied=None):
@@ -23472,7 +23528,8 @@ def build_season_sections(entries: List[Dict],
                           game_extras: Dict | None = None,
                           game_meta: Dict | None = None,
                           include_rookies: bool = True,
-                          races_only: bool = False) -> Dict:
+                          races_only: bool = False,
+                          fixtures: List | None = None) -> Dict:
     def season_ts(stats: Dict) -> float:
         denom = 2 * (stats.get("fga", 0) + 0.44 * stats.get("fta", 0))
         return 0.0 if denom == 0 else 100 * stats.get("pts", 0) / denom
@@ -24021,6 +24078,7 @@ def build_season_sections(entries: List[Dict],
         "_season_game_log_fields": SEASON_GAME_LOG_FIELDS,
         "_season_game_extras": dict(game_extras or {}),
         "_season_games": sorted((game_meta or {}).values(), key=lambda g: g["order"]),
+        "_season_fixtures": list(fixtures or []),   # (game number, home, away) for the whole schedule: upcoming games included
         "_season_standings": standings,
         "_season_awards": awards,
         "_season_awards_table": awards_table,
@@ -24223,7 +24281,7 @@ def live_season_races_payload(entries, player_totals, team_totals, completed: in
 
 
 def season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, completed=None, total=None,
-                          include_rookies: bool = True, positional: bool = False):
+                          include_rookies: bool = True, positional: bool = False, fixtures=None):
     """Give the GUI the season so far (every stats tab) while the sim is paused.
 
     Works on copies of the running totals, so the season keeps adding to its own dicts after Resume."""
@@ -24239,7 +24297,7 @@ def season_pause_snapshot(section_queue, entries, player_totals, team_totals, ga
         sections = build_season_sections(
             [dict(e) for e in entries], copy.deepcopy(player_totals), copy.deepcopy(team_totals),
             game_log=list(game_log.rows), game_extras=dict(game_log.extras), game_meta=dict(game_log.games),
-            include_rookies=include_rookies)
+            include_rookies=include_rookies, fixtures=fixtures)
         sections["_season_paused"] = {"completed": completed, "total": total}
         section_queue.put(sections)
     except Exception:
@@ -24336,9 +24394,11 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     if progress_queue is not None:
         progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
 
+    fixtures = [(index + 1, home["name"], away["name"]) for index, (home, away) in enumerate(schedule)]
+
     def season_snapshot():
         season_pause_snapshot(section_queue, entries, season_player_totals, season_team_totals, season_game_log,
-                              None, total_games, include_rookies=False)
+                              None, total_games, include_rookies=False, fixtures=fixtures)
 
     season_live_tick = make_season_live_updater(season_snapshot)
 
@@ -24381,8 +24441,23 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 season_replay_register_maker(team_name, (lambda t=entry["factory"](): _copy.deepcopy(t)), FANTASY_TRADE_STATE["next_order"])
 
     if fantasy_trades:
-        FANTASY_TRADE_STATE.update(active=True, next_order=0, pending=[],
+        FANTASY_TRADE_STATE.update(active=True, next_order=0, pending=[], offer=None,
                                    hook=lambda: fantasy_trade_process_pending(apply_trade_to_season))
+
+    def maybe_offer_trade(games_played):
+        """Now and then an AI team proposes a trade to you: the season pauses (and only for deals that involve your team)."""
+        global SIM_PAUSED
+        if not fantasy_trades or progress_queue is None or SIM_PAUSED:
+            return
+        if games_played < 120 or games_played > total_games - 90 or random.random() > FANTASY_TRADE_OFFER_CHANCE:
+            return
+        offer = fantasy_trade_generate_offer()
+        if not offer:
+            return
+        FANTASY_TRADE_STATE["offer"] = offer
+        SIM_PAUSED = True
+        progress_queue.put({"trade_offer": offer, "completed": games_played})
+        hold_season_while_paused(season_snapshot)   # waits for your answer; an accepted trade is carried out here
     for order, (entry_a, entry_b) in enumerate(schedule):
         season_replay_register_game(order, entry_a["name"], entry_b["name"], seeds[order])
 
@@ -24396,6 +24471,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             for start_index in range(0, total_games, batch):
                 FANTASY_TRADE_STATE["next_order"] = start_index
                 hold_season_while_paused(season_snapshot)
+                maybe_offer_trade(start_index)
                 tasks = [
                     (templates[ea["name"]], templates[eb["name"]], order, seeds[order])
                     for order, (ea, eb) in enumerate(schedule[start_index:start_index + batch], start=start_index)
@@ -24411,6 +24487,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         for order, (entry_a, entry_b) in enumerate(schedule):
             FANTASY_TRADE_STATE["next_order"] = order
             hold_season_while_paused(season_snapshot)
+            if order % 60 == 0:
+                maybe_offer_trade(order)
             team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"], seeds[order])
             yield team_a, team_b, order
 
@@ -24460,7 +24538,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             fantasy_trade_process_pending(apply_trade_to_season)   # a trade agreed as the season ended still goes through
     sections = build_season_sections(entries, season_player_totals, season_team_totals,
                                      game_log=season_game_log.rows, game_extras=season_game_log.extras,
-                                     game_meta=season_game_log.games, include_rookies=False)
+                                     game_meta=season_game_log.games, include_rookies=False, fixtures=fixtures)
     if section_queue is not None:
         section_queue.put(sections)
     print("\nSeason complete. Standings, averages, advanced stats, shot diet, and awards are ready in the GUI.")
@@ -24888,6 +24966,21 @@ class FantasyDraftCancelled(Exception):
 
 
 FANTASY_DRAFT_CANCEL = "__fantasy_draft_cancel__"  # what the board returns for Cancel
+FANTASY_DRAFT_AUTO = "__fantasy_draft_auto__"      # what the board returns for "Auto-draft the rest"
+FANTASY_SEASON_TEAM_COUNTS = tuple(range(30, 7, -2))   # an even number of teams, 8 to 30
+
+
+def fantasy_pick_team_count(max_teams: int) -> int:
+    """How many franchises take part in the fantasy season (even, 8 up to the number of franchises)."""
+    counts = [n for n in FANTASY_SEASON_TEAM_COUNTS if n <= max_teams]
+    if not counts:
+        return max_teams
+    labels = [f"{n} teams" + (" (the full league)" if n == counts[0] else "") for n in counts]
+    if GUI_OPTION_PICKER is not None:
+        choice = GUI_OPTION_PICKER("Number of Teams", "How many teams play in this fantasy season? (an even number, 8 to 30)", labels)
+        return counts[labels.index(choice)] if choice in labels else counts[0]
+    raw = input(f"How many teams (even, 8-{counts[0]})? [{counts[0]}]: ").strip()
+    return int(raw) if raw.isdigit() and int(raw) in counts else counts[0]
 FANTASY_DRAFT_CANCEL_REQUESTED = False
 GUI_DRAFT_RECAP_VIEWER = None  # set by the GUI: shows the recap table and waits for Continue
 
@@ -25027,7 +25120,12 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
             print(f"  {idx}. {name}")
         raw = input(f"Enter number (1-{len(franchise_names)}): ").strip()
         user_team_name = franchise_names[int(raw) - 1] if raw.isdigit() and 1 <= int(raw) <= len(franchise_names) else franchise_names[0]
-    team_order = [user_team_name] + [name for name in franchise_names if name != user_team_name]
+    others = [name for name in franchise_names if name != user_team_name]
+    team_count = fantasy_pick_team_count(len(franchise_names))
+    if team_count < len(franchise_names):
+        random.shuffle(others)
+        others = sorted(others[:team_count - 1])   # a random set of opponents, drafting in alphabetical order
+    team_order = [user_team_name] + others
     drafted_rosters: Dict[str, List[Player]] = {name: [] for name in team_order}
     taken_names: set = set()
     # A small pool (the 2027-only one has ~320 players) can't fill 12 rounds of
@@ -25042,6 +25140,7 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
         "user_team": user_team_name, "rosters": drafted_rosters, "log": [],
         "round": 0, "rounds": rounds, "pick_in_round": 0, "teams": len(team_order),
         "overall": 0, "total_picks": rounds * len(team_order),
+        "auto_allowed": True, "auto_rest": False,
     })
     pool_label = "2027 players only" if year_prefix else (
         "all-time players (best version of each)" + (", custom players included" if include_custom else "")
@@ -25064,8 +25163,16 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
             FANTASY_DRAFT_STATE["overall"] = (round_num - 1) * len(team_order) + pick_in_round
             FANTASY_DRAFT_STATE["on_clock"] = team_name
             if team_name == user_team_name:
-                print(f"\n{user_team_name} are on the clock.")
-                picked = user_pick_from_pool(pools, taken_names)
+                picked = None
+                if not FANTASY_DRAFT_STATE.get("auto_rest"):
+                    print(f"\n{user_team_name} are on the clock.")
+                    picked = user_pick_from_pool(pools, taken_names)
+                    if isinstance(picked, str) and picked == FANTASY_DRAFT_AUTO:
+                        FANTASY_DRAFT_STATE["auto_rest"] = True
+                        picked = None
+                if picked is None:
+                    picked = ai_pick_for_fantasy_team(pools, taken_names, drafted_rosters[team_name], drafted_rosters[team_name])
+                    print(f"Auto-draft picks {picked.name} ({picked.position}) for {user_team_name}.")
                 versions = list(getattr(picked, "fantasy_versions", None) or [])
                 if versions:
                     picked = max(versions, key=fantasy_ovr)  # always the best version
@@ -25100,6 +25207,7 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
         for name, roster in drafted_rosters.items()
     }
     fantasy_trade_setup(user_team_name, factories)
+    FANTASY_DRAFT_STATE["auto_allowed"] = False
     return list(team_order), factories, user_team_name
 
 
@@ -25114,6 +25222,7 @@ def run_fantasy_draft_playoffs():
     taken_names: set = set()
     picks_per_team = 8
 
+    FANTASY_DRAFT_STATE.clear()   # the season draft's auto-draft option does not apply here
     print("\n=== FANTASY DRAFT PLAYOFFS ===")
     print("You draft against 15 AI teams, then the field splits into 8 East and 8 West playoff teams.")
     print("The player pool uses every player from every team currently made in the simulator.")

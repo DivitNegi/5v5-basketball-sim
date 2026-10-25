@@ -190,6 +190,7 @@ def run_gui_app():
     try:
         import tkinter as tk
         from tkinter import ttk
+        from tkinter import messagebox
     except Exception as exc:
         if os.environ.get("FORCE_TKINTER_GUI") == "1":
             print(f"Tkinter GUI could not start: {exc}")
@@ -1871,6 +1872,7 @@ def run_gui_app():
     schedule_tree.tag_configure("section", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
     schedule_tree.tag_configure("win", foreground="#4ade80")
     schedule_tree.tag_configure("loss", foreground="#f87171")
+    schedule_tree.tag_configure("upcoming", foreground="#94a3b8")
     schedule_tree.grid(row=1, column=0, sticky="nsew")
     schedule_scroll_y.grid(row=1, column=1, sticky="ns")
     schedule_box_frame = ttk.Frame(schedule_frame)
@@ -1896,7 +1898,7 @@ def run_gui_app():
     schedule_box_scroll_x.grid(row=2, column=0, sticky="ew")
     schedule_row_game: Dict[str, int] = {}
     replay_target = {"sched": None, "highs": None}   # schedule order (0-based) of the game whose box score is open
-    schedule_cache = {"rows_id": None, "top": {}}
+    schedule_cache = {"rows_id": None, "top": {}, "auto_done": False, "shown_for": None}
     series_tabs.add(schedule_frame, text="Sched")
 
     rotation_widget_frame = ttk.Frame(series_tabs, padding=(6, 6))
@@ -3439,7 +3441,7 @@ def run_gui_app():
         previous = playoff_sections_state.get("sections") or {}
         if "_season_standings" in previous and "_season_standings" not in sections and "_season_player_totals" not in sections:
             for season_key in ("_season_standings", "_season_awards_table", "_season_awards", "_season_game_log",
-                               "_season_game_log_fields", "_season_game_extras", "_season_games",
+                               "_season_game_log_fields", "_season_game_extras", "_season_games", "_season_fixtures",
                                "_season_player_totals", "_season_team_totals", "_all_star_game"):
                 if season_key in previous:
                     sections[season_key] = previous[season_key]
@@ -4685,12 +4687,17 @@ def run_gui_app():
         schedule_tree.delete(*schedule_tree.get_children())
         schedule_row_game.clear()
         games = sections.get("_season_games") or []
-        if not games:
+        fixtures = sections.get("_season_fixtures") or []   # (game number, home, away) for the whole schedule
+        if not games and not fixtures:
             schedule_tree.insert("", "end", values=("", "The schedule will appear here after Season mode.") + ("",) * 6)
             schedule_count_var.set("")
             return
-        teams = sorted({g["home"] for g in games} | {g["away"] for g in games})
+        teams = sorted({g["home"] for g in games} | {g["away"] for g in games} | {f[1] for f in fixtures} | {f[2] for f in fixtures})
         schedule_team_dropdown.configure(values=("All Teams",) + tuple(teams))
+        my_team = sim_engine.FANTASY_TRADE_STATE.get("user_team")
+        if my_team in teams and not schedule_cache["auto_done"]:
+            schedule_team_var.set(my_team)   # a fantasy season opens on your own schedule
+            schedule_cache["auto_done"] = True
         if schedule_team_var.get() not in ("All Teams",) + tuple(teams):
             schedule_team_var.set("All Teams")
         team_filter = schedule_team_var.get()
@@ -4699,11 +4706,16 @@ def run_gui_app():
         by_team = team_filter != "All Teams" or order == "Group by team (A-Z)"
         schedule_tree.heading("home", text="Team" if by_team else "Home")
         schedule_tree.heading("away", text="Opponent" if by_team else "Away")
-        team_game_no = {}   # (team, gid) -> that team's own game number
+        team_game_no = {}   # (team, game number in the season) -> that team's own game number
         if by_team:
-            for team in teams:
-                for number, game in enumerate(sorted((g for g in games if team in (g["home"], g["away"])), key=lambda g: g["order"]), start=1):
-                    team_game_no[(team, game["gid"])] = number
+            if fixtures:
+                for team in teams:
+                    for number, fixture in enumerate(sorted((f for f in fixtures if team in (f[1], f[2])), key=lambda f: f[0]), start=1):
+                        team_game_no[(team, fixture[0])] = number
+            else:
+                for team in teams:
+                    for number, game in enumerate(sorted((g for g in games if team in (g["home"], g["away"])), key=lambda g: g["order"]), start=1):
+                        team_game_no[(team, game["order"])] = number
 
         def row_values(game, perspective=None):
             hs, as_ = game["home_score"], game["away_score"]
@@ -4717,7 +4729,7 @@ def run_gui_app():
                 own, other = (hs, as_) if at_home else (as_, hs)
                 opponent = game["away"] if at_home else game["home"]
                 return (
-                    team_game_no.get((perspective, game["gid"]), game["order"]), table_player_name(perspective, 30), f"{own} - {other}",
+                    team_game_no.get((perspective, game["order"]), game["order"]), table_player_name(perspective, 30), f"{own} - {other}",
                     table_player_name(opponent, 30), table_player_name(winner, 30), abs(hs - as_),
                     f"{scorer[0]} ({scorer[1]})" if scorer else "", result,
                 )
@@ -4738,14 +4750,40 @@ def run_gui_app():
 
         if team_filter != "All Teams":
             mine = [g for g in games if team_filter in (g["home"], g["away"])]
+            played_orders = {g["order"] for g in games}
+            upcoming = [f for f in fixtures if team_filter in (f[1], f[2]) and f[0] not in played_orders]
+            next_iid = None
             if order == "Biggest margin":
                 mine.sort(key=lambda g: -abs(g["home_score"] - g["away_score"]))
+                upcoming = []
             elif order == "Highest scoring":
                 mine.sort(key=lambda g: -(g["home_score"] + g["away_score"]))
-            for game in mine:
-                add(game, team_filter)
+                upcoming = []
+            if upcoming:
+                # schedule order: the games played so far, then the ones still to come
+                for game in sorted(mine, key=lambda g: g["order"]):
+                    add(game, team_filter)
+                for number, home, away in upcoming:
+                    opponent = away if home == team_filter else home
+                    iid = schedule_tree.insert(
+                        "", "end", tags=("upcoming",),
+                        values=(team_game_no.get((team_filter, number), number), table_player_name(team_filter, 30), "-",
+                                table_player_name(opponent, 30), "", "", "", "Upcoming"),
+                    )
+                    next_iid = next_iid or iid
+            else:
+                for game in mine:
+                    add(game, team_filter)
             wins = sum(1 for g in mine if (g["home"] if g["home_score"] > g["away_score"] else g["away"]) == team_filter)
-            schedule_count_var.set(f"{table_player_name(team_filter, 30)}: {len(mine)} games, {wins}-{len(mine) - wins}")
+            schedule_count_var.set(
+                f"{table_player_name(team_filter, 30)}: {len(mine)} played, {wins}-{len(mine) - wins}"
+                + (f", {len(upcoming)} to play" if upcoming else "")
+            )
+            if schedule_cache.get("shown_for") != (team_filter, order) and next_iid:
+                schedule_tree.see(next_iid)   # first look at this team: scroll to its next game
+            else:
+                schedule_tree.yview_moveto(scroll_position)
+            schedule_cache["shown_for"] = (team_filter, order)
             return
         if order == "Group by team (A-Z)":
             for team in teams:
@@ -5642,11 +5680,13 @@ def run_gui_app():
                 if not rows:
                     continue
                 lead_w, lead_l = rows[0].get("wins", 0), rows[0].get("losses", 0)
+                play_in_here = standings_play_in and len(rows) >= 10
+                cutoff = 10 if play_in_here else (8 if len(rows) >= 8 else 4)
                 for seed, row in enumerate(rows, start=1):
                     w, l = row.get("wins", 0), row.get("losses", 0)
                     games = max(1, w + l)
                     gb = ((lead_w - w) + (l - lead_l)) / 2
-                    tag = ("playin",) if (standings_play_in and 7 <= seed <= 10) else (("out",) if seed > (10 if standings_play_in else 8) else ())
+                    tag = ("playin",) if (play_in_here and 7 <= seed <= 10) else (("out",) if seed > cutoff else ())
                     is_mine = bool(my_team) and row.get("team") == my_team
                     if is_mine:
                         tag = tag + ("mine",)
@@ -5659,18 +5699,18 @@ def run_gui_app():
                         ),
                         tags=tag,
                     )
-                    if standings_play_in and seed == 6:
+                    if play_in_here and seed == 6:
                         tree.insert("", "end", values=("", "-- play-in zone (7-10) --", "", "", "", "", "", "", "", ""), tags=("line",))
-                    elif seed == (10 if standings_play_in else 8):
+                    elif seed == cutoff and seed < len(rows):
                         tree.insert("", "end", values=("", "-- out of the playoffs --", "", "", "", "", "", "", "", ""), tags=("line",))
+            league_play_in = standings_play_in and len(rows_all) >= 20
+            league_cutoff = 8 if len(rows_all) >= 16 else 4
+            qualify_text = ("Seeds 1-6 are in, 7-10 go to the play-in." if league_play_in
+                            else f"The top {league_cutoff} in each conference make the playoffs.")
             if final:
-                rotation_status_var.set("Final regular-season standings.  Seeds 1-6 are in, 7-10 go to the play-in." if standings_play_in
-                                        else "Final regular-season standings.  The top 8 in each conference make the playoffs.")
+                rotation_status_var.set("Final regular-season standings.  " + qualify_text)
             else:
-                rotation_status_var.set(
-                    f"LIVE: {live_standings['completed']} of {live_standings['total']} games simulated.  "
-                    + ("Seeds 1-6 are in, 7-10 go to the play-in." if standings_play_in else "The top 8 in each conference make the playoffs.")
-                )
+                rotation_status_var.set(f"LIVE: {live_standings['completed']} of {live_standings['total']} games simulated.  " + qualify_text)
             return
         teams = [SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")]
         if not all(teams):
@@ -7242,6 +7282,20 @@ def run_gui_app():
                 render_side()
                 fantasy_dialog["rq"].put(player)
 
+            def auto_rest():
+                # Let the AI make this pick and every later one for you.
+                if fantasy_dialog.get("waiting"):
+                    return
+                if not messagebox.askyesno("Auto-draft", "Let the AI make all of your remaining picks?", parent=dialog):
+                    return
+                remember_board_state()
+                fantasy_dialog["waiting"] = True
+                draft_button.state(["disabled"])
+                auto_button.state(["disabled"])
+                status_var_dialog.set("Auto-drafting the rest of your picks...")
+                render_side()
+                fantasy_dialog["rq"].put(sim_engine.FANTASY_DRAFT_AUTO)
+
             def cancel():
                 # Cancel / closing the board ends the whole fantasy draft.
                 sim_engine.FANTASY_DRAFT_CANCEL_REQUESTED = True
@@ -7253,6 +7307,7 @@ def run_gui_app():
                 # Your pick again: same window, refreshed board and roster.
                 fantasy_dialog["waiting"] = False
                 draft_button.state(["!disabled"])
+                auto_button.state(["!disabled"])
                 refresh_board()
                 render_side()
                 try:
@@ -7269,7 +7324,12 @@ def run_gui_app():
             button_frame.columnconfigure(1, weight=1)
             draft_button = ttk.Button(button_frame, text="Draft Selected Player", command=draft_selected)
             draft_button.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-            ttk.Button(button_frame, text="Cancel", command=cancel).grid(row=0, column=1, sticky="ew", padx=(6, 0))
+            auto_button = ttk.Button(button_frame, text="Auto-draft the rest", command=auto_rest)
+            auto_button.grid(row=0, column=1, sticky="ew", padx=(6, 0))
+            if not (getattr(sim_engine, "FANTASY_DRAFT_STATE", None) or {}).get("auto_allowed"):
+                auto_button.grid_remove()   # only the fantasy season draft can finish itself
+            ttk.Button(button_frame, text="Cancel", command=cancel).grid(row=0, column=2, sticky="ew", padx=(6, 0))
+            button_frame.columnconfigure(2, weight=1)
 
             tree.bind("<<TreeviewSelect>>", refresh_versions)
             tree.bind("<Double-Button-1>", lambda _event: draft_selected())
@@ -8349,7 +8409,76 @@ def run_gui_app():
         pool_list.bind("<<ListboxSelect>>", select_pool_player)
         refresh_pool()
 
-    def open_trade_dialog():
+    def show_trade_offer(offer):
+        """An AI team wants one of your players: the season is paused; accept, negotiate or reject."""
+        sim_engine.SIM_PAUSED = True
+        pause_button.configure(text="Resume")
+        status_var.set(f"Trade offer from {offer['ai_team']}. The season is paused until you answer.")
+        win = tk.Toplevel(root)
+        win.title(f"Trade offer - {offer['ai_team']}")
+        win.geometry("640x470")
+        win.configure(bg=APP_BG)
+        win.transient(root)
+        tk.Label(win, text=f"{offer['ai_team']} want {offer['user_gives'][0]}", bg=APP_BG, fg=GOLD, font=("Segoe UI", 17, "bold"), anchor="w", wraplength=590, justify="left").pack(fill="x", padx=18, pady=(16, 4))
+        tk.Label(win, text=offer["pitch"], bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 12), anchor="w", wraplength=590, justify="left").pack(fill="x", padx=18, pady=(0, 10))
+        card = tk.Frame(win, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
+        card.pack(fill="x", padx=18, pady=4)
+        you_give = sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])
+        give_text = ", ".join(sim_engine.fantasy_trade_describe(p) for p in you_give if p.name in offer["user_gives"])
+        tk.Label(card, text="You send:", bg=PANEL, fg=MUTED, font=("Segoe UI", 11), anchor="w").pack(fill="x", padx=12, pady=(10, 0))
+        tk.Label(card, text=give_text, bg=PANEL, fg=TEXT, font=("Segoe UI", 13, "bold"), anchor="w", wraplength=570, justify="left").pack(fill="x", padx=12)
+        tk.Label(card, text="You receive:", bg=PANEL, fg=MUTED, font=("Segoe UI", 11), anchor="w").pack(fill="x", padx=12, pady=(10, 0))
+        tk.Label(card, text="\n".join(offer["detail"]), bg=PANEL, fg=TEXT, font=("Segoe UI", 13, "bold"), anchor="w", justify="left").pack(fill="x", padx=12, pady=(0, 10))
+        tk.Label(win, text=f"Effect on your top-ten rotation value: {offer['user_change'] * 100:+.1f}%", bg=APP_BG, fg=MUTED, font=("Segoe UI", 11), anchor="w").pack(fill="x", padx=18, pady=(8, 0))
+        tk.Label(win, text="Negotiate opens the trade window with this deal filled in, so you can change it and see their counter.", bg=APP_BG, fg=MUTED, font=("Segoe UI", 10), anchor="w", wraplength=590, justify="left").pack(fill="x", padx=18, pady=(2, 8))
+        result = {"done": False}
+
+        def resume_after_offer():
+            sim_engine.FANTASY_TRADE_STATE["offer"] = None
+            sim_engine.SIM_PAUSED = False
+            pause_button.configure(text="Pause")
+            status_var.set("Running...")
+
+        def reject():
+            if result["done"]:
+                return
+            result["done"] = True
+            win.destroy()
+            resume_after_offer()
+
+        def accept():
+            if result["done"]:
+                return
+            check = sim_engine.evaluate_fantasy_trade(offer["ai_team"], offer["user_gives"], offer["ai_gives"], allow_counter=False)
+            if check["decision"] != "accept":
+                messagebox.showinfo("Trade offer", "That offer is no longer available (the rosters have changed).", parent=win)
+                reject()
+                return
+            outcome = sim_engine.fantasy_trade_submit(offer["ai_team"], offer["user_gives"], offer["ai_gives"])
+            if not outcome.get("ok"):
+                messagebox.showinfo("Trade offer", outcome.get("error") or "The trade could not be completed.", parent=win)
+                return
+            result["done"] = True
+            win.destroy()
+            resume_after_offer()
+            status_var.set(f"Trade done with {offer['ai_team']}: {', '.join(offer['user_gives'])} for {', '.join(offer['ai_gives'])}.")
+
+        def negotiate():
+            if result["done"]:
+                return
+            result["done"] = True
+            win.destroy()
+            sim_engine.FANTASY_TRADE_STATE["offer"] = None   # the season stays paused: press Resume when you are done
+            open_trade_dialog(preset=(offer["ai_team"], offer["user_gives"], offer["ai_gives"]))
+
+        buttons = ttk.Frame(win, padding=(18, 8, 18, 14))
+        buttons.pack(fill="x", side="bottom")
+        ttk.Button(buttons, text="Accept", command=accept).grid(row=0, column=0, padx=(0, 8))
+        ttk.Button(buttons, text="Negotiate", command=negotiate).grid(row=0, column=1, padx=(0, 8))
+        ttk.Button(buttons, text="Reject", command=reject).grid(row=0, column=2)
+        win.protocol("WM_DELETE_WINDOW", reject)
+
+    def open_trade_dialog(preset=None):
         """Fantasy trades: pause the season, then trade with any AI team. The AI accepts a good deal, explains a refusal, and sometimes counters."""
         state = sim_engine.FANTASY_TRADE_STATE
         if not sim_engine.fantasy_trade_available():
@@ -8506,6 +8635,14 @@ def run_gui_app():
         partner_box.bind("<<ComboboxSelected>>", lambda _event: (refresh_rosters(), show_response("Pick players on both sides.", "counter", [])))
         refresh_rosters()
         show_response("Pick players on both sides.", "counter", ["The AI accepts a deal that helps its rotation, explains a refusal, and sometimes counters a close one."])
+        if preset:
+            # an offer you chose to negotiate: their deal is filled in; change it and press Propose
+            partner_var.set(preset[0])
+            refresh_rosters()
+            mine_tree.selection_set([n for n in preset[1] if mine_tree.exists(n)])
+            theirs_tree.selection_set([n for n in preset[2] if theirs_tree.exists(n)])
+            note_var.set("Their offer is filled in. Change the players and press Propose to negotiate; press Resume on the main window when you are done.")
+            show_response(f"{preset[0]} offered this deal.", "counter", ["Edit the players on either side and press Propose to see their answer."])
 
     def open_roster_swap_dialog():
         if running["active"]:
@@ -9474,6 +9611,7 @@ def run_gui_app():
         next_button.configure(state="disabled")
         live_standings.update(rows=[], completed=0, total=0, dirty=False)
         sim_engine.fantasy_trade_setup(None, None)   # the fantasy draft sets this again; other modes have no user franchise
+        schedule_cache.update(auto_done=False, shown_for=None)
         bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False, box_open=False)
         bracket_box_frame.grid_remove()
         bracket_avg_frame.grid_remove()
@@ -9718,7 +9856,7 @@ def run_gui_app():
         cover_tabs = False   # the tabs update live during the season, so they are never covered
         if want and not season_view.get("speed_on"):
             season_view["speed_on"] = True
-            season_speed["value"] = 20.0
+            season_speed["value"] = 1.0 if sim_engine.FANTASY_TRADE_STATE.get("user_team") else 20.0   # a fantasy season starts slow: use + to speed it up
             apply_season_speed()
         elif not want and season_view.get("speed_on"):
             season_view["speed_on"] = False
@@ -9781,6 +9919,9 @@ def run_gui_app():
                     if isinstance(message, dict) and message.get("postseason_ready"):
                         next_button.configure(state="normal")
                         status_var.set("Season complete. Press Next for the play-in and playoffs.")
+                        continue
+                    if isinstance(message, dict) and "trade_offer" in message:
+                        show_trade_offer(message["trade_offer"])
                         continue
                     if isinstance(message, dict) and message.get("reset_series_score"):
                         latest_scoreboard = None  # anything queued before the reset is stale
