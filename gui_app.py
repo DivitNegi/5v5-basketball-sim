@@ -541,7 +541,7 @@ def run_gui_app():
         "Jalen Brunson": "1628973", "Karl-Anthony Towns": "1626157", "Tyrese Haliburton": "1630169",
         "Pascal Siakam": "1627783", "Donovan Mitchell": "1628378", "Jalen Williams": "1631114",
         "Chet Holmgren": "1631096", "Alex Caruso": "1627936", "Jrue Holiday": "201950",
-        "Derrick White": "1628401", "Kristaps Porzingis": "204001", "Al Horford": "201143",
+        "Derrick White": "1628401", "Kristaps Porziņģis": "204001", "Al Horford": "201143",
         "Jarred McCain": "1642272", "Jared McCain": "1642272",
         "Dwyane Wade": "2548", "Chris Bosh": "2547", "Ray Allen": "951", "Michael Jordan": "893",
         "Kobe Bryant": "977", "Shaquille O'Neal": "406", "Tim Duncan": "1495",

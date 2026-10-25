@@ -1553,7 +1553,7 @@ def make_warriors_2027() -> Team:
                0.880, 0.930,
                clutchness=0.350, secondary_positions=('C',), height=78, speed=0.730,
                shot_iq=0.300, archetype='defensive playmaker', badges=('lockdown', 'shot_creator'), stamina=0.91),
-        Player('Kristaps Porzingis', 'C',
+        Player('Kristaps Porziņģis', 'C',
                0.42, 0.24, 0.16, 0.20, 0.36, 0.28,
                0.800, 0.900, 0.930, 0.750, 0.840,
                0.18, 0.513, 0.680,
