@@ -9486,7 +9486,7 @@ def run_gui_app():
             tree = ttk.Treeview(frame, columns=cols, show="headings", style="Series.Treeview")
             for col, label, width, anchor in (
                 ("rank", "#", 46, "center"), ("team", "Team", 230, "w"), ("grade", "Grade", 70, "center"),
-                ("proj", "Proj W-L", 100, "center"), ("top", "Best players (OVR)", 560, "w"), ("notes", "Strengths / holes", 360, "w"),
+                ("proj", "Proj W-L", 100, "center"), ("top", "Best players (OVR)", 560, "w"), ("notes", "Strengths / holes", 560, "w"),
             ):
                 tree.heading(col, text=label)
                 tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col in ("top", "notes"))

@@ -25135,39 +25135,62 @@ FANTASY_GRADE_BANDS = (
 )
 
 
-def fantasy_team_notes(roster: List[Player]) -> List[str]:
-    """Plain-language strengths and holes of a drafted roster."""
-    notes = []
-    shooters = sum(1 for p in roster if p.three_rating >= 0.80 and p.three_tendency >= 0.25)
-    creators = sum(1 for p in roster if p.playmaking >= 0.75 or p.ball_handle >= 0.82)
-    anchors = sum(1 for p in roster if p.interior_def >= 0.80 or p.block >= 0.60)
-    stoppers = sum(1 for p in roster if p.perimeter_def >= 0.78)
-    finishers = sum(1 for p in roster if p.rim_rating >= 0.88 or p.dunk_rating >= 0.88)
-    best = max((fantasy_ovr(p) for p in roster), default=0)
-    counts = fantasy_roster_counts(roster)
-    if best >= 96:
-        notes.append("superstar")
-    if shooters >= 6:
-        notes.append("elite spacing")
-    elif shooters <= 2:
-        notes.append("thin on shooting")
-    if creators >= 4:
-        notes.append("deep playmaking")
-    elif creators <= 1:
-        notes.append("few creators")
-    if anchors >= 3:
-        notes.append("strong rim protection")
-    elif anchors == 0:
-        notes.append("no rim protection")
-    if stoppers >= 4:
-        notes.append("lockdown perimeter D")
-    if finishers >= 6:
-        notes.append("great finishers")
-    if counts["PG"] + counts["SG"] <= 2:
-        notes.append("short on guards")
-    if counts["PF"] + counts["C"] <= 2:
-        notes.append("short on bigs")
-    return notes[:4]
+FANTASY_NOTE_LABELS = {
+    # metric: (label when the team is far above the league, label when it is far below)
+    "star power": ("star power", "light on stars"),
+    "depth": ("deep rotation", "thin rotation"),
+    "spacing": ("elite spacing", "thin on shooting"),
+    "playmaking": ("deep playmaking", "thin playmaking"),
+    "rim protection": ("strong rim protection", "weak rim protection"),
+    "perimeter defense": ("lockdown perimeter D", "soft perimeter D"),
+    "finishing": ("great finishers", "few finishers"),
+    "rebounding": ("dominant on the glass", "weak rebounding"),
+    "guards": ("loaded at guard", "short on guards"),
+    "bigs": ("stacked up front", "short on bigs"),
+}
+
+
+def fantasy_roster_metrics(roster: List[Player]) -> Dict[str, float]:
+    """What a drafted team's nine-man rotation can do, as plain numbers (compared across the league in the draft recap)."""
+    rotation = sorted(roster, key=fantasy_ovr, reverse=True)[:9]
+    ovrs = [fantasy_ovr(p) for p in rotation]
+    counts = fantasy_roster_counts(rotation)
+    return {
+        "star power": sum(ovrs[:2]) / max(1, len(ovrs[:2])),
+        "depth": sum(ovrs[3:9]) / max(1, len(ovrs[3:9])),
+        "spacing": sum(1 for p in rotation if p.three_rating >= 0.80 and p.three_tendency >= 0.25),
+        "playmaking": sum(1 for p in rotation if p.playmaking >= 0.75 or p.ball_handle >= 0.82),
+        "rim protection": sum(1 for p in rotation if p.interior_def >= 0.80 or p.block >= 0.60),
+        "perimeter defense": sum(1 for p in rotation if p.perimeter_def >= 0.78),
+        "finishing": sum(1 for p in rotation if p.rim_rating >= 0.88 or p.dunk_rating >= 0.88),
+        "rebounding": sum(1 for p in rotation if p.dreb >= 0.68 or p.oreb >= 0.60),
+        "guards": counts["PG"] + counts["SG"],
+        "bigs": counts["PF"] + counts["C"],
+    }
+
+
+def fantasy_team_notes(roster: List[Player], league: List[List[Player]] | None = None) -> List[str]:
+    """Plain-language strengths and holes of a drafted roster, measured against the other teams in the league: in a draft of
+    stars every team has shooters and rim protectors, so only what a team has more (or less) of than the rest is worth saying."""
+    mine = fantasy_roster_metrics(roster)
+    table = [fantasy_roster_metrics(r) for r in (league or [roster])]
+    strengths, holes = [], []
+    for metric, (good, bad) in FANTASY_NOTE_LABELS.items():
+        values = [row[metric] for row in table]
+        mean = sum(values) / len(values)
+        spread = (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
+        if spread < 1e-9:
+            continue
+        z = (mine[metric] - mean) / spread
+        if z >= 0.7:
+            strengths.append((z, good))
+        elif z <= -0.7:
+            holes.append((z, bad))
+    strengths.sort(reverse=True)
+    holes.sort()
+    notes = [label for _z, label in strengths[:3]]
+    return ["Strong: " + (", ".join(notes) if notes else "balanced")] + (
+        ["Holes: " + ", ".join(label for _z, label in holes[:2])] if holes else ["Holes: none obvious"])
 
 
 def fantasy_draft_recap(drafted_rosters: Dict[str, List[Player]], user_team_name: str) -> List[Dict]:
@@ -25180,6 +25203,7 @@ def fantasy_draft_recap(drafted_rosters: Dict[str, List[Player]], user_team_name
     mean = sum(values) / max(1, len(values))
     spread = (sum((v - mean) ** 2 for v in values) / max(1, len(values))) ** 0.5 or 1.0
     ranked = sorted(strengths.items(), key=lambda item: item[1], reverse=True)
+    league_rosters = list(drafted_rosters.values())
     rows = []
     for rank, (name, strength) in enumerate(ranked, start=1):
         z = (strength - mean) / spread
@@ -25191,7 +25215,7 @@ def fantasy_draft_recap(drafted_rosters: Dict[str, List[Player]], user_team_name
             "rank": rank, "team": name, "grade": grade, "wins": wins, "losses": 82 - wins,
             "strength": round(strength, 1),
             "top": ", ".join(f"{pl.name} ({fantasy_ovr(pl)})" for pl in top),
-            "notes": ", ".join(fantasy_team_notes(roster)),
+            "notes": "  |  ".join(fantasy_team_notes(roster, league_rosters)),
             "user": name == user_team_name,
         })
     return rows
