@@ -22886,24 +22886,32 @@ def evaluate_fantasy_trade(ai_name: str, user_gives: List[str], ai_gives: List[s
 def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: List[Player], user_gives: List[str], ai_gives: List[str]):
     """A counter to a close deal: ask for one more of the user's players, or keep one of ours back."""
     options = []
-    # 1. ask for one more player: the cheapest one that makes it work
-    asks = []
+    # 1. ask for one more of your players and send one of ours back, so the deal stays balanced: the pair whose values differ
+    #    least (the extra player you add is mostly paid for by the one we add)
+    by_ai = {p.name: p for p in ai_roster}
+    ai_keep = {p.name for p in sorted(ai_roster, key=fantasy_ovr, reverse=True)[:2]}   # a team keeps its two best out of a counter
+    pairs = []
     for extra in user_roster:
         if extra.name in user_gives:
             continue
         new_user_gives = user_gives + [extra.name]
-        ai_after = [p for p in ai_roster if p.name not in set(ai_gives)] + [p for p in user_roster if p.name in set(new_user_gives)]
-        user_after_size = len(user_roster) - len(new_user_gives) + len(ai_gives)
-        ai_after_size = len(ai_after)
-        if not (FANTASY_TRADE_MIN_ROSTER <= user_after_size <= FANTASY_TRADE_MAX_ROSTER and FANTASY_TRADE_MIN_ROSTER <= ai_after_size <= FANTASY_TRADE_MAX_ROSTER):
-            continue
-        net = _fantasy_trade_net(ai_name, ai_roster, ai_after)[0]
-        if net >= FANTASY_TRADE_ACCEPT_NET:
-            asks.append((fantasy_trade_value(extra), extra))
-    if asks:
-        extra = min(asks, key=lambda item: item[0])[1]
-        options.append({"user_gives": user_gives + [extra.name], "ai_gives": list(ai_gives),
-                        "why": f"Counter: add {fantasy_trade_describe(extra)} from your side and we have a deal."})
+        for back in [None] + [p for p in ai_roster if p.name not in ai_gives and p.name not in ai_keep]:
+            new_ai_gives = ai_gives + ([back.name] if back is not None else [])
+            ai_after = [p for p in ai_roster if p.name not in set(new_ai_gives)] + [p for p in user_roster if p.name in set(new_user_gives)]
+            user_after_size = len(user_roster) - len(new_user_gives) + len(new_ai_gives)
+            if not (FANTASY_TRADE_MIN_ROSTER <= user_after_size <= FANTASY_TRADE_MAX_ROSTER and FANTASY_TRADE_MIN_ROSTER <= len(ai_after) <= FANTASY_TRADE_MAX_ROSTER):
+                continue
+            if _fantasy_trade_net(ai_name, ai_roster, ai_after)[0] >= FANTASY_TRADE_ACCEPT_NET:
+                gap = fantasy_trade_value(extra) - (fantasy_trade_value(back) if back is not None else 0.0)
+                pairs.append((0 if back is not None else 1, gap, extra, back))
+    if pairs:
+        _flag, _gap, extra, back = min(pairs, key=lambda item: (item[0], item[1]))
+        if back is not None:
+            options.append({"user_gives": user_gives + [extra.name], "ai_gives": list(ai_gives) + [back.name],
+                            "why": f"Counter: add {fantasy_trade_describe(extra)} from your side and we add {fantasy_trade_describe(back)} from ours."})
+        else:
+            options.append({"user_gives": user_gives + [extra.name], "ai_gives": list(ai_gives),
+                            "why": f"Counter: add {fantasy_trade_describe(extra)} from your side and we have a deal."})
     # 2. keep one of our lesser players back
     if len(ai_gives) > 1:
         by_ai = {p.name: p for p in ai_roster}
