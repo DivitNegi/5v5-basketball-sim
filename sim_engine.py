@@ -5493,6 +5493,27 @@ def player_from_stat_key(team: Team, key: str) -> Player | None:
     return next((player for player in getattr(team, "roster", []) if player.name == key), None)
 
 
+def merge_stat_totals(dst: Dict, src: Dict):
+    """Add one player's running totals (counts, shot diets, quarter stats) into another's."""
+    for key, value in src.items():
+        if isinstance(value, dict):
+            merge_stat_totals(dst.setdefault(key, {}), value)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            dst[key] = dst.get(key, 0) + value
+        else:
+            dst[key] = value   # position and the like: the latest wins
+
+
+def reconcile_traded_stats(player_totals: Dict, current_team: Dict[str, str]):
+    """After trades a player's whole season belongs to the team he is on now: move any stats filed under a former team into his
+    current team's entry, so averages show current players over all their games and no traded-away player is left behind."""
+    for name, team_name in current_team.items():
+        for other_team, players in list(player_totals.items()):
+            if other_team != team_name and name in players:
+                stats = players.pop(name)
+                merge_stat_totals(player_totals.setdefault(team_name, {}).setdefault(name, {}), stats)
+
+
 def add_player_to_series_totals(series_totals: Dict, team: Team):
     if team.name not in series_totals:
         series_totals[team.name] = {}
@@ -22754,7 +22775,9 @@ def make_fantasy_team_factory(team_name: str, drafted_players: List[Player], use
 # rotation (top ten players, weighted by rank, with value growing steeply with overall, so a star is worth more than two good
 # players) and by whether it would be left thin at guard or big. It accepts a good deal, turns down a bad one with the reasons,
 # and sometimes counters a close one by asking for one more player or by offering less.
-FANTASY_TRADE_STATE: Dict = {"user_team": None, "factories": None, "pending": [], "active": False, "next_order": 0, "hook": None, "log": [], "offer": None}
+FANTASY_TRADE_STATE: Dict = {"user_team": None, "factories": None, "pending": [], "active": False, "next_order": 0, "hook": None, "log": [], "offer": None,
+                             "deadline_game": None, "deadline_passed": False}
+FANTASY_TRADE_DEADLINE_SHARE = 0.6   # the trade deadline falls this far into the season (about game 49 of 82)
 FANTASY_TRADE_MIN_ROSTER = 9
 FANTASY_TRADE_MAX_ROSTER = 14
 FANTASY_TRADE_ROTATION_WEIGHTS = (1.0, 1.0, 1.0, 1.0, 1.0, 0.85, 0.7, 0.5, 0.35, 0.2)
@@ -22764,7 +22787,9 @@ FANTASY_TRADE_GROUP_NAMES = {"G": "guards", "W": "wings", "B": "bigs"}
 
 
 def fantasy_trade_setup(user_team: str, factories: Dict[str, object]):
-    FANTASY_TRADE_STATE.update(user_team=user_team, factories=factories, pending=[], active=False, next_order=0, hook=None, log=[], offer=None)
+    deadline = int(round(FANTASY_TRADE_DEADLINE_SHARE * 82 * len(factories) / 2)) if factories else None   # a game number in the whole league's schedule
+    FANTASY_TRADE_STATE.update(user_team=user_team, factories=factories, pending=[], active=False, next_order=0, hook=None, log=[], offer=None,
+                               deadline_game=deadline, deadline_passed=False)
 
 
 def fantasy_trade_roster(team_name: str) -> List[Player]:
@@ -22915,6 +22940,8 @@ def evaluate_fantasy_trade(ai_name: str, user_gives: List[str], ai_gives: List[s
     def answer(decision, headline, reasons, counter=None):
         return {"decision": decision, "headline": headline, "reasons": reasons, "counter": counter}
 
+    if state.get("deadline_passed"):
+        return answer("invalid", "The trade deadline has passed.", ["No trades can be made after the deadline."])
     if not user_gives and not ai_gives:
         return answer("invalid", "Pick the players to trade.", ["Select at least one player on each side."])
     if not user_gives or not ai_gives:
@@ -23211,6 +23238,8 @@ def fantasy_trade_submit(ai_team: str, user_gives: List[str], ai_gives: List[str
     """Make an accepted trade happen. While a season is running it is carried out by the season thread at its next pause point
     (the games already handed to the workers keep the old rosters); otherwise it is done at once."""
     state = FANTASY_TRADE_STATE
+    if state.get("deadline_passed"):
+        return {"ok": False, "error": "The trade deadline has passed."}
     trade = {"ai_team": ai_team, "user_gives": list(user_gives), "ai_gives": list(ai_gives), "done": threading.Event()}
     if not state["active"]:
         try:
@@ -24626,8 +24655,15 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         else:
             season_replay_register_maker(entry["name"], entry["factory"])
 
+    traded_to = {}   # player name -> the team he is on now (after trades)
+
     def apply_trade_to_season(trade):
         """Runs on the season thread: the traded teams play their new rosters from the next game that has not been handed out."""
+        for name in trade["user_gives"]:
+            traded_to[name] = trade["ai_team"]
+        for name in trade["ai_gives"]:
+            traded_to[name] = FANTASY_TRADE_STATE["user_team"]
+        reconcile_traded_stats(season_player_totals, traded_to)
         for team_name in (FANTASY_TRADE_STATE["user_team"], trade["ai_team"]):
             entry = entry_by_name.get(team_name)
             if entry is None:
@@ -24640,13 +24676,14 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 season_replay_register_maker(team_name, (lambda t=entry["factory"](): _copy.deepcopy(t)), FANTASY_TRADE_STATE["next_order"])
 
     if fantasy_trades:
-        FANTASY_TRADE_STATE.update(active=True, next_order=0, pending=[], offer=None,
+        FANTASY_TRADE_STATE.update(active=True, next_order=0, pending=[], offer=None, deadline_passed=False,
+                                   deadline_game=int(round(FANTASY_TRADE_DEADLINE_SHARE * total_games)),
                                    hook=lambda: fantasy_trade_process_pending(apply_trade_to_season))
 
     def maybe_offer_trade(games_played):
         """Now and then an AI team proposes a trade to you: the season pauses (and only for deals that involve your team)."""
         global SIM_PAUSED
-        if not fantasy_trades or progress_queue is None or SIM_PAUSED:
+        if not fantasy_trades or progress_queue is None or SIM_PAUSED or FANTASY_TRADE_STATE["deadline_passed"]:
             return
         if games_played < 120 or games_played > total_games - 90 or random.random() > FANTASY_TRADE_OFFER_CHANCE:
             return
@@ -24657,6 +24694,21 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         SIM_PAUSED = True
         progress_queue.put({"trade_offer": offer, "completed": games_played})
         hold_season_while_paused(season_snapshot)   # waits for your answer; an accepted trade is carried out here
+
+    def maybe_trade_deadline(games_played):
+        """The deadline: the season stops once, at the deadline game, for your last chance to trade. Nothing can be traded after it."""
+        global SIM_PAUSED
+        state = FANTASY_TRADE_STATE
+        if not fantasy_trades or state["deadline_passed"] or state["deadline_game"] is None or games_played < state["deadline_game"]:
+            return
+        if progress_queue is None:
+            state["deadline_passed"] = True
+            return
+        state["offer"] = None
+        SIM_PAUSED = True
+        progress_queue.put({"trade_deadline": {"completed": games_played, "total": total_games, "deadline_game": state["deadline_game"]}})
+        hold_season_while_paused(season_snapshot)   # your last chance to trade; Resume ends the trading period
+        state["deadline_passed"] = True
     for order, (entry_a, entry_b) in enumerate(schedule):
         season_replay_register_game(order, entry_a["name"], entry_b["name"], seeds[order])
 
@@ -24670,6 +24722,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             for start_index in range(0, total_games, batch):
                 FANTASY_TRADE_STATE["next_order"] = start_index
                 hold_season_while_paused(season_snapshot)
+                maybe_trade_deadline(start_index)
                 maybe_offer_trade(start_index)
                 tasks = [
                     (templates[ea["name"]], templates[eb["name"]], order, seeds[order])
@@ -24686,6 +24739,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         for order, (entry_a, entry_b) in enumerate(schedule):
             FANTASY_TRADE_STATE["next_order"] = order
             hold_season_while_paused(season_snapshot)
+            maybe_trade_deadline(order)
             if order % 60 == 0:
                 maybe_offer_trade(order)
             team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"], seeds[order])
@@ -24699,6 +24753,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             entry_a, entry_b = schedule[order]
             add_player_to_series_totals(season_player_totals, team_a)
             add_player_to_series_totals(season_player_totals, team_b)
+            if traded_to:
+                reconcile_traded_stats(season_player_totals, traded_to)   # games from before a trade still count for his new team
             add_team_to_series_totals(season_team_totals, team_a)
             add_team_to_series_totals(season_team_totals, team_b)
             season_game_log.add(team_a, team_b, order=order)
@@ -24735,6 +24791,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         if fantasy_trades:
             FANTASY_TRADE_STATE.update(active=False, hook=None)
             fantasy_trade_process_pending(apply_trade_to_season)   # a trade agreed as the season ended still goes through
+            FANTASY_TRADE_STATE["deadline_passed"] = True          # the deadline is behind us by the end of the regular season
     sections = build_season_sections(entries, season_player_totals, season_team_totals,
                                      game_log=season_game_log.rows, game_extras=season_game_log.extras,
                                      game_meta=season_game_log.games, include_rookies=False, fixtures=fixtures)

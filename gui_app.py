@@ -8409,6 +8409,33 @@ def run_gui_app():
         pool_list.bind("<<ListboxSelect>>", select_pool_player)
         refresh_pool()
 
+    def show_trade_deadline(info):
+        """The deadline: the season has stopped for your last chance to trade."""
+        sim_engine.SIM_PAUSED = True
+        pause_button.configure(text="Resume")
+        status_var.set("Trade deadline. The season is paused: make your last trades, then press Resume.")
+        win = tk.Toplevel(root)
+        win.title("Trade deadline")
+        win.geometry("560x300")
+        win.configure(bg=APP_BG)
+        win.transient(root)
+        tk.Label(win, text="TRADE DEADLINE", bg=APP_BG, fg=GOLD, font=("Segoe UI", 20, "bold")).pack(pady=(20, 4))
+        tk.Label(win, text=f"{info['completed']} of {info['total']} games are played. This is your last chance to trade this season: "
+                           "after you resume, no trades are allowed.",
+                 bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 12), wraplength=500, justify="center").pack(padx=24)
+        buttons = ttk.Frame(win, padding=(18, 20, 18, 14))
+        buttons.pack(side="bottom")
+
+        def resume():
+            win.destroy()
+            sim_engine.SIM_PAUSED = False
+            pause_button.configure(text="Pause")
+            status_var.set("Running...")
+
+        ttk.Button(buttons, text="Open the trade window", command=open_trade_dialog).grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(buttons, text="Finish: resume the season", command=resume).grid(row=0, column=1)
+        win.protocol("WM_DELETE_WINDOW", lambda: None)   # the deadline is answered with a button
+
     def show_trade_offer(offer):
         """An AI team wants one of your players: the season is paused; accept, negotiate or reject."""
         sim_engine.SIM_PAUSED = True
@@ -8484,6 +8511,9 @@ def run_gui_app():
         if not sim_engine.fantasy_trade_available():
             status_var.set("Trades are only available in the fantasy season modes, after the draft.")
             return
+        if state.get("deadline_passed"):
+            status_var.set("The trade deadline has passed: no more trades this season.")
+            return
         if running["active"] and not sim_engine.SIM_PAUSED:
             status_var.set("Pause the season first, then open Trade.")
             return
@@ -8506,7 +8536,8 @@ def run_gui_app():
         dialog.protocol("WM_DELETE_WINDOW", lambda: (trade_dialog.update(win=None), dialog.destroy()))
 
         partner_var = tk.StringVar(value=ai_teams[0])
-        note_var = tk.StringVar(value="Click players to pick them (click again to un-pick); pick as many as you like on either side, then press Propose.")
+        deadline_text = f"  Trade deadline: game {state['deadline_game']} of the season." if state.get("deadline_game") else ""
+        note_var = tk.StringVar(value="Click players to pick them (click again to un-pick); pick as many as you like on either side, then press Propose." + deadline_text)
         proposal = {"counter": None}
 
         top = ttk.Frame(dialog, padding=10)
@@ -9640,7 +9671,9 @@ def run_gui_app():
                 draft_names, draft_factories, draft_user_team = run_fantasy_season_draft(year_prefix)
                 if draft_names and draft_factories:
                     status_var.set("Fantasy season running...")
-                    scoreboard_status_var.set("Fantasy season running in background (82 games per team)...")
+                    scoreboard_status_var.set(
+                        "Fantasy season running in background (82 games per team). "
+                        f"The trade deadline is game {sim_engine.FANTASY_TRADE_STATE.get('deadline_game')}: the season pauses there for your last trades.")
                     season_view["quiet"] = True
                     scoreboard_queue.put({"season_progress": True, "completed": 0, "total": 82 * len(draft_names) // 2})
                     with contextlib.redirect_stdout(io.StringIO()):
@@ -10047,6 +10080,9 @@ def run_gui_app():
                         continue
                     if isinstance(message, dict) and "trade_offer" in message:
                         show_trade_offer(message["trade_offer"])
+                        continue
+                    if isinstance(message, dict) and "trade_deadline" in message:
+                        show_trade_deadline(message["trade_deadline"])
                         continue
                     if isinstance(message, dict) and message.get("reset_series_score"):
                         latest_scoreboard = None  # anything queued before the reset is stale
