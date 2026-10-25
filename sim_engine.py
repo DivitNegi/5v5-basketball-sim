@@ -21756,6 +21756,7 @@ def fantasy_ovr(player: Player) -> int:
     center_creator_bonus = 0.0
     center_core_path = 0.0
     if player.position == "C":
+        shooting_three, shooting_mid = tpt, mpt   # his real shooting, before the floor below lifts it for complete bigs
         # A center who finishes, protects the rim and rebounds is already a
         # complete big -- not being a shooter shouldn't drag him down, it
         # should only help when he can shoot. Shooting is floored at his
@@ -22024,6 +22025,12 @@ def fantasy_ovr(player: Player) -> int:
             if stretched > CENTER_TOP_TIER:
                 # in the top tier a big is ranked on his core: only a near-perfect core stays above the tier line
                 stretched = min(stretched, max(center_core_path, CENTER_TOP_TIER))
+        if shooting_three >= 68 and shooting_mid >= 68:
+            # a shooting big (Dirk, Vucevic, Brook Lopez, Aldama) is also valued on his shooting, rim finishing, rim defense,
+            # rebounding and passing, not only on a core of dunks and blocks he does not have. This can only raise him.
+            stretch_center = (0.28 * shooting_three + 0.20 * shooting_mid + 0.14 * lpt + 0.14 * idef + 0.10 * rebound
+                              + 0.07 * pl + 0.07 * cpt)
+            stretched = max(stretched, stretch_center)
         raw = stretched
     elif player.position == "PG" and raw > 93:
         raw = 93 + (raw - 93) * 0.68
