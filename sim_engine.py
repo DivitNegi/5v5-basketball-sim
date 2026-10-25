@@ -24967,19 +24967,19 @@ class FantasyDraftCancelled(Exception):
 
 FANTASY_DRAFT_CANCEL = "__fantasy_draft_cancel__"  # what the board returns for Cancel
 FANTASY_DRAFT_AUTO = "__fantasy_draft_auto__"      # what the board returns for "Auto-draft the rest"
-FANTASY_SEASON_TEAM_COUNTS = tuple(range(30, 7, -2))   # an even number of teams, 8 to 30
+FANTASY_SEASON_TEAM_COUNTS = tuple(range(30, 15, -2))   # an even number of teams, 16 to 30
 
 
 def fantasy_pick_team_count(max_teams: int) -> int:
-    """How many franchises take part in the fantasy season (even, 8 up to the number of franchises)."""
+    """How many franchises take part in the fantasy season (even, 16 up to the number of franchises)."""
     counts = [n for n in FANTASY_SEASON_TEAM_COUNTS if n <= max_teams]
     if not counts:
         return max_teams
     labels = [f"{n} teams" + (" (the full league)" if n == counts[0] else "") for n in counts]
     if GUI_OPTION_PICKER is not None:
-        choice = GUI_OPTION_PICKER("Number of Teams", "How many teams play in this fantasy season? (an even number, 8 to 30)", labels)
+        choice = GUI_OPTION_PICKER("Number of Teams", "How many teams play in this fantasy season? (an even number, 16 to 30)", labels)
         return counts[labels.index(choice)] if choice in labels else counts[0]
-    raw = input(f"How many teams (even, 8-{counts[0]})? [{counts[0]}]: ").strip()
+    raw = input(f"How many teams (even, 16-{counts[0]})? [{counts[0]}]: ").strip()
     return int(raw) if raw.isdigit() and int(raw) in counts else counts[0]
 FANTASY_DRAFT_CANCEL_REQUESTED = False
 GUI_DRAFT_RECAP_VIEWER = None  # set by the GUI: shows the recap table and waits for Continue
