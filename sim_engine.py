@@ -23021,6 +23021,56 @@ def fantasy_trade_find_offers(user_gives: List[str], limit: int = 16) -> List[Di
     return results[:limit]
 
 
+def fantasy_trade_find_asks(ai_team: str, ai_gives: List[str], limit: int = 16) -> List[Dict]:
+    """Trade finder the other way round: what would it take to get these players from this team? Each result is a package of your
+    players the team would accept, cheapest for you first (the most of your rotation value and fit kept)."""
+    state = FANTASY_TRADE_STATE
+    user_name = state["user_team"]
+    user_roster = list(fantasy_trade_roster(user_name))
+    ai_roster = list(fantasy_trade_roster(ai_team))
+    by_ai = {p.name: p for p in ai_roster}
+    if not ai_gives or any(n not in by_ai for n in ai_gives):
+        return []
+    out_a = [by_ai[n] for n in ai_gives]
+    wanted = sum(fantasy_trade_value(p) for p in out_a)
+    user_before = fantasy_trade_rotation_value(user_roster)
+    user_fit_before = fantasy_trade_fit_points(fantasy_trade_profile(user_roster))
+    pool = [p for p in user_roster if fantasy_trade_value(p) <= 1.6 * wanted]
+    packages = [[p] for p in pool] + [[a, b] for i, a in enumerate(pool) for b in pool[i + 1:]]
+    packages += [[a, b, c] for i, a in enumerate(pool) for j, b in enumerate(pool[i + 1:], start=i + 1) for c in pool[j + 1:]
+                 if len(out_a) >= 2]   # asking for several players can take several of yours
+    results = []
+    for package in packages:
+        value = sum(fantasy_trade_value(p) for p in package)
+        if not 0.5 <= value / max(wanted, 1e-9) <= 1.8:
+            continue
+        give = {p.name for p in package}
+        ai_after = [p for p in ai_roster if p.name not in set(ai_gives)] + package
+        user_after = [p for p in user_roster if p.name not in give] + out_a
+        if not (FANTASY_TRADE_MIN_ROSTER <= len(ai_after) <= FANTASY_TRADE_MAX_ROSTER and FANTASY_TRADE_MIN_ROSTER <= len(user_after) <= FANTASY_TRADE_MAX_ROSTER):
+            continue
+        if _fantasy_trade_net(ai_team, ai_roster, ai_after)[0] < FANTASY_TRADE_ACCEPT_NET:
+            continue
+        change = fantasy_trade_rotation_value(user_after) / max(user_before, 1e-9) - 1.0
+        fit_delta = fantasy_trade_fit_points(fantasy_trade_profile(user_after)) - user_fit_before
+        events = fantasy_trade_fit_events(user_roster, user_after, out_a)
+        results.append({
+            "ai_team": ai_team, "user_gives": [p.name for p in package], "ai_gives": list(ai_gives),
+            "detail": [fantasy_trade_describe(p) for p in package], "user_change": change,
+            "gain": change + FANTASY_TRADE_FIT_WEIGHT * fit_delta,
+            "fit": fantasy_trade_fit_tags(events), "fit_score": sum(sign for _need, sign, _who in events),
+            "best_ovr": max(fantasy_ovr(p) for p in package),
+        })
+    results.sort(key=lambda item: -item["gain"])
+    unique = []
+    for item in results:
+        names = set(item["user_gives"])
+        if any(set(kept["user_gives"]) < names for kept in unique):
+            continue   # the same deal with an extra throw-in: not a different option
+        unique.append(item)
+    return unique[:limit]
+
+
 def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: List[Player], user_gives: List[str], ai_gives: List[str]):
     """A counter to a close deal: ask for one more of the user's players, or keep one of ours back."""
     options = []

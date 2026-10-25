@@ -8651,33 +8651,47 @@ def run_gui_app():
             if finish(partner, counter["user_gives"], counter["ai_gives"]):
                 show_response("Deal. We accept.", "accept", [f"Trade completed: you send {', '.join(counter['user_gives'])} and receive {', '.join(counter['ai_gives'])}."])
 
-        def open_finder():
-            """Trade finder: pick the players you want to shop, see what every team would give for them, and take one."""
-            shop = list(mine_tree.selection())
-            if not shop:
-                show_response("Trade Finder", "counter", ["Select the player (or players) on your side that you want to shop, then press Trade Finder."])
-                return
-            offers = sim_engine.fantasy_trade_find_offers(shop, limit=24)
+        def open_finder(mode="shop"):
+            """Trade finder. shop: pick your players and see what every team would give for them. ask: pick players on the other team and
+            see what it would take (which of your players) to get them."""
+            if mode == "shop":
+                shop = list(mine_tree.selection())
+                if not shop:
+                    show_response("Trade Finder", "counter", ["Select the player (or players) on your side that you want to shop, then press Find offers."])
+                    return
+                offers = sim_engine.fantasy_trade_find_offers(shop, limit=24)
+                heading = f"What teams would give for: {', '.join(shop)}"
+                column_title = "You would get"
+                empty_text = "No team would make an offer you would want for them right now."
+            else:
+                targets = list(theirs_tree.selection())
+                if not targets:
+                    show_response("Trade Finder", "counter", ["Select the player (or players) you want from the other team (right side), then press What would it take?"])
+                    return
+                offers = sim_engine.fantasy_trade_find_asks(partner_var.get(), targets, limit=24)
+                heading = f"What it would take to get {', '.join(targets)} from {partner_var.get()}"
+                column_title = "You would send"
+                empty_text = "They would not make that deal for any package of your players that works for the roster limits."
             win = tk.Toplevel(dialog)
             win.title("Trade Finder")
             win.geometry("1060x560")
             win.configure(bg=APP_BG)
             win.transient(dialog)
             tk.Label(win, text="Trade Finder", bg=APP_BG, fg=GOLD, font=("Segoe UI", 17, "bold"), anchor="w").pack(fill="x", padx=16, pady=(14, 0))
-            tk.Label(win, text=f"What teams would give for: {', '.join(shop)}", bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11), anchor="w", wraplength=1000, justify="left").pack(fill="x", padx=16, pady=(0, 8))
+            tk.Label(win, text=heading, bg=APP_BG, fg=TEXT_SOFT, font=("Segoe UI", 11), anchor="w", wraplength=1000, justify="left").pack(fill="x", padx=16, pady=(0, 8))
             sort_var = tk.StringVar(value="Best for my team")
             bar = ttk.Frame(win, padding=(16, 0, 16, 6))
             bar.pack(fill="x")
             ttk.Label(bar, text="Sort by").grid(row=0, column=0, padx=(0, 8))
             ttk.Combobox(bar, textvariable=sort_var, values=("Best for my team", "Best fit", "Best player"), state="readonly", width=20).grid(row=0, column=1)
-            tk.Label(win, text="Every offer here is one that team would accept. Rotation = change to your top-ten value; fit = what the deal adds (+) or costs (-) your lineup.",
+            tk.Label(win, text="Every deal here is one that team would accept. Rotation = change to your top-ten value; fit = what the deal adds (+) or costs (-) your lineup.",
                      bg=APP_BG, fg=MUTED, font=("Segoe UI", 10), anchor="w", wraplength=1000, justify="left").pack(fill="x", padx=16)
             holder = ttk.Frame(win, padding=(16, 6))
             holder.pack(fill="both", expand=True)
             holder.columnconfigure(0, weight=1)
             holder.rowconfigure(0, weight=1)
             tree = ttk.Treeview(holder, columns=("team", "give", "rot", "fit"), show="headings", height=14, style="Series.Treeview")
-            for col, label, width, anchor in (("team", "Team", 220, "w"), ("give", "You would get", 470, "w"), ("rot", "Rotation", 90, "center"), ("fit", "Fit", 250, "w")):
+            for col, label, width, anchor in (("team", "Team", 220, "w"), ("give", column_title, 470, "w"), ("rot", "Rotation", 90, "center"), ("fit", "Fit", 250, "w")):
                 tree.heading(col, text=label)
                 tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col == "give")
             yscroll = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
@@ -8699,7 +8713,7 @@ def run_gui_app():
             sort_box = bar.winfo_children()[1]
             sort_box.bind("<<ComboboxSelected>>", refill)
             if not offers:
-                tk.Label(win, text="No team would make an offer you would want for them right now.", bg=APP_BG, fg="#f87171", font=("Segoe UI", 12, "bold")).pack(pady=6)
+                tk.Label(win, text=empty_text, bg=APP_BG, fg="#f87171", font=("Segoe UI", 12, "bold")).pack(pady=6)
             refill()
 
             def chosen():
@@ -8738,7 +8752,8 @@ def run_gui_app():
             ttk.Button(action_bar, text="Close", command=win.destroy).grid(row=0, column=2)
             tree.bind("<Double-Button-1>", lambda _event: make_trade())
 
-        ttk.Button(top, text="Trade Finder", command=open_finder).grid(row=0, column=3, padx=(10, 0))
+        ttk.Button(top, text="Find offers for my players", command=lambda: open_finder("shop")).grid(row=0, column=3, padx=(10, 0))
+        ttk.Button(top, text="What would it take?", command=lambda: open_finder("ask")).grid(row=0, column=4, padx=(6, 0))
         propose_button.configure(command=propose)
         accept_counter_button.configure(command=accept_counter)
         partner_box.bind("<<ComboboxSelected>>", lambda _event: (refresh_rosters(), show_response("Pick players on both sides.", "counter", [])))
