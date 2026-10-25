@@ -993,7 +993,7 @@ def make_heat_2026() -> Team:
                0.79, 0.76, 0.75, 0.57, 0.65,
                0.14, 0.96, 0.78,
                0.46, 0.37, 0.33, 0.45, 0.327, 0.767,
-               0.87, 0.44,
+               0.98, 0.44,
                clutchness=0.59, height=72, speed=0.84,
                shot_iq=0.58, archetype='playmaker', stamina=0.8),
         Player('Pelle Larsson', 'SG',
