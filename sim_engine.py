@@ -22776,7 +22776,7 @@ def make_fantasy_team_factory(team_name: str, drafted_players: List[Player], use
 # players) and by whether it would be left thin at guard or big. It accepts a good deal, turns down a bad one with the reasons,
 # and sometimes counters a close one by asking for one more player or by offering less.
 FANTASY_TRADE_STATE: Dict = {"user_team": None, "factories": None, "pending": [], "active": False, "next_order": 0, "hook": None, "log": [], "offer": None,
-                             "deadline_game": None, "deadline_passed": False}
+                             "deadline_game": None, "deadline_passed": False, "block": set()}
 FANTASY_TRADE_DEADLINE_SHARE = 0.6   # the trade deadline falls this far into the season (about game 49 of 82)
 FANTASY_TRADE_MIN_ROSTER = 9
 FANTASY_TRADE_MAX_ROSTER = 14
@@ -22789,7 +22789,19 @@ FANTASY_TRADE_GROUP_NAMES = {"G": "guards", "W": "wings", "B": "bigs"}
 def fantasy_trade_setup(user_team: str, factories: Dict[str, object]):
     deadline = int(round(FANTASY_TRADE_DEADLINE_SHARE * 82 * len(factories) / 2)) if factories else None   # a game number in the whole league's schedule
     FANTASY_TRADE_STATE.update(user_team=user_team, factories=factories, pending=[], active=False, next_order=0, hook=None, log=[], offer=None,
-                               deadline_game=deadline, deadline_passed=False)
+                               deadline_game=deadline, deadline_passed=False, block=set())
+
+
+def fantasy_trade_block_toggle(names: List[str]) -> set:
+    """Put players on (or take them off) your trade block. A player on the block is protected: the trade finder never asks for
+    him, the AI teams never ask for him in an offer or a counter, and you keep him unless you trade him yourself."""
+    block = FANTASY_TRADE_STATE.setdefault("block", set())
+    for name in names:
+        if name in block:
+            block.discard(name)
+        else:
+            block.add(name)
+    return block
 
 
 def fantasy_trade_roster(team_name: str) -> List[Player]:
@@ -23065,7 +23077,8 @@ def fantasy_trade_find_asks(ai_team: str, ai_gives: List[str], limit: int = 16) 
     wanted = sum(fantasy_trade_value(p) for p in out_a)
     user_before = fantasy_trade_rotation_value(user_roster)
     user_fit_before = fantasy_trade_fit_points(fantasy_trade_profile(user_roster))
-    pool = [p for p in user_roster if fantasy_trade_value(p) <= 1.6 * wanted]
+    blocked = FANTASY_TRADE_STATE.get("block", set())
+    pool = [p for p in user_roster if fantasy_trade_value(p) <= 1.6 * wanted and p.name not in blocked]
     packages = [[p] for p in pool] + [[a, b] for i, a in enumerate(pool) for b in pool[i + 1:]]
     packages += [[a, b, c] for i, a in enumerate(pool) for j, b in enumerate(pool[i + 1:], start=i + 1) for c in pool[j + 1:]
                  if len(out_a) >= 2]   # asking for several players can take several of yours
@@ -23109,8 +23122,9 @@ def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: Li
     by_ai = {p.name: p for p in ai_roster}
     ai_keep = {p.name for p in sorted(ai_roster, key=fantasy_ovr, reverse=True)[:2]}   # a team keeps its two best out of a counter
     pairs = []
+    blocked = FANTASY_TRADE_STATE.get("block", set())
     for extra in user_roster:
-        if extra.name in user_gives:
+        if extra.name in user_gives or extra.name in blocked:
             continue
         new_user_gives = user_gives + [extra.name]
         for back in [None] + [p for p in ai_roster if p.name not in ai_gives and p.name not in ai_keep]:
@@ -23159,6 +23173,7 @@ def _fantasy_trade_execute(trade: Dict):
         ai_roster.remove(p)
     user_roster.extend(out_a)
     ai_roster.extend(out_u)
+    FANTASY_TRADE_STATE.get("block", set()).difference_update(trade["user_gives"])
     FANTASY_TRADE_STATE["log"].append({"ai_team": trade["ai_team"], "user_gives": list(trade["user_gives"]), "ai_gives": list(trade["ai_gives"])})
 
 
@@ -23176,7 +23191,8 @@ def fantasy_trade_generate_offer() -> Dict | None:
     if len(user_roster) < FANTASY_TRADE_MIN_ROSTER:
         return None
     user_before = fantasy_trade_rotation_value(user_roster)
-    targets_all = sorted(user_roster, key=fantasy_ovr, reverse=True)[:7]
+    blocked = state.get("block", set())
+    targets_all = [p for p in sorted(user_roster, key=fantasy_ovr, reverse=True)[:7] if p.name not in blocked]
     teams = [name for name in state["factories"] if name != user_name]
     random.shuffle(teams)
     for ai_name in teams[:12]:

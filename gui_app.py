@@ -8562,8 +8562,8 @@ def run_gui_app():
             holder.grid(row=1, column=column, sticky="nsew", padx=(0, 6) if column == 0 else (6, 0))
             holder.columnconfigure(0, weight=1)
             holder.rowconfigure(0, weight=1)
-            tree = ttk.Treeview(holder, columns=("pos", "ovr", "name"), show="headings", height=14, style="Series.Treeview", selectmode="extended")
-            for col, label, width, anchor in (("pos", "Pos", 56, "center"), ("ovr", "OVR", 60, "center"), ("name", "Player", 330, "w")):
+            tree = ttk.Treeview(holder, columns=("pos", "ovr", "name", "block"), show="headings", height=14, style="Series.Treeview", selectmode="extended")
+            for col, label, width, anchor in (("pos", "Pos", 56, "center"), ("ovr", "OVR", 60, "center"), ("name", "Player", 300, "w"), ("block", "Block", 70, "center")):
                 tree.heading(col, text=label)
                 tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col == "name")
             scroll = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
@@ -8625,8 +8625,9 @@ def run_gui_app():
         def fill(tree, team_name):
             tree.delete(*tree.get_children())
             roster = sorted(sim_engine.fantasy_trade_roster(team_name), key=sim_engine.fantasy_ovr, reverse=True)
+            blocked = sim_engine.FANTASY_TRADE_STATE.get("block", set()) if team_name == user_team else set()
             for player in roster:
-                tree.insert("", "end", iid=player.name, values=(player.position, sim_engine.fantasy_ovr(player), player.name))
+                tree.insert("", "end", iid=player.name, values=(player.position, sim_engine.fantasy_ovr(player), player.name, "BLOCK" if player.name in blocked else ""))
 
         def refresh_rosters():
             partner = partner_var.get()
@@ -8703,6 +8704,8 @@ def run_gui_app():
                 heading = f"What it would take to get {', '.join(targets)} from {partner_var.get()}"
                 column_title = "You would send"
                 empty_text = "They would not make that deal for any package of your players that works for the roster limits."
+                if sim_engine.FANTASY_TRADE_STATE.get("block"):
+                    empty_text += " (Players on your trade block are never asked for: take some off the block to see more.)"
             win = tk.Toplevel(dialog)
             win.title("Trade Finder")
             win.geometry("1060x560")
@@ -8783,6 +8786,20 @@ def run_gui_app():
             ttk.Button(action_bar, text="Close", command=win.destroy).grid(row=0, column=2)
             tree.bind("<Double-Button-1>", lambda _event: make_trade())
 
+        def toggle_block():
+            names = list(mine_tree.selection())
+            if not names:
+                show_response("Trade block", "counter", ["Select your players on the left, then press Trade block to protect them (or to take them off the block)."])
+                return
+            blocked = sim_engine.fantasy_trade_block_toggle(names)
+            for name in names:
+                if mine_tree.exists(name):
+                    mine_tree.set(name, "block", "BLOCK" if name in blocked else "")
+            show_response("Trade block updated.", "counter", [
+                "On the block: " + (", ".join(sorted(blocked)) if blocked else "nobody."),
+                "Players on the block are protected: the finder never asks for them and the AI teams never ask for them in an offer or counter-offer."])
+
+        ttk.Button(top, text="Trade block", command=toggle_block).grid(row=0, column=5, padx=(6, 0))
         ttk.Button(top, text="Find offers for my players", command=lambda: open_finder("shop")).grid(row=0, column=3, padx=(10, 0))
         ttk.Button(top, text="What would it take?", command=lambda: open_finder("ask")).grid(row=0, column=4, padx=(6, 0))
         propose_button.configure(command=propose)
