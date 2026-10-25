@@ -283,13 +283,14 @@ def make_heat_2027() -> Team:
 def make_sixers_2027() -> Team:
     players = [
         Player('Tyrese Maxey', 'PG',
-               0.40, 0.23, 0.33, 0.040, 0.11, 0.90,
+               0.40, 0.23, 0.33, 0.040, 0.11, 0.60,
                0.88, 0.85, 0.92, 0.57, 0.89,
-               0.32, 0.70, 0.86,
+               0.36, 0.70, 0.86,
                0.73, 0.60, 0.29, 0.52, 0.733, 0.467,
                0.79, 0.54,
                clutchness=0.81, height=74, speed=0.84,
-               shot_iq=0.66, archetype='defender', stamina=0.8),
+               shot_iq=0.66, archetype='defender', stamina=0.8,
+               badges=('catch_shoot', 'catch_shoot_gold', 'movement_shooter', 'movement_shooter_gold'), iso_tendency=0.5008),
         Player('VJ Edgecombe', 'SG',
                0.43, 0.23, 0.28, 0.060, 0.23, 0.85,
                0.80, 0.80, 0.92, 0.67, 0.80,
@@ -301,7 +302,7 @@ def make_sixers_2027() -> Team:
         Player('Jaylen Brown', 'SF',
                        0.28, 0.32, 0.30, 0.10, 0.31, 0.84,
                        0.83, 0.92, 0.95, 0.95, 0.79,
-                       0.32, 0.68, 0.72,
+                       0.32, 0.48, 0.70,
                        0.43, 0.51, 0.43, 0.70, 0.933, 0.667,
                        0.92, 0.78,
                        clutchness=0.82, height=78, speed=0.71,
@@ -325,15 +326,15 @@ def make_sixers_2027() -> Team:
                clutchness=0.80, height=84, speed=0.51,
                shot_iq=0.47, archetype='big', stamina=0.56),
         Player('Anfernee Simons', 'SG',
-               0.58, 0.20, 0.17, 0.05, 0.20, 0.34,
+               0.58, 0.20, 0.17, 0.05, 0.20, 0.272,
                0.88, 0.80, 0.82, 0.74, 0.88,
                0.24, 0.62, 0.82,
                0.38, 0.35, 0.35, 0.43, 0.467, 0.600,
                0.57, 0.47,
                clutchness=0.74, height=75, speed=0.78,
-               shot_iq=0.62, archetype='shooter', stamina=0.68),
+               shot_iq=0.62, archetype='shooter', stamina=0.68, iso_tendency=0.356),
         Player('Dean Wade', 'PF',
-               0.520, 0.200, 0.120, 0.160, 0.120, 0.092,
+               0.520, 0.200, 0.120, 0.160, 0.120, 0.074,
                0.820, 0.760, 0.760, 0.660, 0.760,
                0.010, 0.360, 0.360,
                0.49, 0.56, 0.47, 0.66, 0.267, 0.667,
@@ -347,7 +348,7 @@ def make_sixers_2027() -> Team:
                0.37, 0.74,
                clutchness=0.500, stamina=0.66),
         Player('Kentavious Caldwell-Pope', 'SG',
-               0.52, 0.14, 0.27, 0.02, 0.08, 0.19,
+               0.52, 0.14, 0.27, 0.02, 0.08, 0.152,
                0.78, 0.70, 0.73, 0.62, 0.86,
                0.14, 0.46, 0.68,
                0.58, 0.40, 0.30, 0.48, 0.400, 0.500,
@@ -357,13 +358,13 @@ def make_sixers_2027() -> Team:
                height=77, speed=0.75, shot_iq=0.76, iso_tendency=0.08,
                archetype='3-and-D guard', stamina=0.62),
         Player('Justin Edwards', 'SF',
-               0.55, 0.12, 0.24, 0.10, 0.31, 0.25,
+               0.55, 0.12, 0.24, 0.10, 0.31, 0.20,
                0.73, 0.71, 0.73, 0.71, 0.80,
                0.16, 0.50, 0.58,
                0.80, 0.51, 0.38, 0.45, 0.367, 0.833,
                0.68, 0.50,
                clutchness=0.61, height=79, speed=0.72,
-               shot_iq=0.57, archetype='shooter', stamina=0.76),
+               shot_iq=0.57, archetype='shooter', stamina=0.76, iso_tendency=0.195),
         Player('Adem Bona', 'C',
                0.000, 0.37, 0.22, 0.41, 0.66, 0.16,
                0.050, 0.79, 0.85, 0.96, 0.69,
@@ -388,24 +389,8 @@ def make_sixers_2027() -> Team:
     # than dribble creation. Explicit targets keep the three balanced instead
     # of one swallowing the offense while the others starve.
     for player in t.roster:
-        if player.name == 'Jaylen Brown':
-            player.playmaking = 0.48
-            player.ball_handle = 0.70
-            player.usage = 0.32
-            player.shot_tendency = 0.84
+        if player.name in ('Jaylen Brown', 'Joel Embiid', 'Tyrese Maxey'):
             player.target_fga_soft_cap = 18.5
-        elif player.name == 'Joel Embiid':
-            player.usage = 0.18
-            player.shot_tendency = 0.46
-            player.target_fga_soft_cap = 18.5
-        elif player.name == 'Tyrese Maxey':
-            player.usage = 0.36
-            player.shot_tendency = 0.60
-            player.target_fga_soft_cap = 18.5
-            add_badge(player, 'catch_shoot', 'gold')
-            add_badge(player, 'movement_shooter', 'gold')
-        elif player.name in ('Kentavious Caldwell-Pope', 'Dean Wade', 'Anfernee Simons', 'Justin Edwards'):
-            player.shot_tendency = round(player.shot_tendency * 0.80, 3)
     t.init_lineup()
     return t
 
@@ -413,25 +398,25 @@ def make_sixers_2027() -> Team:
 def make_raptors_2027() -> Team:
     players = [
         Player('Immanuel Quickley', 'PG',
-               0.52, 0.12, 0.31, 0.040, 0.10, 0.32,
+               0.52, 0.12, 0.31, 0.040, 0.10, 0.42,
                0.81, 0.73, 0.72, 0.56, 0.82,
-               0.21, 0.83, 0.78,
+               0.26, 0.83, 0.78,
                0.56, 0.30, 0.34, 0.56, 0.600, 0.533,
                0.80, 0.37,
                clutchness=0.66, height=74, speed=0.83,
-               shot_iq=0.62, archetype='shooter', stamina=0.74),
+               shot_iq=0.62, archetype='shooter', stamina=0.74, iso_tendency=0.32),
         Player('RJ Barrett', 'SG',
-               0.36, 0.25, 0.29, 0.10, 0.31, 0.39,
+               0.36, 0.25, 0.29, 0.10, 0.31, 0.47,
                0.75, 0.79, 0.77, 0.71, 0.71,
-               0.26, 0.60, 0.65,
+               0.31, 0.60, 0.65,
                0.40, 0.50, 0.41, 0.67, 0.833, 0.733,
                0.86, 0.58,
                clutchness=0.71, height=78, speed=0.70,
-               shot_iq=0.60, archetype='balanced', stamina=0.72),
+               shot_iq=0.60, archetype='balanced', stamina=0.72, iso_tendency=0.2852),
         Player('Kawhi Leonard', 'SF',
-               0.36, 0.25, 0.29, 0.10, 0.31, 0.50,
+               0.36, 0.30, 0.24, 0.10, 0.31, 0.40,
                0.85, 0.96, 0.96, 0.72, 0.89,
-               0.34, 0.62, 0.70,
+               0.30, 0.62, 0.70,
                0.94, 0.53, 0.46, 0.73, 0.867, 0.400,
                0.96, 0.82,
                clutchness=0.79, height=78, speed=0.73,
@@ -445,7 +430,7 @@ def make_raptors_2027() -> Team:
                clutchness=0.74, height=80, speed=0.63,
                shot_iq=0.63, archetype='big', stamina=0.8),
         Player('Jakob Poeltl', 'C',
-               0.000, 0.42, 0.18, 0.40, 0.60, 0.23,
+               0.000, 0.14, 0.26, 0.40, 0.60, 0.16,
                0.050, 0.91, 0.92, 0.92, 0.61,
                0.05, 0.50, 0.57,
                0.46, 0.67, 0.77, 0.80, 0.733, 0.990,
@@ -502,25 +487,6 @@ def make_raptors_2027() -> Team:
                shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Toronto Raptors', players)
-    # Tendencies calibrated against 2025-26 real lines: Kawhi ~28 pts on ~19-20
-    # FGA with ~6 FTA and more midrange; Barrett ~19 pts / Quickley ~16 pts take
-    # a bigger share of the offense; Poeltl is a ~11 pt rim runner with no jumper.
-    for player in t.roster:
-        if player.name == 'Kawhi Leonard':
-            player.usage = 0.30
-            player.shot_tendency = 0.40
-            player.drive_tendency = 0.24
-            player.mid_tendency = 0.30
-        elif player.name == 'RJ Barrett':
-            player.usage = 0.31
-            player.shot_tendency = 0.47
-        elif player.name == 'Immanuel Quickley':
-            player.usage = 0.26
-            player.shot_tendency = 0.42
-        elif player.name == 'Jakob Poeltl':
-            player.shot_tendency = 0.16
-            player.mid_tendency = 0.14
-            player.drive_tendency = 0.26
     t.init_lineup()
     return t
 
@@ -534,29 +500,29 @@ def make_timberwolves_2027() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player('LaMelo Ball', 'PG',
-               0.99, 0.12, 0.29, 0.040, 0.12, 0.49,
+               0.99, 0.12, 0.29, 0.040, 0.12, 0.72,
                0.88, 0.78, 0.92, 0.58, 0.90,
-               0.32, 0.98, 0.93,
+               0.44, 0.98, 0.93,
                0.63, 0.42, 0.42, 0.65, 0.533, 0.800,
                0.70, 0.45,
                clutchness=0.71, height=79, speed=0.81,
-               shot_iq=0.49, archetype='playmaker', stamina=0.76, ),
+               shot_iq=0.49, archetype='playmaker', stamina=0.76, iso_tendency=0.4592),
         Player('Anthony Edwards', 'SG',
-               0.75, 0.21, 0.32, 0.060, 0.21, 0.30,
+               0.75, 0.21, 0.32, 0.060, 0.21, 0.56,
                0.96, 0.92, 0.95, 0.92, 0.80,
-               0.30, 0.60, 0.92,
+               0.31, 0.60, 0.92,
                0.56, 0.61, 0.34, 0.80, 0.900, 0.500,
                0.87, 0.59,
                clutchness=0.80, height=76, speed=0.90,
                shot_iq=0.8, archetype='balanced', stamina=0.86,),
         Player('Jonathan Kuminga', 'SF',
-               0.39, 0.12, 0.25, 0.24, 0.46, 0.33,
+               0.39, 0.12, 0.25, 0.24, 0.46, 0.38,
                0.75, 0.86, 0.90, 0.81, 0.71,
-               0.23, 0.49, 0.60,
+               0.25, 0.49, 0.60,
                0.40, 0.52, 0.57, 0.78, 0.933, 0.667,
                0.73, 0.73,
                clutchness=0.67, height=79, speed=0.63,
-               shot_iq=0.59, archetype='big', stamina=0.84),
+               shot_iq=0.59, archetype='big', stamina=0.84, iso_tendency=0.2518),
         Player('Jaden McDaniels', 'PF',
                0.31, 0.24, 0.22, 0.23, 0.46, 0.28,
                0.83, 0.77, 0.79, 0.81, 0.84,
@@ -566,21 +532,21 @@ def make_timberwolves_2027() -> Team:
                clutchness=0.68, height=81, speed=0.62,
                shot_iq=0.62, archetype='3 and d', stamina=0.83),
         Player('Rudy Gobert', 'C',
-               0.000, 0.00, 0.23, 0.43, 0.65, 0.09,
+               0.000, 0.00, 0.23, 0.43, 0.65, 0.08,
                0.050, 0.55, 0.92, 0.95, 0.52,
-               0.13, 0.43, 0.53,
+               0.11, 0.43, 0.53,
                0.41, 0.83, 0.91, 0.88, 0.600, 0.700,
                0.65, 0.99,
                clutchness=0.66, height=85, speed=0.52,
                shot_iq=0.71, archetype='big', stamina=0.7),
         Player('Ayo Dosunmu', 'SF',
-               0.35, 0.30, 0.29, 0.060, 0.20, 0.40,
+               0.35, 0.30, 0.29, 0.060, 0.20, 0.42,
                0.85, 0.78, 0.76, 0.65, 0.93,
-               0.20, 0.65, 0.70,
+               0.22, 0.65, 0.70,
                0.43, 0.47, 0.38, 0.52, 0.500, 0.700,
                0.69, 0.38,
                clutchness=0.69, height=76, speed=0.77,
-               shot_iq=0.66, archetype='balanced', stamina=0.76),
+               shot_iq=0.66, archetype='balanced', stamina=0.76, iso_tendency=0.298),
         Player('Josh Green', 'SF',
                0.62, 0.10, 0.23, 0.052, 0.22, 0.16,
                0.81, 0.74, 0.77, 0.66, 0.89,
@@ -621,29 +587,12 @@ def make_timberwolves_2027() -> Team:
         key=lambda player: starter_order.index(player.name) if player.name in starter_order else len(starter_order),
     )
     t = Team('2027 Minnesota Timberwolves', players)
-    # 2027 role overrides: LaMelo and Ant are co-stars at ~18-20 shots each;
-    # Kuminga starts at SF per the ESPN depth chart (Ayo Dosunmu is the
-    # second-string SF).
+    # LaMelo and Ant are co-stars at ~18-20 shots each; Kuminga starts at SF per the ESPN depth chart
+    # (Ayo Dosunmu is the second-string SF).
+    soft_caps = {'Anthony Edwards': 19.0, 'LaMelo Ball': 20.0, 'Ayo Dosunmu': 11.0, 'Rudy Gobert': 5.0}
     for player in t.roster:
-        if player.name == 'Anthony Edwards':
-            player.shot_tendency = 0.56
-            player.usage = 0.31
-            player.target_fga_soft_cap = 19.0
-        elif player.name == 'LaMelo Ball':
-            player.shot_tendency = 0.72
-            player.usage = 0.44
-            player.target_fga_soft_cap = 20.0
-        elif player.name == 'Ayo Dosunmu':
-            player.shot_tendency = max(player.shot_tendency, 0.42)
-            player.usage = max(player.usage, 0.22)
-            player.target_fga_soft_cap = 11.0
-        elif player.name == 'Rudy Gobert':
-            player.shot_tendency = min(player.shot_tendency, 0.08)
-            player.usage = min(player.usage, 0.11)
-            player.target_fga_soft_cap = 5.0
-        elif player.name == 'Jonathan Kuminga':
-            player.shot_tendency = max(player.shot_tendency, 0.38)
-            player.usage = max(player.usage, 0.25)
+        if player.name in soft_caps:
+            player.target_fga_soft_cap = soft_caps[player.name]
     t.init_lineup()
     return t
 
@@ -770,7 +719,7 @@ def make_mavs_2027() -> Team:
                0.75, 0.40,
                clutchness=0.950,
                secondary_positions=("SG",),
-               badges=("clutch gold", "closer gold", "ankle breaker hof", "shot creator gold"),
+               badges=("clutch gold", "closer gold", "ankle breaker hof", "shot creator gold", "catch_shoot", "catch_shoot_gold", "movement_shooter", "movement_shooter_gold"),
                height=74, speed=0.88, shot_iq=0.99, iso_tendency=0.88,
                archetype="isolation scorer", stamina=0.8),
         Player('Max Christie', 'SG',
@@ -879,12 +828,6 @@ def make_mavs_2027() -> Team:
                shot_iq=0.500, stamina=0.79),
     ]
     t = Team('2027 Dallas Mavericks', players)
-    # Kyrie is an elite catch-and-shoot / movement shooter as well as a
-    # pull-up creator: give him the off-ball shooting credit for it.
-    for player in t.roster:
-        if player.name == 'Kyrie Irving':
-            add_badge(player, 'catch_shoot', 'gold')
-            add_badge(player, 'movement_shooter', 'gold')
     t.init_lineup()
     return t
 
@@ -903,7 +846,7 @@ def make_lakers_2027() -> Team:
                        0.400, 0.960, 0.920,
                        0.66, 0.53, 0.55, 0.82, 0.990, 0.800,
                        0.59, 0.58,
-                       clutchness=0.940, iso_tendency = .99, stamina=0.73, shot_iq = .59),
+                       clutchness=0.940, iso_tendency=0.88, stamina=0.73, shot_iq = .59),
         Player('Austin Reaves', 'SG',
                0.42, 0.30, 0.22, 0.06, 0.08, 0.660,
                0.880, 0.900, 0.920, 0.700, 0.860,
@@ -923,9 +866,9 @@ def make_lakers_2027() -> Team:
                height=76, speed=0.78, shot_iq=0.80, iso_tendency=0.12,
                secondary_positions=('SG',), archetype='physical perimeter lock', stamina=0.74),
         Player('Sandro Mamukelashvili', 'PF',
-               0.42, 0.12, 0.12, 0.34, 0.44, 0.161,
+               0.42, 0.12, 0.12, 0.34, 0.44, 0.14,
                0.820, 0.800, 0.820, 0.760, 0.740,
-               0.120, 0.560, 0.560,
+               0.11, 0.560, 0.560,
                0.45, 0.60, 0.60, 0.71, 0.600, 0.700,
                0.52, 0.66,
                clutchness=0.640, badges=('stretch_big',),
@@ -987,18 +930,8 @@ def make_lakers_2027() -> Team:
                secondary_positions=('SG',), archetype='defensive combo guard', stamina=0.82),
     ]
     t = Team('2027 Los Angeles Lakers', players)
-    # Luka remains the engine and owns elite usage, but the 2027 offense uses
-    # his passing more often instead of treating every touch as a clear-out.
-    luka = next((p for p in t.roster if p.name == 'Luka Dončić'), None)
-    if luka is not None:
-        luka.usage = max(luka.usage, 0.40)
-        luka.playmaking = max(luka.playmaking, 0.96)
-        luka.ball_handle = max(luka.ball_handle, 0.92)
-        luka.iso_tendency = min(luka.iso_tendency, 0.88)
     sandro = next((p for p in t.roster if p.name == 'Sandro Mamukelashvili'), None)
     if sandro is not None:
-        sandro.shot_tendency = min(sandro.shot_tendency, 0.14)
-        sandro.usage = min(sandro.usage, 0.11)
         sandro.target_fga_soft_cap = 7.0
     # Kessler is a rim-runner, not a scorer: he was taking 11 shots at ~48 TS%,
     # which came out of Reaves' and Sexton's much more efficient looks.
@@ -2519,7 +2452,7 @@ def make_magic_2027() -> Team:
 def make_suns_2027() -> Team:
     players = [
         Player('Devin Booker', 'SG',
-               0.42, 0.34, 0.28, 0.02, 0.14, 0.36,
+               0.38, 0.36, 0.33, 0.02, 0.14, 0.36,
                0.860, 0.940, 0.960, 0.750, 0.870,
                0.30, 0.783, 0.920,
                0.400, 0.450, 0.360, 0.520, 0.870, 0.467,
@@ -2600,13 +2533,6 @@ def make_suns_2027() -> Team:
                shot_iq=0.750, archetype='hustle guard', stamina=0.78),
     ]
     t = Team('2027 Phoenix Suns', players)
-    # Booker real 2025-26: 5.8 3PA / 18.7 FGA (31%), 8.1 FTA -- fewer threes,
-    # more drives/free throws than the old tendencies produced.
-    for player in t.roster:
-        if player.name == 'Devin Booker':
-            player.three_tendency = 0.38
-            player.drive_tendency = 0.33
-            player.mid_tendency = 0.36
     t.init_lineup()
     return t
 
