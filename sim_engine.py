@@ -21733,6 +21733,9 @@ FOUL_DRAW_BIG_PER_POINT = 0.35     # per point above 90 (about +4.2 in total at 
 CENTER_RAW_FOR_99 = 97.4          # raw score of a peak, all-99-core center (Shaq 2001): that is a 99 with no special case
 CENTER_STRETCH_SLOPE = 1.9        # overall points per raw point below that, down to CENTER_STRETCH_FLOOR
 CENTER_TOP_TIER = 94.0            # above this a center is limited by his core rating (see center_core_path)
+CENTER_PLAYMAKING_LINE = 55.0               # a center whose playmaking rating is below this loses points
+CENTER_PLAYMAKING_PENALTY = 0.25            # overall points per playmaking point under the line
+CENTER_PLAYMAKING_FULL_USAGE_ABOVE = 0.30   # no penalty for a featured scorer at this usage; full penalty at 0.20 and below
 CENTER_STRETCH_FLOOR = 85.0       # below this raw score the scale is 1:1 again (weak bigs are not pushed any lower)
 CENTER_CREATOR_BONUS_SCALE = 0.9  # passing bigs keep nearly all of their creator bonus (it sits outside the stretch)
 
@@ -22031,6 +22034,12 @@ def fantasy_ovr(player: Player) -> int:
             stretch_center = (0.28 * shooting_three + 0.20 * shooting_mid + 0.14 * lpt + 0.14 * idef + 0.10 * rebound
                               + 0.07 * pl + 0.07 * cpt)
             stretched = max(stretched, stretch_center)
+        if pl < CENTER_PLAYMAKING_LINE:
+            # a big with no passing (Capela, Chandler, Kessler, Gobert) is a lesser player than his rim numbers say: 1/4 of an overall
+            # point per playmaking point under the line. The featured post scorers (usage 0.30+: Shaq, Dwight in 2009) are exempt, and
+            # it fades in between 0.20 and 0.30 usage.
+            usage_fade = min(1.0, max(0.0, (CENTER_PLAYMAKING_FULL_USAGE_ABOVE - player.usage) / 0.10))
+            stretched -= (CENTER_PLAYMAKING_LINE - pl) * CENTER_PLAYMAKING_PENALTY * usage_fade
         raw = stretched
     elif player.position == "PG" and raw > 93:
         raw = 93 + (raw - 93) * 0.68
