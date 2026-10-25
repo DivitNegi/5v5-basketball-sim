@@ -8506,7 +8506,7 @@ def run_gui_app():
         dialog.protocol("WM_DELETE_WINDOW", lambda: (trade_dialog.update(win=None), dialog.destroy()))
 
         partner_var = tk.StringVar(value=ai_teams[0])
-        note_var = tk.StringVar(value="Select the players you give (left) and the players you want (right), then press Propose.")
+        note_var = tk.StringVar(value="Click players to pick them (click again to un-pick); pick as many as you like on either side, then press Propose.")
         proposal = {"counter": None}
 
         top = ttk.Frame(dialog, padding=10)
@@ -8539,10 +8539,30 @@ def run_gui_app():
             tree.configure(yscrollcommand=scroll.set)
             tree.grid(row=0, column=0, sticky="nsew")
             scroll.grid(row=0, column=1, sticky="ns")
+
+            def toggle_row(event):
+                # a click adds or removes that player, so several can be picked without holding Ctrl
+                iid = tree.identify_row(event.y)
+                if iid:
+                    if iid in tree.selection():
+                        tree.selection_remove(iid)
+                    else:
+                        tree.selection_add(iid)
+                    update_summary()
+                return "break"
+
+            tree.bind("<Button-1>", toggle_row)
             return tree
+
+        summary_var = tk.StringVar(value="")
+
+        def update_summary():
+            give, get = list(mine_tree.selection()), list(theirs_tree.selection())
+            summary_var.set(f"You send ({len(give)}): {', '.join(give) or '-'}      You get ({len(get)}): {', '.join(get) or '-'}")
 
         mine_tree = roster_tree(0)
         theirs_tree = roster_tree(1)
+        ttk.Label(dialog, textvariable=summary_var, foreground=MUTED, wraplength=1040, justify="left").pack(fill="x", padx=12, pady=(6, 0))
 
         response = tk.Text(dialog, height=9, wrap="word", bg=PANEL, fg=TEXT, relief="flat", font=("Segoe UI", 11), padx=10, pady=8)
         response.pack(fill="x", padx=10, pady=(10, 0))
@@ -8585,6 +8605,7 @@ def run_gui_app():
             fill(theirs_tree, partner)
             proposal["counter"] = None
             accept_counter_button.grid_remove()
+            update_summary()
             history = sim_engine.FANTASY_TRADE_STATE["log"]
             history_var.set("Trades so far: " + "; ".join(f"{', '.join(t['user_gives'])} to {t['ai_team']} for {', '.join(t['ai_gives'])}" for t in history) if history else "")
 
@@ -8641,6 +8662,7 @@ def run_gui_app():
             refresh_rosters()
             mine_tree.selection_set([n for n in preset[1] if mine_tree.exists(n)])
             theirs_tree.selection_set([n for n in preset[2] if theirs_tree.exists(n)])
+            update_summary()
             note_var.set("Their offer is filled in. Change the players and press Propose to negotiate; press Resume on the main window when you are done.")
             show_response(f"{preset[0]} offered this deal.", "counter", ["Edit the players on either side and press Propose to see their answer."])
 
