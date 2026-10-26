@@ -6,10 +6,10 @@ def make_76ers_1983() -> Team:
     players = [
         Player('Moses Malone', 'C',
                0.00, 0.35, 0.20, 0.50, 0.20, 0.42,
-               0.33, 0.85, 0.93, 0.80, 0.84,
+               0.33, 0.85, 0.99, 0.80, 0.84,
                0.30, 0.30, 0.40,
-               0.42, 0.70, 0.90, 0.95, 0.600, 0.600,
-               0.70, 0.88,
+               0.42, 0.90, 0.99, 0.99, 0.990, 0.600,
+               0.70, 0.94,
                clutchness=0.85, height=82, speed=0.58, shot_iq=0.75,
                badges=('rebounder_hof',), archetype='rebounding machine', stamina=0.72),
         Player('Julius Erving', 'SF',
