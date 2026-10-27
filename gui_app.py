@@ -2893,30 +2893,25 @@ def run_gui_app():
             coach_build_rows()
         refresh_live_panel()
 
-    # ---- the live game: who is on the floor, with drag-to-substitute and the timeout / offense / defense buttons ----
+    # ---- the live game: your five on the floor and your bench as cards. Drag a card onto another to substitute; you see it being dragged. ----
     live_box = ttk.Frame(coach_inner)
-    live_box.grid(row=4, column=0, sticky="ew", pady=(16, 0))
-    live_box.columnconfigure(0, weight=1, uniform="live")
-    live_box.columnconfigure(1, weight=1, uniform="live")
+    live_box.grid(row=4, column=0, sticky="ew", pady=(18, 0))
+    live_box.columnconfigure(0, weight=1)
     live_title_var = tk.StringVar(value="Live game")
     live_note_var = tk.StringVar(value="")
-    ttk.Label(live_box, textvariable=live_title_var, font=("Segoe UI", 13, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
-    ttk.Label(live_box, textvariable=live_note_var, foreground=GOLD, wraplength=1000, justify="left").grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 6))
-    ttk.Label(live_box, text="On the floor", foreground=MUTED).grid(row=2, column=0, sticky="w")
-    ttk.Label(live_box, text="Bench  (drag a bench player onto a player on the floor, or the other way, to substitute)", foreground=MUTED).grid(row=2, column=1, sticky="w", padx=(8, 0))
-    live_columns = ("name", "pos", "min", "pts", "pf")
-
-    def live_tree(column, height):
-        tree = ttk.Treeview(live_box, columns=live_columns, show="headings", height=height, style="Series.Treeview", selectmode="browse")
-        for col, label, width, anchor in (("name", "Player", 170, "w"), ("pos", "Pos", 44, "center"), ("min", "MIN", 52, "center"), ("pts", "PTS", 48, "center"), ("pf", "PF", 40, "center")):
-            tree.heading(col, text=label)
-            tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col == "name")
-        tree.grid(row=3, column=column, sticky="nsew", padx=(0, 6) if column == 0 else (8, 0))
-        return tree
-
-    live_floor_tree = live_tree(0, 5)
-    live_bench_tree = live_tree(1, 8)
-    live_drag = {"tree": None, "name": None}
+    ttk.Label(live_box, textvariable=live_title_var, font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
+    ttk.Label(live_box, textvariable=live_note_var, foreground=GOLD, wraplength=1000, justify="left").grid(row=1, column=0, sticky="w", pady=(2, 8))
+    ttk.Label(live_box, text="ON THE FLOOR", foreground=MUTED, font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w")
+    live_floor_frame = tk.Frame(live_box, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
+    live_floor_frame.grid(row=3, column=0, sticky="ew", pady=(4, 10))
+    ttk.Label(live_box, text="BENCH   (drag a bench player onto someone on the floor, or a floor player onto the bench, to substitute)", foreground=MUTED,
+              font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky="w")
+    live_bench_frame = tk.Frame(live_box, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
+    live_bench_frame.grid(row=5, column=0, sticky="ew", pady=(4, 6))
+    live_cards = {"floor": {}, "bench": {}}
+    live_drag = {"name": None, "kind": None, "start": (0, 0), "active": False, "ghost": None, "target": None}
+    live_view = {"was_live": False, "timeout_shown": False, "signature": None}
+    CARD_FLOOR_BG, CARD_BENCH_BG, CARD_HOVER_BG, CARD_DRAG_BG = "#16294a", "#0f1c33", "#2d6a4f", "#3b3b55"
 
     def live_user_team() -> Team | None:
         name = sim_engine.FANTASY_TRADE_STATE.get("user_team")
@@ -2925,32 +2920,149 @@ def run_gui_app():
                 return team
         return None
 
-    def live_press(event):
-        tree = event.widget
-        row = tree.identify_row(event.y)
-        live_drag.update(tree=tree if row else None, name=row or None)
+    def live_card_colour(card, colour):
+        for widget in (card["frame"], card["name_label"], card["info_label"], card["tag_label"]):
+            widget.configure(bg=colour)
 
-    def live_release(event):
-        source, name = live_drag["tree"], live_drag["name"]
-        live_drag.update(tree=None, name=None)
+    def live_card_at(x_root, y_root, kind):
+        """The card of that kind under the pointer, found from screen coordinates (so it works while a ghost is in the way)."""
+        for name, card in live_cards[kind].items():
+            frame = card["frame"]
+            left, top = frame.winfo_rootx(), frame.winfo_rooty()
+            if left <= x_root <= left + frame.winfo_width() and top <= y_root <= top + frame.winfo_height():
+                return name
+        return None
+
+    def live_drag_press(event, name, kind):
+        live_drag.update(name=name, kind=kind, start=(event.x_root, event.y_root), active=False, target=None)
+
+    def live_drag_motion(event):
+        if not live_drag["name"]:
+            return
+        if not live_drag["active"]:
+            if abs(event.x_root - live_drag["start"][0]) + abs(event.y_root - live_drag["start"][1]) < 6:
+                return   # a click, not a drag yet
+            live_drag["active"] = True
+            ghost = tk.Toplevel(root)
+            ghost.overrideredirect(True)
+            try:
+                ghost.attributes("-topmost", True)
+                ghost.attributes("-alpha", 0.92)
+            except Exception:
+                pass
+            tk.Label(ghost, text="☰  " + live_drag["name"], bg=GOLD, fg="#111827", font=("Segoe UI", 12, "bold"), padx=16, pady=10).pack()
+            live_drag["ghost"] = ghost
+            source = live_cards[live_drag["kind"]].get(live_drag["name"])
+            if source:
+                live_card_colour(source, CARD_DRAG_BG)   # the card you picked up goes dim
+        ghost = live_drag["ghost"]
+        if ghost is not None:
+            ghost.geometry(f"+{int(event.x_root) + 16}+{int(event.y_root) + 12}")
+        other = "bench" if live_drag["kind"] == "floor" else "floor"
+        target = live_card_at(event.x_root, event.y_root, other)
+        if target != live_drag["target"]:
+            previous = live_drag["target"]
+            if previous and previous in live_cards[other]:
+                live_card_colour(live_cards[other][previous], CARD_FLOOR_BG if other == "floor" else CARD_BENCH_BG)
+            if target:
+                live_card_colour(live_cards[other][target], CARD_HOVER_BG)   # the card you would swap with lights up
+            live_drag["target"] = target
+
+    def live_drag_release(event):
+        name, kind, target, active = live_drag["name"], live_drag["kind"], live_drag["target"], live_drag["active"]
+        ghost = live_drag["ghost"]
+        live_drag.update(name=None, kind=None, active=False, ghost=None, target=None)
+        if ghost is not None:
+            ghost.destroy()
+        if not active:
+            return
         team = live_user_team()
-        if source is None or not name or team is None:
-            return
-        target = root.winfo_containing(event.x_root, event.y_root)
-        if target not in (live_floor_tree, live_bench_tree) or target is source:
-            return
-        row = target.identify_row(event.y_root - target.winfo_rooty())
-        if not row:
-            return
-        out_name, in_name = (row, name) if source is live_bench_tree else (name, row)
-        live_note_var.set(sim_engine.gui_substitute(team, out_name, in_name))
-        refresh_live_panel()
+        if team is not None and name and target:
+            out_name, in_name = (target, name) if kind == "bench" else (name, target)
+            live_view["message"] = (sim_engine.gui_substitute(team, out_name, in_name), time.monotonic())
+        refresh_live_panel(force=True)
 
-    for _tree in (live_floor_tree, live_bench_tree):
-        _tree.bind("<ButtonPress-1>", live_press)
-        _tree.bind("<ButtonRelease-1>", live_release)
+    def live_make_card(parent, player, kind, column, row):
+        base = CARD_FLOOR_BG if kind == "floor" else CARD_BENCH_BG
+        frame = tk.Frame(parent, bg=base, highlightthickness=1, highlightbackground=BORDER, cursor="hand2", padx=12, pady=8)
+        name_label = tk.Label(frame, text=player.name, bg=base, fg=TEXT, font=("Segoe UI", 12, "bold"), anchor="w", cursor="hand2")
+        info_label = tk.Label(frame, text="", bg=base, fg=MUTED, font=("Segoe UI", 10), anchor="w", cursor="hand2")
+        tag_label = tk.Label(frame, text="", bg=base, fg=GOLD, font=("Segoe UI", 10, "bold"), anchor="w", cursor="hand2")
+        name_label.grid(row=0, column=0, sticky="w")
+        info_label.grid(row=1, column=0, sticky="w")
+        tag_label.grid(row=2, column=0, sticky="w")
+        frame.grid(row=row, column=column, sticky="nsew", padx=6, pady=6)
+        for widget in (frame, name_label, info_label, tag_label):
+            widget.bind("<ButtonPress-1>", lambda e, n=player.name, k=kind: live_drag_press(e, n, k))
+            widget.bind("<B1-Motion>", live_drag_motion)
+            widget.bind("<ButtonRelease-1>", live_drag_release)
+        return {"frame": frame, "name_label": name_label, "info_label": info_label, "tag_label": tag_label}
 
-    live_view = {"was_live": False, "timeout_shown": False}
+    def refresh_live_panel(force=False):
+        if live_drag["active"]:
+            return   # never rebuild cards while one is being dragged: that is what makes dragging jerky
+        team = live_user_team()
+        if team is None or not coach_available():
+            if live_view["signature"] is not None:
+                for kind, frame in (("floor", live_floor_frame), ("bench", live_bench_frame)):
+                    for child in frame.winfo_children():
+                        child.destroy()
+                    live_cards[kind].clear()
+                live_view["signature"] = None
+            live_view["was_live"] = False
+            live_title_var.set("Live game")
+            live_note_var.set("No live game right now. In a fantasy season, pick one of your upcoming games in the Sched tab and press Watch: when the season "
+                              "gets there you coach it from here (call a timeout, change the offense and defense, drag substitutions).")
+            return
+        if not live_view["was_live"]:
+            live_view["was_live"] = True
+            scroll_to_live_panel()   # a live game just started: show the floor and the bench
+        if getattr(team, "coach_timeout_open", False) and not live_view["timeout_shown"]:
+            live_view["timeout_shown"] = True
+            scroll_to_live_panel()
+        elif not getattr(team, "coach_timeout_open", False):
+            live_view["timeout_shown"] = False
+        live_title_var.set(f"Live game: {short_team_name(team)}")
+        floor, bench = list(team.on_floor), list(team.bench)
+        signature = (tuple(p.name for p in floor), tuple(p.name for p in bench))
+        if force or signature != live_view["signature"]:
+            live_view["signature"] = signature
+            for kind, frame, players in (("floor", live_floor_frame, floor), ("bench", live_bench_frame, bench)):
+                for child in frame.winfo_children():
+                    child.destroy()
+                live_cards[kind].clear()
+                columns = 5 if kind == "floor" else 4
+                for column in range(columns):
+                    frame.columnconfigure(column, weight=1, uniform=kind)
+                for index, p in enumerate(players):
+                    live_cards[kind][p.name] = live_make_card(frame, p, kind, index % columns, index // columns)
+        queued = list(getattr(team, "manual_substitution", []) or [])
+        pending_out = {out_name: in_name for out_name, in_name in queued}
+        pending_in = {in_name: out_name for out_name, in_name in queued}
+        for kind, players in (("floor", floor), ("bench", bench)):
+            for p in players:
+                card = live_cards[kind].get(p.name)
+                if card is None:
+                    continue
+                card["info_label"].configure(text=f"{p.position}   {p.minutes / 60:.0f} min   {p.pts} pts   {p.pf} PF" + ("   FOULED OUT" if p.fouled_out else ""))
+                if kind == "floor" and p.name in pending_out:
+                    card["tag_label"].configure(text=f"→ {pending_out[p.name]} is queued in")
+                elif kind == "bench" and p.name in pending_in:
+                    card["tag_label"].configure(text=f"QUEUED IN for {pending_in[p.name]}")
+                else:
+                    card["tag_label"].configure(text="")
+        message = live_view.get("message")
+        if message and time.monotonic() - message[1] < 6.0:
+            live_note_var.set(message[0])   # what your last substitution did stays on screen for a few seconds
+        elif getattr(team, "coach_timeout_open", False):
+            live_note_var.set("TIMEOUT: drag substitutions now (they happen at once), then press Resume.")
+        elif queued:
+            live_note_var.set("Queued for the next dead ball: " + "; ".join(f"{i} for {o}" for o, i in queued))
+        else:
+            live_note_var.set("")
+        if sim_engine.SIM_PAUSED and str(pause_button.cget("text")) == "Pause":
+            pause_button.configure(text="Resume")
+            status_var.set("Paused (timeout): make your substitutions, then press Resume.")
 
     def scroll_to_live_panel():
         """Bring the live-game section into view (it sits under the rotation list)."""
@@ -2960,52 +3072,19 @@ def run_gui_app():
         except Exception:
             pass
 
-    def refresh_live_panel():
-        team = live_user_team()
-        if team is not None and coach_available():
-            if not live_view["was_live"]:
-                live_view["was_live"] = True
-                scroll_to_live_panel()   # a live game just started: show the floor and the bench
-            if getattr(team, "coach_timeout_open", False) and not live_view["timeout_shown"]:
-                live_view["timeout_shown"] = True
-                scroll_to_live_panel()
-            elif not getattr(team, "coach_timeout_open", False):
-                live_view["timeout_shown"] = False
-        else:
-            live_view["was_live"] = False
-        for tree in (live_floor_tree, live_bench_tree):
-            tree.delete(*tree.get_children())
-        if team is None or not coach_available():
-            live_title_var.set("Live game")
-            live_note_var.set("No live game right now. In a fantasy season, pick one of your upcoming games in the Sched tab and press Watch: when the season "
-                              "gets there you coach it from here (call a timeout, change the offense and defense, drag substitutions).")
-            return
-        live_title_var.set(f"Live game: {short_team_name(team)}")
-        for tree, players in ((live_floor_tree, list(team.on_floor)), (live_bench_tree, list(team.bench))):
-            for p in players:
-                tree.insert("", "end", iid=p.name, values=(p.name + ("  (out: fouls)" if p.fouled_out else ""), p.position, f"{p.minutes / 60:.1f}", p.pts, p.pf))
-        queued = list(getattr(team, "manual_substitution", []) or [])
-        if getattr(team, "coach_timeout_open", False):
-            live_note_var.set("TIMEOUT: drag substitutions now (they happen at once), then press Resume.")
-        elif queued:
-            live_note_var.set("Queued for the next dead ball: " + "; ".join(f"{i} for {o}" for o, i in queued))
-        if sim_engine.SIM_PAUSED and str(pause_button.cget("text")) == "Pause":
-            pause_button.configure(text="Resume")
-            status_var.set("Paused (timeout): make your substitutions, then press Resume.")
-
     def live_panel_loop():
         try:
             if str(series_tabs.tab(series_tabs.select(), "text")) == "Coach":
                 refresh_live_panel()
         except Exception:
             pass
-        root.after(1000, live_panel_loop)
+        root.after(500, live_panel_loop)
 
     adjustment_text = tk.Text(coach_inner, wrap="word", height=4, font=("Consolas", 10), bg=PANEL_DARK, fg=TEXT, relief="flat", padx=10, pady=8, state="disabled")
     coach_live_buttons = ttk.Frame(live_box)
-    coach_live_buttons.grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
-    ttk.Label(live_box, textvariable=adjustment_status_var, wraplength=1000, foreground=MUTED).grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
-    adjustment_text.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+    coach_live_buttons.grid(row=6, column=0, sticky="w", pady=(8, 0))
+    ttk.Label(live_box, textvariable=adjustment_status_var, wraplength=1000, foreground=MUTED).grid(row=7, column=0, sticky="w", pady=(6, 0))
+    adjustment_text.grid(row=8, column=0, sticky="ew", pady=(6, 0))
 
     root.after(1500, live_panel_loop)
 
