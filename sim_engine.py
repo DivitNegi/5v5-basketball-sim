@@ -9928,6 +9928,8 @@ def is_blowout(teamA: Team, teamB: Team, period: int, period_time: int) -> bool:
 
 
 def force_garbage_time_lineup(team: Team):
+    if team_has_pinned_minutes(team):
+        return   # a blowout does not change the minutes the user set
     available = [p for p in team.roster if not p.fouled_out]
     if len(available) <= 5:
         team.on_floor = available[:5]
@@ -10628,36 +10630,104 @@ def enforce_thunder_2018_rotation(team: Team, period: int, period_time: int, pro
     return swap_players(team, out_player, sub_in, " (2018 rotation)")
 
 
+def lineup_has_big_and_guards(lineup: List[Player]) -> bool:
+    """A five with at least one big and two guards (what the minutes pacing keeps when it swaps players)."""
+    bigs = sum(1 for p in lineup if can_play_center_slot(p))
+    guards = sum(1 for p in lineup if can_play_position(p, "PG") or can_play_position(p, "SG"))
+    return bigs >= 1 and guards >= 2
+
+
+def team_has_pinned_minutes(team: Team) -> bool:
+    """True when the user set minutes in the Coach tab for this team."""
+    return any(getattr(p, "gui_target_minutes_override", None) is not None for p in team.roster)
+
+
 def enforce_pinned_minutes(team: Team, period: int, period_time: int, protected: Player = None) -> bool:
     """Minutes the user set in the Coach tab: pace every player toward his number, game clock by game clock, like a coach watching
-    the minutes sheet. A bench player who is behind his pace comes in for the player on the floor who is furthest ahead of his."""
-    if getattr(team, "garbage_time_locked", False):
-        return False
-    pinned = [p for p in team.roster if getattr(p, "gui_target_minutes_override", None) is not None]
-    if not pinned:
+    the minutes sheet. A bench player who is behind his pace comes in for the player on the floor who is furthest ahead of his,
+    preferably one who plays the same position."""
+    if getattr(team, "garbage_time_locked", False) or not team_has_pinned_minutes(team):
         return False
     elapsed = max(0.0, ((period - 1) * rules_quarter_seconds() + (rules_quarter_seconds() - period_time)) / 60)
 
-    def goal(p: Player) -> float:
-        return float(p.gui_target_minutes_override) * min(1.0, elapsed / 48.0) if getattr(p, "gui_target_minutes_override", None) is not None else 0.0
+    def target(p: Player) -> float:
+        value = getattr(p, "gui_target_minutes_override", None)
+        return float(value) if value is not None else 0.0
 
     def behind(p: Player) -> float:
-        return goal(p) - p.minutes / 60
+        return target(p) * min(1.0, elapsed / 48.0) - p.minutes / 60
 
-    bench = [p for p in team.bench if getattr(p, "gui_target_minutes_override", None) not in (None, 0) and not p.fouled_out
-             and not is_foul_rest_locked(p, period)]
-    candidates = [p for p in team.on_floor if p is not protected and not p.fouled_out and not is_foul_rest_locked(p, period)]
-    if not bench or not candidates:
+    bench = [p for p in team.bench if target(p) > 0 and not p.fouled_out and not is_foul_rest_locked(p, period)]
+    on_floor = [p for p in team.on_floor if p is not protected and not p.fouled_out and not is_foul_rest_locked(p, period)]
+    if not bench or not on_floor:
         return False
-    sub_in = max(bench, key=behind)
-    out_player = min(candidates, key=behind)
-    ahead = -behind(out_player)
-    over_target = out_player.minutes / 60 >= float(getattr(out_player, "gui_target_minutes_override", 0) or 0) + 0.5
-    if not ((behind(sub_in) > 0.6 and ahead > 0.3) or (over_target and behind(sub_in) > -0.5)):
-        return False
-    if behind(sub_in) <= behind(out_player):
-        return False
-    return swap_players(team, out_player, sub_in, " (your minutes)")
+    def worth_swapping(sub_in: Player, out_player: Player) -> bool:
+        over_target = out_player.minutes / 60 >= target(out_player) + 0.5
+        if not ((behind(sub_in) > 0.5 and -behind(out_player) > 0.2) or (over_target and behind(sub_in) > -0.5)):
+            return False
+        return behind(sub_in) > behind(out_player)
+
+    # the players most owed minutes first: each tries to replace a teammate at his position, then anyone the five can spare
+    for sub_in in sorted(bench, key=behind, reverse=True):
+        if behind(sub_in) <= 0.5 and not any(p.minutes / 60 >= target(p) + 0.5 for p in on_floor):
+            break
+        same_position = [p for p in on_floor if can_play_position(sub_in, p.position) or can_play_position(p, sub_in.position)]
+        if same_position:
+            out_player = min(same_position, key=behind)
+            if worth_swapping(sub_in, out_player):
+                return swap_players(team, out_player, sub_in, " (your minutes)")
+        for out_player in sorted(on_floor, key=behind):
+            if worth_swapping(sub_in, out_player) and lineup_has_big_and_guards([sub_in if p is out_player else p for p in team.on_floor]):
+                return swap_players(team, out_player, sub_in, " (your minutes)")
+    return False
+
+
+def pinned_quarter_lineup(team: Team, period: int, protected: Player = None):
+    """The five who start a quarter when the user set minutes: whoever is most behind on his minutes comes in for whoever is most ahead,
+    keeping at least one big and two guards on the floor."""
+    elapsed = max(0.0, (period - 1) * rules_quarter_seconds() / 60)
+
+    def target(p: Player) -> float:
+        value = getattr(p, "gui_target_minutes_override", None)
+        return float(value) if value is not None else 0.0
+
+    def behind(p: Player) -> float:
+        return target(p) * min(1.0, elapsed / 48.0) - p.minutes / 60
+
+    def balanced(lineup: List[Player]) -> bool:
+        bigs = sum(1 for p in lineup if can_play_center_slot(p))
+        guards = sum(1 for p in lineup if can_play_position(p, "PG") or can_play_position(p, "SG"))
+        return bigs >= 1 and guards >= 2
+
+    lineup = [p for p in team.on_floor if not p.fouled_out and not is_foul_rest_locked(p, period)]
+    pool = [p for p in team.roster if not p.fouled_out and not is_foul_rest_locked(p, period) and target(p) > 0]
+    for p in pool:
+        if len(lineup) < 5 and not identity_contains(lineup, p):
+            lineup.append(p)
+    for _swap in range(5):
+        bench = [p for p in pool if not identity_contains(lineup, p)]
+        if not bench:
+            break
+        sub_in = max(bench, key=behind)
+        candidates = [p for p in lineup if p is not protected]
+        if not candidates:
+            break
+        out_player = min(candidates, key=behind)
+        if behind(sub_in) - behind(out_player) <= 1.5:
+            break
+        trial = [sub_in if p is out_player else p for p in lineup]
+        if not balanced(trial) and balanced(lineup):
+            # take the next most-ahead player instead, so the five keeps a big and two guards
+            alternatives = sorted(candidates, key=behind)
+            replacement = next((c for c in alternatives if balanced([sub_in if p is c else p for p in lineup])), None)
+            if replacement is None:
+                break
+            out_player = replacement
+            trial = [sub_in if p is out_player else p for p in lineup]
+        lineup = trial
+    team.on_floor = lineup[:5]
+    team.bench = [p for p in team.roster if not identity_contains(team.on_floor, p)]
+    balance_lineup_positions(team)
 
 
 def enforce_spurs_rotation_map(team: Team, period: int, period_time: int, protected: Player = None) -> bool:
@@ -10798,8 +10868,11 @@ def dead_ball_rotation(team: Team, period: int, period_time: int,
     if not hasattr(team.roster[0], "target_minutes"):
         initialize_minute_targets(team)
 
-    if enforce_pinned_minutes(team, period, period_time, protected):
-        enforce_pinned_minutes(team, period, period_time, protected)   # a second swap when two players are due
+    if team_has_pinned_minutes(team):
+        # the user's minutes run the rotation: no closing-lineup or star-rest rules on top of them
+        for _swap in range(3):
+            if not enforce_pinned_minutes(team, period, period_time, protected):
+                break
         team.last_sub_period = period
         team.last_sub_time = period_time
         return
@@ -11152,6 +11225,14 @@ def maybe_substitute(team: Team, reason: str, protected: Player = None,
     if not team.bench:
         return
 
+    if team_has_pinned_minutes(team):
+        # minutes the user set run the rotation: at a quarter break rebuild by minutes owed, on a foul or timeout pace them
+        if reason == "quarter":
+            pinned_quarter_lineup(team, period if period is not None else getattr(team, "current_period", 1), protected)
+        elif period is not None and period_time is not None:
+            dead_ball_rotation(team, period, period_time, reason=reason, protected=protected, max_subs=3)
+        return
+
     ranked = sorted([p for p in team.roster if not p.fouled_out], key=overall_rating, reverse=True)
     superstar = ranked[0] if ranked else None
     second_star = ranked[1] if len(ranked) > 1 else None
@@ -11362,6 +11443,9 @@ def force_starter_lineup(team: Team, protected: Player = None):
     if getattr(team, "garbage_time_locked", False):
         return
     protected = protected or getattr(team, "free_throw_shooter", None)
+    if team_has_pinned_minutes(team):
+        pinned_quarter_lineup(team, max(1, getattr(team, "current_period", 1) or 1), protected)   # the user's minutes pick the five
+        return
 
     available = [
         p for p in team.roster
