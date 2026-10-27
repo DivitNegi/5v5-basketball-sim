@@ -1854,6 +1854,9 @@ def run_gui_app():
     schedule_order_dropdown.grid(row=0, column=3, sticky="w", padx=(0, 16))
     schedule_count_var = tk.StringVar(value="")
     ttk.Label(schedule_top, textvariable=schedule_count_var).grid(row=0, column=4, sticky="w")
+    schedule_watch_button = ttk.Button(schedule_top, text="Watch selected game live")
+    schedule_watch_button.grid(row=0, column=6, sticky="w", padx=(16, 0))
+    schedule_watch_button.grid_remove()   # only in a fantasy season, with an upcoming game selected
     schedule_back_to_standings = ttk.Button(schedule_top, text="<  Back to standings")
     schedule_back_to_standings.grid(row=0, column=5, sticky="w", padx=(16, 0))
     schedule_back_to_standings.grid_remove()   # only shown after jumping here from a standings row
@@ -1873,6 +1876,7 @@ def run_gui_app():
     schedule_tree.tag_configure("win", foreground="#4ade80")
     schedule_tree.tag_configure("loss", foreground="#f87171")
     schedule_tree.tag_configure("upcoming", foreground="#94a3b8")
+    schedule_tree.tag_configure("watch", foreground=GOLD, font=("Segoe UI", 10, "bold"))
     schedule_tree.grid(row=1, column=0, sticky="nsew")
     schedule_scroll_y.grid(row=1, column=1, sticky="ns")
     schedule_box_frame = ttk.Frame(schedule_frame)
@@ -4862,6 +4866,38 @@ def run_gui_app():
         return top
 
     def update_schedule_table(sections: Dict):
+        kept = schedule_tree.selection()
+        update_schedule_table_rows(sections)
+        if kept and schedule_tree.exists(kept[0]):
+            schedule_tree.selection_set(kept[0])
+        try:
+            if sim_engine.SEASON_LIVE_HOOK is not None and sim_engine.FANTASY_TRADE_STATE.get("user_team"):
+                schedule_watch_button.grid()
+            else:
+                schedule_watch_button.grid_remove()
+        except Exception:
+            pass
+
+    def toggle_watch_selected_game():
+        selection = schedule_tree.selection()
+        iid = selection[0] if selection else ""
+        if not iid.startswith("up|"):
+            status_var.set("Pick one of your upcoming games in the list first, then press Watch.")
+            return
+        order = int(iid[3:]) - 1
+        was_chosen = order in sim_engine.SEASON_WATCH
+        now_chosen = sim_engine.season_watch_toggle(order)
+        if now_chosen:
+            status_var.set(f"Game {order + 1} will be played live, play by play, when the season gets to it.")
+        elif was_chosen:
+            status_var.set(f"Game {order + 1} will be simulated with the rest of the season again.")
+        else:
+            status_var.set("That game has already been handed out to the season: pick a later one.")
+        update_schedule_table(playoff_sections_state.get("sections") or {})
+
+    schedule_watch_button.configure(command=toggle_watch_selected_game)
+
+    def update_schedule_table_rows(sections: Dict):
         if sections.get("_season_paused") and schedule_box_frame.winfo_ismapped():
             return   # a live refresh while you are reading a box score: leave it open
         scroll_position = schedule_tree.yview()[0]
@@ -4947,10 +4983,11 @@ def run_gui_app():
                     add(game, team_filter)
                 for number, home, away in upcoming:
                     opponent = away if home == team_filter else home
+                    watched = (number - 1) in sim_engine.SEASON_WATCH
                     iid = schedule_tree.insert(
-                        "", "end", tags=("upcoming",),
+                        "", "end", iid=f"up|{number}", tags=("upcoming", "watch") if watched else ("upcoming",),
                         values=(team_game_no.get((team_filter, number), number), table_player_name(team_filter, 30), "-",
-                                table_player_name(opponent, 30), "", "", "", "Upcoming"),
+                                table_player_name(opponent, 30), "", "", "", "LIVE: you will watch" if watched else "Upcoming"),
                     )
                     next_iid = next_iid or iid
             else:
@@ -9876,8 +9913,42 @@ def run_gui_app():
                         f"The trade deadline is game {sim_engine.FANTASY_TRADE_STATE.get('deadline_game')}: the season pauses there for your last trades.")
                     season_view["quiet"] = True
                     scoreboard_queue.put({"season_progress": True, "completed": 0, "total": 82 * len(draft_names) // 2})
-                    with contextlib.redirect_stdout(io.StringIO()):
-                        fantasy_sections = run_quiet_82_game_season(draft_names, draft_factories, section_queue, scoreboard_queue)
+
+                    def live_season_game(order, live_team_a, live_team_b):
+                        """Runs on the season thread when the season reaches a game you chose to watch: play it live, with play by play."""
+                        ready = threading.Event()
+
+                        def prepare():
+                            try:
+                                prepare_live_season_game(order, live_team_a.name, live_team_b.name)
+                            finally:
+                                ready.set()
+
+                        root.after(0, prepare)
+                        ready.wait(10)
+                        season_stdout = sys.stdout
+                        sys.stdout = proxy   # the season hides its output; this game must reach the play-by-play
+                        try:
+                            simulate_game(live_team_a, live_team_b)
+                        finally:
+                            sys.stdout = season_stdout
+                            finished = threading.Event()
+
+                            def finish():
+                                try:
+                                    finish_live_season_game(order, live_team_a.name, live_team_b.name)
+                                finally:
+                                    finished.set()
+
+                            root.after(0, finish)
+                            finished.wait(10)
+
+                    sim_engine.SEASON_LIVE_HOOK = live_season_game
+                    try:
+                        with contextlib.redirect_stdout(io.StringIO()):
+                            fantasy_sections = run_quiet_82_game_season(draft_names, draft_factories, section_queue, scoreboard_queue)
+                    finally:
+                        sim_engine.SEASON_LIVE_HOOK = None
                     postseason_state["standings"] = (fantasy_sections or {}).get("_season_standings")
                     postseason_state["factories"] = dict(draft_factories)
                     season_view["quiet"] = False
@@ -9999,6 +10070,31 @@ def run_gui_app():
         thread.start()
 
     replay_state = {"order": None}
+    watch_state = {"after_game": False}
+
+    def prepare_live_season_game(order, name_a, name_b):
+        """GUI thread: switch to the live game view for a season game you chose to watch."""
+        kept_sections = playoff_sections_state.get("sections")
+        clear_log()                                          # empties the live game widgets...
+        playoff_sections_state["sections"] = kept_sections   # ...but the season's data stays
+        season_view["quiet"] = False
+        set_scoreboard_teams(name_a, name_b)
+        scoreboard_status_var.set(f"LIVE: game {order + 1} of the season. {team_display_name(name_a)} vs {team_display_name(name_b)}.")
+        status_var.set(f"Watching game {order + 1} live...")
+        try:
+            for tab_id in series_tabs.tabs():
+                if str(series_tabs.tab(tab_id, "text")) == "PBP":
+                    series_tabs.select(tab_id)
+        except Exception:
+            pass
+
+    def finish_live_season_game(order, name_a, name_b):
+        """GUI thread: the game is over; the season waits for Resume so you can read the box score and the tabs."""
+        sim_engine.SIM_PAUSED = True
+        pause_button.configure(text="Resume")
+        watch_state["after_game"] = True
+        status_var.set(f"Game {order + 1} is over. Look at the box score and tabs, then press Resume to continue the season.")
+        scoreboard_status_var.set("Final. Press Resume to continue the season.")
 
     def start_replay(order):
         """Replay a finished season game live. Works once the season sim has finished."""
@@ -10065,6 +10161,9 @@ def run_gui_app():
         sim_engine.SIM_PAUSED = not sim_engine.SIM_PAUSED
         pause_button.configure(text="Resume" if sim_engine.SIM_PAUSED else "Pause")
         status_var.set("Paused" if sim_engine.SIM_PAUSED else "Running...")
+        if not sim_engine.SIM_PAUSED and watch_state["after_game"]:
+            watch_state["after_game"] = False
+            season_view["quiet"] = True   # back to the season view after a game you watched
         output_queue.put("\n[GUI] Simulation paused.\n" if sim_engine.SIM_PAUSED else "\n[GUI] Simulation resumed.\n")
 
     def active_adjustment_team() -> Team | None:
@@ -10214,10 +10313,12 @@ def run_gui_app():
         cover_tabs = False   # the tabs update live during the season, so they are never covered
         if want and not season_view.get("speed_on"):
             season_view["speed_on"] = True
-            season_speed["value"] = 1.0 if sim_engine.FANTASY_TRADE_STATE.get("user_team") else 20.0   # a fantasy season starts slow: use + to speed it up
+            season_speed["value"] = season_speed.pop("restore", None) or (
+                1.0 if sim_engine.FANTASY_TRADE_STATE.get("user_team") else 20.0)   # a fantasy season starts slow: use + to speed it up
             apply_season_speed()
         elif not want and season_view.get("speed_on"):
             season_view["speed_on"] = False
+            season_speed["restore"] = season_speed["value"]   # a game you watch must not reset the season speed you chose
             sim_engine.SEASON_GAME_DELAY = 0.0
             apply_gui_speed()
         if want and not season_view["shown"]:

@@ -24760,6 +24760,22 @@ def season_pause_snapshot(section_queue, entries, player_totals, team_totals, ga
         SEASON_POSITIONAL_AWARDS = saved
 
 
+SEASON_WATCH: set = set()        # (0-based) game numbers the user chose to watch live, play by play, when the season gets to them
+SEASON_LIVE_HOOK = None           # set by the GUI: plays one season game live (hook(order, team_a, team_b)) and returns when it is over
+
+
+def season_watch_toggle(order: int) -> bool:
+    """Choose (or un-choose) a future game to be played live. Returns whether the game is now chosen; a game already handed out
+    to the season cannot be chosen."""
+    if order in SEASON_WATCH:
+        SEASON_WATCH.discard(order)
+        return False
+    if order < FANTASY_TRADE_STATE.get("next_order", 0) or SEASON_LIVE_HOOK is None:
+        return False
+    SEASON_WATCH.add(order)
+    return True
+
+
 SEASON_GAME_DELAY = 0.0          # seconds each game takes while a season is simmed; the GUI's speed buttons set it
 SEASON_LIVE_MIN_INTERVAL = 2.0   # seconds between live "season so far" refreshes of the stats tabs
 
@@ -24942,6 +24958,26 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
     for order, (entry_a, entry_b) in enumerate(schedule):
         season_replay_register_game(order, entry_a["name"], entry_b["name"], seeds[order])
 
+    def play_watched_game(order):
+        """A game the user chose to watch: played live (play by play) when the season gets to it, then the season pauses so the box
+        score can be read. It is the same seeded game the quiet sim would have played."""
+        global SIM_PAUSED
+        entry_a, entry_b = schedule[order]
+        if templates is not None:
+            maker_a = lambda t=templates[entry_a["name"]]: _copy.deepcopy(t)
+            maker_b = lambda t=templates[entry_b["name"]]: _copy.deepcopy(t)
+        else:
+            maker_a, maker_b = entry_a["factory"], entry_b["factory"]
+        team_a, team_b = build_season_game_teams(maker_a, maker_b, seeds[order])
+        SEASON_WATCH.discard(order)
+        try:
+            SEASON_LIVE_HOOK(order, team_a, team_b)
+        finally:
+            SIM_PAUSED = True   # the season waits for Resume
+        return team_a, team_b, order
+
+    SEASON_WATCH.clear()
+
     def parallel_results():
         import multiprocessing
         import os
@@ -24956,11 +24992,16 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 hold_season_while_paused(season_snapshot)
                 maybe_trade_deadline(start_index)
                 maybe_offer_trade(start_index)
+                watched = [o for o in range(start_index, min(total_games, start_index + batch)) if o in SEASON_WATCH] if SEASON_LIVE_HOOK else []
+                live_results = [play_watched_game(order) for order in watched]
                 tasks = [
                     (templates[ea["name"]], templates[eb["name"]], order, seeds[order])
                     for order, (ea, eb) in enumerate(schedule[start_index:start_index + batch], start=start_index)
+                    if order not in watched
                 ]
                 FANTASY_TRADE_STATE["next_order"] = start_index + batch   # a trade made from here on starts with the next batch
+                for result in live_results:
+                    yield result
                 for result in pool.imap_unordered(_quiet_season_worker, tasks, chunksize=2):
                     yield result
         finally:
@@ -24974,6 +25015,9 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             maybe_trade_deadline(order)
             if order % 60 == 0:
                 maybe_offer_trade(order)
+            if SEASON_LIVE_HOOK and order in SEASON_WATCH:
+                yield play_watched_game(order)
+                continue
             team_a, team_b = simulate_silent_season_game(entry_a["factory"], entry_b["factory"], seeds[order])
             yield team_a, team_b, order
 
