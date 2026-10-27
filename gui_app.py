@@ -2614,7 +2614,10 @@ def run_gui_app():
     coach_canvas.bind("<Leave>", lambda _e: coach_canvas.unbind_all("<MouseWheel>"))
 
     adjustment_status_var = tk.StringVar(value="Start a game, then use these for the team with possession.")
-    COACH_ROW_H = 30
+    import tkinter.font as tkfont
+    COACH_FONT = ("Segoe UI", 12)
+    COACH_ROW_H = max(48, tkfont.Font(font=COACH_FONT).metrics("linespace") + 28)   # roomy rows, sized to the font so nothing is clipped
+    COACH_ROW_GAP = 8
     COACH_SLOT_LABELS = ("1  PG", "2  SG", "3  SF", "4  PF", "5  C", "6th man", "7th", "8th", "9th", "10th", "11th", "12th", "13th", "14th", "15th")
     COACH_SLOT_POSITIONS = ("PG", "SG", "SF", "PF", "C")
     coach_state = {"signature": None, "rows": {}, "order": [], "labels": {}, "drag": None, "natural": {}, "ovr": {}}
@@ -2622,12 +2625,13 @@ def run_gui_app():
     coach_total_var = tk.StringVar(value="")
     coach_note_var = tk.StringVar(value="")
     ttk.Label(coach_inner, textvariable=coach_title_var, font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
-    ttk.Label(coach_inner, text="Drag a player up or down to set your rotation. Slots 1-5 are your starters (point guard, shooting guard, small forward, "
-                                "power forward, center); 6 is your sixth man, 7 the next off the bench, and so on. Drag the sliders for minutes (they always "
-                                "add up to 240), then press Apply: it takes effect from the next game day.",
-              wraplength=1000, justify="left", foreground=MUTED).grid(row=1, column=0, sticky="w", pady=(2, 6))
+    ttk.Label(coach_inner, text="Drag a player up or down to set your rotation.  Slots 1-5 start the game at PG, SG, SF, PF and C; 6 is your sixth man, "
+                                "7 the next off the bench.  The sliders set each player's minutes and always add up to 240.  Changes save by themselves "
+                                "and apply from the next game day.",
+              wraplength=1000, justify="left", foreground=MUTED).grid(row=1, column=0, sticky="w", pady=(4, 10))
     coach_list = tk.Frame(coach_inner, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
-    coach_list.grid(row=2, column=0, sticky="ew")
+    coach_list.grid(row=2, column=0, sticky="ew", pady=(4, 0))
+    coach_divider = tk.Frame(coach_list, bg=GOLD)
     coach_footer = ttk.Frame(coach_inner)
     coach_footer.grid(row=3, column=0, sticky="ew", pady=(8, 0))
     coach_next_var = tk.StringVar(value="")
@@ -2719,11 +2723,15 @@ def run_gui_app():
             row["slot"].configure(text=COACH_SLOT_LABELS[index] if index < len(COACH_SLOT_LABELS) else f"{index + 1}th",
                                   fg=GOLD if starter else MUTED)
             if name == dragging:
-                frame.place(x=0, y=max(0, min(pointer_y - COACH_ROW_H // 2, (len(order) - 1) * COACH_ROW_H)), relwidth=1.0, height=COACH_ROW_H)
+                frame.place(x=6, y=max(0, min(pointer_y - COACH_ROW_H // 2, (len(order) - 1) * COACH_ROW_H)) + COACH_ROW_GAP // 2,
+                            relwidth=1.0, width=-12, height=COACH_ROW_H - COACH_ROW_GAP)
                 frame.lift()
             else:
-                frame.place(x=0, y=index * COACH_ROW_H, relwidth=1.0, height=COACH_ROW_H)
+                frame.place(x=6, y=index * COACH_ROW_H + COACH_ROW_GAP // 2, relwidth=1.0, width=-12, height=COACH_ROW_H - COACH_ROW_GAP)
         coach_list.configure(height=max(1, len(order)) * COACH_ROW_H)
+        if len(order) > 5:
+            coach_divider.place(x=0, y=5 * COACH_ROW_H - 2, relwidth=1.0, height=3)   # the line under the starting five
+            coach_divider.lift()
 
     def coach_target_index(event) -> int:
         position = (event.y_root - coach_list.winfo_rooty()) / COACH_ROW_H
@@ -2769,7 +2777,9 @@ def run_gui_app():
 
     def coach_build_rows():
         for child in coach_list.winfo_children():
-            child.destroy()
+            if child is not coach_divider:
+                child.destroy()
+        coach_divider.place_forget()
         coach_state.update(rows={}, order=[], labels={}, drag=None)
         if not coach_available():
             coach_title_var.set("Coach")
@@ -2795,14 +2805,15 @@ def run_gui_app():
             player = roster[name]
             frame = tk.Frame(coach_list, bg=PANEL)
             frame.columnconfigure(5, weight=1)
-            slot = tk.Label(frame, text="", width=7, anchor="w", bg=PANEL, fg=MUTED, font=("Segoe UI", 10, "bold"), cursor="fleur")
-            grip = tk.Label(frame, text="≡", bg=PANEL, fg=MUTED, font=("Segoe UI", 12), cursor="fleur")
-            label = tk.Label(frame, text=name, width=22, anchor="w", bg=PANEL, fg=TEXT, font=("Segoe UI", 10), cursor="fleur")
+            slot = tk.Label(frame, text="", width=8, anchor="w", bg=PANEL, fg=MUTED, font=("Segoe UI", 12, "bold"), cursor="fleur")
+            grip = tk.Label(frame, text="☰", bg=PANEL, fg=MUTED, font=("Segoe UI", 12), cursor="fleur")
+            label = tk.Label(frame, text=name, width=24, anchor="w", bg=PANEL, fg=TEXT, font=COACH_FONT, cursor="fleur")
             natural = getattr(player, "auto_position", player.position)
-            pos_label = tk.Label(frame, text=natural, width=4, bg=PANEL, fg=MUTED, font=("Segoe UI", 10))
-            ovr_label = tk.Label(frame, text=str(sim_engine.fantasy_ovr(player)), width=4, bg=PANEL, fg=TEXT, font=("Segoe UI", 10))
+            pos_label = tk.Label(frame, text=natural, width=4, bg=PANEL, fg=MUTED, font=COACH_FONT)
+            overall = sim_engine.fantasy_ovr(player)
+            ovr_label = tk.Label(frame, text=str(overall), width=4, bg=PANEL, fg=GOLD if overall >= 90 else ("#4ade80" if overall >= 80 else TEXT), font=("Segoe UI", 12, "bold"))
             min_var = tk.DoubleVar(value=defaults["minutes"].get(name, 0))
-            minute_label = tk.Label(frame, text=str(int(round(min_var.get()))), width=3, bg=PANEL, fg=TEXT, font=("Segoe UI", 10, "bold"))
+            minute_label = tk.Label(frame, text=str(int(round(min_var.get()))), width=3, bg=PANEL, fg=TEXT, font=("Segoe UI", 13, "bold"))
 
             def slide(value, who=name):
                 coach_rebalance(who, int(round(float(value))))
@@ -2811,9 +2822,10 @@ def run_gui_app():
             scale = ttk.Scale(frame, from_=0, to=44, variable=min_var, command=slide)
             scale.bind("<ButtonRelease-1>", coach_schedule_apply)
             for column, widget in enumerate((slot, grip, label, pos_label, ovr_label)):
-                widget.grid(row=0, column=column, padx=3, sticky="w")
-            scale.grid(row=0, column=5, sticky="ew", padx=6)
-            minute_label.grid(row=0, column=6, padx=(2, 8))
+                widget.grid(row=0, column=column, padx=(10, 6), sticky="w")
+            scale.grid(row=0, column=5, sticky="ew", padx=14)
+            minute_label.grid(row=0, column=6, padx=(4, 16))
+            frame.rowconfigure(0, weight=1)
             for handle in (slot, grip, label):
                 handle.bind("<ButtonPress-1>", lambda e, who=name: coach_drag_start(e, who))
                 handle.bind("<B1-Motion>", coach_drag_move)
