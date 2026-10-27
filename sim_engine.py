@@ -23314,6 +23314,97 @@ def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: Li
     return random.choice(options) if options else None
 
 
+# ---- player form: a player who is playing well (or badly) for his rating gets better (or worse) as the fantasy season goes on ----
+FANTASY_FORM_FIRST_GAME = 120      # no form changes before this many league games have been played
+FANTASY_FORM_EVERY = 60            # then they are recalculated this often (about every four rounds of a 30-team league)
+FANTASY_FORM_PER_Z = 0.04          # rating change (0.04 = 4 points) per standard deviation above or below what his rating predicts
+FANTASY_FORM_MAX = 0.06            # the most a rating can move from where it started
+FANTASY_FORM_MAX_OVR = 5           # and the most his overall can move (a big's overall reacts strongly to small rating changes)
+FANTASY_FORM_RATINGS = (("three_rating", 1.0), ("mid_rating", 1.0), ("rim_rating", 1.0), ("dunk_rating", 1.0), ("ft_rating", 1.0),
+                        ("playmaking", 0.5), ("ball_handle", 0.5))
+
+
+def fantasy_game_score_per_36(stats: Dict) -> float | None:
+    minutes = stats.get("minutes", 0) / 60.0
+    games = stats.get("games", 0)
+    if games < 12 or minutes / max(games, 1) < 12.0:
+        return None
+    game_score = (stats["pts"] + 0.4 * stats["fgm"] - 0.7 * stats["fga"] - 0.4 * (stats["fta"] - stats["ftm"]) + 0.7 * stats["oreb"]
+                  + 0.3 * stats["dreb"] + stats["stl"] + 0.7 * stats["ast"] + 0.7 * stats["blk"] - 0.4 * stats["pf"] - stats["tov"])
+    return game_score / minutes * 36.0
+
+
+def fantasy_form_update(player_totals: Dict) -> Dict[str, Dict]:
+    """Recalculate every fantasy player's form from the season so far. A player's production per 36 minutes is compared with what his
+    starting overall predicts for the league; the gap (as a number of standard deviations, shrunk while the sample is small) moves his
+    scoring and playmaking ratings up or down, at most FANTASY_FORM_MAX from where they started. Because the overall and the trade value
+    are computed from the ratings, they follow. Returns {team: {player: change in overall}} for the teams that changed."""
+    state = FANTASY_TRADE_STATE
+    by_name: Dict[str, Dict] = {}
+    for team_stats in player_totals.values():
+        for name, stats in team_stats.items():
+            if name in by_name:
+                merged = {k: v for k, v in by_name[name].items()}
+                for key, value in stats.items():
+                    if isinstance(value, (int, float)) and not isinstance(value, bool):
+                        merged[key] = merged.get(key, 0) + value
+                by_name[name] = merged
+            else:
+                by_name[name] = dict(stats)
+    players = {}
+    for team_name in state["factories"]:
+        for p in fantasy_trade_roster(team_name):
+            if not hasattr(p, "form_base"):
+                p.form_base = {attr: getattr(p, attr) for attr, _w in FANTASY_FORM_RATINGS}
+                p.form_base_ovr = fantasy_ovr(p)
+            players[p.name] = (team_name, p)
+    rows = []
+    for name, (team_name, p) in players.items():
+        stats = by_name.get(name)
+        value = fantasy_game_score_per_36(stats) if stats else None
+        if value is not None:
+            rows.append((p.form_base_ovr, value, stats["games"], name))
+    if len(rows) < 30:
+        return {}
+    mean_x = sum(r[0] for r in rows) / len(rows)
+    mean_y = sum(r[1] for r in rows) / len(rows)
+    var_x = sum((r[0] - mean_x) ** 2 for r in rows) or 1.0
+    slope = sum((r[0] - mean_x) * (r[1] - mean_y) for r in rows) / var_x
+    residuals = {r[3]: r[1] - (mean_y + slope * (r[0] - mean_x)) for r in rows}
+    spread = (sum(v * v for v in residuals.values()) / len(residuals)) ** 0.5 or 1.0
+    games_played = {r[3]: r[2] for r in rows}
+    changed: Dict[str, Dict] = {}
+    for name, residual in residuals.items():
+        team_name, p = players[name]
+        z = residual / spread
+        shrink = games_played[name] / (games_played[name] + 30.0)
+        shift = max(-FANTASY_FORM_MAX, min(FANTASY_FORM_MAX, FANTASY_FORM_PER_Z * z * shrink))
+        before = fantasy_ovr(p)
+        for _attempt in range(12):
+            for attr, weight in FANTASY_FORM_RATINGS:
+                base = p.form_base[attr]
+                if base >= 0.2:   # a player who does not shoot or pass does not become one
+                    setattr(p, attr, round(max(0.05, min(0.99, base + shift * weight)), 3))
+            if abs(fantasy_ovr(p) - p.form_base_ovr) <= FANTASY_FORM_MAX_OVR or abs(shift) < 0.002:
+                break
+            shift *= 0.8   # too big a jump in overall for the rating change: ease it back
+        if abs(fantasy_ovr(p) - p.form_base_ovr) > FANTASY_FORM_MAX_OVR:
+            shift = 0.0   # even a tiny change crosses one of the formula's thresholds: leave his ratings where they started
+            for attr, _weight in FANTASY_FORM_RATINGS:
+                setattr(p, attr, p.form_base[attr])
+        p.form_shift = shift
+        after = fantasy_ovr(p)
+        if after != before:
+            changed.setdefault(team_name, {})[name] = after - before
+    return changed
+
+
+def fantasy_player_form(player: Player) -> int:
+    """How far a player's overall has moved from where the season started (0 if his form has not been calculated yet)."""
+    base = getattr(player, "form_base_ovr", None)
+    return 0 if base is None else fantasy_ovr(player) - base
+
+
 def _fantasy_lineup_execute(change: Dict):
     """Starters, positions and minutes the user chose in the Coach tab (or a reset to the automatic ones)."""
     user_name = FANTASY_TRADE_STATE["user_team"]
@@ -24941,6 +25032,25 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
         progress_queue.put({"trade_offer": offer, "completed": games_played})
         hold_season_while_paused(season_snapshot)   # waits for your answer; an accepted trade is carried out here
 
+    form_state = {"last": 0}
+
+    def maybe_update_form(games_played):
+        """Players who are playing well (or badly) for their rating get better (or worse): ratings, overall and trade value follow."""
+        if not fantasy_trades or games_played < FANTASY_FORM_FIRST_GAME or games_played - form_state["last"] < FANTASY_FORM_EVERY:
+            return
+        form_state["last"] = games_played
+        changed = fantasy_form_update(season_player_totals)
+        for team_name in changed:
+            entry = entry_by_name.get(team_name)
+            if entry is None:
+                continue
+            refresh_season_entry(entry)
+            if templates is not None:
+                templates[team_name] = entry["factory"]()
+                season_replay_register_maker(team_name, (lambda t=templates[team_name]: _copy.deepcopy(t)), games_played)
+            else:
+                season_replay_register_maker(team_name, (lambda t=entry["factory"](): _copy.deepcopy(t)), games_played)
+
     def maybe_trade_deadline(games_played):
         """The deadline: the season stops once, at the deadline game, for your last chance to trade. Nothing can be traded after it."""
         global SIM_PAUSED
@@ -24991,6 +25101,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 FANTASY_TRADE_STATE["next_order"] = start_index
                 hold_season_while_paused(season_snapshot)
                 maybe_trade_deadline(start_index)
+                maybe_update_form(start_index)
                 maybe_offer_trade(start_index)
                 watched = [o for o in range(start_index, min(total_games, start_index + batch)) if o in SEASON_WATCH] if SEASON_LIVE_HOOK else []
                 live_results = [play_watched_game(order) for order in watched]
@@ -25013,6 +25124,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             FANTASY_TRADE_STATE["next_order"] = order
             hold_season_while_paused(season_snapshot)
             maybe_trade_deadline(order)
+            maybe_update_form(order)
             if order % 60 == 0:
                 maybe_offer_trade(order)
             if SEASON_LIVE_HOOK and order in SEASON_WATCH:
