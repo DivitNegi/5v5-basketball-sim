@@ -2636,6 +2636,66 @@ def run_gui_app():
         coach_total_var.set(f"Minutes: {total} / 240     Starters: {starters} / 5")
         coach_total_label.configure(foreground="#4ade80" if total == 240 and starters == 5 else "#f87171")
 
+    def coach_spread(total: int, weights: Dict[str, float], low: int = 0, high: int = 44) -> Dict[str, int]:
+        """Split `total` minutes over the names in proportion to `weights`, each between low and high, as whole numbers that add up exactly."""
+        names = list(weights)
+        if not names:
+            return {}
+        total = max(low * len(names), min(high * len(names), int(total)))
+        share = {n: float(max(weights[n], 0.0)) for n in names}
+        if sum(share.values()) <= 0:
+            share = {n: 1.0 for n in names}
+        fixed: Dict[str, float] = {}
+        free = list(names)
+        for _ in range(len(names) + 2):
+            remaining = total - sum(fixed.values())
+            weight_sum = sum(share[n] for n in free)
+            alloc = {n: remaining * share[n] / weight_sum if weight_sum > 0 else remaining / len(free) for n in free}
+            over = [n for n in free if alloc[n] > high]
+            under = [n for n in free if alloc[n] < low]
+            if not over and not under:
+                break
+            for n in over:
+                fixed[n] = float(high)
+            for n in under:
+                fixed[n] = float(low)
+            free = [n for n in free if n not in fixed]
+            if not free:
+                break
+        values = {**fixed, **{n: alloc[n] for n in free if n in alloc}}
+        floors = {n: int(values[n]) for n in names}
+        leftover = total - sum(floors.values())
+        for n in sorted(names, key=lambda k: values[k] - floors[k], reverse=True):
+            if leftover <= 0:
+                break
+            if floors[n] < high:
+                floors[n] += 1
+                leftover -= 1
+        return floors
+
+    def coach_show_minutes(values: Dict[str, int]):
+        for name, minutes in values.items():
+            row = coach_state["rows"][name]
+            row["min"].set(minutes)
+            coach_state["labels"][name].configure(text=str(int(minutes)))
+
+    def coach_rebalance(name: str, new_minutes: int):
+        """The sliders always add up to 240: moving one moves the others the other way, in proportion to how many minutes they have."""
+        rows = coach_state["rows"]
+        others = {n: float(row["min"].get()) for n, row in rows.items() if n != name}
+        new_minutes = max(0, min(44, int(new_minutes), 240 - 0 * len(others)))
+        if others:
+            # the others can hold at most 44 each and at least 0
+            new_minutes = max(240 - 44 * len(others), min(new_minutes, 240))
+        values = coach_spread(240 - new_minutes, others) if others else {}
+        values[name] = new_minutes
+        coach_show_minutes(values)
+
+    def coach_normalize_240():
+        rows = coach_state["rows"]
+        if rows:
+            coach_show_minutes(coach_spread(240, {n: float(row["min"].get()) for n, row in rows.items()}))
+
     def coach_build_rows():
         for child in coach_rows_frame.winfo_children():
             child.destroy()
@@ -2672,15 +2732,15 @@ def run_gui_app():
             ttk.Label(coach_rows_frame, text=str(sim_engine.fantasy_ovr(player))).grid(row=r, column=3, padx=4)
             minute_label = ttk.Label(coach_rows_frame, text=str(int(round(min_var.get()))), width=3)
 
-            def slide(value, var=min_var, label=minute_label):
-                var.set(round(float(value)))
-                label.configure(text=str(int(var.get())))
+            def slide(value, who=player.name):
+                coach_rebalance(who, int(round(float(value))))
                 coach_update_total()
 
             ttk.Scale(coach_rows_frame, from_=0, to=44, variable=min_var, command=slide).grid(row=r, column=4, sticky="ew", padx=4)
             minute_label.grid(row=r, column=5, padx=4)
             coach_state.setdefault("labels", {})[player.name] = minute_label
         coach_state["signature"] = tuple(p.name for p in roster)
+        coach_normalize_240()
         coach_update_total()
 
     def coach_apply():
@@ -2704,7 +2764,7 @@ def run_gui_app():
         coach_note_var.set(
             ("Saved. It applies from game " + str(when + 1) + " on (games already played or handed out keep the old lineup). " if when is not None
              else "Saved. It applies to your next games. ")
-            + ("" if total == 240 else f"Your minutes add up to {total}, not 240: the sim paces everyone toward his number but will under- or over-play someone.")
+
         )
 
     def coach_reset():
@@ -2714,23 +2774,7 @@ def run_gui_app():
         coach_build_rows()
         coach_note_var.set("Back to the automatic starters, positions and minutes.")
 
-    def coach_fit_240():
-        rows = coach_state["rows"]
-        total = sum(row["min"].get() for row in rows.values())
-        if total <= 0:
-            return
-        scaled = {name: row["min"].get() * 240.0 / total for name, row in rows.items()}
-        floors = {name: int(v) for name, v in scaled.items()}
-        leftover = 240 - sum(floors.values())
-        for name in sorted(scaled, key=lambda n: scaled[n] - floors[n], reverse=True)[:max(0, leftover)]:
-            floors[name] += 1
-        for name, value in floors.items():
-            rows[name]["min"].set(min(44, value))
-            coach_state["labels"][name].configure(text=str(int(rows[name]["min"].get())))
-        coach_update_total()
-
     ttk.Button(coach_footer, text="Apply", command=coach_apply).grid(row=0, column=1, padx=(0, 8))
-    ttk.Button(coach_footer, text="Make it 240", command=coach_fit_240).grid(row=0, column=2, padx=(0, 8))
     ttk.Button(coach_footer, text="Automatic", command=coach_reset).grid(row=0, column=3, padx=(0, 8))
     ttk.Button(coach_footer, text="Reload", command=lambda: coach_build_rows()).grid(row=0, column=4)
 
