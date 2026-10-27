@@ -2626,8 +2626,9 @@ def run_gui_app():
     coach_note_var = tk.StringVar(value="")
     ttk.Label(coach_inner, textvariable=coach_title_var, font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
     ttk.Label(coach_inner, text="Drag a player up or down to set your rotation.  Slots 1-5 start the game at PG, SG, SF, PF and C; 6 is your sixth man, "
-                                "7 the next off the bench.  The sliders set each player's minutes and always add up to 240.  Changes save by themselves "
-                                "and apply from the next game day.",
+                                "7 the next off the bench.  Each slider sets one player's minutes and moves only that player.  The team has 240 minutes: once they are "
+                                "all handed out a slider can't go higher, so slide someone else down first.  Changes save by themselves and apply from the "
+                                "next game day (minutes save once all 240 are handed out).",
               wraplength=1000, justify="left", foreground=MUTED).grid(row=1, column=0, sticky="w", pady=(4, 10))
     coach_list = tk.Frame(coach_inner, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
     coach_list.grid(row=2, column=0, sticky="ew", pady=(4, 0))
@@ -2646,7 +2647,8 @@ def run_gui_app():
     def coach_update_total(*_args):
         rows = coach_state["rows"]
         total = sum(int(round(row["min"].get())) for row in rows.values())
-        coach_total_var.set(f"Minutes: {total} / 240     Starters: slots 1-5")
+        left = 240 - total
+        coach_total_var.set(f"Minutes: {total} / 240     " + ("all handed out" if left == 0 else f"{left} left to hand out (slide someone down to free more)"))
         coach_total_label.configure(foreground="#4ade80" if total == 240 else "#f87171")
 
     def coach_spread(total: int, weights: Dict[str, float], low: int = 0, high: int = 44) -> Dict[str, int]:
@@ -2693,15 +2695,13 @@ def run_gui_app():
             coach_state["labels"][name].configure(text=str(int(minutes)))
 
     def coach_rebalance(name: str, new_minutes: int):
-        """The sliders always add up to 240: moving one moves the others the other way, in proportion to how many minutes they have."""
+        """A slider moves on its own. The team has 240 minutes to hand out, so a slider can only go up as far as the minutes nobody is using;
+        slide another player down to free some."""
         rows = coach_state["rows"]
-        others = {n: float(row["min"].get()) for n, row in rows.items() if n != name}
-        new_minutes = max(0, min(44, int(new_minutes)))
-        if others:
-            new_minutes = max(240 - 44 * len(others), min(new_minutes, 240))
-        values = coach_spread(240 - new_minutes, others) if others else {}
-        values[name] = new_minutes
-        coach_show_minutes(values)
+        used_by_others = sum(int(round(row["min"].get())) for n, row in rows.items() if n != name)
+        room = max(0, 240 - used_by_others)
+        new_minutes = max(0, min(44, room, int(new_minutes)))
+        coach_show_minutes({name: new_minutes})
 
     def coach_normalize_240():
         rows = coach_state["rows"]
@@ -2851,7 +2851,8 @@ def run_gui_app():
             player = roster.get(name)
             natural = getattr(player, "auto_position", player.position) if player is not None else "SF"
             positions[name] = COACH_SLOT_POSITIONS[index] if index < 5 else natural   # slots 1-5 play PG, SG, SF, PF, C
-        outcome = sim_engine.fantasy_lineup_submit(order[:5], positions, minutes, rotation=order)
+        short = 240 - sum(minutes.values())
+        outcome = sim_engine.fantasy_lineup_submit(order[:5], positions, minutes if short == 0 else {}, rotation=order)
         if not outcome.get("ok"):
             coach_note_var.set(outcome.get("error") or "Could not apply that.")
             return
@@ -2859,6 +2860,7 @@ def run_gui_app():
         coach_note_var.set(
             ("Saved. It applies from game " + str(when + 1) + " on (games already played or handed out keep the old lineup)." if when is not None
              else "Saved. It applies to your next games.")
+            + ("" if short == 0 else f"  Minutes are not saved yet: {short} still to hand out so they add up to 240.")
         )
         coach_show_next_game()
 
