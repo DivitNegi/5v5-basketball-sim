@@ -23436,6 +23436,7 @@ def fantasy_form_update(player_totals: Dict) -> Dict[str, Dict]:
         after = fantasy_ovr(p)
         if after != before:
             changed.setdefault(team_name, {})[name] = after - before
+    fantasy_optimize_all_usage()   # ratings moved, so each team's usage is shared out again
     return changed
 
 
@@ -23443,6 +23444,113 @@ def fantasy_player_form(player: Player) -> int:
     """How far a player's overall has moved from where the season started (0 if his form has not been calculated yet)."""
     base = getattr(player, "form_base_ovr", None)
     return 0 if base is None else fantasy_ovr(player) - base
+
+
+# ---- usage in a fantasy season: set from each player's ratings and the team he is on (shot tendencies are left alone) ----
+FANTASY_USAGE_TEAM_WEIGHT = 1.44   # what a team's minutes-weighted usage adds up to (the average of the hand-built teams)
+FANTASY_USAGE_MINUTE_WEIGHTS = (1.0, 1.0, 1.0, 1.0, 1.0, 0.85, 0.7, 0.5, 0.3, 0.15, 0.05, 0.05, 0.02, 0.02, 0.02)
+FANTASY_USAGE_MIN, FANTASY_USAGE_MAX = 0.04, 0.50
+
+
+def fantasy_raw_usage(player: Player) -> float:
+    """How much of an offense a player's ratings ask for, before his teammates are taken into account: scoring plus creation (handle and
+    passing), finishing, speed and size. Fitted to how the hand-built rosters rate their stars and role players."""
+    zones = sorted([player.three_rating, player.mid_rating, player.rim_rating], reverse=True)
+    scoring = 0.50 * zones[0] + 0.30 * zones[1] + 0.20 * zones[2]
+    creation = 0.55 * player.ball_handle + 0.45 * player.playmaking
+    finishing = 0.50 * player.dunk_rating + 0.50 * player.ft_rating
+    height = ((player.height - 78) / 6.0) if player.height else 0.0
+    value = (-0.1575 - 0.0033 * scoring + 0.0684 * creation + 0.1663 * finishing + 0.0525 * player.speed + 0.033 * height
+             + 0.2871 * scoring * creation)
+    return max(0.03, value)
+
+
+def fantasy_optimize_usage(players: List[Player], rotation: List[str] | None = None) -> None:
+    """Give every player on a team the usage his ratings deserve on THIS team: each one's rate comes from his ratings, and the team's
+    usage (weighted by how much each plays) always adds up to the same total, so adding a star lowers everyone else's usage and a
+    thin team gives its scorers more. Usage a player was set to by hand (usage_custom) is kept, and the rest shares what is left."""
+    if not players:
+        return
+    order = {name: index for index, name in enumerate(rotation or [])}
+    ranked = sorted(players, key=lambda p: (order.get(p.name, 99), -fantasy_ovr(p)) if order else (-fantasy_ovr(p),))
+    weight = {p.name: FANTASY_USAGE_MINUTE_WEIGHTS[min(i, len(FANTASY_USAGE_MINUTE_WEIGHTS) - 1)] for i, p in enumerate(ranked)}
+    custom = [p for p in players if getattr(p, "usage_custom", None) is not None]
+    auto = [p for p in players if getattr(p, "usage_custom", None) is None]
+    for p in custom:
+        p.usage = max(FANTASY_USAGE_MIN, min(FANTASY_USAGE_MAX, float(p.usage_custom)))
+    if not auto:
+        return
+    raw = {p.name: fantasy_raw_usage(p) ** 1.4 for p in auto}   # a little steeper than linear: the best scorers take the most shots
+    remaining = max(0.4, FANTASY_USAGE_TEAM_WEIGHT - sum(weight[p.name] * p.usage for p in custom))
+    for _pass in range(3):   # the clamps can free up or use up usage: share what is left again
+        denominator = sum(weight[p.name] * raw[p.name] for p in auto) or 1.0
+        scale = remaining / denominator
+        clamped = 0.0
+        free = []
+        for p in auto:
+            value = raw[p.name] * scale
+            if value > FANTASY_USAGE_MAX or value < FANTASY_USAGE_MIN:
+                p.usage = FANTASY_USAGE_MAX if value > FANTASY_USAGE_MAX else FANTASY_USAGE_MIN
+                clamped += weight[p.name] * p.usage
+            else:
+                p.usage = value
+                free.append(p)
+        if not clamped or not free:
+            break
+        remaining = max(0.2, remaining - clamped)
+        auto = free
+        raw = {p.name: raw[p.name] for p in free}
+    for p in players:
+        p.usage = round(p.usage, 3)
+
+
+def fantasy_optimize_team_usage(team_name: str) -> None:
+    factory = (FANTASY_TRADE_STATE.get("factories") or {}).get(team_name)
+    roster = getattr(factory, "drafted_players", None)
+    if roster:
+        fantasy_optimize_usage(roster, getattr(factory, "rotation_order", None))
+
+
+def fantasy_optimize_all_usage() -> None:
+    for team_name in (FANTASY_TRADE_STATE.get("factories") or {}):
+        fantasy_optimize_team_usage(team_name)
+
+
+def fantasy_usage_defaults() -> Dict[str, Dict]:
+    """The user's players: their usage now, and whether you set it by hand (custom) or the game set it from ratings (auto)."""
+    roster = fantasy_trade_roster(FANTASY_TRADE_STATE["user_team"])
+    return {p.name: {"usage": float(p.usage), "custom": getattr(p, "usage_custom", None) is not None} for p in roster}
+
+
+def fantasy_usage_submit(values: Dict[str, float | None], timeout: float = 5.0) -> Dict:
+    """Set your players' usage by hand (a number), or give it back to the game (None) to be set from his ratings and your roster."""
+    state = FANTASY_TRADE_STATE
+    change = {"kind": "usage", "values": dict(values), "ai_team": None, "user_gives": [], "ai_gives": [], "done": threading.Event()}
+    if not state["active"]:
+        try:
+            _fantasy_usage_execute(change)
+            return {"ok": True, "effective_order": None}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+    state["pending"].append(change)
+    if not change["done"].wait(timeout):
+        if change in state["pending"]:
+            state["pending"].remove(change)
+        return {"ok": False, "error": "The season did not respond. Pause it and try again."}
+    return {"ok": bool(change.get("ok")), "error": change.get("error"), "effective_order": change.get("effective_order")}
+
+
+def _fantasy_usage_execute(change: Dict):
+    user_name = FANTASY_TRADE_STATE["user_team"]
+    for p in fantasy_trade_roster(user_name):
+        if p.name in change["values"]:
+            value = change["values"][p.name]
+            if value is None:
+                if hasattr(p, "usage_custom"):
+                    del p.usage_custom
+            else:
+                p.usage_custom = max(FANTASY_USAGE_MIN, min(FANTASY_USAGE_MAX, float(value)))
+    fantasy_optimize_team_usage(user_name)
 
 
 def _fantasy_lineup_execute(change: Dict):
@@ -23458,6 +23566,7 @@ def _fantasy_lineup_execute(change: Dict):
                 del p.gui_target_minutes_override
         factory.starters = None
         factory.rotation_order = None
+        fantasy_optimize_team_usage(user_name)
         return
     factory.rotation_order = list(change.get("rotation") or []) or None
     for p in roster:
@@ -23468,6 +23577,7 @@ def _fantasy_lineup_execute(change: Dict):
         if p.name in change["minutes"]:
             p.gui_target_minutes_override = int(change["minutes"][p.name])
     factory.starters = list(change["starters"]) if len(change["starters"]) == 5 else None
+    fantasy_optimize_team_usage(user_name)   # the rotation sets how much each player plays, which shares the team's usage
 
 
 def fantasy_lineup_defaults() -> Dict:
@@ -23506,6 +23616,9 @@ def _fantasy_trade_execute(trade: Dict):
     if trade.get("kind") == "lineup":
         _fantasy_lineup_execute(trade)
         return
+    if trade.get("kind") == "usage":
+        _fantasy_usage_execute(trade)
+        return
     user_roster = fantasy_trade_roster(FANTASY_TRADE_STATE["user_team"])
     ai_roster = fantasy_trade_roster(trade["ai_team"])
     out_u = [p for p in user_roster if p.name in set(trade["user_gives"])]
@@ -23518,6 +23631,11 @@ def _fantasy_trade_execute(trade: Dict):
         ai_roster.remove(p)
     user_roster.extend(out_a)
     ai_roster.extend(out_u)
+    for moved in out_u + out_a:
+        if hasattr(moved, "usage_custom"):
+            del moved.usage_custom   # a traded player's usage goes back to the game: it is set from his ratings and his new team
+    fantasy_optimize_team_usage(FANTASY_TRADE_STATE["user_team"])
+    fantasy_optimize_team_usage(trade["ai_team"])
     FANTASY_TRADE_STATE.get("block", set()).difference_update(trade["user_gives"])
     FANTASY_TRADE_STATE["log"].append({"ai_team": trade["ai_team"], "user_gives": list(trade["user_gives"]), "ai_gives": list(trade["ai_gives"])})
 
@@ -25036,7 +25154,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
 
     def apply_trade_to_season(trade):
         """Runs on the season thread: the traded teams play their new rosters from the next game that has not been handed out."""
-        if trade.get("kind") == "lineup":
+        if trade.get("kind") in ("lineup", "usage"):
             teams_changed = (FANTASY_TRADE_STATE["user_team"],)
         else:
             teams_changed = (FANTASY_TRADE_STATE["user_team"], trade["ai_team"])
@@ -25084,7 +25202,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             return
         form_state["last"] = games_played
         changed = fantasy_form_update(season_player_totals)
-        for team_name in changed:
+        for team_name in list(entry_by_name):
             entry = entry_by_name.get(team_name)
             if entry is None:
                 continue
@@ -25919,6 +26037,7 @@ def run_fantasy_season_draft(year_prefix, rounds: int = FANTASY_SEASON_DRAFT_ROU
         for name, roster in drafted_rosters.items()
     }
     fantasy_trade_setup(user_team_name, factories)
+    fantasy_optimize_all_usage()   # usage comes from each player's ratings and the team he drafted onto
     FANTASY_DRAFT_STATE["auto_allowed"] = False
     return list(team_order), factories, user_team_name
 

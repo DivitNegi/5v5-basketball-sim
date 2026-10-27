@@ -2635,7 +2635,7 @@ def run_gui_app():
     coach_footer = ttk.Frame(coach_inner)
     coach_footer.grid(row=3, column=0, sticky="ew", pady=(8, 0))
     coach_next_var = tk.StringVar(value="")
-    ttk.Label(coach_inner, textvariable=coach_next_var, foreground=TEXT_SOFT, wraplength=1000, justify="left").grid(row=5, column=0, sticky="w", pady=(6, 0))
+    ttk.Label(coach_inner, textvariable=coach_next_var, foreground=TEXT_SOFT, wraplength=1000, justify="left").grid(row=6, column=0, sticky="w", pady=(6, 0))
     coach_total_label = ttk.Label(coach_footer, textvariable=coach_total_var, font=("Segoe UI", 11, "bold"))
     coach_total_label.grid(row=0, column=0, sticky="w", padx=(0, 16))
     ttk.Label(coach_footer, textvariable=coach_note_var, foreground=GOLD, wraplength=800, justify="left").grid(row=1, column=0, columnspan=6, sticky="w", pady=(4, 0))
@@ -2887,15 +2887,113 @@ def run_gui_app():
             if coach_state["signature"] != "none":
                 coach_state["signature"] = "none"
                 coach_build_rows()
+            update_usage_section()
             return
         current = tuple(sorted(p.name for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])))
         if coach_state["signature"] is None or coach_state["signature"] == "none" or tuple(sorted(coach_state["signature"])) != current:
             coach_build_rows()
+        update_usage_section()
         refresh_live_panel()
+
+    # ---- usage: set from the ratings and your roster; slide one to set it yourself, press Auto to give it back ----
+    usage_box = ttk.Frame(coach_inner)
+    usage_box.grid(row=4, column=0, sticky="ew", pady=(20, 0))
+    usage_box.columnconfigure(0, weight=1)
+    usage_note_var = tk.StringVar(value="")
+    ttk.Label(usage_box, text="Shot usage", font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
+    ttk.Label(usage_box, text="How much of the offense each player carries. The game sets it from his ratings and the players around him: add a star and everyone else's "
+                              "usage drops, play a thin roster and your scorers' rises. Slide a player to set his usage yourself (CUSTOM); press Auto to give it back. "
+                              "A player you trade starts fresh on his new team. Shot tendencies are not changed.",
+              wraplength=1000, justify="left", foreground=MUTED).grid(row=1, column=0, sticky="w", pady=(2, 8))
+    usage_rows_frame = tk.Frame(usage_box, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
+    usage_rows_frame.grid(row=2, column=0, sticky="ew")
+    ttk.Label(usage_box, textvariable=usage_note_var, foreground=GOLD).grid(row=3, column=0, sticky="w", pady=(6, 0))
+    usage_state = {"signature": None, "rows": {}, "dragging": False, "job": None}
+
+    def usage_available() -> bool:
+        return bool(sim_engine.fantasy_trade_available())
+
+    def usage_build_rows():
+        for child in usage_rows_frame.winfo_children():
+            child.destroy()
+        usage_state.update(rows={}, signature=None)
+        if not usage_available():
+            usage_note_var.set("Usage can be set in a fantasy season, after the draft.")
+            return
+        usage_note_var.set("")
+        roster = {p.name: p for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])}
+        order = [n for n in (coach_state.get("order") or []) if n in roster] or sorted(roster, key=lambda n: -sim_engine.fantasy_ovr(roster[n]))
+        order += [n for n in roster if n not in order]
+        values = sim_engine.fantasy_usage_defaults()
+        usage_rows_frame.columnconfigure(2, weight=1)
+        for index, name in enumerate(order):
+            bg = PANEL if index % 2 else "#0f1c33"
+            row = tk.Frame(usage_rows_frame, bg=bg)
+            row.grid(row=index, column=0, columnspan=6, sticky="ew")
+            row.columnconfigure(2, weight=1)
+            tk.Label(row, text=name, width=24, anchor="w", bg=bg, fg=TEXT, font=COACH_FONT).grid(row=0, column=0, padx=(12, 6), pady=8, sticky="w")
+            status = tk.Label(row, text="AUTO", width=8, bg=bg, fg=MUTED, font=("Segoe UI", 10, "bold"))
+            status.grid(row=0, column=1, padx=6)
+            var = tk.DoubleVar(value=round(values[name]["usage"] * 100))
+            label = tk.Label(row, text=f"{int(var.get())}%", width=5, bg=bg, fg=TEXT, font=("Segoe UI", 13, "bold"))
+
+            def on_slide(value, who=name, lab=label, v=var):
+                v.set(round(float(value)))
+                lab.configure(text=f"{int(v.get())}%")
+                usage_state["dragging"] = True
+
+            scale = ttk.Scale(row, from_=4, to=50, variable=var, command=on_slide)
+            scale.bind("<ButtonRelease-1>", lambda e, who=name: usage_set_custom(who))
+            scale.grid(row=0, column=2, sticky="ew", padx=14)
+            label.grid(row=0, column=3, padx=(4, 10))
+            ttk.Button(row, text="Auto", width=6, command=lambda who=name: usage_set_auto(who)).grid(row=0, column=4, padx=(0, 12))
+            usage_state["rows"][name] = {"var": var, "label": label, "status": status, "bg": bg}
+        usage_state["signature"] = tuple(sorted(roster))
+        usage_refresh_values(force=True)
+
+    def usage_refresh_values(force=False):
+        """Keep the sliders showing what the game is using: auto usage moves when a trade, your rotation or a player's form changes."""
+        if not usage_state["rows"] or (usage_state["dragging"] and not force):
+            return
+        values = sim_engine.fantasy_usage_defaults()
+        for name, row in usage_state["rows"].items():
+            info = values.get(name)
+            if info is None:
+                continue
+            percent = round(info["usage"] * 100)
+            if int(round(row["var"].get())) != percent:
+                row["var"].set(percent)
+                row["label"].configure(text=f"{percent}%")
+            row["status"].configure(text="CUSTOM" if info["custom"] else "AUTO", fg=GOLD if info["custom"] else MUTED)
+
+    def usage_set_custom(name):
+        usage_state["dragging"] = False
+        outcome = sim_engine.fantasy_usage_submit({name: usage_state["rows"][name]["var"].get() / 100.0})
+        usage_note_var.set(f"{name}'s usage is set to {int(usage_state['rows'][name]['var'].get())}%; the others share what is left." if outcome.get("ok")
+                           else (outcome.get("error") or "Could not set that."))
+        usage_refresh_values(force=True)
+
+    def usage_set_auto(name):
+        usage_state["dragging"] = False
+        outcome = sim_engine.fantasy_usage_submit({name: None})
+        usage_note_var.set(f"{name}'s usage is back to automatic." if outcome.get("ok") else (outcome.get("error") or "Could not do that."))
+        usage_refresh_values(force=True)
+
+    def update_usage_section():
+        if not usage_available():
+            if usage_state["signature"] != "none":
+                usage_state["signature"] = "none"
+                usage_build_rows()
+            return
+        current = tuple(sorted(p.name for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])))
+        if usage_state["signature"] != current:
+            usage_build_rows()
+        else:
+            usage_refresh_values()
 
     # ---- the live game: your five on the floor and your bench as cards. Drag a card onto another to substitute; you see it being dragged. ----
     live_box = ttk.Frame(coach_inner)
-    live_box.grid(row=4, column=0, sticky="ew", pady=(18, 0))
+    live_box.grid(row=5, column=0, sticky="ew", pady=(20, 0))
     live_box.columnconfigure(0, weight=1)
     live_title_var = tk.StringVar(value="Live game")
     live_note_var = tk.StringVar(value="")
@@ -3075,6 +3173,7 @@ def run_gui_app():
     def live_panel_loop():
         try:
             if str(series_tabs.tab(series_tabs.select(), "text")) == "Coach":
+                update_usage_section()
                 refresh_live_panel()
         except Exception:
             pass
