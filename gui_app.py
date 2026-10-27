@@ -2966,7 +2966,10 @@ def run_gui_app():
             if int(round(row["var"].get())) != percent:
                 row["var"].set(percent)
                 row["label"].configure(text=f"{percent}%")
-            row["status"].configure(text="CUSTOM" if info["custom"] else "AUTO", fg=GOLD if info["custom"] else MUTED)
+            status_text = "CUSTOM" if info["custom"] else "AUTO"
+            if row.get("status_text") != status_text:
+                row["status_text"] = status_text
+                row["status"].configure(text=status_text, fg=GOLD if info["custom"] else MUTED)
 
     def usage_set_custom(name):
         usage_state["dragging"] = False
@@ -4021,6 +4024,7 @@ def run_gui_app():
             draw_named_headshot(canvas, "")
             name_var.set("Waiting for series...")
             stat_var.set("")
+        season_races_painted["signature"] = None
         season_awards_tree.delete(*season_awards_tree.get_children())
         season_awards_tree.insert("", "end", values=("The MVP and DPOY races will appear here during Season mode.", "", "", ""))
 
@@ -5634,12 +5638,18 @@ def run_gui_app():
     season_back_button.configure(command=close_season_box_score)
     season_awards_tree.bind("<<TreeviewSelect>>", show_all_star_box_score)
 
+    season_races_painted = {"signature": None, "at": 0.0}
+
     def show_season_races(races: Dict, completed=None):
         """Season tab: only the MVP race and the DPOY race, the top five of each, re-ranked as games finish."""
-        season_awards_tree.delete(*season_awards_tree.get_children())
-        season_all_star_rows.clear()
         mvp_rows = (races or {}).get("mvp") or []
         dpoy_rows = (races or {}).get("dpoy") or []
+        signature = (repr(mvp_rows), repr(dpoy_rows), completed)
+        if season_races_painted.get("signature") == signature:
+            return   # nothing changed: do not clear and refill the table (that is what made the window stutter)
+        season_races_painted["signature"] = signature
+        season_awards_tree.delete(*season_awards_tree.get_children())
+        season_all_star_rows.clear()
         if not mvp_rows and not dpoy_rows:
             season_awards_tree.insert("", "end", values=("The MVP and DPOY races will appear here during Season mode.", "", "", ""))
             return
@@ -5652,6 +5662,7 @@ def run_gui_app():
                 ))
 
     def show_full_season_awards(rows: List[Dict]):
+        season_races_painted["signature"] = None
         season_awards_tree.delete(*season_awards_tree.get_children())
         last_award = None
         season_all_star_rows.clear()
@@ -10769,6 +10780,9 @@ def run_gui_app():
         text = f"{completed} of {total} games simulated"
         if sim_engine.SIM_PAUSED:
             text += "  (paused)"
+        if season_view.get("progress_painted") == (text, total, len(season_progress_vars)):
+            return
+        season_view["progress_painted"] = (text, total, len(season_progress_vars))
         for var, bar in zip(season_progress_vars, season_progress_bars):
             var.set(text)
             bar.configure(maximum=total)

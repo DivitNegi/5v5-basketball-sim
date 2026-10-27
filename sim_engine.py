@@ -7737,19 +7737,38 @@ def queue_manual_substitution(team: Team):
     print(f"{len(queued)} manual substitution(s) queued for the next dead ball.")
 
 
+def manual_lineup_holds(team: Team, period: int | None = None) -> bool:
+    """True while a substitution you made owns the lineup: the automatic rotation leaves the five alone for the rest of that quarter
+    (and the opening of the next one), unless somebody has fouled out."""
+    lock = getattr(team, "manual_lineup_lock", None)
+    if lock is None or any(p.fouled_out for p in team.on_floor):
+        return False
+    return lock == (getattr(team, "current_period", 0) if period is None else period)
+
+
 def apply_manual_substitution(team: Team) -> bool:
+    """Carry out the substitutions you asked for. They override the automatic rotation: if the player you wanted out has already come
+    out, the player you wanted in still goes in, for whoever on the floor fits best; if he is already in, there is nothing to do."""
     requests = list(getattr(team, "manual_substitution", []) or [])
     if not requests:
         return False
     applied = False
     team.manual_substitution = []
     free_throw_shooter = getattr(team, "free_throw_shooter", None)
+    wanted_in = {in_name for _out_name, in_name in requests}
     for out_name, in_name in requests:
         out_player = next((p for p in team.on_floor if p.name == out_name), None)
         in_player = next((p for p in team.bench if p.name == in_name and not p.fouled_out), None)
-        if out_player is None or in_player is None:
-            print(f"{team.name} manual sub {in_name} for {out_name} could not be applied because the lineup changed.")
-            continue
+        if in_player is None:
+            if not any(p.name == in_name for p in team.on_floor):
+                print(f"{team.name} manual sub: {in_name} is not available (fouled out).")
+            continue   # he is already on the floor: the sub is done
+        if out_player is None:
+            candidates = [p for p in team.on_floor if p.name not in wanted_in and p is not free_throw_shooter]
+            if not candidates:
+                continue
+            same_spot = [p for p in candidates if can_play_position(in_player, p.position) or can_play_position(p, in_player.position)]
+            out_player = max(same_spot or candidates, key=lambda p: p.minutes)
         if free_throw_shooter is not None and out_player is free_throw_shooter:
             print(f"{team.name} cannot sub out {out_player.name} until his free throws are finished.")
             team.manual_substitution.append((out_name, in_name))
@@ -7760,6 +7779,7 @@ def apply_manual_substitution(team: Team) -> bool:
         team.bench.append(out_player)
         out_player.current_stint = 0
         in_player.current_stint = 0
+        team.manual_lineup_lock = getattr(team, "current_period", 0)
         print(commentator_sub(team.name, in_player.name, out_player.name))
         applied = True
     if applied:
@@ -7806,6 +7826,7 @@ def gui_substitute(team: Team, out_name: str, in_name: str) -> str:
         team.bench.append(out_player)
         out_player.current_stint = 0
         in_player.current_stint = 0
+        team.manual_lineup_lock = getattr(team, "current_period", 0)
         balance_lineup_positions(team)
         print(commentator_sub(team.name, in_player.name, out_player.name))
         return f"{in_player.name} is in for {out_player.name}."
@@ -7843,6 +7864,7 @@ def maybe_apply_manual_timeout(possession: Team, teamA: Team, teamB: Team,
     if GUI_COACH_MODE and possession.name == FANTASY_TRADE_STATE.get("user_team"):
         # your timeout: the game waits here while you substitute in the Coach tab (drag players); Resume plays on
         print("TIMEOUT: make your substitutions in the Coach tab, then press Resume.")
+        apply_manual_substitution(possession)   # what you queued before the timeout opened goes in now
         possession.coach_timeout_open = True
         SIM_PAUSED = True
         while SIM_PAUSED:
@@ -10003,7 +10025,7 @@ def is_close_late_game(team: Team, period: int) -> bool:
 
 def force_mandatory_closer_lineup(team: Team, period: int):
     closer_names = set(mandatory_closers(team))
-    if not closer_names or getattr(team, "garbage_time_locked", False):
+    if not closer_names or getattr(team, "garbage_time_locked", False) or manual_lineup_holds(team, period):
         return
     protected = getattr(team, "free_throw_shooter", None)
     available = [
@@ -10681,23 +10703,24 @@ def enforce_pinned_minutes(team: Team, period: int, period_time: int, protected:
     """Minutes the user set in the Coach tab: pace every player toward his number, game clock by game clock, like a coach watching
     the minutes sheet. A bench player who is behind his pace comes in for the player on the floor who is furthest ahead of his,
     preferably one who plays the same position."""
-    if getattr(team, "garbage_time_locked", False) or not team_has_pinned_minutes(team):
+    if getattr(team, "garbage_time_locked", False) or not team_has_pinned_minutes(team) or manual_lineup_holds(team, period):
         return False
     elapsed = max(0.0, ((period - 1) * rules_quarter_seconds() + (rules_quarter_seconds() - period_time)) / 60)
+    game_share = elapsed / 48.0   # keeps growing in overtime, so the starters are not "over their minutes" the moment regulation ends
 
     def target(p: Player) -> float:
         value = getattr(p, "gui_target_minutes_override", None)
         return float(value) if value is not None else 0.0
 
     def behind(p: Player) -> float:
-        return target(p) * min(1.0, elapsed / 48.0) - p.minutes / 60
+        return target(p) * game_share - p.minutes / 60
 
     bench = [p for p in team.bench if target(p) > 0 and not p.fouled_out and not is_foul_rest_locked(p, period)]
     on_floor = [p for p in team.on_floor if p is not protected and not p.fouled_out and not is_foul_rest_locked(p, period)]
     if not bench or not on_floor:
         return False
     def worth_swapping(sub_in: Player, out_player: Player) -> bool:
-        over_target = out_player.minutes / 60 >= target(out_player) + 0.5
+        over_target = out_player.minutes / 60 >= target(out_player) * max(1.0, game_share) + 0.5
         if not ((behind(sub_in) > 0.5 and -behind(out_player) > 0.2) or (over_target and behind(sub_in) > -0.5)):
             return False
         return behind(sub_in) > behind(out_player)
@@ -10705,7 +10728,7 @@ def enforce_pinned_minutes(team: Team, period: int, period_time: int, protected:
     # the players most owed minutes first: each tries to replace a teammate at his position, then anyone the five can spare
     rank = getattr(team, "rotation_rank", {}) or {}
     for sub_in in sorted(bench, key=lambda p: (round(behind(p), 1), -rank.get(p.name, 99)), reverse=True):
-        if behind(sub_in) <= 0.5 and not any(p.minutes / 60 >= target(p) + 0.5 for p in on_floor):
+        if behind(sub_in) <= 0.5 and not any(p.minutes / 60 >= target(p) * max(1.0, game_share) + 0.5 for p in on_floor):
             break
         same_position = [p for p in on_floor if can_play_position(sub_in, p.position) or can_play_position(p, sub_in.position)]
         if same_position:
@@ -10728,7 +10751,7 @@ def pinned_quarter_lineup(team: Team, period: int, protected: Player = None):
         return float(value) if value is not None else 0.0
 
     def behind(p: Player) -> float:
-        return target(p) * min(1.0, elapsed / 48.0) - p.minutes / 60
+        return target(p) * (elapsed / 48.0) - p.minutes / 60
 
     def balanced(lineup: List[Player]) -> bool:
         bigs = sum(1 for p in lineup if can_play_center_slot(p))
@@ -10898,7 +10921,7 @@ def dead_ball_rotation(team: Team, period: int, period_time: int,
                        max_subs: int = 3):
     if getattr(team, "garbage_time_locked", False) or not team.bench:
         return
-    if not auto_subs_allowed(team):
+    if not auto_subs_allowed(team) or manual_lineup_holds(team, period):
         return
 
     if not hasattr(team.roster[0], "target_minutes"):
@@ -11058,6 +11081,9 @@ def set_quarter_lineup(team: Team, next_period: int):
     if getattr(team, "garbage_time_locked", False):
         return
     if not auto_subs_allowed(team):
+        return
+    if getattr(team, "manual_lineup_lock", None) == next_period - 1 and not any(p.fouled_out for p in team.on_floor):
+        team.manual_lineup_lock = None   # your five opens the next quarter; after that the rotation runs again
         return
 
     if not hasattr(team.roster[0], "target_minutes"):
@@ -11252,7 +11278,7 @@ def maybe_substitute(team: Team, reason: str, protected: Player = None,
     if reason not in ("foul", "quarter", "timeout"):
         return
 
-    if getattr(team, "garbage_time_locked", False):
+    if getattr(team, "garbage_time_locked", False) or manual_lineup_holds(team, period):
         return
 
     if not hasattr(team.roster[0], "target_minutes"):
@@ -11476,7 +11502,7 @@ def is_overworked(player: Player, team: Team) -> bool:
 
 
 def force_starter_lineup(team: Team, protected: Player = None):
-    if getattr(team, "garbage_time_locked", False):
+    if getattr(team, "garbage_time_locked", False) or manual_lineup_holds(team):
         return
     protected = protected or getattr(team, "free_throw_shooter", None)
     if team_has_pinned_minutes(team):
@@ -11513,7 +11539,7 @@ def force_starter_lineup(team: Team, protected: Player = None):
 
 
 def force_closing_lineup(team: Team, protected: Player = None):
-    if getattr(team, "garbage_time_locked", False):
+    if getattr(team, "garbage_time_locked", False) or manual_lineup_holds(team):
         return
     protected = protected or getattr(team, "free_throw_shooter", None)
 
@@ -24995,6 +25021,20 @@ def live_season_races_payload(entries, player_totals, team_totals, completed: in
     return {"season_races": sections.get("_season_races") or {"mvp": [], "dpoy": []}, "completed": completed, "total": total}
 
 
+def copy_season_totals(value):
+    """A copy of running totals (dicts of numbers, lists and dicts) several times faster than copy.deepcopy, which is what made every live
+    refresh of the season tabs hold up the whole window."""
+    kind = type(value)
+    if kind is dict:
+        return {key: copy_season_totals(item) for key, item in value.items()}
+    if kind is list:
+        return [copy_season_totals(item) for item in value]
+    if kind in (int, float, str, bool) or value is None:
+        return value
+    import copy
+    return copy.deepcopy(value)
+
+
 def season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, completed=None, total=None,
                           include_rookies: bool = True, positional: bool = False, fixtures=None):
     """Give the GUI the season so far (every stats tab) while the sim is paused.
@@ -25010,7 +25050,7 @@ def season_pause_snapshot(section_queue, entries, player_totals, team_totals, ga
     SEASON_POSITIONAL_AWARDS = positional
     try:
         sections = build_season_sections(
-            [dict(e) for e in entries], copy.deepcopy(player_totals), copy.deepcopy(team_totals),
+            [dict(e) for e in entries], copy_season_totals(player_totals), copy_season_totals(team_totals),
             game_log=list(game_log.rows), game_extras=dict(game_log.extras), game_meta=dict(game_log.games),
             include_rookies=include_rookies, fixtures=fixtures)
         sections["_season_paused"] = {"completed": completed, "total": total}
@@ -25304,6 +25344,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             yield team_a, team_b, order
 
     SEASON_STAR_MINUTES_CAP = 34
+    races_gate = {"at": 0.0, "cost": 0.0}   # the race tables are repainted about once a second, so they are only worked out that often
     try:
         results = parallel_results() if templates is not None else sequential_results()
         for team_a, team_b, order in results:
@@ -25339,7 +25380,11 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 progress_queue.put({"season_progress": True, "completed": completed_games, "total": total_games})
                 if completed_games % 6 == 0 or completed_games == total_games:
                     progress_queue.put(live_season_standings_payload(entries, completed_games, total_games))
-                progress_queue.put(live_season_races_payload(entries, season_player_totals, season_team_totals, completed_games, total_games))
+                gate_now = time.monotonic()
+                if completed_games <= 1 or completed_games == total_games or gate_now - races_gate["at"] >= max(1.0, 4.0 * races_gate["cost"]):
+                    progress_queue.put(live_season_races_payload(entries, season_player_totals, season_team_totals, completed_games, total_games))
+                    races_gate["cost"] = time.monotonic() - gate_now
+                    races_gate["at"] = time.monotonic()
             season_live_tick()
             season_game_pace()
             if completed_games % 300 == 0:
