@@ -3172,6 +3172,16 @@ def run_gui_app():
 
     def live_panel_loop():
         try:
+            # the Coach tab is there for the whole fantasy season, its playoffs included
+            wanted = fantasy_mode_active()
+            shown = str(series_tabs.tab(adjustments_frame, "state")) != "hidden"
+            if wanted and not shown:
+                series_tabs.add(adjustments_frame, text="Coach")
+            elif not wanted and shown:
+                series_tabs.hide(adjustments_frame)
+        except Exception:
+            pass
+        try:
             if str(series_tabs.tab(series_tabs.select(), "text")) == "Coach":
                 update_usage_section()
                 refresh_live_panel()
@@ -7237,7 +7247,9 @@ def run_gui_app():
         set_text_widget(adjustment_text, "\n\n".join(lines) if lines else "No active game.")
 
     def fantasy_mode_active() -> bool:
-        return mode_var.get().lower().startswith("fantasy") or bool(SIM_CONTEXT.get("fantasy_control_enabled"))
+        # also true for the playoffs of a fantasy season you are still in: the Coach tab stays
+        return (mode_var.get().lower().startswith("fantasy") or bool(SIM_CONTEXT.get("fantasy_control_enabled"))
+                or bool(sim_engine.FANTASY_TRADE_STATE.get("user_team")))
 
     def set_adjustments_tab_visibility():
         try:
@@ -10434,7 +10446,11 @@ def run_gui_app():
                 scoreboard_queue.put({"postseason_ready": True})
             elif mode == "2027 play-in & playoffs":
                 status_var.set(f"{_players_data_module.POSTSEASON_YEAR_LABEL} play-in and playoffs running...")
-                run_2027_postseason(postseason_state["standings"], postseason_state.get("factories"))
+                sim_engine.GUI_COACH_MODE = bool(sim_engine.FANTASY_TRADE_STATE.get("user_team"))   # your timeouts pause the game for you to coach it
+                try:
+                    run_2027_postseason(postseason_state["standings"], postseason_state.get("factories"))
+                finally:
+                    sim_engine.GUI_COACH_MODE = False
             else:
                 print(f"Unknown mode: {mode}")
             sim_completed = True
@@ -10487,7 +10503,10 @@ def run_gui_app():
         )
         next_button.configure(state="disabled")
         live_standings.update(rows=[], completed=0, total=0, dirty=False)
-        sim_engine.fantasy_trade_setup(None, None)   # the fantasy draft sets this again; other modes have no user franchise
+        continuing_fantasy_postseason = (mode == "2027 play-in & playoffs" and bool(sim_engine.FANTASY_TRADE_STATE.get("user_team"))
+                                         and bool(postseason_state.get("factories")))
+        if not continuing_fantasy_postseason:
+            sim_engine.fantasy_trade_setup(None, None)   # the fantasy draft sets this again; other modes have no user franchise
         schedule_cache.update(auto_done=False, shown_for=None)
         bracket_ui.update(state=None, view="tree", auto=True, selected=None, dirty=False, box_open=False)
         bracket_box_frame.grid_remove()
