@@ -23354,85 +23354,93 @@ def fantasy_trade_counter(ai_name: str, user_roster: List[Player], ai_roster: Li
     return random.choice(options) if options else None
 
 
-# ---- player form: a player who is playing well (or badly) for his rating gets better (or worse) as the fantasy season goes on ----
+# ---- player form: a player who shoots badly (or well) from a spot for his rating gets worse (or better) at that spot as the season goes on ----
 FANTASY_FORM_FIRST_GAME = 120      # no form changes before this many league games have been played
 FANTASY_FORM_EVERY = 60            # then they are recalculated this often (about every four rounds of a 30-team league)
 FANTASY_FORM_PER_Z = 0.04          # rating change (0.04 = 4 points) per standard deviation above or below what his rating predicts
 FANTASY_FORM_MAX = 0.06            # the most a rating can move from where it started
 FANTASY_FORM_MAX_OVR = 5           # and the most his overall can move (a big's overall reacts strongly to small rating changes)
-FANTASY_FORM_RATINGS = (("three_rating", 1.0), ("mid_rating", 1.0), ("rim_rating", 1.0), ("dunk_rating", 1.0), ("ft_rating", 1.0),
-                        ("playmaking", 0.5), ("ball_handle", 0.5))
+FANTASY_FORM_SHRINK = 40.0         # attempts at which half the measured gap counts (a small sample is mostly luck)
+# rating -> (where the shots are counted, fewest attempts before it can move)
+FANTASY_FORM_ZONES = {"three_rating": ("three", 40), "mid_rating": ("mid", 30), "rim_rating": ("rim", 60), "dunk_rating": ("dunk", 20),
+                      "ft_rating": (None, 40)}
 
 
-def fantasy_game_score_per_36(stats: Dict) -> float | None:
-    minutes = stats.get("minutes", 0) / 60.0
-    games = stats.get("games", 0)
-    if games < 12 or minutes / max(games, 1) < 12.0:
-        return None
-    game_score = (stats["pts"] + 0.4 * stats["fgm"] - 0.7 * stats["fga"] - 0.4 * (stats["fta"] - stats["ftm"]) + 0.7 * stats["oreb"]
-                  + 0.3 * stats["dreb"] + stats["stl"] + 0.7 * stats["ast"] + 0.7 * stats["blk"] - 0.4 * stats["pf"] - stats["tov"])
-    return game_score / minutes * 36.0
+def fantasy_zone_counts(stats: Dict) -> Dict[str, tuple]:
+    """(made, attempted) for each shooting rating, from a player's season totals."""
+    diet = stats.get("shot_diet") or {}
+    counts = {}
+    for attr, (zone, _minimum) in FANTASY_FORM_ZONES.items():
+        if zone is None:
+            counts[attr] = (stats.get("ftm", 0), stats.get("fta", 0))
+        else:
+            counts[attr] = (diet.get(zone + "_made", 0), diet.get(zone, 0))
+    return counts
 
 
 def fantasy_form_update(player_totals: Dict) -> Dict[str, Dict]:
-    """Recalculate every fantasy player's form from the season so far. A player's production per 36 minutes is compared with what his
-    starting overall predicts for the league; the gap (as a number of standard deviations, shrunk while the sample is small) moves his
-    scoring and playmaking ratings up or down, at most FANTASY_FORM_MAX from where they started. Because the overall and the trade value
-    are computed from the ratings, they follow. Returns {team: {player: change in overall}} for the teams that changed."""
+    """Recalculate every fantasy player's form from the season so far. For each shooting rating (three, mid, rim, dunk, free throw) what
+    a player's starting rating predicts for the league is compared with how he actually shot from that spot; the gap (a number of
+    standard deviations of shooting luck, shrunk while the sample is small) moves THAT rating up or down, at most FANTASY_FORM_MAX from
+    where it started. Because the overall and the trade value are computed from the ratings, they follow. Returns {team: {player:
+    change in overall}} for the teams that changed."""
     state = FANTASY_TRADE_STATE
     by_name: Dict[str, Dict] = {}
     for team_stats in player_totals.values():
         for name, stats in team_stats.items():
-            if name in by_name:
-                merged = {k: v for k, v in by_name[name].items()}
-                for key, value in stats.items():
-                    if isinstance(value, (int, float)) and not isinstance(value, bool):
-                        merged[key] = merged.get(key, 0) + value
-                by_name[name] = merged
-            else:
-                by_name[name] = dict(stats)
+            merge_stat_totals(by_name.setdefault(name, {}), stats)
     players = {}
     for team_name in state["factories"]:
         for p in fantasy_trade_roster(team_name):
             if not hasattr(p, "form_base"):
-                p.form_base = {attr: getattr(p, attr) for attr, _w in FANTASY_FORM_RATINGS}
+                p.form_base = {attr: getattr(p, attr) for attr in FANTASY_FORM_ZONES}
                 p.form_base_ovr = fantasy_ovr(p)
             players[p.name] = (team_name, p)
-    rows = []
-    for name, (team_name, p) in players.items():
-        stats = by_name.get(name)
-        value = fantasy_game_score_per_36(stats) if stats else None
-        if value is not None:
-            rows.append((p.form_base_ovr, value, stats["games"], name))
-    if len(rows) < 30:
+    counts = {name: fantasy_zone_counts(by_name[name]) for name in players if name in by_name}
+    if len(counts) < 30:
         return {}
-    mean_x = sum(r[0] for r in rows) / len(rows)
-    mean_y = sum(r[1] for r in rows) / len(rows)
-    var_x = sum((r[0] - mean_x) ** 2 for r in rows) or 1.0
-    slope = sum((r[0] - mean_x) * (r[1] - mean_y) for r in rows) / var_x
-    residuals = {r[3]: r[1] - (mean_y + slope * (r[0] - mean_x)) for r in rows}
-    spread = (sum(v * v for v in residuals.values()) / len(residuals)) ** 0.5 or 1.0
-    games_played = {r[3]: r[2] for r in rows}
+    # what each starting rating predicts: attempts-weighted straight line of shooting % against rating, per spot, over the whole league
+    expected = {}
+    for attr, (_zone, minimum) in FANTASY_FORM_ZONES.items():
+        points = [(players[n][1].form_base[attr], made / att, att) for n, c in counts.items() for made, att in [c[attr]] if att >= minimum]
+        if len(points) < 15:
+            continue
+        weight = sum(w for _x, _y, w in points)
+        mean_x = sum(x * w for x, _y, w in points) / weight
+        mean_y = sum(y * w for _x, y, w in points) / weight
+        var_x = sum(w * (x - mean_x) ** 2 for x, _y, w in points)
+        if var_x <= 1e-9:
+            continue
+        slope = sum(w * (x - mean_x) * (y - mean_y) for x, y, w in points) / var_x
+        expected[attr] = (mean_x, mean_y, slope)
     changed: Dict[str, Dict] = {}
-    for name, residual in residuals.items():
-        team_name, p = players[name]
-        z = residual / spread
-        shrink = games_played[name] / (games_played[name] + 30.0)
-        shift = max(-FANTASY_FORM_MAX, min(FANTASY_FORM_MAX, FANTASY_FORM_PER_Z * z * shrink))
+    for name, (team_name, p) in players.items():
+        shifts = {}
+        for attr, (_zone, minimum) in FANTASY_FORM_ZONES.items():
+            made, att = counts.get(name, {}).get(attr, (0, 0))
+            if attr not in expected or att < minimum or p.form_base[attr] < 0.2:   # a player who does not shoot from there does not start
+                continue
+            mean_x, mean_y, slope = expected[attr]
+            chance = max(0.05, min(0.95, mean_y + slope * (p.form_base[attr] - mean_x)))
+            z = (made - att * chance) / ((att * chance * (1.0 - chance)) ** 0.5)
+            shrink = att / (att + FANTASY_FORM_SHRINK)
+            shifts[attr] = max(-FANTASY_FORM_MAX, min(FANTASY_FORM_MAX, FANTASY_FORM_PER_Z * z * shrink))
         before = fantasy_ovr(p)
+        scale = 1.0
         for _attempt in range(12):
-            for attr, weight in FANTASY_FORM_RATINGS:
-                base = p.form_base[attr]
-                if base >= 0.2:   # a player who does not shoot or pass does not become one
-                    setattr(p, attr, round(max(0.05, min(0.99, base + shift * weight)), 3))
-            if abs(fantasy_ovr(p) - p.form_base_ovr) <= FANTASY_FORM_MAX_OVR or abs(shift) < 0.002:
+            for attr in FANTASY_FORM_ZONES:
+                setattr(p, attr, round(max(0.05, min(0.99, p.form_base[attr] + shifts.get(attr, 0.0) * scale)), 3))
+            gap = fantasy_ovr(p) - p.form_base_ovr
+            wrong_way = abs(gap) >= 2 and gap * sum(shifts.values()) < 0   # better shooting that lowers his overall: a cliff in the formula
+            if (abs(gap) <= FANTASY_FORM_MAX_OVR and not wrong_way) or max((abs(v) for v in shifts.values()), default=0.0) * scale < 0.002:
                 break
-            shift *= 0.8   # too big a jump in overall for the rating change: ease it back
-        if abs(fantasy_ovr(p) - p.form_base_ovr) > FANTASY_FORM_MAX_OVR:
-            shift = 0.0   # even a tiny change crosses one of the formula's thresholds: leave his ratings where they started
-            for attr, _weight in FANTASY_FORM_RATINGS:
+            scale *= 0.8   # too big a jump in overall for the rating change: ease it back
+        gap = fantasy_ovr(p) - p.form_base_ovr
+        if abs(gap) > FANTASY_FORM_MAX_OVR or (abs(gap) >= 2 and gap * sum(shifts.values()) < 0):
+            scale = 0.0   # even a tiny change crosses one of the formula's thresholds: leave his ratings where they started
+            for attr in FANTASY_FORM_ZONES:
                 setattr(p, attr, p.form_base[attr])
-        p.form_shift = shift
+        p.form_shift = {attr: round(v * scale, 3) for attr, v in shifts.items()}
         after = fantasy_ovr(p)
         if after != before:
             changed.setdefault(team_name, {})[name] = after - before

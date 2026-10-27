@@ -9201,6 +9201,10 @@ def run_gui_app():
             r = lambda value: int(round(value * 100))
             lines.append(f"Shooting: 3PT {r(player.three_rating)}  Mid {r(player.mid_rating)}  Rim {r(player.rim_rating)}  Dunk {r(player.dunk_rating)}  FT {r(player.ft_rating)}"
                          f"      Playmaking {r(player.playmaking)}  Handle {r(player.ball_handle)}")
+            moved = {k: v for k, v in (getattr(player, "form_shift", None) or {}).items() if abs(v) >= 0.005}
+            if moved:
+                names = {"three_rating": "3PT", "mid_rating": "Mid", "rim_rating": "Rim", "dunk_rating": "Dunk", "ft_rating": "FT"}
+                lines.append("Shooting form this season: " + "  ".join(f"{names[k]} {r(v):+d}" for k, v in moved.items()))
             lines.append(f"Defense: Perimeter {r(player.perimeter_def)}  Interior {r(player.interior_def)}  Steal {r(player.steal)}  Block {r(player.block)}"
                          f"      Rebounding: Off {r(player.oreb)}  Def {r(player.dreb)}      Clutch {r(player.clutchness)}")
             stats = season_stats_for(team_name, player.name)
