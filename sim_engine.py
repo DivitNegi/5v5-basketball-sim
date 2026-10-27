@@ -7789,8 +7789,33 @@ def can_advance_after_timeout(period: int, period_time: int) -> bool:
     return period > 4 or (period == 4 and period_time <= 2 * 60)
 
 
+GUI_COACH_MODE = False   # set by the GUI in a fantasy season: your timeouts pause the game and you substitute in the Coach tab
+
+
+def gui_substitute(team: Team, out_name: str, in_name: str) -> str:
+    """A substitution you make by dragging in the Coach tab. During a timeout you called it happens at once; otherwise it is queued
+    for the next dead ball, like the other manual substitutions."""
+    out_player = next((p for p in team.on_floor if p.name == out_name), None)
+    in_player = next((p for p in team.bench if p.name == in_name and not p.fouled_out), None)
+    if out_player is None or in_player is None:
+        return "That substitution is not possible right now."
+    if getattr(team, "coach_timeout_open", False):
+        index = team.on_floor.index(out_player)
+        team.on_floor[index] = in_player
+        team.bench.remove(in_player)
+        team.bench.append(out_player)
+        out_player.current_stint = 0
+        in_player.current_stint = 0
+        balance_lineup_positions(team)
+        print(commentator_sub(team.name, in_player.name, out_player.name))
+        return f"{in_player.name} is in for {out_player.name}."
+    team.manual_substitution = list(getattr(team, "manual_substitution", []) or []) + [(out_name, in_name)]
+    return f"{in_player.name} for {out_player.name} is queued for the next dead ball."
+
+
 def maybe_apply_manual_timeout(possession: Team, teamA: Team, teamB: Team,
                                period: int, period_time: int) -> bool:
+    global SIM_PAUSED
     if not getattr(possession, "manual_timeout_requested", False):
         return False
     possession.manual_timeout_requested = False
@@ -7814,6 +7839,16 @@ def maybe_apply_manual_timeout(possession: Team, teamA: Team, teamB: Team,
 
     print_scoreboard(period, period_time, teamA, teamB)
     print(commentator_timeout(possession.name, possession.timeouts))
+
+    if GUI_COACH_MODE and possession.name == FANTASY_TRADE_STATE.get("user_team"):
+        # your timeout: the game waits here while you substitute in the Coach tab (drag players); Resume plays on
+        print("TIMEOUT: make your substitutions in the Coach tab, then press Resume.")
+        possession.coach_timeout_open = True
+        SIM_PAUSED = True
+        while SIM_PAUSED:
+            _REAL_SLEEP(0.05)
+        possession.coach_timeout_open = False
+        return True
 
     was_enabled = SIM_CONTROL_ENABLED
     if was_enabled:
@@ -10668,7 +10703,8 @@ def enforce_pinned_minutes(team: Team, period: int, period_time: int, protected:
         return behind(sub_in) > behind(out_player)
 
     # the players most owed minutes first: each tries to replace a teammate at his position, then anyone the five can spare
-    for sub_in in sorted(bench, key=behind, reverse=True):
+    rank = getattr(team, "rotation_rank", {}) or {}
+    for sub_in in sorted(bench, key=lambda p: (round(behind(p), 1), -rank.get(p.name, 99)), reverse=True):
         if behind(sub_in) <= 0.5 and not any(p.minutes / 60 >= target(p) + 0.5 for p in on_floor):
             break
         same_position = [p for p in on_floor if can_play_position(sub_in, p.position) or can_play_position(p, sub_in.position)]
@@ -22915,10 +22951,14 @@ def make_fantasy_team_factory(team_name: str, drafted_players: List[Player], use
             if len(first) == 5:
                 team.roster = first + [p for p in team.roster if all(p is not f for f in first)]
                 team.lock_custom_starting_positions = True   # start them at the positions the user chose
+        order = getattr(factory, "rotation_order", None)
+        if order:
+            team.rotation_rank = {name: index for index, name in enumerate(order)}   # 6th man, 7th man ...: who comes in first
         return team
 
     factory.drafted_players = drafted_players   # trades edit this list in place
     factory.starters = None
+    factory.rotation_order = None
     return factory
 
 
@@ -23417,7 +23457,9 @@ def _fantasy_lineup_execute(change: Dict):
             if hasattr(p, "gui_target_minutes_override"):
                 del p.gui_target_minutes_override
         factory.starters = None
+        factory.rotation_order = None
         return
+    factory.rotation_order = list(change.get("rotation") or []) or None
     for p in roster:
         if p.name in change["positions"]:
             if not hasattr(p, "auto_position"):
@@ -23435,14 +23477,16 @@ def fantasy_lineup_defaults() -> Dict:
     team.init_lineup()
     initialize_minute_targets(team)
     return {"starters": [p.name for p in team.on_floor], "minutes": {p.name: int(round(p.target_minutes)) for p in team.roster},
-            "positions": {p.name: p.position for p in team.roster}}
+            "positions": {p.name: p.position for p in team.roster},
+            "rotation": list(getattr(FANTASY_TRADE_STATE["factories"][user_name], "rotation_order", None) or [])}
 
 
-def fantasy_lineup_submit(starters: List[str], positions: Dict[str, str], minutes: Dict[str, int], reset: bool = False, timeout: float = 5.0) -> Dict:
+def fantasy_lineup_submit(starters: List[str], positions: Dict[str, str], minutes: Dict[str, int], reset: bool = False, timeout: float = 5.0,
+                          rotation: List[str] | None = None) -> Dict:
     """Make a Coach-tab change. During a season it is carried out by the season thread, so the games already handed out keep the old
     lineup; otherwise it is done at once."""
     state = FANTASY_TRADE_STATE
-    change = {"kind": "lineup", "starters": list(starters), "positions": dict(positions), "minutes": dict(minutes), "reset": reset,
+    change = {"kind": "lineup", "starters": list(starters), "positions": dict(positions), "minutes": dict(minutes), "reset": reset, "rotation": list(rotation or []),
               "ai_team": None, "user_gives": [], "ai_gives": [], "done": threading.Event()}
     if not state["active"]:
         try:

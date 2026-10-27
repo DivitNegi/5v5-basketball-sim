@@ -2592,43 +2592,49 @@ def run_gui_app():
     q_tree.tag_configure("team", background=CARD_ALT, foreground=GOLD, font=("Segoe UI", 11, "bold"))
     series_tabs.add(quarter_frame, text="Qtr")
 
-    adjustments_frame = ttk.Frame(series_tabs, padding=(10, 10))
+    # ---- Coach tab: your rotation (drag players into slots: 1-5 start at PG, SG, SF, PF, C; 6th man, 7th ...), minutes, and the live game ----
+    adjustments_frame = ttk.Frame(series_tabs, padding=(4, 4))
     adjustments_frame.columnconfigure(0, weight=1)
-    adjustments_frame.columnconfigure(1, weight=1)
     adjustments_frame.rowconfigure(0, weight=1)
+    coach_canvas = tk.Canvas(adjustments_frame, bg=APP_BG, highlightthickness=0)
+    coach_scroll = ttk.Scrollbar(adjustments_frame, orient="vertical", command=coach_canvas.yview)
+    coach_canvas.configure(yscrollcommand=coach_scroll.set)
+    coach_canvas.grid(row=0, column=0, sticky="nsew")
+    coach_scroll.grid(row=0, column=1, sticky="ns")
+    coach_inner = ttk.Frame(coach_canvas, padding=(8, 6))
+    coach_window = coach_canvas.create_window((0, 0), window=coach_inner, anchor="nw")
+    coach_inner.bind("<Configure>", lambda _e: coach_canvas.configure(scrollregion=coach_canvas.bbox("all")))
+    coach_canvas.bind("<Configure>", lambda e: coach_canvas.itemconfigure(coach_window, width=e.width))
+    coach_inner.columnconfigure(0, weight=1)
+
+    def _coach_wheel(event):
+        coach_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    coach_canvas.bind("<Enter>", lambda _e: coach_canvas.bind_all("<MouseWheel>", _coach_wheel))
+    coach_canvas.bind("<Leave>", lambda _e: coach_canvas.unbind_all("<MouseWheel>"))
+
     adjustment_status_var = tk.StringVar(value="Start a game, then use these for the team with possession.")
-    ttk.Label(adjustments_frame, textvariable=adjustment_status_var, wraplength=360).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 8))
-    adjustment_text = tk.Text(
-        adjustments_frame,
-        wrap="word",
-        height=5,
-        font=("Consolas", 10),
-        bg=PANEL_DARK,
-        fg=TEXT,
-        relief="flat",
-        padx=10,
-        pady=8,
-        state="disabled",
-    )
-    adjustment_text.grid(row=6, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
-    # ---- Coach: starting five, positions and minutes for your fantasy team (replaces the old Adjustments tab; the in-game buttons are below) ----
-    coach_box = ttk.Frame(adjustments_frame)
-    coach_box.grid(row=0, column=0, columnspan=2, sticky="nsew", pady=(0, 6))
-    coach_box.columnconfigure(0, weight=1)
-    coach_state = {"signature": None, "rows": {}}
+    COACH_ROW_H = 30
+    COACH_SLOT_LABELS = ("1  PG", "2  SG", "3  SF", "4  PF", "5  C", "6th man", "7th", "8th", "9th", "10th", "11th", "12th", "13th", "14th", "15th")
+    COACH_SLOT_POSITIONS = ("PG", "SG", "SF", "PF", "C")
+    coach_state = {"signature": None, "rows": {}, "order": [], "labels": {}, "drag": None, "natural": {}, "ovr": {}}
     coach_title_var = tk.StringVar(value="")
     coach_total_var = tk.StringVar(value="")
     coach_note_var = tk.StringVar(value="")
-    coach_rows_frame = ttk.Frame(coach_box)
-    ttk.Label(coach_box, textvariable=coach_title_var, font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
-    ttk.Label(coach_box, text="Pick your five starters, change positions, and drag the sliders for the minutes you want each player to play. "
-                              "Press Apply: it takes effect from the next game day.", wraplength=900, justify="left", foreground=MUTED).grid(row=1, column=0, sticky="w", pady=(2, 6))
-    coach_rows_frame.grid(row=2, column=0, sticky="nsew")
-    coach_footer = ttk.Frame(coach_box)
+    ttk.Label(coach_inner, textvariable=coach_title_var, font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
+    ttk.Label(coach_inner, text="Drag a player up or down to set your rotation. Slots 1-5 are your starters (point guard, shooting guard, small forward, "
+                                "power forward, center); 6 is your sixth man, 7 the next off the bench, and so on. Drag the sliders for minutes (they always "
+                                "add up to 240), then press Apply: it takes effect from the next game day.",
+              wraplength=1000, justify="left", foreground=MUTED).grid(row=1, column=0, sticky="w", pady=(2, 6))
+    coach_list = tk.Frame(coach_inner, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
+    coach_list.grid(row=2, column=0, sticky="ew")
+    coach_footer = ttk.Frame(coach_inner)
     coach_footer.grid(row=3, column=0, sticky="ew", pady=(8, 0))
-    ttk.Label(coach_footer, textvariable=coach_total_var, font=("Segoe UI", 11, "bold")).grid(row=0, column=0, sticky="w", padx=(0, 16))
-    coach_total_label = coach_footer.winfo_children()[0]
-    ttk.Label(coach_footer, textvariable=coach_note_var, foreground=GOLD, wraplength=560, justify="left").grid(row=1, column=0, columnspan=6, sticky="w", pady=(4, 0))
+    coach_next_var = tk.StringVar(value="")
+    ttk.Label(coach_inner, textvariable=coach_next_var, foreground=TEXT_SOFT, wraplength=1000, justify="left").grid(row=5, column=0, sticky="w", pady=(6, 0))
+    coach_total_label = ttk.Label(coach_footer, textvariable=coach_total_var, font=("Segoe UI", 11, "bold"))
+    coach_total_label.grid(row=0, column=0, sticky="w", padx=(0, 16))
+    ttk.Label(coach_footer, textvariable=coach_note_var, foreground=GOLD, wraplength=800, justify="left").grid(row=1, column=0, columnspan=6, sticky="w", pady=(4, 0))
 
     def coach_available() -> bool:
         return bool(sim_engine.fantasy_trade_available())
@@ -2636,9 +2642,8 @@ def run_gui_app():
     def coach_update_total(*_args):
         rows = coach_state["rows"]
         total = sum(int(round(row["min"].get())) for row in rows.values())
-        starters = sum(int(row["start"].get()) for row in rows.values())
-        coach_total_var.set(f"Minutes: {total} / 240     Starters: {starters} / 5")
-        coach_total_label.configure(foreground="#4ade80" if total == 240 and starters == 5 else "#f87171")
+        coach_total_var.set(f"Minutes: {total} / 240     Starters: slots 1-5")
+        coach_total_label.configure(foreground="#4ade80" if total == 240 else "#f87171")
 
     def coach_spread(total: int, weights: Dict[str, float], low: int = 0, high: int = 44) -> Dict[str, int]:
         """Split `total` minutes over the names in proportion to `weights`, each between low and high, as whole numbers that add up exactly."""
@@ -2651,6 +2656,7 @@ def run_gui_app():
             share = {n: 1.0 for n in names}
         fixed: Dict[str, float] = {}
         free = list(names)
+        alloc: Dict[str, float] = {}
         for _ in range(len(names) + 2):
             remaining = total - sum(fixed.values())
             weight_sum = sum(share[n] for n in free)
@@ -2679,17 +2685,15 @@ def run_gui_app():
 
     def coach_show_minutes(values: Dict[str, int]):
         for name, minutes in values.items():
-            row = coach_state["rows"][name]
-            row["min"].set(minutes)
+            coach_state["rows"][name]["min"].set(minutes)
             coach_state["labels"][name].configure(text=str(int(minutes)))
 
     def coach_rebalance(name: str, new_minutes: int):
         """The sliders always add up to 240: moving one moves the others the other way, in proportion to how many minutes they have."""
         rows = coach_state["rows"]
         others = {n: float(row["min"].get()) for n, row in rows.items() if n != name}
-        new_minutes = max(0, min(44, int(new_minutes), 240 - 0 * len(others)))
+        new_minutes = max(0, min(44, int(new_minutes)))
         if others:
-            # the others can hold at most 44 each and at least 0
             new_minutes = max(240 - 44 * len(others), min(new_minutes, 240))
         values = coach_spread(240 - new_minutes, others) if others else {}
         values[name] = new_minutes
@@ -2700,76 +2704,159 @@ def run_gui_app():
         if rows:
             coach_show_minutes(coach_spread(240, {n: float(row["min"].get()) for n, row in rows.items()}))
 
+    def coach_layout(sequence=None, dragging=None, pointer_y=0):
+        """Put every row in its slot. While one is being dragged it follows the pointer and the others make room."""
+        order = sequence or coach_state["order"]
+        for index, name in enumerate(order):
+            row = coach_state["rows"][name]
+            frame = row["frame"]
+            starter = index < 5
+            tint = "#16294a" if starter else PANEL
+            if name == dragging:
+                tint = "#27406e"
+            for widget in (frame, *row["widgets"]):
+                widget.configure(bg=tint)
+            row["slot"].configure(text=COACH_SLOT_LABELS[index] if index < len(COACH_SLOT_LABELS) else f"{index + 1}th",
+                                  fg=GOLD if starter else MUTED)
+            if name == dragging:
+                frame.place(x=0, y=max(0, min(pointer_y - COACH_ROW_H // 2, (len(order) - 1) * COACH_ROW_H)), relwidth=1.0, height=COACH_ROW_H)
+                frame.lift()
+            else:
+                frame.place(x=0, y=index * COACH_ROW_H, relwidth=1.0, height=COACH_ROW_H)
+        coach_list.configure(height=max(1, len(order)) * COACH_ROW_H)
+
+    def coach_target_index(event) -> int:
+        position = (event.y_root - coach_list.winfo_rooty()) / COACH_ROW_H
+        return max(0, min(len(coach_state["order"]) - 1, int(position)))
+
+    def coach_drag_start(event, name):
+        coach_state["drag"] = {"name": name}
+
+    def coach_drag_move(event):
+        drag = coach_state["drag"]
+        if not drag:
+            return
+        name = drag["name"]
+        rest = [n for n in coach_state["order"] if n != name]
+        target = coach_target_index(event)
+        sequence = rest[:target] + [name] + rest[target:]
+        drag["sequence"] = sequence
+        coach_layout(sequence, name, int(event.y_root - coach_list.winfo_rooty()))
+
+    def coach_drag_end(event):
+        drag = coach_state["drag"]
+        coach_state["drag"] = None
+        if drag and drag.get("sequence"):
+            changed = drag["sequence"] != coach_state["order"]
+            coach_state["order"] = drag["sequence"]
+            if changed:
+                coach_schedule_apply()
+        coach_layout()
+
+    def coach_schedule_apply(_event=None):
+        """Every change you make is saved a moment later, so you never have to remember to press Apply."""
+        job = coach_state.get("apply_job")
+        if job:
+            try:
+                root.after_cancel(job)
+            except Exception:
+                pass
+        coach_state["apply_job"] = root.after(700, coach_apply_now)
+
+    def coach_apply_now():
+        coach_state["apply_job"] = None
+        coach_apply()
+
     def coach_build_rows():
-        for child in coach_rows_frame.winfo_children():
+        for child in coach_list.winfo_children():
             child.destroy()
-        coach_state["rows"] = {}
+        coach_state.update(rows={}, order=[], labels={}, drag=None)
         if not coach_available():
             coach_title_var.set("Coach")
-            coach_note_var.set("Starting lineups, positions and minutes can be set in a fantasy season, after the draft. "
-                               "The buttons below are the in-game adjustments.")
+            coach_note_var.set("Rotation, positions and minutes can be set in a fantasy season, after the draft. The live-game tools are below.")
             coach_total_var.set("")
+            coach_list.configure(height=1)
             return
         user_team = sim_engine.FANTASY_TRADE_STATE["user_team"]
         coach_title_var.set(f"Coach: {user_team}")
         coach_note_var.set("")
         defaults = sim_engine.fantasy_lineup_defaults()
-        roster = sorted(sim_engine.fantasy_trade_roster(user_team), key=lambda p: (p.name not in defaults["starters"], -sim_engine.fantasy_ovr(p)))
-        for col, (label, width) in enumerate((("Start", 48), ("Player", 190), ("Pos", 70), ("OVR", 46), ("Minutes", 360), ("", 40))):
-            ttk.Label(coach_rows_frame, text=label, foreground=MUTED).grid(row=0, column=col, sticky="w", padx=4)
-        coach_rows_frame.columnconfigure(4, weight=1)
-        for r, player in enumerate(roster, start=1):
-            start_var = tk.IntVar(value=1 if player.name in defaults["starters"] else 0)
-            pos_var = tk.StringVar(value=defaults["positions"].get(player.name, player.position))
-            min_var = tk.DoubleVar(value=defaults["minutes"].get(player.name, 0))
-            coach_state["rows"][player.name] = {"start": start_var, "pos": pos_var, "min": min_var}
+        roster = {p.name: p for p in sim_engine.fantasy_trade_roster(user_team)}
+        saved = [n for n in (defaults.get("rotation") or []) if n in roster]
+        if len(saved) == len(roster):
+            order = saved
+        else:
+            slot_of = {pos: i for i, pos in enumerate(COACH_SLOT_POSITIONS)}
+            starters = sorted(defaults["starters"], key=lambda n: slot_of.get(defaults["positions"].get(n, "SF"), 2))
+            bench = sorted((n for n in roster if n not in starters), key=lambda n: -defaults["minutes"].get(n, 0))
+            order = starters + bench
+        coach_state["order"] = order
+        for name in order:
+            player = roster[name]
+            frame = tk.Frame(coach_list, bg=PANEL)
+            frame.columnconfigure(5, weight=1)
+            slot = tk.Label(frame, text="", width=7, anchor="w", bg=PANEL, fg=MUTED, font=("Segoe UI", 10, "bold"), cursor="fleur")
+            grip = tk.Label(frame, text="≡", bg=PANEL, fg=MUTED, font=("Segoe UI", 12), cursor="fleur")
+            label = tk.Label(frame, text=name, width=22, anchor="w", bg=PANEL, fg=TEXT, font=("Segoe UI", 10), cursor="fleur")
+            natural = getattr(player, "auto_position", player.position)
+            pos_label = tk.Label(frame, text=natural, width=4, bg=PANEL, fg=MUTED, font=("Segoe UI", 10))
+            ovr_label = tk.Label(frame, text=str(sim_engine.fantasy_ovr(player)), width=4, bg=PANEL, fg=TEXT, font=("Segoe UI", 10))
+            min_var = tk.DoubleVar(value=defaults["minutes"].get(name, 0))
+            minute_label = tk.Label(frame, text=str(int(round(min_var.get()))), width=3, bg=PANEL, fg=TEXT, font=("Segoe UI", 10, "bold"))
 
-            def toggle_start(name=player.name, var=start_var):
-                if var.get() and sum(int(row["start"].get()) for row in coach_state["rows"].values()) > 5:
-                    var.set(0)
-                    coach_note_var.set("You already have five starters: un-pick one first.")
-                coach_update_total()
-
-            ttk.Checkbutton(coach_rows_frame, variable=start_var, command=toggle_start).grid(row=r, column=0, padx=4)
-            ttk.Label(coach_rows_frame, text=player.name).grid(row=r, column=1, sticky="w", padx=4)
-            ttk.Combobox(coach_rows_frame, textvariable=pos_var, values=("PG", "SG", "SF", "PF", "C"), state="readonly", width=4).grid(row=r, column=2, padx=4)
-            ttk.Label(coach_rows_frame, text=str(sim_engine.fantasy_ovr(player))).grid(row=r, column=3, padx=4)
-            minute_label = ttk.Label(coach_rows_frame, text=str(int(round(min_var.get()))), width=3)
-
-            def slide(value, who=player.name):
+            def slide(value, who=name):
                 coach_rebalance(who, int(round(float(value))))
                 coach_update_total()
 
-            ttk.Scale(coach_rows_frame, from_=0, to=44, variable=min_var, command=slide).grid(row=r, column=4, sticky="ew", padx=4)
-            minute_label.grid(row=r, column=5, padx=4)
-            coach_state.setdefault("labels", {})[player.name] = minute_label
-        coach_state["signature"] = tuple(p.name for p in roster)
+            scale = ttk.Scale(frame, from_=0, to=44, variable=min_var, command=slide)
+            scale.bind("<ButtonRelease-1>", coach_schedule_apply)
+            for column, widget in enumerate((slot, grip, label, pos_label, ovr_label)):
+                widget.grid(row=0, column=column, padx=3, sticky="w")
+            scale.grid(row=0, column=5, sticky="ew", padx=6)
+            minute_label.grid(row=0, column=6, padx=(2, 8))
+            for handle in (slot, grip, label):
+                handle.bind("<ButtonPress-1>", lambda e, who=name: coach_drag_start(e, who))
+                handle.bind("<B1-Motion>", coach_drag_move)
+                handle.bind("<ButtonRelease-1>", coach_drag_end)
+            coach_state["rows"][name] = {"min": min_var, "frame": frame, "slot": slot, "widgets": [slot, grip, label, pos_label, ovr_label, minute_label]}
+            coach_state["labels"][name] = minute_label
+        coach_state["signature"] = tuple(order)
         coach_normalize_240()
+        coach_layout()
         coach_update_total()
+        coach_show_next_game()
 
     def coach_apply():
         if not coach_available():
             return
-        rows = coach_state["rows"]
-        starters = [name for name, row in rows.items() if int(row["start"].get())]
-        if len(starters) != 5:
-            coach_note_var.set("Pick exactly five starters first.")
+        order = list(coach_state["order"])
+        if len(order) < 5:
             return
-        minutes = {name: int(round(row["min"].get())) for name, row in rows.items()}
-        positions = {name: row["pos"].get() for name, row in rows.items()}
-        # the first five in the row order are your starters, in the order they appear
-        ordered = [name for name in rows if name in starters]
-        outcome = sim_engine.fantasy_lineup_submit(ordered, positions, minutes)
+        roster = {p.name: p for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])}
+        minutes = {name: int(round(row["min"].get())) for name, row in coach_state["rows"].items()}
+        positions = {}
+        for index, name in enumerate(order):
+            player = roster.get(name)
+            natural = getattr(player, "auto_position", player.position) if player is not None else "SF"
+            positions[name] = COACH_SLOT_POSITIONS[index] if index < 5 else natural   # slots 1-5 play PG, SG, SF, PF, C
+        outcome = sim_engine.fantasy_lineup_submit(order[:5], positions, minutes, rotation=order)
         if not outcome.get("ok"):
             coach_note_var.set(outcome.get("error") or "Could not apply that.")
             return
         when = outcome.get("effective_order")
-        total = sum(minutes.values())
         coach_note_var.set(
-            ("Saved. It applies from game " + str(when + 1) + " on (games already played or handed out keep the old lineup). " if when is not None
-             else "Saved. It applies to your next games. ")
-
+            ("Saved. It applies from game " + str(when + 1) + " on (games already played or handed out keep the old lineup)." if when is not None
+             else "Saved. It applies to your next games.")
         )
+        coach_show_next_game()
+
+    def coach_show_next_game():
+        """What the sim will actually start your next game with, so you can see whether it matches what you set."""
+        if not coach_available():
+            coach_next_var.set("")
+            return
+        defaults = sim_engine.fantasy_lineup_defaults()
+        coach_next_var.set("Your next game starts: " + ", ".join(f"{defaults['positions'].get(n, '')} {n}" for n in defaults["starters"]))
 
     def coach_reset():
         if not coach_available():
@@ -2779,8 +2866,8 @@ def run_gui_app():
         coach_note_var.set("Back to the automatic starters, positions and minutes.")
 
     ttk.Button(coach_footer, text="Apply", command=coach_apply).grid(row=0, column=1, padx=(0, 8))
-    ttk.Button(coach_footer, text="Automatic", command=coach_reset).grid(row=0, column=3, padx=(0, 8))
-    ttk.Button(coach_footer, text="Reload", command=lambda: coach_build_rows()).grid(row=0, column=4)
+    ttk.Button(coach_footer, text="Automatic", command=coach_reset).grid(row=0, column=2, padx=(0, 8))
+    ttk.Button(coach_footer, text="Reload", command=lambda: coach_build_rows()).grid(row=0, column=3)
 
     def update_coach_tab():
         """Rebuild the rows when the roster has changed (a trade) or the tab has never been filled; otherwise leave your edits alone."""
@@ -2792,6 +2879,123 @@ def run_gui_app():
         current = tuple(sorted(p.name for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])))
         if coach_state["signature"] is None or coach_state["signature"] == "none" or tuple(sorted(coach_state["signature"])) != current:
             coach_build_rows()
+        refresh_live_panel()
+
+    # ---- the live game: who is on the floor, with drag-to-substitute and the timeout / offense / defense buttons ----
+    live_box = ttk.Frame(coach_inner)
+    live_box.grid(row=4, column=0, sticky="ew", pady=(16, 0))
+    live_box.columnconfigure(0, weight=1, uniform="live")
+    live_box.columnconfigure(1, weight=1, uniform="live")
+    live_title_var = tk.StringVar(value="Live game")
+    live_note_var = tk.StringVar(value="")
+    ttk.Label(live_box, textvariable=live_title_var, font=("Segoe UI", 13, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
+    ttk.Label(live_box, textvariable=live_note_var, foreground=GOLD, wraplength=1000, justify="left").grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 6))
+    ttk.Label(live_box, text="On the floor", foreground=MUTED).grid(row=2, column=0, sticky="w")
+    ttk.Label(live_box, text="Bench  (drag a bench player onto a player on the floor, or the other way, to substitute)", foreground=MUTED).grid(row=2, column=1, sticky="w", padx=(8, 0))
+    live_columns = ("name", "pos", "min", "pts", "pf")
+
+    def live_tree(column, height):
+        tree = ttk.Treeview(live_box, columns=live_columns, show="headings", height=height, style="Series.Treeview", selectmode="browse")
+        for col, label, width, anchor in (("name", "Player", 170, "w"), ("pos", "Pos", 44, "center"), ("min", "MIN", 52, "center"), ("pts", "PTS", 48, "center"), ("pf", "PF", 40, "center")):
+            tree.heading(col, text=label)
+            tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col == "name")
+        tree.grid(row=3, column=column, sticky="nsew", padx=(0, 6) if column == 0 else (8, 0))
+        return tree
+
+    live_floor_tree = live_tree(0, 5)
+    live_bench_tree = live_tree(1, 8)
+    live_drag = {"tree": None, "name": None}
+
+    def live_user_team() -> Team | None:
+        name = sim_engine.FANTASY_TRADE_STATE.get("user_team")
+        for team in (SIM_CONTEXT.get("teamA"), SIM_CONTEXT.get("teamB")):
+            if team is not None and name and team.name == name:
+                return team
+        return None
+
+    def live_press(event):
+        tree = event.widget
+        row = tree.identify_row(event.y)
+        live_drag.update(tree=tree if row else None, name=row or None)
+
+    def live_release(event):
+        source, name = live_drag["tree"], live_drag["name"]
+        live_drag.update(tree=None, name=None)
+        team = live_user_team()
+        if source is None or not name or team is None:
+            return
+        target = root.winfo_containing(event.x_root, event.y_root)
+        if target not in (live_floor_tree, live_bench_tree) or target is source:
+            return
+        row = target.identify_row(event.y_root - target.winfo_rooty())
+        if not row:
+            return
+        out_name, in_name = (row, name) if source is live_bench_tree else (name, row)
+        live_note_var.set(sim_engine.gui_substitute(team, out_name, in_name))
+        refresh_live_panel()
+
+    for _tree in (live_floor_tree, live_bench_tree):
+        _tree.bind("<ButtonPress-1>", live_press)
+        _tree.bind("<ButtonRelease-1>", live_release)
+
+    live_view = {"was_live": False, "timeout_shown": False}
+
+    def scroll_to_live_panel():
+        """Bring the live-game section into view (it sits under the rotation list)."""
+        try:
+            coach_canvas.update_idletasks()
+            coach_canvas.yview_moveto(max(0.0, (live_box.winfo_y() - 8) / max(1, coach_inner.winfo_height())))
+        except Exception:
+            pass
+
+    def refresh_live_panel():
+        team = live_user_team()
+        if team is not None and coach_available():
+            if not live_view["was_live"]:
+                live_view["was_live"] = True
+                scroll_to_live_panel()   # a live game just started: show the floor and the bench
+            if getattr(team, "coach_timeout_open", False) and not live_view["timeout_shown"]:
+                live_view["timeout_shown"] = True
+                scroll_to_live_panel()
+            elif not getattr(team, "coach_timeout_open", False):
+                live_view["timeout_shown"] = False
+        else:
+            live_view["was_live"] = False
+        for tree in (live_floor_tree, live_bench_tree):
+            tree.delete(*tree.get_children())
+        if team is None or not coach_available():
+            live_title_var.set("Live game")
+            live_note_var.set("No live game right now. In a fantasy season, pick one of your upcoming games in the Sched tab and press Watch: when the season "
+                              "gets there you coach it from here (call a timeout, change the offense and defense, drag substitutions).")
+            return
+        live_title_var.set(f"Live game: {short_team_name(team)}")
+        for tree, players in ((live_floor_tree, list(team.on_floor)), (live_bench_tree, list(team.bench))):
+            for p in players:
+                tree.insert("", "end", iid=p.name, values=(p.name + ("  (out: fouls)" if p.fouled_out else ""), p.position, f"{p.minutes / 60:.1f}", p.pts, p.pf))
+        queued = list(getattr(team, "manual_substitution", []) or [])
+        if getattr(team, "coach_timeout_open", False):
+            live_note_var.set("TIMEOUT: drag substitutions now (they happen at once), then press Resume.")
+        elif queued:
+            live_note_var.set("Queued for the next dead ball: " + "; ".join(f"{i} for {o}" for o, i in queued))
+        if sim_engine.SIM_PAUSED and str(pause_button.cget("text")) == "Pause":
+            pause_button.configure(text="Resume")
+            status_var.set("Paused (timeout): make your substitutions, then press Resume.")
+
+    def live_panel_loop():
+        try:
+            if str(series_tabs.tab(series_tabs.select(), "text")) == "Coach":
+                refresh_live_panel()
+        except Exception:
+            pass
+        root.after(1000, live_panel_loop)
+
+    adjustment_text = tk.Text(coach_inner, wrap="word", height=4, font=("Consolas", 10), bg=PANEL_DARK, fg=TEXT, relief="flat", padx=10, pady=8, state="disabled")
+    coach_live_buttons = ttk.Frame(live_box)
+    coach_live_buttons.grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+    ttk.Label(live_box, textvariable=adjustment_status_var, wraplength=1000, foreground=MUTED).grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
+    adjustment_text.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+
+    root.after(1500, live_panel_loop)
 
     series_tabs.add(adjustments_frame, text="Coach")
     series_tabs.hide(adjustments_frame)
@@ -10009,11 +10213,13 @@ def run_gui_app():
                             finished.wait(10)
 
                     sim_engine.SEASON_LIVE_HOOK = live_season_game
+                    sim_engine.GUI_COACH_MODE = True
                     try:
                         with contextlib.redirect_stdout(io.StringIO()):
                             fantasy_sections = run_quiet_82_game_season(draft_names, draft_factories, section_queue, scoreboard_queue)
                     finally:
                         sim_engine.SEASON_LIVE_HOOK = None
+                        sim_engine.GUI_COACH_MODE = False
                     postseason_state["standings"] = (fantasy_sections or {}).get("_season_standings")
                     postseason_state["factories"] = dict(draft_factories)
                     season_view["quiet"] = False
@@ -10232,6 +10438,9 @@ def run_gui_app():
         output_queue.put("\n[GUI] Simulation paused.\n" if sim_engine.SIM_PAUSED else "\n[GUI] Simulation resumed.\n")
 
     def active_adjustment_team() -> Team | None:
+        mine = live_user_team()   # in a fantasy season the buttons act on your team, not on whoever has the ball
+        if mine is not None:
+            return mine
         possession = SIM_CONTEXT.get("possession")
         if possession is not None:
             return possession
@@ -10243,7 +10452,8 @@ def run_gui_app():
             adjustment_status_var.set("No active team yet.")
             return
         team.manual_timeout_requested = True
-        adjustment_status_var.set(f"Timeout requested for {short_team_name(team)}.")
+        adjustment_status_var.set(f"Timeout requested for {short_team_name(team)}: it is called at {short_team_name(team)}'s next possession, "
+                                  "and the game stops so you can drag substitutions.")
         output_queue.put(f"\n[GUI] Timeout requested for {team.name}.\n")
 
     def queue_gui_subs():
@@ -10554,11 +10764,10 @@ def run_gui_app():
     ttk.Button(controls, text="Sim All Playoffs", command=lambda: gui_sim_stage("playoffs")).grid(row=4, column=3, columnspan=3, padx=(0, 6), pady=(6, 0), sticky="ew")
     next_button = ttk.Button(controls, text="Next: Play-in & Playoffs", state="disabled", command=lambda: start_sim("2027 play-in & playoffs"))
     next_button.grid(row=3, column=6, columnspan=4, padx=(0, 6), pady=(6, 0), sticky="ew")
-    ttk.Button(adjustments_frame, text="Call Timeout", command=queue_gui_timeout).grid(row=2, column=0, sticky="ew", padx=(0, 5), pady=3)
-    ttk.Button(adjustments_frame, text="Queue Subs", command=queue_gui_subs).grid(row=2, column=1, sticky="ew", padx=(5, 0), pady=3)
-    ttk.Button(adjustments_frame, text="Cycle Offense", command=cycle_gui_offense).grid(row=3, column=0, sticky="ew", padx=(0, 5), pady=3)
-    ttk.Button(adjustments_frame, text="Cycle Defense", command=cycle_gui_defense).grid(row=3, column=1, sticky="ew", padx=(5, 0), pady=3)
-    ttk.Button(adjustments_frame, text="Load Help On Star", command=matchup_note).grid(row=4, column=0, columnspan=2, sticky="ew", pady=3)
+    ttk.Button(coach_live_buttons, text="Call Timeout", command=queue_gui_timeout).grid(row=0, column=0, padx=(0, 8))
+    ttk.Button(coach_live_buttons, text="Cycle Offense", command=cycle_gui_offense).grid(row=0, column=1, padx=(0, 8))
+    ttk.Button(coach_live_buttons, text="Cycle Defense", command=cycle_gui_defense).grid(row=0, column=2, padx=(0, 8))
+    ttk.Button(coach_live_buttons, text="Load Help On Star", command=matchup_note).grid(row=0, column=3)
     ttk.Label(footer, textvariable=status_var).grid(row=0, column=0, sticky="w")
     gui_input_var = tk.StringVar(value="")
     dark_entry(footer, textvariable=gui_input_var).grid(row=0, column=1, sticky="ew", padx=(10, 6))
