@@ -8989,14 +8989,6 @@ def run_gui_app():
                 entry = next((team_stats[name] for team_stats in totals.values() if name in team_stats), None)
             return entry if entry and entry.get("games", 0) > 0 else None
 
-        def stat_columns(team_name, player):
-            stats = season_stats_for(team_name, player.name)
-            if stats is None:
-                return ("-",) * 7
-            games = stats["games"]
-            return (games, f"{stats['minutes'] / 60.0 / games:.1f}", f"{stats['pts'] / games:.1f}", f"{stats['reb'] / games:.1f}",
-                    f"{stats['ast'] / games:.1f}", f"{100.0 * stats['fgm'] / max(1, stats['fga']):.1f}", f"{100.0 * stats['tpm'] / max(1, stats['tpa']):.1f}")
-
         def player_card_text(team_name, player):
             form = sim_engine.fantasy_player_form(player)
             feet, inches = divmod(int(player.height or 0), 12)
@@ -9035,10 +9027,8 @@ def run_gui_app():
             holder.grid(row=1, column=column, sticky="nsew", padx=(0, 6) if column == 0 else (6, 0))
             holder.columnconfigure(0, weight=1)
             holder.rowconfigure(0, weight=1)
-            tree = ttk.Treeview(holder, columns=("pos", "ovr", "form", "name", "block", "gp", "mpg", "ppg", "rpg", "apg", "fgp", "tpp"), show="headings", height=14, style="Series.Treeview", selectmode="extended")
-            for col, label, width, anchor in (("pos", "Pos", 44, "center"), ("ovr", "OVR", 46, "center"), ("form", "Form", 46, "center"), ("name", "Player", 180, "w"),
-                                              ("block", "Block", 58, "center"), ("gp", "GP", 40, "center"), ("mpg", "MIN", 46, "center"), ("ppg", "PTS", 46, "center"),
-                                              ("rpg", "REB", 46, "center"), ("apg", "AST", 46, "center"), ("fgp", "FG%", 52, "center"), ("tpp", "3P%", 52, "center")):
+            tree = ttk.Treeview(holder, columns=("pos", "ovr", "name", "block"), show="headings", height=14, style="Series.Treeview", selectmode="extended")
+            for col, label, width, anchor in (("pos", "Pos", 56, "center"), ("ovr", "OVR", 60, "center"), ("name", "Player", 300, "w"), ("block", "Block", 70, "center")):
                 tree.heading(col, text=label)
                 tree.column(col, width=width, minwidth=width, anchor=anchor, stretch=col == "name")
             scroll = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
@@ -9110,10 +9100,7 @@ def run_gui_app():
             roster = sorted(sim_engine.fantasy_trade_roster(team_name), key=sim_engine.fantasy_ovr, reverse=True)
             blocked = sim_engine.FANTASY_TRADE_STATE.get("block", set()) if team_name == user_team else set()
             for player in roster:
-                form = sim_engine.fantasy_player_form(player)
-                tree.insert("", "end", iid=player.name, values=(
-                    player.position, sim_engine.fantasy_ovr(player), (f"{form:+d}" if form else "-"), player.name,
-                    "BLOCK" if player.name in blocked else "", *stat_columns(team_name, player)))
+                tree.insert("", "end", iid=player.name, values=(player.position, sim_engine.fantasy_ovr(player), player.name, "BLOCK" if player.name in blocked else ""))
 
         def refresh_rosters():
             partner = partner_var.get()
