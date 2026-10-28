@@ -10707,11 +10707,25 @@ def team_has_pinned_minutes(team: Team) -> bool:
     return any(getattr(p, "gui_target_minutes_override", None) is not None for p in team.roster)
 
 
+def pinned_pacing_suspended() -> bool:
+    """The late stretch of a close game (the last nine minutes of the 4th, or overtime, within the usual close-game margin): the minutes
+    you set stop pulling players out, and the normal closing-lineup rules keep the best players on the floor. A coach does not sit his
+    star at 1:41 of a one-possession game because he has reached his minutes."""
+    ctx = SIM_CONTEXT if isinstance(globals().get("SIM_CONTEXT"), dict) else {}
+    period, clock = ctx.get("period"), ctx.get("period_time")
+    team_a, team_b = ctx.get("teamA"), ctx.get("teamB")
+    if not isinstance(period, int) or team_a is None or team_b is None or period < 4:
+        return False
+    if period == 4 and (clock is None or clock > 9 * 60):
+        return False
+    return abs(team_a.score - team_b.score) <= STAR_CLOSE_GAME_MARGIN
+
+
 def enforce_pinned_minutes(team: Team, period: int, period_time: int, protected: Player = None) -> bool:
     """Minutes the user set in the Coach tab: pace every player toward his number, game clock by game clock, like a coach watching
     the minutes sheet. A bench player who is behind his pace comes in for the player on the floor who is furthest ahead of his,
     preferably one who plays the same position."""
-    if getattr(team, "garbage_time_locked", False) or not team_has_pinned_minutes(team) or manual_lineup_holds(team, period):
+    if getattr(team, "garbage_time_locked", False) or not team_has_pinned_minutes(team) or manual_lineup_holds(team, period) or pinned_pacing_suspended():
         return False
     elapsed = max(0.0, ((period - 1) * rules_quarter_seconds() + (rules_quarter_seconds() - period_time)) / 60)
     game_share = elapsed / 48.0   # keeps growing in overtime, so the starters are not "over their minutes" the moment regulation ends
@@ -10935,7 +10949,7 @@ def dead_ball_rotation(team: Team, period: int, period_time: int,
     if not hasattr(team.roster[0], "target_minutes"):
         initialize_minute_targets(team)
 
-    if team_has_pinned_minutes(team):
+    if team_has_pinned_minutes(team) and not pinned_pacing_suspended():
         # the user's minutes run the rotation: no closing-lineup or star-rest rules on top of them
         for _swap in range(3):
             if not enforce_pinned_minutes(team, period, period_time, protected):
@@ -11295,7 +11309,7 @@ def maybe_substitute(team: Team, reason: str, protected: Player = None,
     if not team.bench:
         return
 
-    if team_has_pinned_minutes(team):
+    if team_has_pinned_minutes(team) and not pinned_pacing_suspended():
         # minutes the user set run the rotation: at a quarter break rebuild by minutes owed, on a foul or timeout pace them
         if reason == "quarter":
             pinned_quarter_lineup(team, period if period is not None else getattr(team, "current_period", 1), protected)
@@ -11513,7 +11527,7 @@ def force_starter_lineup(team: Team, protected: Player = None):
     if getattr(team, "garbage_time_locked", False) or manual_lineup_holds(team):
         return
     protected = protected or getattr(team, "free_throw_shooter", None)
-    if team_has_pinned_minutes(team):
+    if team_has_pinned_minutes(team) and not pinned_pacing_suspended():
         pinned_quarter_lineup(team, max(1, getattr(team, "current_period", 1) or 1), protected)   # the user's minutes pick the five
         return
 
