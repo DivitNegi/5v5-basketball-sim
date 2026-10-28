@@ -23385,7 +23385,6 @@ FANTASY_FORM_FIRST_GAME = 120      # no form changes before this many league gam
 FANTASY_FORM_EVERY = 60            # then they are recalculated this often (about every four rounds of a 30-team league)
 FANTASY_FORM_PER_Z = 0.04          # rating change (0.04 = 4 points) per standard deviation above or below what his rating predicts
 FANTASY_FORM_MAX = 0.06            # the most a rating can move from where it started
-FANTASY_FORM_MAX_OVR = 5           # and the most his overall can move (a big's overall reacts strongly to small rating changes)
 FANTASY_FORM_SHRINK = 40.0         # attempts at which half the measured gap counts (a small sample is mostly luck)
 # rating -> (where the shots are counted, fewest attempts before it can move)
 FANTASY_FORM_ZONES = {"three_rating": ("three", 40), "mid_rating": ("mid", 30), "rim_rating": ("rim", 60), "dunk_rating": ("dunk", 20),
@@ -23452,18 +23451,20 @@ def fantasy_form_update(player_totals: Dict) -> Dict[str, Dict]:
             shrink = att / (att + FANTASY_FORM_SHRINK)
             shifts[attr] = max(-FANTASY_FORM_MAX, min(FANTASY_FORM_MAX, FANTASY_FORM_PER_Z * z * shrink))
         before = fantasy_ovr(p)
+        net = sum(shifts.values())
         scale = 1.0
+        # the overall is only ever recalculated from the ratings: nothing here moves it directly. The one thing checked is that the
+        # formula does not answer better shooting with a lower overall (or worse shooting with a higher one) through a threshold in it.
         for _attempt in range(12):
             for attr in FANTASY_FORM_ZONES:
                 setattr(p, attr, round(max(0.05, min(0.99, p.form_base[attr] + shifts.get(attr, 0.0) * scale)), 3))
             gap = fantasy_ovr(p) - p.form_base_ovr
-            wrong_way = abs(gap) >= 2 and gap * sum(shifts.values()) < 0   # better shooting that lowers his overall: a cliff in the formula
-            if (abs(gap) <= FANTASY_FORM_MAX_OVR and not wrong_way) or max((abs(v) for v in shifts.values()), default=0.0) * scale < 0.002:
+            if not (abs(gap) >= 2 and gap * net < 0) or max((abs(v) for v in shifts.values()), default=0.0) * scale < 0.002:
                 break
-            scale *= 0.8   # too big a jump in overall for the rating change: ease it back
+            scale *= 0.8
         gap = fantasy_ovr(p) - p.form_base_ovr
-        if abs(gap) > FANTASY_FORM_MAX_OVR or (abs(gap) >= 2 and gap * sum(shifts.values()) < 0):
-            scale = 0.0   # even a tiny change crosses one of the formula's thresholds: leave his ratings where they started
+        if abs(gap) >= 2 and gap * net < 0:
+            scale = 0.0   # even a tiny change crosses such a threshold: leave his ratings where they started
             for attr in FANTASY_FORM_ZONES:
                 setattr(p, attr, p.form_base[attr])
         p.form_shift = {attr: round(v * scale, 3) for attr, v in shifts.items()}

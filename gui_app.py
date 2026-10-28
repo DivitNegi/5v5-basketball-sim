@@ -2830,7 +2830,8 @@ def run_gui_app():
                 handle.bind("<ButtonPress-1>", lambda e, who=name: coach_drag_start(e, who))
                 handle.bind("<B1-Motion>", coach_drag_move)
                 handle.bind("<ButtonRelease-1>", coach_drag_end)
-            coach_state["rows"][name] = {"min": min_var, "frame": frame, "slot": slot, "widgets": [slot, grip, label, pos_label, ovr_label, minute_label]}
+            coach_state["rows"][name] = {"min": min_var, "frame": frame, "slot": slot, "ovr": ovr_label,
+                                         "widgets": [slot, grip, label, pos_label, ovr_label, minute_label]}
             coach_state["labels"][name] = minute_label
         coach_state["signature"] = tuple(order)
         coach_normalize_240()
@@ -2883,6 +2884,20 @@ def run_gui_app():
     ttk.Button(coach_footer, text="Automatic", command=coach_reset).grid(row=0, column=2, padx=(0, 8))
     ttk.Button(coach_footer, text="Reload", command=lambda: coach_build_rows()).grid(row=0, column=3)
 
+    def coach_refresh_ovr():
+        """The overalls follow the ratings, which move through the season (shooting form), so they are redrawn rather than kept from the draft."""
+        if not coach_available() or not coach_state["rows"]:
+            return
+        roster = {p.name: p for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])}
+        for name, row in coach_state["rows"].items():
+            player = roster.get(name)
+            if player is None:
+                continue
+            overall = sim_engine.fantasy_ovr(player)
+            if row.get("ovr_shown") != overall:
+                row["ovr_shown"] = overall
+                row["ovr"].configure(text=str(overall), fg=GOLD if overall >= 90 else ("#4ade80" if overall >= 80 else TEXT))
+
     def update_coach_tab():
         """Rebuild the rows when the roster has changed (a trade) or the tab has never been filled; otherwise leave your edits alone."""
         if not coach_available():
@@ -2894,6 +2909,7 @@ def run_gui_app():
         current = tuple(sorted(p.name for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])))
         if coach_state["signature"] is None or coach_state["signature"] == "none" or tuple(sorted(coach_state["signature"])) != current:
             coach_build_rows()
+        coach_refresh_ovr()
         update_usage_section()
         refresh_live_panel()
 
