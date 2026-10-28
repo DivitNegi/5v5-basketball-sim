@@ -1265,6 +1265,14 @@ dribble_combo_drive_finishes = [
     "He uses the handle to get downhill and puts pressure on the rim."
 ]
 
+gather_before_shot_lines = [
+    "catches it, takes a dribble to get set, and rises.",
+    "pump-fakes, resets with one dribble, and pulls up.",
+    "gathers the pass, finds his balance, and lets it go.",
+    "takes the pass, squares up, and takes a second to get the shot off.",
+    "catches it on the move, takes a hard dribble, and rises.",
+]
+
 dribble_combo_pass_finishes = [
     "{shooter} pulls the help toward him and kicks it to {receiver}.",
     "{shooter} gets two defenders watching the ball and finds {receiver}.",
@@ -20248,6 +20256,11 @@ def simulate_possession(off: Team, dff: Team,
 
     elif ankle_breaker_open and shot_type == "mid":
         print(f"{shooter.name} rises into the open jumper after the shake.")
+
+    elif catch_shoot_context and shot_type in ("three", "mid") and last_passer and last_passer is not shooter and not quick_shot_for_assist:
+        # a pass that is not a one-motion catch-and-shoot (the shooter has to reset first) is described that way, because it is not
+        # credited as an automatic assist: the line must not say "catches and shoots" about a shot that was not
+        print(f"{shooter.name} {random.choice(gather_before_shot_lines)}")
 
     elif catch_shoot_context and closeout_contest and shot_type in ("three", "mid"):
         print(f"{shooter.name} catches and rises over the closeout from {defender.name}.")
