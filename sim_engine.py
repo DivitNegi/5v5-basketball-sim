@@ -4308,6 +4308,12 @@ def can_play_center_slot(player: Player) -> bool:
     return player.position.upper() in ("PF", "C")
 
 
+def is_plain_center(player: Player) -> bool:
+    """A center who plays only center: his position is C and PF is not among his secondary positions. Only a center whose entry
+    lists PF as a secondary position (special permission) may fill the power-forward slot."""
+    return player.position.upper() == "C" and "PF" not in player_positions(player)
+
+
 def lineup_slot_eligible(player: Player, slot: str) -> bool:
     slot = slot.upper()
     primary = player.position.upper()
@@ -4317,7 +4323,7 @@ def lineup_slot_eligible(player: Player, slot: str) -> bool:
         # The 4 can be a wing or a big, but never a true guard. If a guard
         # checks in for a forward, the lineup should slide a wing/big down
         # instead of showing that guard at power forward.
-        return primary in ("SF", "PF", "C") or (can_play_position(player, "PF") and primary not in ("PG", "SG"))
+        return primary in ("SF", "PF") or (can_play_position(player, "PF") and primary not in ("PG", "SG"))   # a plain C is not a PF
     if slot == "SF":
         # Mirrors the PF slot's own logic: a wing-capable big or a bigger
         # guard is a sane fallback at the 3 when the real small forward's
@@ -4570,6 +4576,21 @@ def _balance_lineup_positions_impl(team: Team):
             current[current.index(out_player)] = sub_in
             bench_pool.remove(sub_in)
             bench_pool.append(out_player)
+
+    # Centers play center only (unless PF is listed for them): two of them never share the floor. The one who is not the team's best
+    # sits for the best forward on the bench.
+    plain = [p for p in current if is_plain_center(p)]
+    while len(plain) >= 2:
+        keep = max(plain, key=overall_rating)
+        sit = min((p for p in plain if p is not keep), key=lambda p: (overall_rating(p), -p.minutes))
+        replacements = [p for p in bench_pool if not is_plain_center(p) and not identity_contains(current, p)]
+        if not replacements:
+            break
+        sub_in = max(replacements, key=lambda p: (lineup_slot_eligible(p, "PF"), starter_minute_need(p, team), overall_rating(p)))
+        current[current.index(sit)] = sub_in
+        bench_pool.remove(sub_in)
+        bench_pool.append(sit)
+        plain = [p for p in current if is_plain_center(p)]
 
     team.on_floor = balanced_lineup_order(current)
     team.bench = [p for p in team.roster if not identity_contains(team.on_floor, p) and not p.fouled_out]
