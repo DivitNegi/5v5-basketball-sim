@@ -8817,17 +8817,22 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2027 Dallas Mavericks":
-        target_ranges = {
-            "Morez Johnson Jr.": (24, 29),
-            "Kyrie Irving": (36, 40), "Max Christie": (28, 33),
-            "Cooper Flagg": (34, 38), "P.J. Washington": (31, 35),
-            "Dereck Lively II": (14, 17), "Daniel Gafford": (30, 34),
-            "Naji Marshall": (22, 28), "Santi Aldama": (0, 4),
-            "Zaccharie Risacher": (20, 25), "Marcus Sasser": (18, 24),
+        # Minutes the 2027 Mavericks should play (Basketball-Reference's shape, scaled to this 11-man roster's 240; Kyrie stays at
+        # 31-32 and Lively keeps his). The rotation rules alone do not land them, so they are the pinned minutes the pacing steers
+        # to: the numbers below are what is asked for, tuned until the games average the intended minutes.
+        intended = {
+            "P.J. Washington": 31.4, "Kyrie Irving": 31.5, "Cooper Flagg": 26.9, "Zaccharie Risacher": 26.9, "Max Christie": 26.4,
+            "Naji Marshall": 24.8, "Daniel Gafford": 19.1, "Marcus Sasser": 19.1, "Dereck Lively II": 17.0,
+            "Morez Johnson Jr.": 13.0, "Santi Aldama": 4.0,
+        }
+        steer = {
+            "P.J. Washington": 29.2, "Cooper Flagg": 22.8, "Zaccharie Risacher": 30.7, "Max Christie": 22.8, "Naji Marshall": 24.6,
+            "Daniel Gafford": 18.1, "Marcus Sasser": 21.3, "Morez Johnson Jr.": 14.3, "Kyrie Irving": 28.4, "Dereck Lively II": 19.1,
+            "Santi Aldama": 3.8,
         }
         for p in team.roster:
-            low, high = target_ranges.get(p.name, (6, 14))
-            p.target_minutes = random.randint(low, high)
+            p.target_minutes = intended.get(p.name, 4.0)
+            p.gui_target_minutes_override = steer.get(p.name, 4.0)
         return
 
     if team.name == "2026 New York Knicks":
