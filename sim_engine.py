@@ -9237,16 +9237,19 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2027 Portland Trail Blazers":
-        target_ranges = {
-            "Ja Morant": (28, 33), "Damian Lillard": (30, 34),
-            "Toumani Camara": (18, 24), "Deni Avdija": (28, 33),
-            "Donovan Clingan": (20, 26), "Jrue Holiday": (18, 24),
-            "Shaedon Sharpe": (16, 22), "Scoot Henderson": (14, 20),
-            "Robert Williams III": (14, 20), "Vit Krejci": (10, 16),
+        # Basketball-Reference's per-game minutes scaled to this ten-man roster's 240 (Sharpe keeps his). The rotation rules alone do not
+        # land them, so they are the pinned minutes the pacing steers to; "steer" is tuned until the games average "intended".
+        intended = {
+            "Deni Avdija": 34.0, "Damian Lillard": 31.8, "Ja Morant": 29.0, "Jrue Holiday": 27.9, "Toumani Camara": 26.8,
+            "Donovan Clingan": 24.2, "Scoot Henderson": 20.6, "Robert Williams III": 19.5, "Shaedon Sharpe": 16.8, "Vit Krejci": 9.4,
+        }
+        steer = {
+            "Deni Avdija": 31.9, "Damian Lillard": 29.7, "Ja Morant": 25.9, "Jrue Holiday": 27.9, "Toumani Camara": 23.0,
+            "Donovan Clingan": 24.2, "Scoot Henderson": 23.0, "Robert Williams III": 21.6, "Shaedon Sharpe": 18.5, "Vit Krejci": 9.9,
         }
         for p in team.roster:
-            low, high = target_ranges.get(p.name, (6, 14))
-            p.target_minutes = random.randint(low, high)
+            p.target_minutes = intended.get(p.name, 6.0)
+            p.gui_target_minutes_override = steer.get(p.name, 6.0)
         return
 
     if team.name == "2027 Sacramento Kings":

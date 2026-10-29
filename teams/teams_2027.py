@@ -2540,7 +2540,7 @@ def make_suns_2027() -> Team:
 def make_blazers_2027() -> Team:
     players = [
         Player('Ja Morant', 'PG',
-               0.24, 0.24, 0.40, 0.04, 0.44, 0.30,
+               0.61, 0.24, 0.40, 0.04, 0.44, 0.30,
                0.700, 0.82, 0.950, 0.960, 0.900,
                0.26, 0.920, 0.920,
                0.490, 0.400, 0.320, 0.510, 0.900, 0.467,
@@ -2548,7 +2548,7 @@ def make_blazers_2027() -> Team:
                clutchness=0.90, secondary_positions=('SG',), height=74, speed=0.950,
                shot_iq=0.600, archetype='explosive scorer', badges=('posterizer', 'shot_creator'), stamina=0.72),
         Player('Damian Lillard', 'PG',
-               0.56, 0.28, 0.20, 0.02, 0.14, 0.34,
+               0.95, 0.28, 0.20, 0.02, 0.14, 0.34,
                0.930, 0.950, 0.860, 0.850, 0.930,
                0.28, 0.810, 0.890,
                0.460, 0.370, 0.330, 0.540, 0.620, 0.400,
@@ -2556,7 +2556,7 @@ def make_blazers_2027() -> Team:
                clutchness=0.950, height=74, speed=0.830,
                shot_iq=0.550, archetype='legendary scorer', badges=('shot_creator_gold', 'clutch_hof', 'limitless_range'), stamina=0.64),
         Player('Toumani Camara', 'PF',
-               0.34, 0.18, 0.20, 0.10, 0.20, 0.22,
+               0.95, 0.18, 0.20, 0.10, 0.20, 0.22,
                0.830, 0.600, 0.860, 0.750, 0.700,
                0.14, 0.587, 0.650,
                0.820, 0.510, 0.500, 0.550, 0.320, 0.600,
@@ -2564,7 +2564,7 @@ def make_blazers_2027() -> Team:
                clutchness=0.500, secondary_positions=('SF',), height=79, speed=0.630,
                shot_iq=0.550, archetype='defensive forward', badges=('lockdown',), stamina=0.83),
         Player('Deni Avdija', 'SF',
-               0.36, 0.28, 0.30, 0.10, 0.24, 0.32,
+               0.54, 0.28, 0.30, 0.10, 0.24, 0.32,
                0.750, 0.890, 0.880, 0.750, 0.800,
                0.24, 0.783, 0.780,
                0.380, 0.560, 0.430, 0.740, 0.800, 0.533,
@@ -2572,7 +2572,7 @@ def make_blazers_2027() -> Team:
                clutchness=0.800, secondary_positions=('SG',), height=80, speed=0.750,
                shot_iq=0.900, archetype='playmaking forward', badges=('shot_creator',), stamina=0.82),
         Player('Donovan Clingan', 'C',
-               0.06, 0.10, 0.14, 0.28, 0.36, 0.16,
+               0.09, 0.10, 0.14, 0.28, 0.36, 0.16,
                0.750, 0.780, 0.940, 0.750, 0.670,
                0.14, 0.533, 0.460,
                0.370, 0.860, 0.940, 0.900, 0.690, 0.667,
@@ -2580,7 +2580,7 @@ def make_blazers_2027() -> Team:
                clutchness=0.750, height=86, speed=0.440,
                shot_iq=0.850, archetype='rim protector', stamina=0.78),
         Player('Jrue Holiday', 'PG',
-               0.40, 0.24, 0.20, 0.02, 0.14, 0.26,
+               0.69, 0.24, 0.20, 0.02, 0.14, 0.26,
                0.830, 0.810, 0.910, 0.650, 0.830,
                0.16, 0.790, 0.790,
                0.800, 0.320, 0.480, 0.550, 0.400, 0.567,
@@ -2596,7 +2596,7 @@ def make_blazers_2027() -> Team:
                clutchness=0.550, secondary_positions=('SF',), height=77, speed=0.870,
                shot_iq=0.600, archetype='explosive scorer', badges=('posterizer',), stamina=0.78),
         Player('Scoot Henderson', 'PG',
-               0.32, 0.20, 0.34, 0.02, 0.28, 0.26,
+               0.95, 0.20, 0.34, 0.02, 0.28, 0.26,
                0.790, 0.820, 0.810, 0.880, 0.840,
                0.18, 0.760, 0.860,
                0.430, 0.500, 0.380, 0.490, 0.400, 0.467,
@@ -2612,7 +2612,7 @@ def make_blazers_2027() -> Team:
                clutchness=0.250, height=81, speed=0.710,
                shot_iq=0.300, archetype='athletic defender', badges=('chasedown', 'lob_threat'), stamina=0.65),
         Player('Vit Krejci', 'SF',
-               0.40, 0.22, 0.18, 0.04, 0.14, 0.22,
+               0.25, 0.22, 0.18, 0.04, 0.14, 0.22,
                0.820, 0.740, 0.970, 0.700, 0.750,
                0.10, 0.593, 0.700,
                0.460, 0.510, 0.360, 0.470, 0.440, 0.467,
@@ -2621,6 +2621,17 @@ def make_blazers_2027() -> Team:
                shot_iq=0.800, archetype='versatile wing', stamina=0.76),
     ]
     t = Team('2027 Portland Trail Blazers', players)
+    # Attempt roles, minute by minute, from Basketball-Reference's per-game table (minutes scaled to this ten-man roster; Sharpe keeps his
+    # own). The paced target is a little off the table's number on purpose: it is tuned until the games average the table's attempts.
+    attempt_roles = {
+        'Deni Avdija': (20.8, 20.2), 'Damian Lillard': (10.0, 18.2), 'Ja Morant': (15.0, 14.8), 'Jrue Holiday': (9.4, 12.4),
+        'Toumani Camara': (6.2, 11.7), 'Donovan Clingan': (4.3, 8.3), 'Scoot Henderson': (10.6, 10.8),
+        'Robert Williams III': (5.4, 8.0), 'Vit Krejci': (1.4, 3.4),
+    }
+    for player in t.roster:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
     t.init_lineup()
     return t
 
