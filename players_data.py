@@ -596,6 +596,75 @@ SEASON_2027_DIVISIONS = {
 }
 
 
+import json
+import os
+
+SCHEDULE_2027_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schedule_2027.json")
+CUP_PHASE_GAMES_2027 = 30   # 4 quarterfinals + 2 semifinals count as regular-season games, plus 24 more that set the last two games of each team
+
+
+def load_2027_real_schedule():
+    """The NBA's real 2026-27 order: (games before the Cup knockouts, games after), each [home, away, 1 if a Cup group game]. None if the
+    data file is missing, in which case the season falls back to a generated schedule."""
+    try:
+        with open(SCHEDULE_2027_FILE, encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data["before_cup_knockouts"], data["after_cup_knockouts"]
+    except Exception:
+        return None
+
+
+def nba_cup_groups(cup_games):
+    """The six Cup groups, found from who plays whom on Cup nights: five teams each, four games apiece."""
+    adjacency = {}
+    for home, away in cup_games:
+        adjacency.setdefault(home, set()).add(away)
+        adjacency.setdefault(away, set()).add(home)
+    seen, groups = set(), []
+    for team in sorted(adjacency):
+        if team in seen:
+            continue
+        stack, group = [team], set()
+        while stack:
+            current = stack.pop()
+            if current in group:
+                continue
+            group.add(current)
+            stack.extend(adjacency[current] - group)
+        seen |= group
+        groups.append(sorted(group))
+    return groups
+
+
+def nba_cup_field(groups, results, conf_of, rng):
+    """From the Cup group games [(home, away, home_pts, away_pts)]: each group's table, the eight teams that reach the knockouts (the
+    three group winners and the best second-place team of each conference, seeded 1-4), the teams that do not, and the group records."""
+    stats = {team: {"w": 0, "l": 0, "pf": 0, "pa": 0} for group in groups for team in group}
+    for home, away, home_pts, away_pts in results:
+        stats[home]["pf"] += home_pts
+        stats[home]["pa"] += away_pts
+        stats[away]["pf"] += away_pts
+        stats[away]["pa"] += home_pts
+        stats[home if home_pts > away_pts else away]["w"] += 1
+        stats[away if home_pts > away_pts else home]["l"] += 1
+    tiebreak = {team: rng.random() for team in stats}
+
+    def order_key(team):
+        record = stats[team]
+        return (-record["w"], -(record["pf"] - record["pa"]), -record["pf"], tiebreak[team])
+
+    tables = [sorted(group, key=order_key) for group in groups]
+    field = {}
+    for conference in ("East", "West"):
+        conference_tables = [table for table in tables if conf_of[table[0]] == conference]
+        winners = sorted((table[0] for table in conference_tables), key=order_key)
+        wildcard = sorted((table[1] for table in conference_tables), key=order_key)[0]
+        field[conference] = winners + [wildcard]
+    reached = {team for seeds in field.values() for team in seeds}
+    rest = sorted((team for table in tables for team in table if team not in reached), key=order_key)
+    return {"tables": tables, "field": field, "rest": rest, "stats": stats}
+
+
 def build_2027_season_schedule():
     """Return (games, conference_of) where games is a shuffled list of (home_key, away_key)."""
     conf_of, div_of = {}, {}
@@ -645,9 +714,27 @@ def _run_2027_season_game(task):
 def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     global POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN
     POSTSEASON_YEAR_LABEL, POSTSEASON_SEASON_LABEL, POSTSEASON_PLAY_IN = "2027", "2026-27", True
-    games, conf_of = build_2027_season_schedule()
     import random as _random
-    games = [(home, away, order, _random.getrandbits(32)) for order, (home, away) in enumerate(games)]
+    real_schedule = load_2027_real_schedule()
+    conf_of = {key: conference for conference, divisions in SEASON_2027_DIVISIONS.items() for members in divisions.values() for key in members}
+    cup = {"on": False, "orders": set(), "results": {}, "outcomes": {}, "summary": None}
+    if real_schedule is None:
+        generated, conf_of = build_2027_season_schedule()   # no data file: a generated schedule, no Cup
+        before_tasks = [(home, away, order, _random.getrandbits(32)) for order, (home, away) in enumerate(generated)]
+        after_tasks = []
+        total_games = len(before_tasks)
+    else:
+        # The NBA's real order (80 games per team; the last two come from the Cup), with the NBA Cup played in the middle.
+        before_real, after_real = real_schedule
+        before_tasks = [(home, away, order, _random.getrandbits(32)) for order, (home, away, _c) in enumerate(before_real)]
+        cup["orders"] = {order for order, (_h, _a, is_cup) in enumerate(before_real) if is_cup}
+        cup["groups"] = nba_cup_groups([(home, away) for home, away, is_cup in before_real if is_cup])
+        first_after = len(before_real) + CUP_PHASE_GAMES_2027
+        after_tasks = [(home, away, first_after + index, _random.getrandbits(32)) for index, (home, away, _c) in enumerate(after_real)]
+        total_games = len(before_real) + CUP_PHASE_GAMES_2027 + len(after_real)
+        cup["on"] = True
+        cup["next_order"] = len(before_real)
+    games = before_tasks + after_tasks   # the games whose order is known up front
     entries = []
     _name_of_key = {}
     import sim_engine as _replay_engine
@@ -664,7 +751,6 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         _replay_engine.season_replay_register_game(_order, _name_of_key[_home], _name_of_key[_away], _seed)
     player_totals, team_totals = {}, {}
     game_log = SeasonGameLog()
-    total_games = len(games)
     print("\n=== 2027 SEASON (82 games per team, NBA schedule) ===")
     print(f"Quiet-simming {total_games} games. No play-by-play during the regular season.")
     if progress_queue is not None:
@@ -675,6 +761,57 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
 
     import sim_engine as _live_engine
     live_tick = _live_engine.make_season_live_updater(snap)
+
+    def cup_task(home, away):
+        order = cup["next_order"]
+        cup["next_order"] += 1
+        seed = _random.getrandbits(32)
+        _replay_engine.season_replay_register_game(order, _name_of_key[home], _name_of_key[away], seed)
+        return (home, away, order, seed)
+
+    def winner_of(order):
+        return cup["outcomes"][order][0]
+
+    def loser_of(order):
+        _winner, home, away, _margin = cup["outcomes"][order]
+        return away if _winner == home else home
+
+    def cup_batches():
+        """The NBA Cup, played where the schedule leaves its gap (Dec. 4-10). Group play has been played by now; the knockout rounds and
+        the two games each team still needs are set from how the groups finished. Quarterfinals and semifinals count as regular-season
+        games (the winners' two games); the final does not. The eight teams that reach the knockouts are the three group winners and the
+        best second-place team of each conference."""
+        field = nba_cup_field(cup["groups"], list(cup["results"].values()), conf_of, _random)
+        cup["field"] = field
+        seeds = field["field"]
+        quarterfinals = {}
+        first_batch = []
+        for conference in ("East", "West"):
+            one, two, three, four = seeds[conference]
+            quarterfinals[conference] = [cup_task(one, four), cup_task(two, three)]
+            first_batch.extend(quarterfinals[conference])
+        rest = field["rest"]   # the other 22 teams, best group record first: each plays the teams ranked next to it, one at home and one away
+        for index, team in enumerate(rest):
+            first_batch.append(cup_task(team, rest[(index + 1) % len(rest)]))
+        yield first_batch
+        second_batch, semifinals = [], {}
+        for conference in ("East", "West"):
+            (a_home, a_away, a_order, _s1), (b_home, b_away, b_order, _s2) = quarterfinals[conference]
+            semifinals[conference] = cup_task(winner_of(a_order), winner_of(b_order))   # the higher seed (the 1-4 winner) hosts
+            second_batch.append(semifinals[conference])
+            second_batch.append(cup_task(loser_of(a_order), loser_of(b_order)))        # the quarterfinal losers still owe one game
+        yield second_batch
+        east_home, _east_away, east_order, _s = semifinals["East"]
+        west_home, _west_away, west_order, _s = semifinals["West"]
+        yield [(winner_of(east_order), winner_of(west_order), None, _random.getrandbits(32))]   # the final: not a regular-season game
+
+    def season_batches(batch):
+        for start in range(0, len(before_tasks), batch):
+            yield before_tasks[start:start + batch]
+        if cup["on"]:
+            yield from cup_batches()
+        for start in range(0, len(after_tasks), batch):
+            yield after_tasks[start:start + batch]
 
     def parallel_results():
         # Games are independent, so they are spread over worker processes
@@ -688,10 +825,9 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         try:
             # Games go to the workers in small batches so Pause can hold the
             # season between batches instead of the pool racing ahead.
-            batch = workers * 6
-            for start in range(0, len(games), batch):
+            for tasks in season_batches(workers * 6):
                 _engine.hold_season_while_paused(snap)
-                for result in pool.imap_unordered(_run_2027_season_game, games[start:start + batch], chunksize=2):
+                for result in pool.imap_unordered(_run_2027_season_game, tasks, chunksize=2):
                     yield result
         finally:
             pool.terminate()
@@ -700,9 +836,10 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     def sequential_results():
         import time as _time
         import sim_engine as _engine
-        for task in games:
-            _engine.hold_season_while_paused(snap)
-            yield _run_2027_season_game(task)
+        for tasks in season_batches(24):
+            for task in tasks:
+                _engine.hold_season_while_paused(snap)
+                yield _run_2027_season_game(task)
 
     try:
         import os as _os
@@ -710,9 +847,19 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     except Exception:
         use_parallel = False
     results = parallel_results() if use_parallel else sequential_results()
-    for done, (home_key, away_key, team_a, team_b, order) in enumerate(results, start=1):
+    done = 0
+    for home_key, away_key, team_a, team_b, order in results:
         import sim_engine as _pause_engine
         _pause_engine.hold_season_while_paused(snap)
+        winner_key = home_key if team_a.score > team_b.score else away_key
+        if order is None:   # the Cup final: played and recorded, but it is not one of the 82
+            cup["summary"] = {"champion": winner_key, "runner_up": away_key if winner_key == home_key else home_key,
+                              "score": f"{max(team_a.score, team_b.score)}-{min(team_a.score, team_b.score)}", "home": home_key}
+            continue
+        done += 1
+        cup["outcomes"][order] = (winner_key, home_key, away_key, abs(team_a.score - team_b.score))
+        if order in cup["orders"]:
+            cup["results"][order] = (home_key, away_key, team_a.score, team_b.score)
         add_player_to_series_totals(player_totals, team_a)
         add_player_to_series_totals(player_totals, team_b)
         add_team_to_series_totals(team_totals, team_a)
@@ -756,6 +903,15 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     _sim_engine.SEASON_STAR_MINUTES_CAP = None
     sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,
                                      game_extras=game_log.extras, game_meta=game_log.games)
+    if cup.get("summary"):
+        summary = cup["summary"]
+        champion, runner_up = _name_of_key[summary["champion"]], _name_of_key[summary["runner_up"]]
+        text = f"beat {runner_up} {summary['score']} in the final"
+        sections["_season_awards_table"] = [{"award": "NBA Cup", "player": champion, "team": champion, "stats": text}] + list(sections.get("_season_awards_table") or [])
+        sections["_season_awards"] = [("NBA Cup", champion, text)] + list(sections.get("_season_awards") or [])
+        field = cup["field"]["field"]
+        print("\nNBA CUP: " + ", ".join(f"{conference}: " + " / ".join(_name_of_key[t] for t in seeds) for conference, seeds in field.items()))
+        print(f"NBA Cup champion: {champion} ({text}).")
     if section_queue is not None:
         section_queue.put(sections)
 
