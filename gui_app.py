@@ -10935,6 +10935,14 @@ def run_gui_app():
                     gui_refresh_state["heavy_dirty"] = True
             except queue.Empty:
                 pass
+            # A game that just ended always gets its final refresh. This used to depend on the status text still reading "Running...",
+            # which a fast-sim button (Sim, End 1st, Half, Last 2...) replaces, so after one the on-court box and tabs stayed frozen on
+            # the last position drawn, up to a minute of game time before the end, and no longer matched the final score.
+            just_finished = bool(gui_refresh_state.get("was_active")) and not running["active"] and not season_view["quiet"]
+            gui_refresh_state["was_active"] = bool(running["active"])
+            if just_finished:
+                gui_refresh_state["finish_refreshed"] = False
+                gui_refresh_state["force_final"] = True
             if not running["active"] and status_var.get() == "Running...":
                 status_var.set("Finished")
                 pause_button.configure(text="Pause")
@@ -10963,9 +10971,10 @@ def run_gui_app():
                 # Paused: the sim published the season so far, so paint the tab that is open (the others refresh when opened).
                 update_extra_gui_tabs()
                 gui_refresh_state["heavy_dirty"] = False
-            elif status_var.get() == "Finished" and not gui_refresh_state["finish_refreshed"]:
+            elif (status_var.get() == "Finished" or gui_refresh_state.get("force_final")) and not gui_refresh_state["finish_refreshed"]:
                 refresh_live_widgets(include_heavy=True)
                 gui_refresh_state["finish_refreshed"] = True
+                gui_refresh_state["force_final"] = False
         finally:
             root.after(100, poll_queues)
 
