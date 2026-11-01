@@ -717,7 +717,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     import random as _random
     real_schedule = load_2027_real_schedule()
     conf_of = {key: conference for conference, divisions in SEASON_2027_DIVISIONS.items() for members in divisions.values() for key in members}
-    cup = {"on": False, "orders": set(), "results": {}, "outcomes": {}, "summary": None}
+    cup = {"on": False, "orders": set(), "results": {}, "outcomes": {}, "summary": None, "knockout_orders": set(), "knockout_stats": {}}
     if real_schedule is None:
         generated, conf_of = build_2027_season_schedule()   # no data file: a generated schedule, no Cup
         before_tasks = [(home, away, order, _random.getrandbits(32)) for order, (home, away) in enumerate(generated)]
@@ -790,6 +790,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
             one, two, three, four = seeds[conference]
             quarterfinals[conference] = [cup_task(one, four), cup_task(two, three)]
             first_batch.extend(quarterfinals[conference])
+            cup["knockout_orders"].update(task[2] for task in quarterfinals[conference])
         rest = field["rest"]   # the other 22 teams, best group record first: each plays the teams ranked next to it, one at home and one away
         for index, team in enumerate(rest):
             first_batch.append(cup_task(team, rest[(index + 1) % len(rest)]))
@@ -798,6 +799,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         for conference in ("East", "West"):
             (a_home, a_away, a_order, _s1), (b_home, b_away, b_order, _s2) = quarterfinals[conference]
             semifinals[conference] = cup_task(winner_of(a_order), winner_of(b_order))   # the higher seed (the 1-4 winner) hosts
+            cup["knockout_orders"].add(semifinals[conference][2])
             second_batch.append(semifinals[conference])
             second_batch.append(cup_task(loser_of(a_order), loser_of(b_order)))        # the quarterfinal losers still owe one game
         yield second_batch
@@ -852,6 +854,18 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         import sim_engine as _pause_engine
         _pause_engine.hold_season_while_paused(snap)
         winner_key = home_key if team_a.score > team_b.score else away_key
+        if order is None or order in cup["knockout_orders"]:   # Cup MVP: how each player did in the knockout games (final included)
+            for cup_team, cup_key in ((team_a, home_key), (team_b, away_key)):
+                for cup_player in cup_team.roster:
+                    if cup_player.minutes <= 0:
+                        continue
+                    line = cup["knockout_stats"].setdefault(cup_key, {}).setdefault(cup_player.name, {"g": 0, "pts": 0, "reb": 0, "ast": 0, "stl": 0, "blk": 0})
+                    line["g"] += 1
+                    line["pts"] += cup_player.pts
+                    line["reb"] += cup_player.reb
+                    line["ast"] += cup_player.ast
+                    line["stl"] += cup_player.stl
+                    line["blk"] += cup_player.blk_stat
         if order is None:   # the Cup final: played and recorded, but it is not one of the 82
             cup["summary"] = {"champion": winner_key, "runner_up": away_key if winner_key == home_key else home_key,
                               "score": f"{max(team_a.score, team_b.score)}-{min(team_a.score, team_b.score)}", "home": home_key}
@@ -907,11 +921,21 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         summary = cup["summary"]
         champion, runner_up = _name_of_key[summary["champion"]], _name_of_key[summary["runner_up"]]
         text = f"beat {runner_up} {summary['score']} in the final"
-        sections["_season_awards_table"] = [{"award": "NBA Cup", "player": champion, "team": champion, "stats": text}] + list(sections.get("_season_awards_table") or [])
-        sections["_season_awards"] = [("NBA Cup", champion, text)] + list(sections.get("_season_awards") or [])
+        # Cup MVP: the champion's best player over the knockout games (points, rebounds, assists, steals and blocks per game)
+        lines = cup["knockout_stats"].get(summary["champion"], {})
+        mvp_name, mvp_line = max(lines.items(), key=lambda kv: (kv[1]["pts"] + 0.7 * kv[1]["reb"] + kv[1]["ast"] + 1.5 * (kv[1]["stl"] + kv[1]["blk"])) / max(1, kv[1]["g"])) if lines else (None, None)
+        mvp_text = (f"{mvp_line['pts'] / mvp_line['g']:.1f} PPG, {mvp_line['reb'] / mvp_line['g']:.1f} RPG, {mvp_line['ast'] / mvp_line['g']:.1f} APG in the knockout rounds"
+                    if mvp_name else "")
+        cup_rows = [{"award": "NBA Cup", "player": champion, "team": champion, "stats": text}]
+        cup_awards = [("NBA Cup", champion, text)]
+        if mvp_name:
+            cup_rows.append({"award": "NBA Cup MVP", "player": mvp_name, "team": champion, "stats": mvp_text})
+            cup_awards.append(("NBA Cup MVP", mvp_name, f"{champion} | {mvp_text}"))
+        sections["_season_awards_table"] = list(sections.get("_season_awards_table") or []) + cup_rows   # at the bottom, after the season awards
+        sections["_season_awards"] = list(sections.get("_season_awards") or []) + cup_awards
         field = cup["field"]["field"]
         print("\nNBA CUP: " + ", ".join(f"{conference}: " + " / ".join(_name_of_key[t] for t in seeds) for conference, seeds in field.items()))
-        print(f"NBA Cup champion: {champion} ({text}).")
+        print(f"NBA Cup champion: {champion} ({text})." + (f" MVP: {mvp_name} ({mvp_text})." if mvp_name else ""))
     if section_queue is not None:
         section_queue.put(sections)
 
