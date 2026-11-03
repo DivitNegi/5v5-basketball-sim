@@ -2633,3 +2633,24 @@ def make_wizards_2021() -> Team:
                stamina=0.56, archetype="rim_protector", height=82),
     ]
     return _real_team("2021 Washington Wizards", players, (36.4, 35.8, 31.5, 8.8, 23.3, 9.0, 21.9, 10.7, 6.0, 25.7, 21.0, 9.9))
+
+
+# ---- real assist rates: every 2021 player is paced toward his real assists per minute (see paced_assist_factor in sim_engine.py)
+import re as _re
+from teams.real_assist_rates_2021 import REAL_ASSIST_RATE_2021
+
+
+def _with_real_assist_rates(make):
+    def factory():
+        team = make()
+        for player in team.roster:
+            rate = REAL_ASSIST_RATE_2021.get(team.name, {}).get(player.name)
+            if rate is not None:
+                player.target_ast_per_min = rate
+        return team
+    factory.__name__ = factory.__qualname__ = make.__name__
+    return factory
+
+
+for _name in [n for n in list(globals()) if _re.fullmatch(r"make_\w+_2021", n)]:
+    globals()[_name] = _with_real_assist_rates(globals()[_name])
