@@ -17595,6 +17595,7 @@ SYSTEM_PLAYMAKERS = {
     "2027 Miami Heat": "Davion Mitchell",
     "2027 Sacramento Kings": "Ben Simmons",
     "2027 Philadelphia 76ers": "LeBron James",
+    "2021 Philadelphia 76ers": "Ben Simmons",
 }
 
 
@@ -17606,7 +17607,10 @@ WARRIORS_2018_ASSIST_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.65}   # w
 NUGGETS_2024_ASSIST_BIAS = {"Nikola Jokić": 2.0, "Jamal Murray": 0.75}
 SIXERS_2027_MAXEY_HANDLER_SHARE = 0.60   # share of possessions Maxey brings the ball up while on the floor
 NUGGETS_2024_HANDLER_SHARE = 0.70     # share of possessions Jokic initiates while on the floor
-TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS}
+# 2020-21 Sixers: Simmons ran the offense at 6.9 assists a night; the generic split left him near 4.
+SIXERS_2021_ASSIST_BIAS = {"Ben Simmons": 2.4}
+TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS,
+                    "2021 Philadelphia 76ers": SIXERS_2021_ASSIST_BIAS}
 
 
 def choose_ballhandler(team: Team) -> Player:
