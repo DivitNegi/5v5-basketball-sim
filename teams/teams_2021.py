@@ -5,24 +5,24 @@ from sim_engine import *
 def make_nets_2021() -> Team:
     players = [
         Player("James Harden", "PG",
-               0.80, 0.10, 0.25, 0.05, 0.25, 0.80,
+               0.68, 0.10, 0.40, 0.05, 0.25, 0.80,
                0.88, 0.86, 0.86, 0.78, 0.86,
-               0.40, 0.99, 0.90,
-               0.49, 0.54, 0.37, 0.63, 0.990, 0.867,
+               0.50, 0.99, 0.90,
+               0.49, 0.54, 0.37, 0.63, 0.99, 0.867,
                0.73, 0.65, stamina=0.75, clutchness=0.40, shot_iq = .70),
 
         Player("Kyrie Irving", "SG",
-               0.50, 0.40, 0.25, 0.50,   0.02, 0.900,
+               0.42, 0.40, 0.35, 0.50,   0.02, 0.900,
                0.92, 0.99, 0.99, 0.25, 0.90,
                0.30, 0.65, 0.99,
-               0.53, 0.51, 0.43, 0.51, 0.333, 0.733,
+               0.53, 0.51, 0.43, 0.51, 0.43, 0.733,
                0.67, 0.32, stamina=0.85, clutchness = .99, iso_tendency= .99, shot_iq = .99),
 
         Player("Kevin Durant", "SF",
-               0.38, 0.38, 0.18, 0.06,   0.30, 0.769,
+               0.38, 0.38, 0.28, 0.06,   0.30, 0.769,
                0.90, 0.99, 0.99, 0.86, 0.88,
                0.29, 0.72, 0.90,   
-               0.39, 0.80, 0.34, 0.63, 0.700, 0.733,
+               0.39, 0.80, 0.34, 0.63, 0.88, 0.733,
                0.78, 0.73, stamina=0.83),
 
         Player("Joe Harris", "SF",
@@ -74,6 +74,30 @@ def make_nets_2021() -> Team:
                0.65, 0.84, 0.85, 0.99, 0.733, 0.867,
                0.67, 0.86, stamina=0.8),
     ]
+    # Shot roles from Basketball-Reference's 2020-21 per-game table (Harden 16.6 FGA / 7.3 3PA / 7.3 FTA in 36.6 min, Kyrie 20.1 / 7.0 / 4.0 in 34.9, Durant 17.2 / 5.4 / 6.8 in 33.1).
+    # The paced attempts are tuned until the games average the table; the other seven keep their rotation minutes, scaled to fit.
+    attempt_roles = {
+        "James Harden": (24.0, 27.0),
+        "Kyrie Irving": (19.5, 22.5),
+        "Kevin Durant": (17.6, 20.5),
+    }
+    pinned_minutes = {
+        "James Harden": (36.6, 34.4),
+        "Kyrie Irving": (34.9, 33.0),
+        "Kevin Durant": (33.1, 30.3),
+        "Joe Harris": (27.6, 25.8),
+        "DeAndre Jordan": (21.9, 22.3),
+        "Jeff Green": (20.4, 22.0),
+        "Bruce Brown": (19.5, 21.8),
+        "Blake Griffin": (18.9, 16.9),
+        "Landry Shamet": (13.8, 16.2),
+        "Nicolas Claxton": (13.3, 15.5),
+    }
+    for player in players:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
     t = Team("2021 Brooklyn Nets", players)
     t.init_lineup()
     return t
