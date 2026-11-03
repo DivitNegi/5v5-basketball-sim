@@ -2562,7 +2562,7 @@ def make_wizards_2021() -> Team:
                0.71, 0.51,
                stamina=0.87, archetype="isolation_scorer", height=76),
         Player("Rui Hachimura", "PF",
-               0.21, 0.33, 0.24, 0.10, 0.25, 0.36,
+               0.12, 0.33, 0.24, 0.10, 0.25, 0.36,
                0.85, 0.87, 0.94, 0.89, 0.77,
                0.21, 0.50, 0.37,
                0.48, 0.07, 0.44, 0.63, 0.58, 0.43,
@@ -2576,14 +2576,14 @@ def make_wizards_2021() -> Team:
                0.57, 0.82,
                stamina=0.55, archetype="rim_protector", height=84),
         Player("Deni Avdija", "SF",
-               0.45, 0.08, 0.17, 0.05, 0.11, 0.07,
+               0.58, 0.08, 0.17, 0.05, 0.11, 0.07,
                0.74, 0.81, 0.91, 0.73, 0.69,
                0.06, 0.47, 0.48,
                0.34, 0.41, 0.43, 0.81, 0.43, 0.68,
                0.74, 0.63,
                stamina=0.66, archetype="three_and_d", height=80),
         Player("Garrison Mathews", "SG",
-               0.49, 0.07, 0.05, 0.02, 0.03, 0.03,
+               0.70, 0.07, 0.05, 0.02, 0.03, 0.03,
                0.92, 0.88, 0.86, 0.45, 0.81,
                0.02, 0.10, 0.61,
                0.46, 0.09, 0.36, 0.44, 0.81, 0.64,
@@ -2611,7 +2611,7 @@ def make_wizards_2021() -> Team:
                0.73, 0.61,
                stamina=0.55, archetype="three_and_d", height=80),
         Player("Dāvis Bertāns", "PF",
-               0.57, 0.03, 0.04, 0.04, 0.04, 0.17,
+               0.88, 0.03, 0.04, 0.04, 0.04, 0.17,
                0.89, 0.64, 0.71, 0.46, 0.81,
                0.10, 0.46, 0.36,
                0.46, 0.15, 0.29, 0.42, 0.57, 0.58,
@@ -2632,6 +2632,40 @@ def make_wizards_2021() -> Team:
                0.63, 0.90,
                stamina=0.56, archetype="rim_protector", height=82),
     ]
+    # Shot roles from Basketball-Reference's 2020-21 per-game table (shots, three-point attempts and free throws per minute; backups scaled to this twelve-man roster's minutes).
+    # The paced attempts are tuned until the games average the table. Minutes are the roster's real minutes, pinned (intended, steered).
+    attempt_roles = {
+        "Russell Westbrook": (23.0, 26.0),
+        "Bradley Beal": (25.5, 28.5),
+        "Rui Hachimura": (10.4, 13.4),
+        "Alex Len": (3.9, 6.9),
+        "Deni Avdija": (4.8, 7.8),
+        "Garrison Mathews": (3.1, 6.1),
+        "Raul Neto": (6.5, 9.5),
+        "Robin Lopez": (5.0, 8.0),
+        "Dāvis Bertāns": (7.0, 10.0),
+        "Ish Smith": (5.6, 8.6),
+        "Daniel Gafford": (4.9, 7.9),
+    }
+    pinned_minutes = {
+        "Russell Westbrook": (36.4, 35.1),
+        "Bradley Beal": (35.8, 34.4),
+        "Rui Hachimura": (31.5, 29.1),
+        "Alex Len": (13.1, 8.5),
+        "Deni Avdija": (19.3, 18.3),
+        "Garrison Mathews": (13.4, 15.4),
+        "Raul Neto": (18.1, 17.4),
+        "Robin Lopez": (15.8, 17.6),
+        "Dāvis Bertāns": (21.3, 24.1),
+        "Ish Smith": (17.4, 19.1),
+        "Daniel Gafford": (14.6, 16.5),
+        "Isaac Bonga": (3.3, 3.3),
+    }
+    for player in players:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
     return _real_team("2021 Washington Wizards", players, (36.4, 35.8, 31.5, 8.8, 23.3, 9.0, 21.9, 10.7, 6.0, 25.7, 21.0, 9.9))
 
 
