@@ -8,26 +8,26 @@ def make_nets_2021() -> Team:
                0.68, 0.10, 0.40, 0.05, 0.25, 0.80,
                0.88, 0.86, 0.86, 0.78, 0.86,
                0.50, 0.99, 0.90,
-               0.49, 0.54, 0.37, 0.63, 0.99, 0.867,
+               0.49, 0.54, 0.37, 0.63, 0.990, 0.867,
                0.73, 0.65, stamina=0.75, clutchness=0.40, shot_iq = .70),
 
         Player("Kyrie Irving", "SG",
                0.42, 0.40, 0.35, 0.50,   0.02, 0.900,
                0.92, 0.99, 0.99, 0.25, 0.90,
-               0.30, 0.65, 0.99,
+               0.46, 0.65, 0.99,
                0.53, 0.51, 0.43, 0.51, 0.43, 0.733,
                0.67, 0.32, stamina=0.85, clutchness = .99, iso_tendency= .99, shot_iq = .99),
 
         Player("Kevin Durant", "SF",
                0.38, 0.38, 0.28, 0.06,   0.30, 0.769,
-               0.90, 0.99, 0.99, 0.86, 0.88,
+               0.95, 0.99, 0.99, 0.86, 0.88,
                0.36, 0.72, 0.90,   
                0.39, 0.80, 0.34, 0.63, 0.88, 0.733,
                0.78, 0.73, stamina=0.83),
 
         Player("Joe Harris", "SF",
-               0.60, 0.25, 0.10, 0.05,   0.05, 0.195,
-               0.92, 0.86, 0.80, 0.60, 0.84,
+               0.99, 0.25, 0.10, 0.05,   0.05, 0.195,
+               0.99, 0.86, 0.80, 0.60, 0.84,
                0.09, 0.50, 0.50,
                0.76, 0.55, 0.53, 0.69, 0.533, 0.600,
                0.81, 0.70, stamina=0.78),
@@ -1482,11 +1482,11 @@ def make_lakers_2021() -> Team:
                0.76, 0.50,
                stamina=0.81, archetype="playmaker", height=73),
         Player("LeBron James", "PG",
-               0.50, 0.22, 0.29, 0.02, 0.17, 0.77,
+               0.50, 0.22, 0.29, 0.02, 0.17, 0.87,
                0.77, 0.79, 0.99, 0.89, 0.70,
                0.44, 0.94, 0.88,
-               0.43, 0.39, 0.55, 0.97, 0.68, 0.33,
-               0.85, 0.72,
+               0.73, 0.73, 0.55, 0.97, 0.68, 0.33,
+               0.92, 0.82,
                stamina=0.83, archetype="floor_general", height=81),
         Player("Marc Gasol", "C",
                0.32, 0.14, 0.04, 0.04, 0.06, 0.06,
@@ -2239,7 +2239,7 @@ def make_sixers_2021() -> Team:
         Player("Ben Simmons", "PG",
                0.02, 0.07, 0.50, 0.02, 0.40, 0.48,
                0.32, 0.59, 0.92, 0.82, 0.60,
-               0.37, 0.95, 0.83,
+               0.50, 0.95, 0.83,
                0.58, 0.46, 0.63, 0.79, 0.89, 0.55,
                0.95, 0.77,
                stamina=0.81, archetype="floor_general", height=82),
@@ -2702,24 +2702,3 @@ def make_wizards_2021() -> Team:
             player.target_fga_precision = 1.0
         player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
     return _real_team("2021 Washington Wizards", players, (36.4, 35.8, 31.5, 8.8, 23.3, 9.0, 21.9, 10.7, 6.0, 25.7, 21.0, 9.9))
-
-
-# ---- real assist rates: every 2021 player is paced toward his real assists per minute (see paced_assist_factor in sim_engine.py)
-import re as _re
-from teams.real_assist_rates_2021 import REAL_ASSIST_RATE_2021
-
-
-def _with_real_assist_rates(make):
-    def factory():
-        team = make()
-        for player in team.roster:
-            rate = REAL_ASSIST_RATE_2021.get(team.name, {}).get(player.name)
-            if rate is not None:
-                player.target_ast_per_min = rate
-        return team
-    factory.__name__ = factory.__qualname__ = make.__name__
-    return factory
-
-
-for _name in [n for n in list(globals()) if _re.fullmatch(r"make_\w+_2021", n)]:
-    globals()[_name] = _with_real_assist_rates(globals()[_name])
