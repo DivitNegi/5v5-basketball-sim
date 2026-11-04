@@ -1572,7 +1572,7 @@ def make_grizzlies_2021() -> Team:
                0.73, 0.54,
                stamina=0.77, archetype="pullup_shooter", height=79),
         Player("Ja Morant", "PG",
-               0.33, 0.15, 0.34, 0.02, 0.14, 0.61,
+               0.26, 0.15, 0.34, 0.02, 0.14, 0.61,
                0.74, 0.78, 0.81, 0.77, 0.74,
                0.37, 0.82, 0.85,
                0.59, 0.40, 0.54, 0.61, 0.78, 0.31,
@@ -1600,21 +1600,21 @@ def make_grizzlies_2021() -> Team:
                0.73, 0.56,
                stamina=0.64, archetype="three_and_d", height=78),
         Player("Brandon Clarke", "PF",
-               0.15, 0.15, 0.41, 0.10, 0.33, 0.38,
+               0.25, 0.15, 0.41, 0.10, 0.33, 0.38,
                0.48, 0.89, 0.92, 0.93, 0.67,
                0.22, 0.57, 0.38,
                0.74, 0.77, 0.63, 0.69, 0.56, 0.39,
                0.71, 0.71,
                stamina=0.67, archetype="slasher", height=80),
         Player("Xavier Tillman Sr.", "PF",
-               0.22, 0.18, 0.35, 0.10, 0.24, 0.10,
+               0.35, 0.18, 0.35, 0.10, 0.24, 0.10,
                0.58, 0.92, 0.92, 0.93, 0.69,
                0.08, 0.57, 0.37,
                0.69, 0.79, 0.61, 0.69, 0.48, 0.67,
                0.70, 0.69,
                stamina=0.57, archetype="slasher", height=80),
         Player("Tyus Jones", "PG",
-               0.39, 0.30, 0.16, 0.02, 0.02, 0.52,
+               0.46, 0.30, 0.16, 0.02, 0.02, 0.52,
                0.67, 0.86, 0.76, 0.38, 0.79,
                0.32, 0.83, 0.81,
                0.67, 0.07, 0.45, 0.62, 0.36, 0.30,
@@ -1628,20 +1628,55 @@ def make_grizzlies_2021() -> Team:
                0.84, 0.63,
                stamina=0.60, archetype="three_and_d", height=74),
         Player("Justise Winslow", "SF",
-               0.26, 0.25, 0.25, 0.05, 0.13, 0.49,
+               0.40, 0.25, 0.25, 0.05, 0.13, 0.49,
                0.51, 0.68, 0.90, 0.75, 0.68,
                0.27, 0.59, 0.52,
                0.44, 0.58, 0.46, 0.69, 0.46, 0.57,
                0.74, 0.64,
                stamina=0.59, archetype="balanced", height=78),
         Player("John Konchar", "SG",
-               0.41, 0.07, 0.33, 0.02, 0.17, 0.14,
+               0.60, 0.07, 0.33, 0.02, 0.17, 0.14,
                0.73, 0.92, 0.92, 0.72, 0.75,
                0.14, 0.60, 0.63,
                0.66, 0.43, 0.65, 0.74, 0.55, 0.44,
                0.84, 0.63,
                stamina=0.55, archetype="lockdown", height=77),
     ]
+    # Shot roles from Basketball-Reference's 2020-21 per-game table (shots, three-point attempts and free throws per minute; backups scaled to this roster's minutes).
+    # The paced attempts are tuned until the games average the table. Minutes are the roster's real minutes, pinned (intended, steered).
+    attempt_roles = {
+        "Kyle Anderson": (9.5, 12.5),
+        "Dillon Brooks": (15.4, 18.4),
+        "Ja Morant": (17.5, 20.5),
+        "Jonas Valančiūnas": (12.0, 15.0),
+        "Grayson Allen": (8.3, 11.3),
+        "Desmond Bane": (7.3, 10.3),
+        "Brandon Clarke": (8.4, 11.4),
+        "Xavier Tillman Sr.": (2.9, 5.9),
+        "Tyus Jones": (3.3, 6.3),
+        "De'Anthony Melton": (4.3, 7.3),
+        "Justise Winslow": (4.6, 7.6),
+        "John Konchar": (1.8, 4.8),
+    }
+    pinned_minutes = {
+        "Kyle Anderson": (27.3, 24.3),
+        "Dillon Brooks": (29.8, 28.4),
+        "Ja Morant": (32.6, 32.6),
+        "Jonas Valančiūnas": (28.3, 27.1),
+        "Grayson Allen": (25.2, 23.8),
+        "Desmond Bane": (22.3, 24.5),
+        "Brandon Clarke": (24.0, 25.4),
+        "Xavier Tillman Sr.": (10.5, 10.2),
+        "Tyus Jones": (9.9, 9.6),
+        "De'Anthony Melton": (11.4, 12.1),
+        "Justise Winslow": (11.1, 12.8),
+        "John Konchar": (7.6, 7.0),
+    }
+    for player in players:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
     return _real_team("2021 Memphis Grizzlies", players, (27.3, 29.8, 32.6, 28.3, 25.2, 22.3, 24.0, 10.5, 9.9, 11.4, 11.1, 7.6))
 
 
