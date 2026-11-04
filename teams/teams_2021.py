@@ -21,7 +21,7 @@ def make_nets_2021() -> Team:
         Player("Kevin Durant", "SF",
                0.38, 0.38, 0.28, 0.06,   0.30, 0.769,
                0.90, 0.99, 0.99, 0.86, 0.88,
-               0.29, 0.72, 0.90,   
+               0.36, 0.72, 0.90,   
                0.39, 0.80, 0.34, 0.63, 0.88, 0.733,
                0.78, 0.73, stamina=0.83),
 
@@ -79,7 +79,7 @@ def make_nets_2021() -> Team:
     attempt_roles = {
         "James Harden": (24.0, 27.0),
         "Kyrie Irving": (19.5, 22.5),
-        "Kevin Durant": (17.6, 20.5),
+        "Kevin Durant": (26.0, 29.0),
     }
     pinned_minutes = {
         "James Harden": (36.6, 34.4),
