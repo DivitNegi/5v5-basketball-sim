@@ -112,7 +112,7 @@ def make_warriors_2022() -> Team:
         Player("Draymond Green", "PF",
                0.18, 0.24, 0.30, 0.28, 0.22, 0.190,
                0.64, 0.72, 0.84, 0.70, 0.66,
-               0.12, 0.88, 0.82,
+               0.18, 0.88, 0.82,
                0.79, 0.61, 0.41, 0.74, 0.600, 0.990,
                0.85, 0.88,
                clutchness=0.78, shot_iq = .40, stamina=0.9),
@@ -785,7 +785,7 @@ def make_nuggets_2022() -> Team:
         Player("Nikola Jokić", "C",
                0.27, 0.13, 0.09, 0.50, 0.08, 0.41,
                0.78, 0.92, 0.95, 0.93, 0.80,
-               0.24, 0.95, 0.39,
+               0.34, 0.95, 0.39,
                0.70, 0.67, 0.97, 0.98, 0.74, 0.49,
                0.92, 0.92,
                stamina=0.83, archetype="post_hub", height=83),
@@ -1090,7 +1090,7 @@ def make_pacers_2022() -> Team:
         Player("Tyrese Haliburton", "PG",
                0.33, 0.24, 0.17, 0.02, 0.12, 0.40,
                0.89, 0.84, 0.88, 0.78, 0.86,
-               0.29, 0.95, 0.85,
+               0.36, 0.95, 0.85,
                0.63, 0.57, 0.47, 0.61, 0.61, 0.36,
                0.75, 0.55,
                stamina=0.88, archetype="floor_general", height=77),
@@ -2059,7 +2059,7 @@ def make_suns_2022() -> Team:
         Player("Chris Paul", "PG",
                0.42, 0.54, 0.06, 0.02, 0.02, 0.43,
                0.76, 0.95, 0.90, 0.70, 0.85,
-               0.32, 0.95, 0.87,
+               0.40, 0.95, 0.87,
                0.86, 0.46, 0.41, 0.68, 0.62, 0.42,
                0.92, 0.86,
                stamina=0.82, archetype="floor_general", height=72),
@@ -2232,7 +2232,7 @@ def make_kings_2022() -> Team:
         Player("Tyrese Haliburton", "SG",
                0.32, 0.26, 0.13, 0.02, 0.07, 0.34,
                0.92, 0.81, 0.79, 0.59, 0.84,
-               0.24, 0.90, 0.71,
+               0.32, 0.90, 0.71,
                0.62, 0.59, 0.37, 0.47, 0.48, 0.30,
                0.90, 0.68,
                stamina=0.85, archetype="playmaker", height=77),
@@ -2661,25 +2661,3 @@ def make_wizards_2022() -> Team:
                stamina=0.64, archetype="floor_general", height=72),
     ]
     return _real_team("2022 Washington Wizards", players, (30.2, 33.4, 7.7, 30.2, 36.0, 23.4, 7.5, 6.2, 8.6, 24.2, 24.3, 8.4))
-
-
-# ---- real assists per minute (Basketball-Reference 2021-22) for the 25 teams built from real data ----
-import re as _re
-from teams.real_assist_rates_2022 import REAL_ASSIST_RATE_2022
-
-
-def _with_real_assist_rates(make):
-    def factory():
-        team = make()
-        for player in team.roster:
-            rate = REAL_ASSIST_RATE_2022.get(team.name, {}).get(player.name)
-            if rate is not None:
-                player.target_ast_per_min = rate
-        return team
-    factory.__name__ = factory.__qualname__ = make.__name__
-    return factory
-
-
-for _name in [n for n in list(globals()) if _re.fullmatch(r"make_\w+_2022", n)]:
-    globals()[_name] = _with_real_assist_rates(globals()[_name])
-

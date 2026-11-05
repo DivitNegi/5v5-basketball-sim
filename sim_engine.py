@@ -15283,9 +15283,6 @@ def _assist_load_factor_core(player: Player, team: Team) -> float:
         if player.ast < 13:
             return 0.78
         return 0.54
-    paced = paced_assist_factor(player)
-    if paced is not None:
-        return paced
     team_assists = sum(p.ast for p in team.roster)
     if team_assists < 6:
         return 1.0
@@ -15313,44 +15310,7 @@ def assist_distribution_multiplier(player: Player, team: Team) -> float:
     return max(0.42, 1.0 + gap * 1.8)
 
 
-def paced_assist_factor(player: Player):
-    """Historical rosters carry each player's real assists per minute (`target_ast_per_min`). His passing is paced toward that rate over the
-    minutes he has played instead of the fixed in-game assist ceilings below: behind the pace his passes are credited more often, ahead of it less."""
-    rate = getattr(player, "target_ast_per_min", None)
-    if rate is None:
-        return None
-    gap = rate * player.minutes / 60.0 - player.ast
-    return max(0.30, min(3.5, 1.0 + 0.60 * gap))
-
-
-def assist_pace_gap(player: Player) -> float:
-    """Assists a player with a real assist rate is behind (positive) or ahead of (negative) the pace for the minutes he has played."""
-    rate = getattr(player, "target_ast_per_min", None)
-    if rate is None:
-        return 0.0
-    return rate * player.minutes / 60.0 - player.ast
-
-
-def pace_assist_credit(off: Team, shooter: Player, credited_passer):
-    """A made basket whose pass the engine did not credit (or credited to a player who is on his own pace) can go to the teammate on the floor
-    who is furthest behind his real assist pace, so a team's real passers reach their real assists even when the play-by-play gave the last
-    touch to someone else."""
-    if credited_passer is not None and assist_pace_gap(credited_passer) > 0.0:
-        return None
-    behind = [p for p in off.on_floor if p is not shooter and p is not credited_passer and getattr(p, "target_ast_per_min", None) is not None
-              and assist_pace_gap(p) > 0.4]
-    if not behind:
-        return None
-    best = max(behind, key=assist_pace_gap)
-    if random.random() < min(0.75, 0.22 * assist_pace_gap(best)):
-        return best
-    return None
-
-
 def assist_volume_factor(player: Player) -> float:
-    paced = paced_assist_factor(player)
-    if paced is not None:
-        return paced
     if player.name == "Rajon Rondo":
         if player.ast >= 15:
             return 0.62
@@ -17647,7 +17607,10 @@ WARRIORS_2018_ASSIST_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.65}   # w
 NUGGETS_2024_ASSIST_BIAS = {"Nikola Jokić": 2.0, "Jamal Murray": 0.75}
 SIXERS_2027_MAXEY_HANDLER_SHARE = 0.60   # share of possessions Maxey brings the ball up while on the floor
 NUGGETS_2024_HANDLER_SHARE = 0.70     # share of possessions Jokic initiates while on the floor
-TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS}
+# 2020-21 Sixers: Simmons ran the offense at 6.9 assists a night; the generic split left him near 4.
+SIXERS_2021_ASSIST_BIAS = {"Ben Simmons": 2.4}
+TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS,
+                    "2021 Philadelphia 76ers": SIXERS_2021_ASSIST_BIAS}
 
 
 def choose_ballhandler(team: Team) -> Player:
@@ -18064,8 +18027,6 @@ def _assist_credit_chance_core(passer: Player, shooter: Player, shot_type: str,
         base -= 0.30
     base *= assist_volume_factor(passer)
     base *= assist_phase_relief(passer)
-    if getattr(passer, "target_ast_per_min", None) is not None:
-        return max(0.15, min(0.97, base))
     if passer.name == "Rajon Rondo" and passer.ast < 13:
         base *= 1.06
     if pnr_result in ("dump_off", "dump_off_elite_help") and shot_type in ("rim", "dunk"):
@@ -20622,16 +20583,8 @@ def simulate_possession(off: Team, dff: Team,
                 and random.random() < 0.55
             ):
                 credited_passer = possession_creator
-            paced_passer = pace_assist_credit(off, shooter, credited_passer)
-            if paced_passer is not None:
-                credited_passer = paced_passer
             record_assist(credited_passer, off, pts)
             assist_recorded = True
-        else:
-            paced_passer = pace_assist_credit(off, shooter, None)
-            if paced_passer is not None:
-                record_assist(paced_passer, off, pts)
-                assist_recorded = True
 
         # LOW-CHANCE AND-ONE ON MADE SHOTS
         and_one_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE * 0.58 * foul_trouble_foul_factor(defender)
