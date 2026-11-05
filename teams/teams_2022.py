@@ -1115,22 +1115,38 @@ def make_pacers_2022() -> Team:
                0.23, 0.26, 0.55, 0.64, 0.41, 0.58,
                0.74, 0.58,
                stamina=0.61, archetype="balanced", height=77),
-        Player("Duane Washington Jr.", "PG",
-               0.41, 0.14, 0.20, 0.02, 0.06, 0.10,
-               0.89, 0.77, 0.82, 0.57, 0.73,
-               0.03, 0.16, 0.78,
-               0.22, 0.05, 0.24, 0.34, 0.44, 0.45,
-               0.64, 0.44,
-               stamina=0.61, archetype="movement_shooter", height=74),
-        Player("Lance Stephenson", "PG",
-               0.28, 0.33, 0.22, 0.02, 0.03, 0.29,
-               0.64, 0.82, 0.85, 0.45, 0.76,
-               0.18, 0.80, 0.84,
-               0.33, 0.06, 0.36, 0.55, 0.60, 0.72,
-               0.69, 0.54,
-               stamina=0.58, archetype="floor_general", height=78),
+        Player("Jalen Smith", "PF",
+               0.39, 0.10, 0.31, 0.10, 0.36, 0.31,
+               0.65, 0.80, 0.86, 0.90, 0.74,
+               0.17, 0.22, 0.37,
+               0.34, 0.66, 0.76, 0.85, 0.57, 0.51,
+               0.47, 0.57,
+               stamina=0.68, archetype="slasher", height=80),
+        Player("Goga Bitadze", "C",
+               0.32, 0.04, 0.16, 0.07, 0.29, 0.23,
+               0.36, 0.60, 0.91, 0.79, 0.70,
+               0.17, 0.36, 0.27,
+               0.50, 0.78, 0.88, 0.58, 0.77, 0.82,
+               0.46, 0.63,
+               stamina=0.55, archetype="rim_protector", height=83),
     ]
-    return _real_team("2022 Indiana Pacers", players, (24.5, 20.8, 20.4, 22.0, 19.8, 23.7, 25.5, 25.2, 16.5, 14.3, 14.3, 13.1))
+    pinned_minutes = {
+        "Domantas Sabonis": (30.0, 27.5),
+        "Myles Turner": (24.0, 20.5),
+        "Justin Holiday": (18.0, 17.0),
+        "Caris LeVert": (21.4, 20.5),
+        "Chris Duarte": (22.2, 21.2),
+        "Malcolm Brogdon": (23.1, 24.6),
+        "Tyrese Haliburton": (24.8, 24.0),
+        "Oshae Brissett": (16.1, 17.8),
+        "Torrey Craig": (13.9, 15.4),
+        "Jalen Smith": (12.0, 12.9),
+        "Goga Bitadze": (10.0, 11.3),
+        "Buddy Hield": (24.5, 24.2),
+    }
+    for player in players:   # pinned: the engine otherwise plays its best-rated player 40+ minutes
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Indiana Pacers", players, (30.0, 24.0, 18.0, 21.4, 22.2, 23.1, 24.8, 24.5, 16.1, 13.9, 12.0, 10.0))
 
 
 def make_clippers_2022() -> Team:
