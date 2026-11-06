@@ -24613,13 +24613,25 @@ def build_season_sections(entries: List[Dict],
         # award score, a 25-win team's star ~-2, so standings break close races.
         team_win_pct = {row["team"]: row["pct"] for row in standings}
 
-        def standings_bonus(team_name: str, weight: float) -> float:
-            return (team_win_pct.get(team_name, 0.5) - 0.5) * weight
+        # The standings credit goes to ONE player per team (the team's best by award score); his teammates only get a small share of it,
+        # so a good team's second and third stars are not carried up the MVP / All-NBA ballots by the same win total.
+        TEAMMATE_STANDINGS_SHARE = 0.15
+        team_lead: Dict = {}
+        for _it in all_players:
+            _s = award_score(_it)
+            if _it[0] not in team_lead or _s > team_lead[_it[0]][0]:
+                team_lead[_it[0]] = (_s, _it[1])
+
+        def standings_bonus(team_name: str, weight: float, item=None) -> float:
+            bonus = (team_win_pct.get(team_name, 0.5) - 0.5) * weight
+            if item is not None and team_lead.get(team_name, (0.0, item[1]))[1] != item[1]:
+                return bonus * TEAMMATE_STANDINGS_SHARE
+            return bonus
 
         # MVP comes from the playoff teams (top 8 in a conference), same pool as All-NBA.
         mvp_pool = [item for item in all_players if item[0] in all_nba_eligible_teams] or all_players
         def mvp_key(item):
-            return award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0)
+            return award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05 + standings_bonus(item[0], 10.0, item)
 
         mvp = max(mvp_pool, key=mvp_key)
         scorer = max(all_players, key=lambda item: item[2].get("pts", 0) / max(1, item[2].get("games", 1)))
@@ -24645,7 +24657,7 @@ def build_season_sections(entries: List[Dict],
             return {"_season_races": season_races}
         all_nba = sorted(
             [item for item in all_players if item[0] in all_nba_eligible_teams],
-            key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0),
+            key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.03 + standings_bonus(item[0], 8.0, item),
             reverse=True,
         )
         # The MVP is always on the All-NBA First Team (as its first name).
