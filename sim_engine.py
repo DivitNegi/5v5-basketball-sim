@@ -12733,6 +12733,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     p *= fatigue_offense_factor(shooter)
     p *= offensive_scheme_multiplier(team, opponent, shot_type, shooter)
     p *= defensive_scheme_multiplier(opponent, shot_type, shooter)
+    p *= getattr(opponent, "defense_edge", 1.0)   # historical teams: a team-level defence modifier (below 1 = the opponent shoots worse), so a real team defence is not forced into its players' own ratings
     p *= bench_chemistry_multiplier(team, shooter)
     p *= lineup_chemistry_multiplier(team, shooter, shot_type)
     quality_mult = getattr(shooter, "shot_quality_mult", 1.0)
