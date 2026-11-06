@@ -3273,6 +3273,7 @@ class Player:
     clutchness: float = 0.50
     secondary_positions: Tuple[str, ...] = field(default_factory=tuple, compare=False, hash=False)
     badges: Tuple[str, ...] = field(default_factory=tuple, compare=False, hash=False)
+    rookie: bool = field(default=False, compare=False, hash=False)   # in his first NBA season that year: eligible for Rookie of the Year / All-Rookie
     height: int = field(default=0, compare=False, hash=False)  # inches
     speed: float = field(default=0.0, compare=False, hash=False)
     # Conditioning / endurance (0-1): how well this player holds up as
@@ -24854,8 +24855,17 @@ def build_season_sections(entries: List[Dict],
             except Exception:
                 pass
 
-        # Rookie of the Year / All-Rookie teams only make sense for the 2026 class in the 2027 season.
-        rookies = [item for item in all_players if rookie_name_key(item[1]) in ROOKIE_KEYS_2026] if include_rookies else []
+        # Rookie of the Year / All-Rookie teams: the players marked rookie=True in that season's team file (first NBA season that year),
+        # plus the 2026 draft class in the 2027 season.
+        def _is_rookie(item) -> bool:
+            _pl = player_lookup.get((item[0], item[1]))
+            if _pl is not None and getattr(_pl, "rookie", False):
+                return True
+            return bool(include_rookies and rookie_name_key(item[1]) in ROOKIE_KEYS_2026)
+        # a rookie who barely played (a few games, a few minutes) is not in the running
+        rookies = [item for item in all_players if _is_rookie(item)
+                   and item[2].get("games", 0) >= max(1, int(0.4 * team_gp.get(item[0], 0)))
+                   and item[2].get("minutes", 0) / 60 / max(1, item[2].get("games", 1)) >= 12]
         all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams
         if rookies:
             roy = max(rookies, key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
