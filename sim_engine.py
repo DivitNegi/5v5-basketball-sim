@@ -5025,7 +5025,7 @@ def coach_profile_name(team: Team) -> str:
         return "triangle"
     if name == "1987 Los Angeles Lakers":
         return "showtime"
-    if name in ("1994 Houston Rockets", "2023 Denver Nuggets", "2024 Denver Nuggets", "2027 Denver Nuggets", "2026 Houston Rockets"):
+    if name in ("1994 Houston Rockets", "2023 Denver Nuggets", "2024 Denver Nuggets", "2026 Denver Nuggets", "2027 Denver Nuggets", "2026 Houston Rockets"):
         return "post_hub"
     if name in ("2015 Los Angeles Clippers", "2014 Los Angeles Clippers", "2024 Los Angeles Clippers", "2017 Washington Wizards", "2018 New Orleans Pelicans"):
         return "pace_motion"
@@ -15278,6 +15278,8 @@ def assist_load_factor(player: Player, team: Team) -> float:
 
 
 def _assist_load_factor_core(player: Player, team: Team) -> float:
+    if getattr(player, "assist_hub", False):
+        return assist_volume_factor(player)   # a hub is meant to hold far more than his rating-based share of the team's assists
     if player.name == "Rajon Rondo":
         if player.ast < 11:
             return 1.12
@@ -15312,6 +15314,13 @@ def assist_distribution_multiplier(player: Player, team: Team) -> float:
 
 
 def assist_volume_factor(player: Player) -> float:
+    if getattr(player, "assist_hub", False):
+        # a designated offensive hub (set on the player in the team file): the in-game assist ceilings only start well above a normal passer's
+        if player.ast >= 15:
+            return 0.50
+        if player.ast >= 13:
+            return 0.75
+        return 1.0
     if player.name == "Rajon Rondo":
         if player.ast >= 15:
             return 0.62
@@ -17606,11 +17615,14 @@ WARRIORS_2018_ASSIST_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.65}   # w
 
 # 2023-24 Nuggets: Jokic was the hub (9.0 assists a night) and Murray the scorer off him (6.3).
 NUGGETS_2024_ASSIST_BIAS = {"Nikola Jokić": 2.0, "Jamal Murray": 0.75}
+# 2025-26 Nuggets: Jokic was the hub again (10.7 assists a night in 34.8 minutes).
+NUGGETS_2026_ASSIST_BIAS = {"Nikola Jokić": 3.6, "Jamal Murray": 0.55}
+NUGGETS_2026_HANDLER_SHARE = 0.88     # share of possessions Jokic initiates while on the floor (he averaged 10.7 assists)
 SIXERS_2027_MAXEY_HANDLER_SHARE = 0.60   # share of possessions Maxey brings the ball up while on the floor
 NUGGETS_2024_HANDLER_SHARE = 0.70     # share of possessions Jokic initiates while on the floor
 # 2020-21 Sixers: Simmons ran the offense at 6.9 assists a night; the generic split left him near 4.
 SIXERS_2021_ASSIST_BIAS = {"Ben Simmons": 2.4}
-TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS,
+TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS, "2026 Denver Nuggets": NUGGETS_2026_ASSIST_BIAS,
                     "2021 Philadelphia 76ers": SIXERS_2021_ASSIST_BIAS}
 
 
@@ -17681,10 +17693,10 @@ def choose_ballhandler(team: Team) -> Player:
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
 
-    if team.name == "2024 Denver Nuggets":
+    if team.name in ("2024 Denver Nuggets", "2026 Denver Nuggets"):
         jokic = player_by_name(team.on_floor, ("Nikola Jokić", "Nikola Jokic"))
         # Jokic ran the offense from the elbow and the post; Murray and Jackson initiated the rest.
-        if jokic is not None and not jokic.fouled_out and random.random() < NUGGETS_2024_HANDLER_SHARE:
+        if jokic is not None and not jokic.fouled_out and random.random() < (NUGGETS_2026_HANDLER_SHARE if team.name == "2026 Denver Nuggets" else NUGGETS_2024_HANDLER_SHARE):
             return jokic
 
     if team.name == "2014 San Antonio Spurs":

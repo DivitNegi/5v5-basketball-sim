@@ -7,7 +7,7 @@ import players_data as _players_data_module
 from season_2018 import run_2018_season, run_2018_playoffs, factories_2018
 from season_year import run_year_season, factories_for_year
 
-YEAR_SEASON_MODES = {"2021 season (82 games)": 2021, "2022 season (82 games)": 2022, "2026 season (82 games)": 2026}   # every team of that year, then the play-in and playoffs
+YEAR_SEASON_MODES = {"2021 season (82 games)": 2021, "2022 season (82 games)": 2022, "2023 season (82 games)": 2023, "2026 season (82 games)": 2026}   # every team of that year, then the play-in and playoffs
 from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
 import random as _random_for_cast
 _cast_rng = _random_for_cast.Random()   # the cast filter must not draw from the sim's seeded generator
@@ -843,6 +843,7 @@ def run_gui_app():
             "2018 season (82 games)",
             "2021 season (82 games)",
             "2022 season (82 games)",
+            "2023 season (82 games)",
             "2026 season (82 games)",
             "Full 2018 playoffs",
             "Custom season (82 games)",
@@ -7537,7 +7538,7 @@ def run_gui_app():
 
     def set_team_dropdown_state():
         mode = mode_var.get()
-        state = "disabled" if mode in ("Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2026 season (82 games)", "Full 2018 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
+        state = "disabled" if mode in ("Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)", "Full 2018 playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Olympic tournament", "1-on-1") or mode.lower().startswith("fantasy") else "readonly"
         team_a_dropdown.configure(values=team_names, state=state)
         team_b_dropdown.configure(values=team_names, state=state)
         if team_a_var.get() not in factories and team_names:
@@ -10566,13 +10567,13 @@ def run_gui_app():
             if not picked_1v1["team_a"] or not picked_1v1["team_b"]:
                 status_var.set("Use Play 1-on-1 to pick two players first.")
                 return
-        elif mode not in ("Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2026 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and mode not in FANTASY_SEASON_MODES and team_a_var.get() == team_b_var.get():
+        elif mode not in ("Full 2027 playoffs", "2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Custom 16-team playoffs", "Full playoffs", "Season mode", "Custom season (82 games)", "Fantasy draft season", "2026 fantasy draft season", "Fantasy draft playoffs", "Olympic tournament") and mode not in FANTASY_SEASON_MODES and team_a_var.get() == team_b_var.get():
             status_var.set("Pick two different teams.")
             return
         clear_log()
-        season_view["quiet"] = mode in ("2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2026 season (82 games)", "Season mode", "Custom season (82 games)")
+        season_view["quiet"] = mode in ("2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)", "Season mode", "Custom season (82 games)")
         if season_view["quiet"]:
-            update_season_progress(0, 1230 if mode in ("2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2026 season (82 games)") else 82 * 15)
+            update_season_progress(0, 1230 if mode in ("2027 season (82 games)", "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)") else 82 * 15)
         running["active"] = True
         pause_button.configure(text="Pause")
         status_var.set("Running...")
