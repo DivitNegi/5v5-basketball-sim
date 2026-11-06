@@ -81,9 +81,21 @@ def make_celtics_2022() -> Team:
                0.32, 0.51, 0.39, 0.49, 0.333, 0.733,
                0.72, 0.68, stamina=0.78),
     ]
-    t = Team("2022 Boston Celtics", players)
-    t.init_lineup()
-    return t
+    pinned_minutes = {
+        "Marcus Smart": (31.8, 31.8),
+        "Jaylen Brown": (33.5, 33.5),
+        "Jayson Tatum": (36.5, 36.5),
+        "Al Horford": (27.8, 27.8),
+        "Robert Williams": (28.4, 28.4),
+        "Derrick White": (25.7, 25.7),
+        "Grant Williams": (22.1, 22.1),
+        "Payton Pritchard": (10.8, 10.8),
+        "Daniel Theis": (15.6, 15.6),
+        "Aaron Nesmith": (7.8, 7.8),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Boston Celtics", players, (31.8, 33.5, 36.5, 27.8, 28.4, 25.7, 22.1, 10.8, 15.6, 7.8))
 
 
 def make_warriors_2022() -> Team:
@@ -153,7 +165,21 @@ def make_warriors_2022() -> Team:
                0.37, 0.35, 0.38, 0.61, 0.400, 0.600,
                0.68, 0.65, stamina=0.72),
     ]
-    return _real_team("2022 Golden State Warriors", players, (32.9, 28.0, 30.4, 27.6, 20.1, 28.6, 16.8, 21.2, 15.4, 19.0))
+    pinned_minutes = {
+        "Stephen Curry": (35.7, 35.7),
+        "Klay Thompson": (29.0, 29.0),
+        "Andrew Wiggins": (32.3, 32.3),
+        "Draymond Green": (28.4, 28.4),
+        "Kevon Looney": (18.9, 18.9),
+        "Jordan Poole": (29.8, 29.8),
+        "Gary Payton II": (14.9, 14.9),
+        "Otto Porter Jr.": (20.2, 20.2),
+        "Nemanja Bjelica": (13.3, 13.3),
+        "Damion Lee": (17.5, 17.5),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Golden State Warriors", players, (35.7, 29.0, 32.3, 28.4, 18.9, 29.8, 14.9, 20.2, 13.3, 17.5))
 
 
 def make_nets_2022() -> Team:
@@ -249,9 +275,22 @@ def make_nets_2022() -> Team:
                0.75, 0.77,
                secondary_positions=("PF",), stamina=0.75),
     ]
-    t = Team("2022 Brooklyn Nets", players)
-    t.init_lineup()
-    return t
+    pinned_minutes = {
+        "Kyrie Irving": (34.6, 34.6),
+        "Seth Curry": (25.8, 25.8),
+        "Bruce Brown": (20.0, 20.0),
+        "Kevin Durant": (34.2, 34.2),
+        "Andre Drummond": (17.6, 17.6),
+        "Nicolas Claxton": (16.0, 16.0),
+        "Patty Mills": (24.8, 24.8),
+        "Goran Dragic": (21.0, 21.0),
+        "Blake Griffin": (12.5, 12.5),
+        "LaMarcus Aldridge": (17.6, 17.6),
+        "Kessler Edwards": (15.9, 15.9),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Brooklyn Nets", players, (34.6, 25.8, 20.0, 34.2, 17.6, 16.0, 24.8, 21.0, 12.5, 17.6, 15.9))
 
 
 def make_grizzlies_2022() -> Team:
@@ -320,9 +359,21 @@ def make_grizzlies_2022() -> Team:
                0.88, 0.53, 0.35, 0.48, 0.333, 0.667,
                0.71, 0.58, stamina=0.78),
     ]
-    t = Team("2022 Memphis Grizzlies", players)
-    t.init_lineup()
-    return t
+    pinned_minutes = {
+        "Ja Morant": (34.1, 34.1),
+        "Desmond Bane": (29.9, 29.9),
+        "Dillon Brooks": (27.2, 27.2),
+        "Jaren Jackson Jr.": (26.7, 26.7),
+        "Steven Adams": (25.4, 25.4),
+        "De'Anthony Melton": (21.0, 21.0),
+        "Tyus Jones": (19.2, 19.2),
+        "Brandon Clarke": (17.2, 17.2),
+        "Kyle Anderson": (19.5, 19.5),
+        "Ziaire Williams": (19.8, 19.8),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Memphis Grizzlies", players, (34.1, 29.9, 27.2, 26.7, 25.4, 21.0, 19.2, 17.2, 19.5, 19.8))
 
 
 def make_mavs_2022() -> Team:
@@ -391,7 +442,21 @@ def make_mavs_2022() -> Team:
                0.65, 0.75, 0.78, 0.90, 0.267, 0.600,
                0.66, 0.75, stamina=0.66),
     ]
-    return _real_team("2022 Dallas Mavericks", players, (32.4, 29.2, 25.6, 30.3, 20.0, 25.9, 22.5, 27.1, 14.2, 12.7))
+    pinned_minutes = {
+        "Luka Dončić": (35.1, 35.1),
+        "Jalen Brunson": (30.5, 30.5),
+        "Reggie Bullock": (25.8, 25.8),
+        "Dorian Finney-Smith": (32.0, 32.0),
+        "Dwight Powell": (18.7, 18.7),
+        "Spencer Dinwiddie": (26.1, 26.1),
+        "Maxi Kleber": (21.8, 21.8),
+        "Tim Hardaway Jr.": (27.7, 27.7),
+        "Josh Green": (11.9, 11.9),
+        "Davis Bertans": (10.4, 10.4),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Dallas Mavericks", players, (35.1, 30.5, 25.8, 32.0, 18.7, 26.1, 21.8, 27.7, 11.9, 10.4))
 
 
 # ---- the other 25 teams of 2021-22 (real Basketball-Reference data) ----
@@ -496,7 +561,23 @@ def make_hawks_2022() -> Team:
                0.70, 0.47,
                stamina=0.55, archetype="balanced", height=74),
     ]
-    return _real_team("2022 Atlanta Hawks", players, (34.9, 30.8, 29.8, 27.6, 29.6, 29.3, 25.3, 5.7, 9.0, 8.2, 4.0, 6.2))
+    pinned_minutes = {
+        "Trae Young": (32.5, 32.5),
+        "John Collins": (27.7, 27.7),
+        "De'Andre Hunter": (26.5, 26.5),
+        "Clint Capela": (24.0, 24.0),
+        "Kevin Huerter": (26.3, 26.3),
+        "Bogdan Bogdanović": (25.9, 25.9),
+        "Danilo Gallinari": (21.4, 21.4),
+        "Timothé Luwawu-Cabarrot": (9.2, 9.2),
+        "Onyeka Okongwu": (16.5, 16.5),
+        "Delon Wright": (14.7, 14.7),
+        "Gorgui Dieng": (5.1, 5.1),
+        "Lou Williams": (10.2, 10.2),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Atlanta Hawks", players, (32.5, 27.7, 26.5, 24.0, 26.3, 25.9, 21.4, 9.2, 16.5, 14.7, 5.1, 10.2))
 
 def make_hornets_2022() -> Team:
     players = [
@@ -585,7 +666,23 @@ def make_hornets_2022() -> Team:
                0.62, 0.44,
                stamina=0.55, archetype="balanced", height=76),
     ]
-    return _real_team("2022 Charlotte Hornets", players, (35.2, 33.4, 32.0, 31.6, 8.2, 27.0, 26.1, 26.1, 4.0, 7.0, 5.5, 4.0))
+    pinned_minutes = {
+        "Miles Bridges": (31.7, 31.7),
+        "Terry Rozier": (29.7, 29.7),
+        "LaMelo Ball": (28.1, 28.1),
+        "Gordon Hayward": (27.6, 27.6),
+        "Mason Plumlee": (19.7, 19.7),
+        "P.J. Washington": (22.5, 22.5),
+        "Kelly Oubre Jr.": (21.5, 21.5),
+        "Cody Martin": (21.5, 21.5),
+        "Nick Richards": (4.1, 4.1),
+        "Montrezl Harrell": (16.1, 16.1),
+        "Jalen McDaniels": (11.5, 11.5),
+        "James Bouknight": (6.0, 6.0),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Charlotte Hornets", players, (31.7, 29.7, 28.1, 27.6, 19.7, 22.5, 21.5, 21.5, 4.1, 16.1, 11.5, 6.0))
 
 def make_bulls_2022() -> Team:
     players = [
@@ -674,7 +771,23 @@ def make_bulls_2022() -> Team:
                0.55, 0.80,
                stamina=0.55, archetype="rim_protector", height=82),
     ]
-    return _real_team("2022 Chicago Bulls", players, (35.7, 34.3, 34.2, 32.7, 5.1, 27.1, 27.7, 27.2, 4.0, 4.0, 4.0, 4.0))
+    pinned_minutes = {
+        "DeMar DeRozan": (30.9, 30.9),
+        "Zach LaVine": (29.4, 29.4),
+        "Lonzo Ball": (29.3, 29.3),
+        "Nikola Vučević": (27.6, 27.6),
+        "Javonte Green": (17.6, 17.6),
+        "Ayo Dosunmu": (21.6, 21.6),
+        "Alex Caruso": (22.2, 22.2),
+        "Coby White": (21.7, 21.7),
+        "Derrick Jones Jr.": (12.2, 12.2),
+        "Tristan Thompson": (11.0, 11.0),
+        "Troy Brown Jr.": (10.7, 10.7),
+        "Tony Bradley": (5.8, 5.8),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Chicago Bulls", players, (30.9, 29.4, 29.3, 27.6, 17.6, 21.6, 22.2, 21.7, 12.2, 11.0, 10.7, 5.8))
 
 def make_cavs_2022() -> Team:
     players = [
@@ -683,28 +796,28 @@ def make_cavs_2022() -> Team:
                0.92, 0.92, 0.92, 0.48, 0.90,
                0.30, 0.90, 0.87,
                0.62, 0.05, 0.43, 0.54, 0.52, 0.33,
-               0.92, 0.70,
+               0.65, 0.20,
                stamina=0.87, archetype="floor_general", height=73),
         Player("Evan Mobley", "PF",
                0.11, 0.21, 0.12, 0.18, 0.48, 0.29,
                0.38, 0.77, 0.92, 0.92, 0.65,
                0.20, 0.62, 0.39,
                0.33, 0.78, 0.54, 0.66, 0.67, 0.41,
-               0.92, 0.92,
+               0.75, 0.88,
                stamina=0.84, archetype="post_scorer", height=83),
         Player("Jarrett Allen", "C",
                0.02, 0.06, 0.22, 0.04, 0.80, 0.23,
                0.29, 0.85, 0.95, 0.95, 0.69,
                0.21, 0.54, 0.26,
                0.54, 0.83, 0.75, 0.82, 0.83, 0.36,
-               0.82, 0.92,
+               0.60, 0.88,
                stamina=0.81, archetype="rim_runner", height=81),
         Player("Lauri Markkanen", "SF",
                0.33, 0.09, 0.22, 0.05, 0.21, 0.20,
                0.82, 0.85, 0.92, 0.89, 0.85,
                0.11, 0.21, 0.49,
                0.27, 0.51, 0.44, 0.61, 0.56, 0.44,
-               0.92, 0.91,
+               0.75, 0.75,
                stamina=0.79, archetype="three_and_d", height=85),
         Player("Isaac Okoro", "SF",
                0.10, 0.03, 0.44, 0.05, 0.24, 0.12,
@@ -718,7 +831,7 @@ def make_cavs_2022() -> Team:
                0.74, 0.79, 0.86, 0.62, 0.75,
                0.31, 0.69, 0.68,
                0.45, 0.46, 0.41, 0.51, 0.53, 0.46,
-               0.92, 0.78,
+               0.82, 0.60,
                stamina=0.77, archetype="balanced", height=79),
         Player("Dean Wade", "PF",
                0.65, 0.09, 0.07, 0.04, 0.19, 0.04,
@@ -732,7 +845,7 @@ def make_cavs_2022() -> Team:
                0.80, 0.76, 0.82, 0.25, 0.86,
                0.35, 0.89, 0.85,
                0.57, 0.41, 0.41, 0.64, 0.59, 0.49,
-               0.92, 0.80,
+               0.72, 0.60,
                stamina=0.75, archetype="floor_general", height=74),
         Player("Lamar Stevens", "PF",
                0.20, 0.21, 0.36, 0.10, 0.28, 0.16,
@@ -746,14 +859,14 @@ def make_cavs_2022() -> Team:
                0.87, 0.78, 0.85, 0.43, 0.80,
                0.22, 0.71, 0.29,
                0.36, 0.10, 0.52, 0.77, 0.61, 0.41,
-               0.77, 0.92,
+               0.60, 0.75,
                stamina=0.64, archetype="stretch_big", height=82),
         Player("Cedi Osman", "SF",
                0.44, 0.04, 0.21, 0.05, 0.06, 0.25,
                0.90, 0.60, 0.86, 0.57, 0.69,
                0.14, 0.63, 0.52,
                0.48, 0.07, 0.27, 0.35, 0.56, 0.53,
-               0.92, 0.81,
+               0.80, 0.70,
                stamina=0.64, archetype="movement_shooter", height=79),
         Player("Rajon Rondo", "PG",
                0.51, 0.11, 0.21, 0.02, 0.02, 0.12,
@@ -763,14 +876,30 @@ def make_cavs_2022() -> Team:
                0.78, 0.55,
                stamina=0.57, archetype="floor_general", height=73),
     ]
-    return _real_team("2022 Cleveland Cavaliers", players, (26.8, 25.3, 24.2, 23.1, 22.2, 22.4, 14.4, 21.4, 12.1, 16.9, 16.6, 14.6))
+    pinned_minutes = {
+        "Darius Garland": (28.7, 28.7),
+        "Evan Mobley": (26.9, 26.9),
+        "Jarrett Allen": (25.4, 25.4),
+        "Lauri Markkanen": (23.9, 23.9),
+        "Isaac Okoro": (22.7, 22.7),
+        "Caris LeVert": (22.9, 22.9),
+        "Dean Wade": (12.9, 12.9),
+        "Ricky Rubio": (21.6, 21.6),
+        "Lamar Stevens": (10.3, 10.3),
+        "Kevin Love": (15.9, 15.9),
+        "Cedi Osman": (15.6, 15.6),
+        "Rajon Rondo": (13.2, 13.2),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Cleveland Cavaliers", players, (28.7, 26.9, 25.4, 23.9, 22.7, 22.9, 12.9, 21.6, 10.3, 15.9, 15.6, 13.2))
 
 def make_nuggets_2022() -> Team:
     players = [
         Player("Nikola Jokić", "C",
-               0.27, 0.13, 0.09, 0.50, 0.08, 0.41,
+               0.27, 0.13, 0.09, 0.50, 0.08, 0.21,
                0.78, 0.92, 0.95, 0.93, 0.80,
-               0.34, 0.95, 0.39,
+               0.50, 0.99, 0.39,
                0.70, 0.67, 0.97, 0.98, 0.74, 0.49,
                0.92, 0.92,
                stamina=0.83, archetype="post_hub", height=83),
@@ -852,7 +981,23 @@ def make_nuggets_2022() -> Team:
                0.58, 0.61,
                stamina=0.55, archetype="stretch_big", height=82),
     ]
-    return _real_team("2022 Denver Nuggets", players, (33.5, 32.1, 31.7, 29.9, 24.7, 22.1, 19.0, 10.3, 9.2, 7.9, 9.9, 9.7))
+    pinned_minutes = {
+        "Nikola Jokić": (32.1, 32.1),
+        "Will Barton": (30.4, 30.4),
+        "Aaron Gordon": (29.9, 29.9),
+        "Monte Morris": (27.7, 27.7),
+        "Jeff Green": (21.6, 21.6),
+        "Austin Rivers": (18.7, 18.7),
+        "Bones Hyland": (15.4, 15.4),
+        "Facundo Campazzo": (14.5, 14.5),
+        "JaMychal Green": (12.5, 12.5),
+        "DeMarcus Cousins": (10.2, 10.2),
+        "Bryn Forbes": (13.7, 13.7),
+        "Zeke Nnaji": (13.3, 13.3),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Denver Nuggets", players, (32.1, 30.4, 29.9, 27.7, 21.6, 18.7, 15.4, 14.5, 12.5, 10.2, 13.7, 13.3))
 
 def make_pistons_2022() -> Team:
     players = [
@@ -941,7 +1086,23 @@ def make_pistons_2022() -> Team:
                0.72, 0.54,
                stamina=0.55, archetype="three_and_d", height=76),
     ]
-    return _real_team("2022 Detroit Pistons", players, (33.0, 32.6, 31.9, 25.6, 25.0, 24.6, 9.3, 27.2, 9.4, 8.1, 6.9, 6.3))
+    pinned_minutes = {
+        "Saddiq Bey": (29.1, 29.1),
+        "Cade Cunningham": (28.7, 28.7),
+        "Jerami Grant": (27.9, 27.9),
+        "Isaiah Stewart": (20.9, 20.9),
+        "Killian Hayes": (20.3, 20.3),
+        "Cory Joseph": (19.9, 19.9),
+        "Hamidou Diallo": (17.1, 17.1),
+        "Marvin Bagley III": (22.7, 22.7),
+        "Frank Jackson": (17.2, 17.2),
+        "Kelly Olynyk": (14.3, 14.3),
+        "Saben Lee": (11.6, 11.6),
+        "Rodney McGruder": (10.3, 10.3),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Detroit Pistons", players, (29.1, 28.7, 27.9, 20.9, 20.3, 19.9, 17.1, 22.7, 17.2, 14.3, 11.6, 10.3))
 
 def make_rockets_2022() -> Team:
     players = [
@@ -1030,7 +1191,23 @@ def make_rockets_2022() -> Team:
                0.52, 0.84,
                stamina=0.55, archetype="rim_protector", height=81),
     ]
-    return _real_team("2022 Houston Rockets", players, (31.9, 31.3, 30.8, 26.4, 29.3, 26.3, 26.9, 9.3, 6.0, 9.5, 8.1, 4.2))
+    pinned_minutes = {
+        "Jalen Green": (28.8, 28.8),
+        "Kevin Porter Jr.": (28.1, 28.1),
+        "Christian Wood": (27.5, 27.5),
+        "Jae'Sean Tate": (22.5, 22.5),
+        "Eric Gordon": (25.8, 25.8),
+        "Garrison Mathews": (22.4, 22.4),
+        "Dennis Schröder": (23.1, 23.1),
+        "Alperen Şengün": (16.4, 16.4),
+        "David Nwaba": (9.1, 9.1),
+        "KJ Martin": (16.7, 16.7),
+        "Josh Christopher": (13.7, 13.7),
+        "Bruno Fernando": (5.9, 5.9),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Houston Rockets", players, (28.8, 28.1, 27.5, 22.5, 25.8, 22.4, 23.1, 16.4, 9.1, 16.7, 13.7, 5.9))
 
 def make_pacers_2022() -> Team:
     players = [
@@ -1120,22 +1297,22 @@ def make_pacers_2022() -> Team:
                stamina=0.56, archetype="playmaker", height=78),
     ]
     pinned_minutes = {
-        "Tyrese Haliburton": (28.0, 28.0),
-        "Buddy Hield": (27.6, 27.6),
-        "Malcolm Brogdon": (26.0, 26.0),
-        "Myles Turner": (22.8, 22.8),
-        "Chris Duarte": (21.7, 21.7),
-        "Oshae Brissett": (18.1, 18.1),
-        "T.J. McConnell": (18.7, 18.7),
-        "Goga Bitadze": (11.3, 11.3),
-        "Jalen Smith": (19.1, 19.1),
-        "Terry Taylor": (16.7, 16.7),
-        "Duane Washington Jr.": (15.7, 15.7),
-        "Lance Stephenson": (14.4, 14.4),
+        "Tyrese Haliburton": (30.4, 30.4),
+        "Buddy Hield": (30.0, 30.0),
+        "Malcolm Brogdon": (27.7, 27.7),
+        "Myles Turner": (23.4, 23.4),
+        "Chris Duarte": (22.0, 22.0),
+        "Oshae Brissett": (17.3, 17.3),
+        "T.J. McConnell": (18.1, 18.1),
+        "Goga Bitadze": (9.4, 9.4),
+        "Jalen Smith": (18.7, 18.7),
+        "Terry Taylor": (15.7, 15.7),
+        "Duane Washington Jr.": (14.4, 14.4),
+        "Lance Stephenson": (12.9, 12.9),
     }
-    for player in players:   # pinned: the engine otherwise gives a two-big roster's bigs 40+ minutes
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
         player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
-    return _real_team("2022 Indiana Pacers", players, (28.0, 27.6, 26.0, 22.8, 21.7, 18.1, 18.7, 11.3, 19.1, 16.7, 15.7, 14.4))
+    return _real_team("2022 Indiana Pacers", players, (30.4, 30.0, 27.7, 23.4, 22.0, 17.3, 18.1, 9.4, 18.7, 15.7, 14.4, 12.9))
 
 def make_clippers_2022() -> Team:
     players = [
@@ -1224,7 +1401,23 @@ def make_clippers_2022() -> Team:
                0.69, 0.91,
                stamina=0.57, archetype="rim_protector", height=84),
     ]
-    return _real_team("2022 Los Angeles Clippers", players, (26.6, 23.9, 22.2, 18.7, 19.0, 19.3, 21.9, 19.2, 17.4, 21.0, 16.9, 13.7))
+    pinned_minutes = {
+        "Paul George": (29.1, 29.1),
+        "Reggie Jackson": (25.1, 25.1),
+        "Marcus Morris": (22.8, 22.8),
+        "Ivica Zubac": (18.2, 18.2),
+        "Nicolas Batum": (18.6, 18.6),
+        "Eric Bledsoe": (19.0, 19.0),
+        "Terance Mann": (22.4, 22.4),
+        "Norman Powell": (18.8, 18.8),
+        "Amir Coffey": (16.6, 16.6),
+        "Luke Kennard": (21.2, 21.2),
+        "Robert Covington": (16.0, 16.0),
+        "Isaiah Hartenstein": (12.2, 12.2),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Los Angeles Clippers", players, (29.1, 25.1, 22.8, 18.2, 18.6, 19.0, 22.4, 18.8, 16.6, 21.2, 16.0, 12.2))
 
 def make_lakers_2022() -> Team:
     players = [
@@ -1313,7 +1506,23 @@ def make_lakers_2022() -> Team:
                0.63, 0.41,
                stamina=0.55, archetype="movement_shooter", height=71),
     ]
-    return _real_team("2022 Los Angeles Lakers", players, (37.2, 35.1, 34.3, 7.1, 7.2, 28.1, 5.1, 25.2, 23.2, 5.9, 26.0, 5.6))
+    pinned_minutes = {
+        "LeBron James": (32.0, 32.0),
+        "Anthony Davis": (29.7, 29.7),
+        "Russell Westbrook": (28.9, 28.9),
+        "Avery Bradley": (16.9, 16.9),
+        "Stanley Johnson": (17.0, 17.0),
+        "Malik Monk": (22.3, 22.3),
+        "Dwight Howard": (10.9, 10.9),
+        "Talen Horton-Tucker": (19.3, 19.3),
+        "Austin Reaves": (17.4, 17.4),
+        "Wayne Ellington": (13.2, 13.2),
+        "Carmelo Anthony": (20.1, 20.1),
+        "D.J. Augustin": (12.3, 12.3),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Los Angeles Lakers", players, (32.0, 29.7, 28.9, 16.9, 17.0, 22.3, 10.9, 19.3, 17.4, 13.2, 20.1, 12.3))
 
 def make_heat_2022() -> Team:
     players = [
@@ -1402,7 +1611,23 @@ def make_heat_2022() -> Team:
                0.57, 0.78,
                stamina=0.55, archetype="rim_runner", height=83),
     ]
-    return _real_team("2022 Miami Heat", players, (33.9, 33.9, 32.6, 27.9, 25.9, 6.8, 23.4, 32.6, 7.2, 7.1, 4.9, 4.0))
+    pinned_minutes = {
+        "Kyle Lowry": (28.4, 28.4),
+        "Jimmy Butler": (28.5, 28.5),
+        "Bam Adebayo": (27.0, 27.0),
+        "P.J. Tucker": (22.1, 22.1),
+        "Duncan Robinson": (20.1, 20.1),
+        "Mychal Mulder": (16.2, 16.2),
+        "Gabe Vincent": (17.6, 17.6),
+        "Tyler Herro": (27.0, 27.0),
+        "Max Strus": (17.5, 17.5),
+        "Caleb Martin": (17.1, 17.1),
+        "Dewayne Dedmon": (10.6, 10.6),
+        "Omer Yurtseven": (7.9, 7.9),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Miami Heat", players, (28.4, 28.5, 27.0, 22.1, 20.1, 16.2, 17.6, 27.0, 17.5, 17.1, 10.6, 7.9))
 
 def make_bucks_2022() -> Team:
     players = [
@@ -1491,7 +1716,23 @@ def make_bucks_2022() -> Team:
                0.83, 0.65,
                stamina=0.57, archetype="slasher", height=77),
     ]
-    return _real_team("2022 Milwaukee Bucks", players, (33.0, 32.9, 32.4, 27.3, 28.2, 26.0, 23.2, 8.9, 8.4, 7.8, 7.7, 4.2))
+    pinned_minutes = {
+        "Jrue Holiday": (29.7, 29.7),
+        "Giannis Antetokounmpo": (29.7, 29.7),
+        "Khris Middleton": (29.1, 29.1),
+        "Grayson Allen": (23.3, 23.3),
+        "Bobby Portis": (24.3, 24.3),
+        "Pat Connaughton": (21.9, 21.9),
+        "George Hill": (18.8, 18.8),
+        "Wesley Matthews": (15.9, 15.9),
+        "Jordan Nwora": (14.6, 14.6),
+        "Serge Ibaka": (13.4, 13.4),
+        "Jevon Carter": (13.3, 13.3),
+        "DeAndre' Bembry": (6.0, 6.0),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Milwaukee Bucks", players, (29.7, 29.7, 29.1, 23.3, 24.3, 21.9, 18.8, 15.9, 14.6, 13.4, 13.3, 6.0))
 
 def make_timberwolves_2022() -> Team:
     players = [
@@ -1580,7 +1821,23 @@ def make_timberwolves_2022() -> Team:
                0.72, 0.54,
                stamina=0.55, archetype="balanced", height=76),
     ]
-    return _real_team("2022 Minnesota Timberwolves", players, (33.5, 34.3, 25.4, 32.0, 25.4, 25.8, 25.0, 9.0, 8.3, 5.5, 7.6, 8.2))
+    pinned_minutes = {
+        "Karl-Anthony Towns": (32.0, 32.0),
+        "Anthony Edwards": (32.9, 32.9),
+        "Jarred Vanderbilt": (22.4, 22.4),
+        "D'Angelo Russell": (30.2, 30.2),
+        "Patrick Beverley": (22.4, 22.4),
+        "Jaden McDaniels": (22.8, 22.8),
+        "Malik Beasley": (21.9, 21.9),
+        "Taurean Prince": (13.4, 13.4),
+        "Naz Reid": (12.1, 12.1),
+        "Josh Okogie": (7.1, 7.1),
+        "Jordan McLaughlin": (10.8, 10.8),
+        "Jaylen Nowell": (12.0, 12.0),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Minnesota Timberwolves", players, (32.0, 32.9, 22.4, 30.2, 22.4, 22.8, 21.9, 13.4, 12.1, 7.1, 10.8, 12.0))
 
 
 def make_pelicans_2022() -> Team:
@@ -1670,7 +1927,23 @@ def make_pelicans_2022() -> Team:
                0.69, 0.56,
                stamina=0.55, archetype="three_and_d", height=80),
     ]
-    return _real_team("2022 New Orleans Pelicans", players, (34.0, 33.8, 30.3, 29.9, 28.4, 20.0, 9.7, 8.8, 9.7, 20.2, 8.0, 7.3))
+    pinned_minutes = {
+        "Brandon Ingram": (32.3, 32.3),
+        "CJ McCollum": (31.8, 31.8),
+        "Jonas Valančiūnas": (27.6, 27.6),
+        "Herbert Jones": (27.1, 27.1),
+        "Devonte' Graham": (25.4, 25.4),
+        "Jaxson Hayes": (16.1, 16.1),
+        "Garrett Temple": (14.6, 14.6),
+        "Willy Hernangómez": (12.8, 12.8),
+        "Tony Snell": (14.5, 14.5),
+        "Larry Nance Jr.": (16.3, 16.3),
+        "Jose Alvarado": (11.5, 11.5),
+        "Trey Murphy III": (10.0, 10.0),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 New Orleans Pelicans", players, (32.3, 31.8, 27.6, 27.1, 25.4, 16.1, 14.6, 12.8, 14.5, 16.3, 11.5, 10.0))
 
 def make_knicks_2022() -> Team:
     players = [
@@ -1759,7 +2032,23 @@ def make_knicks_2022() -> Team:
                0.81, 0.58,
                stamina=0.61, archetype="balanced", height=79),
     ]
-    return _real_team("2022 New York Knicks", players, (35.3, 34.5, 29.5, 25.6, 25.7, 28.6, 24.5, 7.4, 6.9, 6.9, 9.3, 5.8))
+    pinned_minutes = {
+        "Julius Randle": (31.8, 31.8),
+        "RJ Barrett": (30.8, 30.8),
+        "Evan Fournier": (25.2, 25.2),
+        "Kemba Walker": (20.9, 20.9),
+        "Mitchell Robinson": (21.0, 21.0),
+        "Alec Burks": (24.2, 24.2),
+        "Derrick Rose": (19.8, 19.8),
+        "Taj Gibson": (13.4, 13.4),
+        "Obi Toppin": (12.4, 12.4),
+        "Quentin Grimes": (12.4, 12.4),
+        "Immanuel Quickley": (18.3, 18.3),
+        "Cam Reddish": (9.8, 9.8),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 New York Knicks", players, (31.8, 30.8, 25.2, 20.9, 21.0, 24.2, 19.8, 13.4, 12.4, 12.4, 18.3, 9.8))
 
 def make_thunder_2022() -> Team:
     players = [
@@ -1848,7 +2137,23 @@ def make_thunder_2022() -> Team:
                0.80, 0.62,
                stamina=0.63, archetype="balanced", height=79),
     ]
-    return _real_team("2022 Oklahoma City Thunder", players, (34.7, 31.5, 27.9, 32.6, 22.2, 24.2, 9.5, 22.8, 9.1, 8.0, 7.5, 9.9))
+    pinned_minutes = {
+        "Shai Gilgeous-Alexander": (31.2, 31.2),
+        "Josh Giddey": (27.5, 27.5),
+        "Darius Bazley": (23.5, 23.5),
+        "Luguentz Dort": (28.8, 28.8),
+        "Jeremiah Robinson-Earl": (17.4, 17.4),
+        "Aaron Wiggins": (19.5, 19.5),
+        "Isaiah Roby": (16.3, 16.3),
+        "Tre Mann": (18.1, 18.1),
+        "Aleksej Pokusevski": (15.4, 15.4),
+        "Théo Maledon": (13.1, 13.1),
+        "Ty Jerome": (12.1, 12.1),
+        "Kenrich Williams": (17.1, 17.1),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Oklahoma City Thunder", players, (31.2, 27.5, 23.5, 28.8, 17.4, 19.5, 16.3, 18.1, 15.4, 13.1, 12.1, 17.1))
 
 
 def make_magic_2022() -> Team:
@@ -1938,7 +2243,23 @@ def make_magic_2022() -> Team:
                0.69, 0.54,
                stamina=0.65, archetype="balanced", height=78),
     ]
-    return _real_team("2022 Orlando Magic", players, (30.7, 25.7, 31.7, 29.9, 27.2, 28.4, 25.0, 10.1, 7.8, 7.0, 5.9, 10.6))
+    pinned_minutes = {
+        "Franz Wagner": (27.1, 27.1),
+        "Mo Bamba": (21.5, 21.5),
+        "Cole Anthony": (28.4, 28.4),
+        "Wendell Carter Jr.": (26.2, 26.2),
+        "Jalen Suggs": (23.2, 23.2),
+        "Gary Harris": (24.5, 24.5),
+        "Chuma Okeke": (20.8, 20.8),
+        "R.J. Hampton": (17.5, 17.5),
+        "Robin Lopez": (12.6, 12.6),
+        "Moritz Wagner": (10.9, 10.9),
+        "Ignas Brazdeikis": (8.7, 8.7),
+        "Terrence Ross": (18.6, 18.6),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Orlando Magic", players, (27.1, 21.5, 28.4, 26.2, 23.2, 24.5, 20.8, 17.5, 12.6, 10.9, 8.7, 18.6))
 
 
 def make_sixers_2022() -> Team:
@@ -2028,7 +2349,23 @@ def make_sixers_2022() -> Team:
                0.69, 0.50,
                stamina=0.55, archetype="three_and_d", height=76),
     ]
-    return _real_team("2022 Philadelphia 76ers", players, (37.7, 35.3, 34.8, 33.8, 25.5, 21.8, 7.6, 22.8, 7.7, 4.8, 4.2, 4.0))
+    pinned_minutes = {
+        "James Harden": (34.6, 34.6),
+        "Tyrese Maxey": (31.8, 31.8),
+        "Tobias Harris": (31.2, 31.2),
+        "Joel Embiid": (30.0, 30.0),
+        "Matisse Thybulle": (20.8, 20.8),
+        "Danny Green": (17.0, 17.0),
+        "Furkan Korkmaz": (16.3, 16.3),
+        "Georges Niang": (18.0, 18.0),
+        "Shake Milton": (16.6, 16.6),
+        "DeAndre Jordan": (9.0, 9.0),
+        "Paul Millsap": (7.6, 7.6),
+        "Isaiah Joe": (7.1, 7.1),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Philadelphia 76ers", players, (34.6, 31.8, 31.2, 30.0, 20.8, 17.0, 16.3, 18.0, 16.6, 9.0, 7.6, 7.1))
 
 def make_suns_2022() -> Team:
     players = [
@@ -2117,7 +2454,23 @@ def make_suns_2022() -> Team:
                0.80, 0.58,
                stamina=0.55, archetype="playmaker", height=75),
     ]
-    return _real_team("2022 Phoenix Suns", players, (34.8, 34.5, 32.9, 29.5, 28.1, 26.2, 22.0, 7.9, 6.0, 7.9, 6.2, 4.2))
+    pinned_minutes = {
+        "Mikal Bridges": (31.0, 31.0),
+        "Devin Booker": (30.8, 30.8),
+        "Chris Paul": (29.0, 29.0),
+        "Deandre Ayton": (25.1, 25.1),
+        "Jae Crowder": (23.6, 23.6),
+        "Cameron Johnson": (21.5, 21.5),
+        "Cameron Payne": (17.2, 17.2),
+        "Landry Shamet": (16.0, 16.0),
+        "JaVale McGee": (11.2, 11.2),
+        "Torrey Craig": (16.0, 16.0),
+        "Aaron Holiday": (11.6, 11.6),
+        "Elfrid Payton": (7.0, 7.0),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Phoenix Suns", players, (31.0, 30.8, 29.0, 25.1, 23.6, 21.5, 17.2, 16.0, 11.2, 16.0, 11.6, 7.0))
 
 def make_blazers_2022() -> Team:
     players = [
@@ -2206,7 +2559,23 @@ def make_blazers_2022() -> Team:
                0.67, 0.47,
                stamina=0.60, archetype="movement_shooter", height=75),
     ]
-    return _real_team("2022 Portland Trail Blazers", players, (27.4, 24.2, 22.2, 21.2, 20.2, 20.1, 22.2, 19.5, 19.2, 15.2, 13.6, 15.1))
+    pinned_minutes = {
+        "Damian Lillard": (30.0, 30.0),
+        "Josh Hart": (25.4, 25.4),
+        "Drew Eubanks": (22.7, 22.7),
+        "Jusuf Nurkić": (21.4, 21.4),
+        "Justise Winslow": (20.1, 20.1),
+        "Brandon Williams": (20.0, 20.0),
+        "Anfernee Simons": (22.7, 22.7),
+        "Nassir Little": (19.2, 19.2),
+        "Keon Johnson": (18.8, 18.8),
+        "CJ Elleby": (13.9, 13.9),
+        "Trendon Watford": (12.0, 12.0),
+        "Ben McLemore": (13.8, 13.8),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Portland Trail Blazers", players, (30.0, 25.4, 22.7, 21.4, 20.1, 20.0, 22.7, 19.2, 18.8, 13.9, 12.0, 13.8))
 
 def make_kings_2022() -> Team:
     players = [
@@ -2295,7 +2664,23 @@ def make_kings_2022() -> Team:
                0.73, 0.60,
                stamina=0.55, archetype="balanced", height=77),
     ]
-    return _real_team("2022 Sacramento Kings", players, (35.3, 33.6, 33.5, 25.6, 23.9, 7.7, 6.2, 27.7, 7.2, 6.2, 26.6, 6.4))
+    pinned_minutes = {
+        "De'Aaron Fox": (30.2, 30.2),
+        "Domantas Sabonis": (28.4, 28.4),
+        "Harrison Barnes": (28.3, 28.3),
+        "Justin Holiday": (19.9, 19.9),
+        "Richaun Holmes": (18.2, 18.2),
+        "Trey Lyles": (17.1, 17.1),
+        "Maurice Harkless": (13.0, 13.0),
+        "Davion Mitchell": (22.1, 22.1),
+        "Chimezie Metu": (15.7, 15.7),
+        "Damian Jones": (12.8, 12.8),
+        "Donte DiVincenzo": (20.9, 20.9),
+        "Jeremy Lamb": (13.4, 13.4),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Sacramento Kings", players, (30.2, 28.4, 28.3, 19.9, 18.2, 17.1, 13.0, 22.1, 15.7, 12.8, 20.9, 13.4))
 
 def make_spurs_2022() -> Team:
     players = [
@@ -2384,7 +2769,23 @@ def make_spurs_2022() -> Team:
                0.78, 0.62,
                stamina=0.55, archetype="balanced", height=77),
     ]
-    return _real_team("2022 San Antonio Spurs", players, (34.8, 31.9, 29.0, 24.0, 27.3, 24.4, 11.9, 10.3, 10.0, 23.0, 6.7, 6.7))
+    pinned_minutes = {
+        "Dejounte Murray": (34.7, 34.7),
+        "Keldon Johnson": (31.1, 31.1),
+        "Jakob Poeltl": (27.4, 27.4),
+        "Doug McDermott": (21.5, 21.5),
+        "Devin Vassell": (25.4, 25.4),
+        "Josh Richardson": (21.9, 21.9),
+        "Joshua Primo": (16.2, 16.2),
+        "Tre Jones": (13.3, 13.3),
+        "Keita Bates-Diop": (12.9, 12.9),
+        "Lonnie Walker IV": (20.3, 20.3),
+        "Jock Landale": (7.7, 7.7),
+        "Romeo Langford": (7.6, 7.6),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 San Antonio Spurs", players, (34.7, 31.1, 27.4, 21.5, 25.4, 21.9, 16.2, 13.3, 12.9, 20.3, 7.7, 7.6))
 
 def make_raptors_2022() -> Team:
     players = [
@@ -2473,7 +2874,23 @@ def make_raptors_2022() -> Team:
                0.77, 0.63,
                stamina=0.55, archetype="balanced", height=80),
     ]
-    return _real_team("2022 Toronto Raptors", players, (36.8, 36.8, 35.0, 34.4, 34.0, 3.9, 22.9, 3.9, 20.5, 3.9, 3.9, 3.9))
+    pinned_minutes = {
+        "Pascal Siakam": (33.4, 33.4),
+        "Fred VanVleet": (33.4, 33.4),
+        "OG Anunoby": (31.2, 31.2),
+        "Scottie Barnes": (30.6, 30.6),
+        "Gary Trent Jr.": (30.1, 30.1),
+        "Khem Birch": (12.7, 12.7),
+        "Precious Achiuwa": (18.0, 18.0),
+        "Armoni Brooks": (7.3, 7.3),
+        "Chris Boucher": (15.6, 15.6),
+        "Svi Mykhailiuk": (8.1, 8.1),
+        "Thaddeus Young": (13.0, 13.0),
+        "Dalano Banton": (6.6, 6.6),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Toronto Raptors", players, (33.4, 33.4, 31.2, 30.6, 30.1, 12.7, 18.0, 7.3, 15.6, 8.1, 13.0, 6.6))
 
 def make_jazz_2022() -> Team:
     players = [
@@ -2562,7 +2979,23 @@ def make_jazz_2022() -> Team:
                0.85, 0.86,
                stamina=0.58, archetype="movement_shooter", height=80),
     ]
-    return _real_team("2022 Utah Jazz", players, (31.2, 28.6, 30.9, 33.8, 32.1, 24.9, 6.9, 7.5, 4.9, 4.9, 27.1, 7.2))
+    pinned_minutes = {
+        "Royce O'Neale": (27.3, 27.3),
+        "Mike Conley": (24.4, 24.4),
+        "Bojan Bogdanović": (27.0, 27.0),
+        "Donovan Mitchell": (30.4, 30.4),
+        "Rudy Gobert": (28.3, 28.3),
+        "Joe Ingles": (20.4, 20.4),
+        "Hassan Whiteside": (13.3, 13.3),
+        "Danuel House Jr.": (14.9, 14.9),
+        "Trent Forrest": (8.6, 8.6),
+        "Eric Paschall": (8.5, 8.5),
+        "Jordan Clarkson": (22.7, 22.7),
+        "Rudy Gay": (14.2, 14.2),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Utah Jazz", players, (27.3, 24.4, 27.0, 30.4, 28.3, 20.4, 13.3, 14.9, 8.6, 8.5, 22.7, 14.2))
 
 
 def make_wizards_2022() -> Team:
@@ -2652,4 +3085,20 @@ def make_wizards_2022() -> Team:
                0.90, 0.68,
                stamina=0.64, archetype="floor_general", height=72),
     ]
-    return _real_team("2022 Washington Wizards", players, (36.0, 33.4, 30.2, 28.2, 27.0, 7.3, 23.4, 6.9, 8.2, 7.1, 24.2, 8.0))
+    pinned_minutes = {
+        "Bradley Beal": (31.0, 31.0),
+        "Kyle Kuzma": (28.2, 28.2),
+        "Kentavious Caldwell-Pope": (24.8, 24.8),
+        "Kristaps Porziņģis": (22.7, 22.7),
+        "Brad Wanamaker": (21.4, 21.4),
+        "Daniel Gafford": (14.6, 14.6),
+        "Corey Kispert": (17.8, 17.8),
+        "Tomáš Satoranský": (13.5, 13.5),
+        "Rui Hachimura": (16.9, 16.9),
+        "Raul Neto": (14.1, 14.1),
+        "Deni Avdija": (18.6, 18.6),
+        "Ish Smith": (16.4, 16.4),
+    }
+    for player in players:   # real minutes (scaled for trades and injuries), pinned
+        player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
+    return _real_team("2022 Washington Wizards", players, (31.0, 28.2, 24.8, 22.7, 21.4, 14.6, 17.8, 13.5, 16.9, 14.1, 18.6, 16.4))
