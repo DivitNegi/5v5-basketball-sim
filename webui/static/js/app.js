@@ -638,35 +638,44 @@ async function refreshBracket() {
   renderBracket();
 }
 
-function brTeam(name, wins, winner, small) {
+function brTeam(name, wins, winner) {
   const t = identOf(name);
+  const seed = BR.data?.teams?.[name]?.seed;
   const cls = winner ? (winner === name ? "win" : "lose") : "";
-  return h("div", { class: `br-team ${cls}`, style: { "--c": t.color } }, logoEl(t), h("span", {}, t.short), wins != null ? h("span", { class: "w" }, wins) : null);
+  return h("div", { class: `br-team ${cls}`, style: { "--c": t.color } }, h("span", { class: "seed" }, seed ?? ""), logoEl(t), h("span", { class: "nm" }, t.short), wins != null ? h("span", { class: "w" }, wins) : null);
 }
 function seriesFor(a, b) {
   const sr = BR.data?.series || {};
   return sr[`${a}|${b}`] || sr[`${b}|${a}`] || null;
 }
-function brCard([a, b, winner]) {
+function brCard([a, b, winner], extra = "") {
   const sr = seriesFor(a, b);
   const wa = sr ? (sr.a === a ? sr.wins_a : sr.wins_b) : null, wb = sr ? (sr.a === a ? sr.wins_b : sr.wins_a) : null;
   const key = `${a}|${b}`;
-  return h("div", { class: `br-card ${BR.selected === key ? "sel" : ""}`, onclick: () => { BR.selected = key; BR.game = null; renderBracket(); } },
-    brTeam(a, wa, winner), brTeam(b, wb, winner));
+  const note = sr ? (sr.winner ? `${identOf(sr.winner).initials} won ${Math.max(sr.wins_a, sr.wins_b)}-${Math.min(sr.wins_a, sr.wins_b)}` : (sr.wins_a || sr.wins_b ? `Game ${sr.wins_a + sr.wins_b + 1} next` : "")) : "";
+  return h("div", { class: `br-card ${extra} ${BR.selected === key ? "sel" : ""}`, onclick: () => { BR.selected = key; BR.game = null; renderBracket(); } },
+    brTeam(a, wa, winner), brTeam(b, wb, winner), note ? h("div", { class: "br-note" }, note) : null);
 }
 function renderTree() {
   const d = BR.data || {};
   const rounds = d.rounds || {};
   if (!rounds.East) return h("div", { class: "empty" }, d.play_in ? "The play-in is running. The bracket fills in after it." : "The bracket appears when the playoffs start.");
-  const col = (title, list) => h("div", { class: "br-col" }, h("h4", {}, title), (list || []).map(brCard));
   const E = rounds.East || {}, W = rounds.West || {}, F = rounds.Finals || {};
   const finals = Object.values(F)[0] || [];
-  const tree = h("div", { class: "bracket" },
-    col("East · 1st round", E["First Round"]), col("East · semis", E["Semifinals"]), col("East · finals", E["Conference Finals"]),
-    col(Object.keys(F)[0] || "Finals", finals),
-    col("West · finals", W["Conference Finals"]), col("West · semis", W["Semifinals"]), col("West · 1st round", W["First Round"]));
-  const champ = d.champion ? h("div", { class: "br-champ" }, h("div", { class: "muted" }, "CHAMPIONS"), h("div", { class: "t" }, identOf(d.champion).short), d.finals_mvp ? h("div", { class: "muted" }, `Finals MVP: ${typeof d.finals_mvp === "string" ? d.finals_mvp : (d.finals_mvp.name || d.finals_mvp[0] || "")}`) : null) : null;
-  return h("div", {}, champ, tree);
+  const pairs = (list, side) => {
+    const out = [];
+    for (let i = 0; i < (list || []).length; i += 2) out.push(h("div", { class: "br-pair" }, (list.slice(i, i + 2)).map((s) => brCard(s))));
+    return h("div", { class: "br-stack" }, out);
+  };
+  const solo = (list, side) => h("div", { class: "br-stack" }, h("div", { class: `br-solo ${side}` }, (list || []).map((s) => brCard(s))));
+  const col = (title, body, cls = "") => h("div", { class: `br-col ${cls}` }, h("h4", {}, title), body);
+  const champ = d.champion ? h("div", { class: "br-champ" }, h("div", { class: "muted" }, "CHAMPIONS"), h("div", { class: "t" }, identOf(d.champion).short),
+    d.finals_mvp ? h("div", { class: "muted" }, `Finals MVP: ${typeof d.finals_mvp === "string" ? d.finals_mvp : (d.finals_mvp.name || d.finals_mvp[0] || "")}`) : null) : null;
+  const center = h("div", { class: "br-col br-finals-col" }, h("h4", {}, Object.keys(F)[0] || "NBA Finals"), h("div", { class: "br-trophy" }, "🏆"), finals.map((s) => brCard(s, "final")));
+  return h("div", {}, champ, h("div", { class: "bracket-wrap" }, h("div", { class: "bracket" },
+    col("East · 1st round", pairs(E["First Round"], "east")), col("East · semis", pairs(E["Semifinals"], "east")), col("East · finals", solo(E["Conference Finals"], "east")),
+    center,
+    col("West · finals", solo(W["Conference Finals"], "west"), "west"), col("West · semis", pairs(W["Semifinals"], "west"), "west"), col("West · 1st round", pairs(W["First Round"], "west"), "west"))));
 }
 function renderPlayIn() {
   const pi = BR.data?.play_in;

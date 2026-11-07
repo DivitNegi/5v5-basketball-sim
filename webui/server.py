@@ -97,6 +97,28 @@ def _espn_index():
     return idx
 
 
+def _wikipedia_image(name: str):
+    """Lead photo of the player's Wikipedia article (for retired and international players). Only accepted when the
+    article title matches the name and the description says basketball, so a namesake is never shown."""
+    import urllib.request
+    try:
+        q = urllib.parse.urlencode({"action": "query", "format": "json", "prop": "pageimages|description", "piprop": "thumbnail", "pithumbsize": 500,
+                                    "redirects": 1, "generator": "search", "gsrsearch": f"{name} basketball", "gsrlimit": 3})
+        req = urllib.request.Request("https://en.wikipedia.org/w/api.php?" + q, headers={"User-Agent": "5v5SimLocal/1.0 (personal project)"})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            pages = json.load(resp).get("query", {}).get("pages", {}).values()
+        want = _norm_name(name)
+        for pg in sorted(pages, key=lambda x: x.get("index", 9)):
+            title = re.sub(r"\(.*?\)", "", pg.get("title", ""))
+            if _norm_name(title) == want and "basketball" in (pg.get("description") or "").lower():
+                src = (pg.get("thumbnail") or {}).get("source")
+                if src:
+                    return src
+    except Exception:
+        pass
+    return None
+
+
 def _headshot_sources(name: str):
     """Where the Tk app looks for a player's picture, in its order: a direct URL, the NBA.com id, then an ESPN search."""
     import media_ids
@@ -108,6 +130,7 @@ def _headshot_sources(name: str):
     if pid:
         yield os.path.join(HEADSHOT_DIR, f"{pid}.png"), f"https://cdn.nba.com/headshots/nba/latest/1040x760/{pid}.png"
     yield os.path.join(HEADSHOT_DIR, f"{safe}_espn.png"), None
+    yield os.path.join(HEADSHOT_DIR, f"{safe}_wiki.png"), "wiki"
 
 
 def _cached_headshot(name: str):
@@ -121,7 +144,11 @@ def _download_headshot(name: str):
     import urllib.request
     try:
         for path, url in _headshot_sources(name):
-            if url is None:   # ESPN roster index (their search endpoint no longer returns players)
+            if url == "wiki":
+                url = _wikipedia_image(name)
+                if not url:
+                    continue
+            elif url is None:   # ESPN roster index (their search endpoint no longer returns players)
                 url = _espn_index().get(_norm_name(name))
                 if not url:
                     continue

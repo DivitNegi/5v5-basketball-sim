@@ -25,3 +25,20 @@ PLAYER_HEADSHOT_IDS = {
 PLAYER_HEADSHOT_URLS = {
     "VJ Edgecombe": "https://images.fantasypros.com/images/players/nba/6311/headshot/1200x1200.png",
 }
+
+
+# Extra NBA.com ids (historical and role players) resolved from nba_api's static list; ids whose NBA.com picture is only
+# the generic silhouette were left out so those players keep their initials.
+def _load_extra_ids():
+    import json
+    import os
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "headshot_ids_extra.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for name, pid in json.load(fh).items():
+                PLAYER_HEADSHOT_IDS.setdefault(name, pid)
+    except Exception:
+        pass
+
+
+_load_extra_ids()
