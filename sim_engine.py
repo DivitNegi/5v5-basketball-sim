@@ -3461,7 +3461,7 @@ def default_secondary_positions(pos: str) -> Tuple[str, ...]:
         "SG": ("PG", "SF"),
         "SF": ("SG", "PF"),
         "PF": ("SF", "C"),
-        "C": ("PF",),
+        "C": (),   # a center plays center; PF is only a secondary position when a player's own entry lists it
     }
     return defaults.get(pos, tuple())
 
