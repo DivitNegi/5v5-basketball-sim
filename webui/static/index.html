@@ -131,7 +131,8 @@
         <div class="panel">
           <div class="panel-head"><h2>Stats</h2><button class="btn" id="statsRefresh">Refresh</button></div>
           <div class="filters">
-            <label>Display <select id="statsKind"><option value="averages">Player averages</option><option value="advanced">Advanced</option><option value="shots">Shot diet</option><option value="defense">Defended shots</option><option value="matchups">Defensive matchups</option><option value="awards">Awards</option><option value="reports">Box scores, recaps &amp; reports</option></select></label>
+            <div class="seg" id="statsTabs"><button data-k="averages" class="on">Player stats</button><button data-k="advanced">Advanced</button><button data-k="shots">Shots</button><button data-k="defense">Defended</button><button data-k="matchups">Matchups</button><button data-k="awards">Awards</button><button data-k="reports">Box scores</button></div>
+            <label hidden>Display <select id="statsKind"><option value="averages">Player averages</option><option value="advanced">Advanced</option><option value="shots">Shot diet</option><option value="defense">Defended shots</option><option value="matchups">Defensive matchups</option><option value="awards">Awards</option><option value="reports">Box scores, recaps &amp; reports</option></select></label>
             <label>Source <select id="statsSource"><option>Live</option></select></label>
             <label>Team <select id="statsTeam"><option>All teams</option></select></label>
             <label id="statsQuarterLabel">Shot quarter <select id="statsQuarter"><option value="All">All</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option><option value="5">OT1</option></select></label>

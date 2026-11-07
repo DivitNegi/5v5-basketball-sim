@@ -514,6 +514,8 @@ function applyStatus(s) {
 }
 
 function resetGame(msg) {
+  const quietSeason = isSeasonMode(msg.mode) && msg.mode !== "2027 play-in & playoffs";
+  $("#scoreboard").classList.toggle("hidden", quietSeason);
   $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
   $("#simPlayoffs").classList.toggle("hidden", msg.mode !== "2027 play-in & playoffs");
   if (msg.mode === "2027 play-in & playoffs") { $('#nav .nav-item[data-view="bracket"]').click(); BR.selected = null; return; }
@@ -589,7 +591,7 @@ async function refreshSeason() {
     renderSeasonBar();
     if ($("#view-season").classList.contains("active")) {
       if (SE.tab === "players") { const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source }); AV.data = await api.get(`/api/season/avg?${q}`); }
-      if (SE.tab === "advanced") SE.adv = (await api.get("/api/season/advanced")).players;
+      if (SE.tab === "advanced") SE.advStats = await api.get("/api/stats?kind=advanced&source=Season&team=All+teams&quarter=All");
       if (SE.tab === "teams") SE.teams = (await api.get("/api/season/teams")).teams;
       if (SE.tab === "highs") SE.highs = await api.get("/api/season/highs");
       if (SE.tab === "schedule" && SE.team) SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
@@ -599,8 +601,8 @@ async function refreshSeason() {
 }
 let seasonTimer = null;
 function scheduleSeasonRefresh() {
-  clearTimeout(seasonTimer);
-  seasonTimer = setTimeout(refreshSeason, 700);
+  if (seasonTimer) return;                       // one refresh at a time, at most every ~0.9s while games finish quickly
+  seasonTimer = setTimeout(() => { seasonTimer = null; refreshSeason(); }, 900);
 }
 
 function renderSeasonBar(state) {
@@ -634,19 +636,41 @@ function renderStandings() {
   return h("div", { class: "conf-grid" }, Object.keys(byConf).map((k) => standingsTable(k === "League" ? "League" : `${k} conference`, byConf[k])));
 }
 
+// "31.8 PPG, 6.5 RPG, ..." -> small stat tiles
+function statChips(text) {
+  const parts = (text || "").split(/,\s*|\s*\|\s*/).filter(Boolean);
+  return h("div", { class: "chips" }, parts.map((s) => {
+    const m = s.match(/^([+-]?[\d.]+(?:\/[\d.]+)?)\s*(.*)$/);
+    return m ? h("div", { class: "chip" }, h("b", {}, m[1]), h("span", {}, m[2])) : h("div", { class: "chip wide" }, h("span", {}, s));
+  }));
+}
+const shortTeam = (t) => (t || "").replace(/^\d{4} /, "");
+function raceCard(title, list) {
+  return h("div", { class: "race-card" }, h("h3", {}, title),
+    list.map((r, i) => {
+      const id = identOf(r.team);
+      return h("div", { class: `race-item ${i === 0 ? "lead" : ""}`, style: { "--c": id.color || "#64748b" } },
+        h("div", { class: "rk" }, r.rank),
+        h("div", { class: "rb" }, h("div", { class: "rtop" }, faceEl(r.player), h("div", {}, h("div", { class: "who" }, r.player), h("div", { class: "tm" }, logoEl(id), shortTeam(r.team)))), statChips(r.stats)));
+    }));
+}
 function renderRaces() {
-  const races = SE.data?.races || {};
-  const titles = { mvp: "MVP race", dpoy: "DPOY race", roy: "Rookie of the Year race" };
-  const cols = Object.keys(titles).filter((k) => (races[k] || []).length).map((k) =>
-    h("div", { class: "race" }, h("h3", {}, titles[k]),
-      (races[k] || []).map((r) => h("div", { class: "race-row" }, h("span", { class: "rk" }, r.rank),
-        h("div", {}, h("div", { class: "who" }, r.player, " ", h("span", { class: "muted" }, (r.team || "").replace(/^\d{4} /, ""))), h("div", { class: "st" }, r.stats))))));
+  const ready = !!SE.data?.state?.ready;
+  if (!ready) {
+    const races = SE.data?.races || {};
+    const titles = { mvp: "MVP race", dpoy: "DPOY race", roy: "Rookie of the Year race" };
+    const cards = Object.keys(titles).filter((k) => (races[k] || []).length).map((k) => raceCard(titles[k], races[k]));
+    return cards.length ? h("div", {}, h("div", { class: "muted", style: { marginBottom: "10px" } }, "Live standings for the awards. They update as the season goes and become the official awards when it ends."), h("div", { class: "race-grid" }, cards))
+      : h("div", { class: "empty" }, "The award races appear once games are played.");
+  }
   const groups = {};
   (SE.data?.awards || []).forEach((a) => { (groups[a.award] ||= []).push(a); });
   const cards = Object.entries(groups).map(([name, list]) => h("div", { class: "award-card" }, h("div", { class: "a" }, name),
-    list.map((a) => h("div", { style: { marginTop: "6px" } }, h("div", { class: "p" }, a.player), h("div", { class: "t" }, (a.team || "").replace(/^\d{4} /, "")), h("div", { class: "s" }, a.stats)))));
-  return h("div", {}, cols.length ? h("div", { class: "race-grid" }, cols) : h("div", { class: "empty" }, "The award races appear once games are played."),
-    cards.length ? h("div", { class: "award-grid" }, cards) : null);
+    list.map((a) => {
+      const id = identOf(a.team);
+      return h("div", { class: "award-item", style: { "--c": id.color || "#64748b" } }, h("div", { class: "rtop" }, faceEl(a.player), h("div", {}, h("div", { class: "p" }, a.player), h("div", { class: "tm" }, logoEl(id), shortTeam(a.team)))), statChips(a.stats));
+    })));
+  return cards.length ? h("div", {}, h("div", { class: "muted", style: { marginBottom: "10px" } }, "Final season awards"), h("div", { class: "award-grid" }, cards)) : h("div", { class: "empty" }, "Awards are given out when the regular season ends.");
 }
 
 const AV = { team: "All Teams", quarter: "All", rank: "Team order", source: "Season", sort: null, dir: -1, filter: "", data: null };
@@ -722,16 +746,10 @@ function renderTeamsTab() {
   return simpleTable(head, sorted.map((t) => h("tr", {}, h("td", { class: "l" }, teamCell(t)), ...TCOLS.map(([k]) => h("td", { class: k === "net" ? "pts" : "" }, t[k] == null ? "–" : (k === "diff" || k === "net") && t[k] > 0 ? `+${t[k]}` : t[k])))));
 }
 function renderAdvancedTab() {
-  const all = SE.adv || [];
-  if (!all.length) return h("div", { class: "empty" }, "Advanced stats appear once games are played.");
-  const key = SE.asort || "ts";
-  const minGp = Math.max(1, Math.floor(Math.max(...all.map((p) => p.gp)) * 0.4));
-  const q = (SE.afilter || "").toLowerCase();
-  const rows = all.filter((p) => p.gp >= minGp && p.mpg >= 15 && (!q || p.name.toLowerCase().includes(q))).sort((a, b) => (b[key] ?? -999) - (a[key] ?? -999)).slice(0, 120);
-  const input = h("input", { placeholder: "Search player…", value: SE.afilter || "", oninput: (e) => { SE.afilter = e.target.value; const pos = e.target.selectionStart; renderSeasonBody(); const i = $("#seasonBody input"); i.focus(); i.setSelectionRange(pos, pos); } });
-  const head = h("tr", {}, h("th", { class: "l" }, "Player"), ...ACOLS.map(([k, l]) => h("th", { class: `sortable ${key === k ? "sorted" : ""}`, onclick: () => { SE.asort = k; renderSeasonBody(); } }, l)));
-  return h("div", {}, h("div", { class: "filters" }, input, h("span", { class: "muted", style: { alignSelf: "center" } }, `${minGp}+ games, 15+ mpg`)),
-    simpleTable(head, rows.map((p) => h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name), h("span", { class: "muted" }, p.short))), ...ACOLS.map(([k]) => h("td", {}, p[k] == null ? "–" : p[k]))))));
+  const box = h("div", { id: "seasonAdv" });
+  if (!SE.advStats || !SE.advStats.rows?.length) return h("div", { class: "empty" }, "Advanced stats appear once games are played.");
+  renderStatsInto(box, SE.advStats);
+  return box;
 }
 function renderScheduleTab() {
   const teams = (S.meta?.teams || []).map((t) => t.name).filter((n) => (SE.data?.standings || []).some((r) => r.team === n));
@@ -861,7 +879,7 @@ function renderBracket() {
   renderSeriesDetail();
 }
 let bracketTimer = null;
-function scheduleBracket() { clearTimeout(bracketTimer); bracketTimer = setTimeout(refreshBracket, 600); }
+function scheduleBracket() { if (bracketTimer) return; bracketTimer = setTimeout(() => { bracketTimer = null; refreshBracket(); }, 700); }
 
 // ───────────────────────── teams & players ─────────────────────────
 const CD = { team: null, data: null, sel: 0, picker: null };
@@ -1262,19 +1280,67 @@ async function loadStats() {
   statsData=data;
   if(signature !== statsSignature) {statsSignature=signature; renderStats();}
 }
-function renderStats() {
-  if(!statsData)return;
-  const root=$("#statsBody"), left=root.scrollLeft, top=root.scrollTop;
-  if(statsData.reports) {
-    root.replaceChildren(...Object.entries(statsData.reports).map(([title,text])=>h("details",{},h("summary",{},title.replaceAll("_"," ")),h("pre",{},text))));
-  } else {
-    const search=$("#statsSearch").value.toLowerCase();
-    let rows=statsData.rows.filter(r=>!search || String(r[1]).toLowerCase().includes(search));
-    const c=statsSort.column;
-    if(c>=0) rows=[...rows].sort((a,b)=>statsSort.direction*(typeof a[c]==="number" && typeof b[c]==="number" ? a[c]-b[c] : String(a[c]??"").localeCompare(String(b[c]??""),undefined,{numeric:true})));
-    root.replaceChildren(rows.length ? h("table",{class:"stats"},h("thead",{},h("tr",{},statsData.columns.map((label,i)=>h("th",{},h("button",{class:"stat-sort",onclick:()=>{statsSort={column:i,direction:statsSort.column===i?-statsSort.direction:1};renderStats();}},label+(c===i?(statsSort.direction===1?" ↑":" ↓"):"")))))),h("tbody",{},rows.map(row=>h("tr",{},row.map(value=>h("td",{},value??"—")))))) : h("div",{class:"empty"},"No stats for this selection yet. Start a game or choose another source."));
+// ---- Tk-style stats table: team groups, rank by, "rank all players", minimum games. Used by the Stats tab and Season > Advanced.
+const STX = {};   // per-table state, keyed by the root element id
+const numOf = (v) => {
+  if (typeof v === "number") return v;
+  if (v == null || v === "—" || v === "") return -1e9;
+  const s = String(v);
+  const m = s.includes("·") ? s.match(/\/(\d+)/) : s.match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[1] !== undefined && s.includes("·") ? m[1] : m[0]) : -1e9;
+};
+function renderStatsInto(root, data, opts = {}) {
+  const st = (STX[root.id] ||= { rank: "Team order", flat: false, minGp: 0, search: "", sort: { column: -1, direction: -1 } });
+  if (data.reports) { root.replaceChildren(...Object.entries(data.reports).map(([title, text]) => h("details", {}, h("summary", {}, title.replaceAll("_", " ")), h("pre", {}, text)))); return; }
+  const cols = data.columns || [];
+  const colSig = cols.join("|");
+  if (st.colSig !== colSig) { st.colSig = colSig; st.rank = "Team order"; st.flat = false; st.sort = { column: -1, direction: -1 }; }   // a different table: start from team order
+  const hasPlayer = cols[1] === "Player";
+  if (!hasPlayer) {   // awards etc.: plain table
+    root.replaceChildren(data.rows.length ? h("table", { class: "stats" }, h("thead", {}, h("tr", {}, cols.map((c) => h("th", {}, c)))), h("tbody", {}, data.rows.map((r) => h("tr", {}, r.map((v) => h("td", {}, v ?? "—")))))) : h("div", { class: "empty" }, "Nothing here yet."));
+    return;
   }
-  root.scrollLeft=left;root.scrollTop=top;
+  const rerender = () => renderStatsInto(root, data, opts);
+  const rankCols = cols.slice(2).filter((c) => !["Opponent"].includes(c));
+  const maxGp = Math.max(1, ...(data.gp || [1]));
+  const controls = h("div", { class: "filters stx-controls" },
+    h("label", {}, "Rank by ", h("select", { onchange: (e) => { st.rank = e.target.value; st.sort = { column: -1, direction: -1 }; rerender(); } }, ["Team order", ...rankCols].map((c) => h("option", { value: c, selected: c === st.rank }, c)))),
+    h("label", {}, "Min games ", h("input", { type: "number", min: 0, max: maxGp, value: st.minGp, style: { width: "70px" }, onchange: (e) => { st.minGp = Math.max(0, Number(e.target.value) || 0); rerender(); } })),
+    h("label", { class: "chk" }, h("input", { type: "checkbox", checked: st.flat, onchange: (e) => { st.flat = e.target.checked; rerender(); } }), " Rank all players (no team headers)"),
+    h("label", {}, "Find player ", h("input", { type: "search", placeholder: "Player name", value: st.search, oninput: (e) => { st.search = e.target.value.toLowerCase(); const pos = e.target.selectionStart; rerender(); const i = $(`#${root.id} .stx-controls input[type=search]`); i.focus(); i.setSelectionRange(pos, pos); } })),
+    h("span", { class: "muted" }, `${maxGp > 1 ? `${maxGp} games played · ` : ""}click a column to sort`));
+  let items = data.rows.map((r, i) => ({ r, gp: data.gp?.[i] ?? maxGp }))
+    .filter((x) => x.gp >= st.minGp && (!st.search || String(x.r[1]).toLowerCase().includes(st.search)));
+  const colIdx = st.sort.column >= 0 ? st.sort.column : (st.rank !== "Team order" ? cols.indexOf(st.rank) : -1);
+  const dirn = st.sort.column >= 0 ? st.sort.direction : -1;
+  const byCol = (a, b) => dirn * (numOf(a.r[colIdx]) - numOf(b.r[colIdx]));
+  const defaultCol = Math.max(2, cols.findIndex((c) => ["MPG", "MIN"].includes(c)) >= 0 ? cols.findIndex((c) => ["MPG", "MIN"].includes(c)) : (cols.indexOf("TOTAL") >= 0 ? cols.indexOf("TOTAL") : 2));
+  const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;
+  const head = h("tr", {}, cols.map((label, i) => h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
+  const rowEl = (x, rank) => h("tr", {}, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 && rank ? `${rank}. ${v}` : (v ?? "—"))));
+  const body = [];
+  if (flat) {
+    let list = [...items];
+    if (colIdx >= 0) list.sort(byCol);
+    list.forEach((x, i) => body.push(rowEl(x, st.rank !== "Team order" || st.sort.column >= 0 ? i + 1 : null)));
+  } else {
+    const by = new Map();
+    items.forEach((x) => { (by.get(x.r[0]) || by.set(x.r[0], []).get(x.r[0])).push(x); });
+    for (const [team, list] of by) {
+      const id = identOf(team);
+      body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${list.length} players`)))));
+      list.sort((a, b) => numOf(b.r[defaultCol]) - numOf(a.r[defaultCol])).forEach((x) => body.push(rowEl(x, null)));
+    }
+  }
+  const prev = root.querySelector(".stx-wrap");
+  const left = prev ? prev.scrollLeft : 0, top = prev ? prev.scrollTop : 0;
+  const wrap = h("div", { class: "table-wrap tall stx-wrap" }, body.length ? h("table", { class: "stats avg" }, h("thead", {}, head), h("tbody", {}, body)) : h("div", { class: "empty" }, "No stats for this selection yet. Start a game or choose another source."));
+  root.replaceChildren(controls, wrap);
+  wrap.scrollLeft = left; wrap.scrollTop = top;
+}
+function renderStats() {
+  if (!statsData) return;
+  renderStatsInto($("#statsBody"), statsData);
 }
 
 // ───────────────────────── trade offers (the season pauses until you answer) ─────────────────────────
@@ -1371,6 +1437,10 @@ async function boot() {
   $("#oneTeamA").addEventListener("change",()=>fillOnePlayers("A")); $("#oneTeamB").addEventListener("change",()=>fillOnePlayers("B"));
   $("#oneStart").addEventListener("click",()=>startSpecial("1-on-1",{teamA:$("#oneTeamA").value,playerA:$("#onePlayerA").value,teamB:$("#oneTeamB").value,playerB:$("#onePlayerB").value,target:11,winBy:2}));
   $("#replayRefresh").addEventListener("click",loadReplays);
+  $$("#statsTabs button").forEach((b) => b.addEventListener("click", () => {
+    $$("#statsTabs button").forEach((x) => x.classList.toggle("on", x === b));
+    $("#statsKind").value = b.dataset.k; $("#statsKind").dispatchEvent(new Event("change", { bubbles: true }));
+  }));
   $("#statsRefresh").addEventListener("click",()=>loadStats().catch(e=>toast(e.message,"err")));
   for(const id of ["statsKind","statsSource","statsTeam","statsQuarter"]) $("#"+id).addEventListener("change",()=>{statsSignature="";statsSort.column=-1;loadStats().catch(e=>toast(e.message,"err"));});
   $("#statsSearch").addEventListener("input",renderStats);

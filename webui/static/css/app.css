@@ -547,3 +547,33 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 /* draft & trades: full-width stacked panels so the player tables have room */
 #view-draft .feature-grid { grid-template-columns: 1fr; }
 #view-draft .draft-board { max-height: none; overflow: visible; }
+
+/* award races & awards */
+.race-grid { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; align-items: start; }
+.race-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 14px 6px; background: rgba(2, 6, 15, .35); }
+.race-card h3 { margin: 0 0 10px; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-2); }
+.race-item { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 10px 6px; border-top: 1px solid var(--line); align-items: start; }
+.race-item .rk { font-weight: 800; color: var(--muted); font-size: 15px; padding-top: 8px; text-align: center; }
+.race-item.lead { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 16%, transparent), transparent 70%); border-radius: 10px; border-top-color: transparent; }
+.race-item.lead .rk { color: var(--accent-2); }
+.rtop { display: flex; align-items: center; gap: 10px; }
+.rtop .who, .award-item .p { font-weight: 800; font-size: 15px; line-height: 1.2; }
+.rtop .tm { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.rtop .tm .logo { width: 16px; height: 16px; font-size: 6px; border-radius: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px; border-radius: 8px; background: rgba(148, 163, 184, .09); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.chip b { font-size: 13px; color: var(--text); }
+.chip span { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+.chip.wide { background: transparent; }
+.award-grid { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+.award-card { padding: 14px; }
+.award-item { padding: 10px 6px; border-top: 1px solid var(--line); }
+.award-item:first-of-type { border-top: 0; }
+
+/* stats tables (Tk layout) */
+.stx-controls { margin-bottom: 8px; align-items: center; }
+.stx-controls .chk { display: inline-flex; align-items: center; gap: 6px; }
+#statsBody { overflow: visible; max-height: none; }
+.stx-wrap { max-height: calc(100vh - 380px); }
+
+.filters label:has(#statsSearch) { display: none; }

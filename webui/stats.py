@@ -44,7 +44,7 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
     if source not in data:
         source = next(iter(data), "Live")
     players, teams = data.get(source, ({}, {}))
-    result = {"sources": list(data), "source": source, "teams": list(players), "columns": [], "rows": []}
+    result = {"sources": list(data), "source": source, "teams": list(players), "columns": [], "rows": [], "gp": []}
     if kind == "reports":
         result["reports"] = {k: v for k, v in sec.items() if isinstance(v, str) and v.strip()}
         return result
@@ -88,14 +88,17 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
                         m = sum(d.get(k + "_made", 0) for k in keys)
                         return f"{m}/{a} · {100*m/a:.0f}%" if a else "0/0 · —"
                     result["rows"].append([tn, pn] + ([opponent] if kind == "matchups" else []) + [pair([k]) for k, _ in ZONES] + [pair(["three", "mid", "rim", "post", "dunk"])])
+                    result["gp"].append(st["games"])
             elif kind == "advanced":
                 tt = defaultdict(float, teams.get(tn, {}))
                 other = next((v for k, v in teams.items() if k != tn), {})
                 opp = defaultdict(float, {k: tt.get("opp_" + k, v) for k, v in other.items()})
                 adv = engine.calc_series_advanced(st, tt, opp)
                 result["rows"].append([tn, pn] + [round(x, 3 if i in (4, 5, 17) else 1) for i, x in enumerate(adv)])
+                result["gp"].append(st["games"])
             else:
                 pct = lambda m, a: round(100*st[m]/st[a], 1) if st[a] else None
                 pair = lambda m, a: f"{st[m]/g:.1f}/{st[a]/g:.1f}"
                 result["rows"].append([tn, pn, st["games"], round(st["minutes"]/60/g, 1)] + [round(st[k]/g, 1) for k in ("pts", "reb", "oreb", "ast", "stl", "blk", "tov", "pf")] + [pair("fgm", "fga"), pct("fgm", "fga"), pair("tpm", "tpa"), pct("tpm", "tpa"), pair("ftm", "fta"), pct("ftm", "fta"), round(st["plus_minus"]/g, 1)])
+                result["gp"].append(st["games"])
     return result
