@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .hub import EventHub
 from .runner import SimRunner
 from .live import team_identity
+from . import live
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(ROOT, "static")
@@ -264,6 +265,33 @@ def roster_payload(runner, team_name):
     return {"team": ident, "players": players}
 
 
+def compare_payload(runner):
+    sec = runner.sections or {}
+    totals = sec.get("_season_player_totals") or sec.get("_series_totals") or {}
+    keys = ("games", "minutes", "pts", "reb", "ast", "stl", "blk", "tov", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus")
+    out = {}
+    for team, players in totals.items():
+        ident = team_identity(team)
+        out[team] = {"short": ident["short"], "logo": ident["logo"], "players": {n: {k: st.get(k, 0) for k in keys} for n, st in players.items() if st.get("games", 0)}}
+    if out:
+        return {"teams": out, "source": "season" if sec.get("_season_player_totals") else "series"}
+    # no season/series yet: compare using the game being played
+    from . import live
+    a, b = live._teams()
+    if a is not None:
+        for team in (a, b):
+            ident = team_identity(team.name)
+            players = {}
+            for p in team.roster:
+                if getattr(p, "minutes", 0) <= 0:
+                    continue
+                players[p.name] = {"games": 1, "minutes": p.minutes, "pts": p.pts, "reb": p.reb, "ast": p.ast, "stl": getattr(p, "stl", 0),
+                                   "blk": getattr(p, "blk_stat", 0), "tov": p.tov, "fgm": p.fgm, "fga": p.fga, "tpm": p.tpm, "tpa": p.tpa,
+                                   "ftm": p.ftm, "fta": p.fta, "plus_minus": getattr(p, "plus_minus", 0)}
+            out[team.name] = {"short": ident["short"], "logo": ident["logo"], "players": players}
+    return {"teams": out, "source": "game"}
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -332,6 +360,16 @@ def build_app():
                 return self._json(highs_payload(runner))
             if path == "/api/season/schedule":
                 return self._json(schedule_payload(runner, (params.get("team") or [""])[0]))
+            if path == "/api/game/shots":
+                return self._json(live.shots_payload())
+            if path == "/api/game/quarters":
+                return self._json(live.quarters_payload())
+            if path == "/api/game/card":
+                return self._json(live.player_payload((params.get("team") or [""])[0], (params.get("name") or [""])[0]))
+            if path == "/api/game/players":
+                return self._json(live.players_for_card())
+            if path == "/api/compare":
+                return self._json(compare_payload(runner))
             if path == "/api/roster":
                 return self._json(roster_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/season/players":

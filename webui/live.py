@@ -131,3 +131,112 @@ def live_snapshot() -> Optional[Dict]:
         "possession": getattr(possession, "name", None),
         "teams": [team_block(team_a), team_block(team_b)],
     }
+
+
+# ---------------------------------------------------------------- shot chart, quarter box scores, player card
+def _zone(diet: Dict, key: str):
+    if key == "rim":
+        return [int(diet.get("rim_made", 0)) + int(diet.get("dunk_made", 0)), int(diet.get("rim", 0)) + int(diet.get("dunk", 0))]
+    if key == "paint":
+        att, made = int(diet.get("paint", 0)), int(diet.get("paint_made", 0))
+        if not att:
+            att, made = int(diet.get("rim", 0)), int(diet.get("rim_made", 0))
+        return [made, att]
+    return [int(diet.get(f"{key}_made", 0)), int(diet.get(key, 0))]
+
+
+def zones(diet: Optional[Dict]) -> Dict:
+    diet = diet or {}
+    return {k: _zone(diet, k) for k in ("rim", "paint", "mid", "three", "post", "dunk")}
+
+
+def _teams():
+    ctx = sim_engine.SIM_CONTEXT
+    a, b = ctx.get("teamA"), ctx.get("teamB")
+    return (a, b) if a is not None and b is not None else (None, None)
+
+
+def shots_payload() -> Dict:
+    a, b = _teams()
+    if a is None:
+        return {"teams": []}
+    out = []
+    for team in (a, b):
+        block = team_identity(team.name)
+        block["team"] = zones(getattr(team, "shot_diet", {}))
+        block["players"] = {p.name: zones(getattr(p, "shot_diet", {})) for p in team.roster if getattr(p, "fga", 0)}
+        out.append(block)
+    return {"teams": out}
+
+
+_QKEYS = ("minutes", "pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus")
+_TKEYS = ("score", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "points_paint", "fastbreak_pts", "second_chance_pts", "fouls_drawn")
+
+
+def _player_now(team, p) -> Dict:
+    snap = sim_engine.player_quarter_snapshot(team)
+    return snap.get(sim_engine.player_stat_key(team, p), {})
+
+
+def quarters_payload() -> Dict:
+    a, b = _teams()
+    if a is None:
+        return {"teams": [], "period": None}
+    period = sim_engine.SIM_CONTEXT.get("period") or 1
+    out = []
+    for team in (a, b):
+        done_team = list(getattr(team, "quarter_team_stats", []) or [])
+        done_players = getattr(team, "quarter_player_stats", {}) or {}
+        periods = {}
+        for row in done_team:
+            periods[row["period"]] = {"team": {k: row.get(k, 0) for k in _TKEYS}, "players": {}}
+        # the quarter being played: totals so far minus the finished quarters
+        cur = sim_engine.team_quarter_snapshot(team)
+        completed_periods = {r["period"] for r in done_team}
+        if period not in completed_periods:
+            live_team = {k: cur.get(k, 0) - sum(r.get(k, 0) for r in done_team) for k in _TKEYS}
+            periods[period] = {"team": live_team, "players": {}, "live": True}
+        snap = sim_engine.player_quarter_snapshot(team)
+        for p in team.roster:
+            key = sim_engine.player_stat_key(team, p)
+            rows = done_players.get(key, [])
+            for r in rows:
+                if r["period"] in periods:
+                    periods[r["period"]]["players"][p.name] = {k: r.get(k, 0) for k in _QKEYS}
+            if period not in completed_periods and period in periods:
+                now = snap.get(key, {})
+                periods[period]["players"][p.name] = {k: now.get(k, 0) - sum(r.get(k, 0) for r in rows) for k in _QKEYS}
+        ident = team_identity(team.name)
+        ident["periods"] = {str(k): v for k, v in sorted(periods.items())}
+        ident["roster"] = [{"name": p.name, "pos": p.position, "starter": bool(getattr(p, "started_game", False))} for p in team.roster]
+        out.append(ident)
+    return {"teams": out, "period": period}
+
+
+def player_payload(team_name: str, name: str) -> Dict:
+    a, b = _teams()
+    team = next((t for t in (a, b) if t is not None and t.name == team_name), None)
+    if team is None:
+        return {"error": "No live game"}
+    p = next((x for x in team.roster if x.name == name), None)
+    if p is None:
+        return {"error": "Unknown player"}
+    opp = b if team is a else a
+    line = player_line(p, None, any(x is p for x in team.on_floor))
+    fga, fta = p.fga, p.fta
+    line["ts"] = round(100 * p.pts / (2 * (fga + 0.44 * fta)), 1) if (fga + fta) else None
+    line["dreb"] = getattr(p, "dreb_stat", 0)
+    ident = team_identity(team.name)
+    return {
+        "team": ident, "opp": team_identity(opp.name) if opp else None, "score": [team.score, opp.score if opp else 0],
+        "player": line, "archetype": getattr(p, "archetype", ""), "badges": list(getattr(p, "badges", ()) or ()),
+        "shots": zones(getattr(p, "shot_diet", {})), "defended": zones(getattr(p, "defended_diet", {})),
+        "period": sim_engine.SIM_CONTEXT.get("period"), "clock": sim_engine.SIM_CONTEXT.get("period_time"),
+    }
+
+
+def players_for_card():
+    a, b = _teams()
+    if a is None:
+        return []
+    return [{"team": t.name, "short": short_name(t.name), "players": [p.name for p in sorted(t.roster, key=lambda x: -x.minutes)]} for t in (a, b)]

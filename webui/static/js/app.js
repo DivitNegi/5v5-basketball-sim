@@ -316,6 +316,8 @@ function closeBlock(m) {
     h("div", { class: scored >= 0 ? "result made" : "result" }, result),
     detail.length ? h("div", { class: "detail" }, detail.slice(-2).join(" ")) : null,
   ].filter(Boolean));
+  S.plays.unshift({ period, clock, score: `${now[0]}-${now[1]}`, text: feed.lines.join(" ") });
+  S.plays.length = Math.min(S.plays.length, 1500);
   root.prepend(block);
   applyFeedFilter(block);
   while (root.children.length > 450) root.lastChild.remove();
@@ -435,7 +437,7 @@ function resetGame(msg) {
     SE.data = null; SE.players = null; refreshSeason();
     return;
   }
-  S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
+  S.plays = []; S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
   S.identities = msg.teams || [null, null];
   (msg.teams || []).forEach((t, i) => {     // keep the setup bar on the teams actually playing
     const full = S.meta?.teams.find((x) => x.name === t.name) || t;
@@ -468,7 +470,7 @@ function connect() {
       case "reset": resetGame(msg); break;
       case "pbp": addFeedLine(msg.text); break;
       case "score": applyScore(msg); break;
-      case "live": applyLive(msg.data); break;
+      case "live": applyLive(msg.data); scheduleGameViews(); break;
       case "status": applyStatus(msg); break;
       case "series":
         if (msg.series_status?.startsWith("SERIES FINAL")) $("#sbSeries").textContent = `${S.seriesText || "Series"} · Final`;
@@ -739,6 +741,182 @@ function renderPlayerCard() {
       h("span", {}, it.label), h("div", { class: "track" }, h("div", { class: "fill", style: { width: `${it.value}%`, background: ratingColor(it.value) } })), h("span", { class: "val" }, it.value)))))));
 }
 
+// ───────────────────────── in-game views: player card, shot chart, quarters, compare ─────────────────────────
+const GV = { qtr: "1", pc: { team: null, name: null, quarter: "all" }, shot: [ "Team", "Team" ], comp: { a: [null, null], b: [null, null], data: null } };
+S.plays = [];
+let gvTimer = null;
+function scheduleGameViews() {
+  if (gvTimer) return;
+  gvTimer = setTimeout(() => { gvTimer = null; refreshGameViews(); }, 1200);
+}
+function refreshGameViews() {
+  const active = $(".view.active")?.id;
+  if (active === "view-qtr") loadQuarters();
+  else if (active === "view-pcard") loadPlayerCard();
+  else if (active === "view-shots") loadShots();
+}
+const pct1 = (m, a) => (a ? (100 * m / a).toFixed(1) : "–");
+
+// ---- quarters
+async function loadQuarters() {
+  const d = await api.get("/api/game/quarters");
+  const tabs = $("#qtrTabs");
+  if (!d.teams.length) { $("#qtrBody").replaceChildren(h("div", { class: "empty" }, "Quarter box scores appear once a game is going.")); return; }
+  const have = [...new Set(d.teams.flatMap((t) => Object.keys(t.periods)))].map(Number).sort((x, y) => x - y);
+  const label = (n) => (n <= 4 ? `Q${n}` : n === 5 ? "OT" : `OT${n - 4}`);
+  tabs.replaceChildren(...have.map((n) => h("button", { class: String(n) === GV.qtr ? "on" : "", onclick: () => { GV.qtr = String(n); loadQuarters(); } }, label(n))));
+  if (!have.includes(Number(GV.qtr))) GV.qtr = String(have[have.length - 1]);
+  const blocks = d.teams.map((t) => {
+    const per = t.periods[GV.qtr];
+    if (!per) return h("div", {}, h("h3", {}, t.short), h("div", { class: "muted" }, "Not played yet."));
+    const tm = per.team;
+    const rows = t.roster.map((p) => ({ p, r: per.players[p.name] })).filter((x) => x.r && (x.r.minutes > 0 || x.r.pts || x.r.reb || x.r.ast || x.r.fga || x.r.tov));
+    const head = ["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "OREB", "DREB", "PF", "+/-", "FG", "3PT", "FT", "FG%", "TS%"];
+    const row = ({ p, r }) => {
+      const tsd = 2 * (r.fga + 0.44 * r.fta);
+      return h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, h("span", { class: "slot" }, p.pos), h("span", { class: "pname" }, p.name))),
+        h("td", {}, (r.minutes / 60).toFixed(1)), h("td", { class: "pts" }, r.pts), h("td", {}, r.reb), h("td", {}, r.ast), h("td", {}, r.stl), h("td", {}, r.blk), h("td", {}, r.tov),
+        h("td", {}, r.oreb), h("td", {}, r.dreb), h("td", {}, r.pf), h("td", {}, r.plus_minus > 0 ? `+${r.plus_minus}` : r.plus_minus),
+        h("td", {}, `${r.fgm}-${r.fga}`), h("td", {}, `${r.tpm}-${r.tpa}`), h("td", {}, `${r.ftm}-${r.fta}`), h("td", {}, pct1(r.fgm, r.fga)), h("td", {}, tsd ? (100 * r.pts / tsd).toFixed(1) : "–"));
+    };
+    return h("div", {}, h("div", { class: "court-team-head", style: { "--c": t.color, borderRadius: "10px" } }, logoEl(t), t.short,
+      h("span", { class: "tot" }, `${tm.score} pts · ${tm.reb} reb · ${tm.ast} ast · FG ${tm.fgm}-${tm.fga} · 3PT ${tm.tpm}-${tm.tpa} · paint ${tm.points_paint} · fast break ${tm.fastbreak_pts}`)),
+      h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...head.map((x) => h("th", {}, x)))), h("tbody", {}, rows.map(row)))));
+  });
+  $("#qtrBody").replaceChildren(h("div", { style: { display: "grid", gap: "18px" } }, blocks));
+}
+
+// ---- player card
+async function loadPlayerCard() {
+  const list = await api.get("/api/game/players");
+  const pick = $("#pcardPick");
+  if (!list.length) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, "Start a game, then pick a player.")); return; }
+  if (!GV.pc.team || !list.some((t) => t.team === GV.pc.team)) GV.pc.team = list[0].team;
+  const roster = list.find((t) => t.team === GV.pc.team).players;
+  if (!roster.includes(GV.pc.name)) GV.pc.name = roster[0];
+  pick.replaceChildren(
+    h("select", { onchange: (e) => { GV.pc.team = e.target.value; GV.pc.name = null; loadPlayerCard(); } }, list.map((t) => h("option", { value: t.team, selected: t.team === GV.pc.team }, t.short))),
+    h("select", { onchange: (e) => { GV.pc.name = e.target.value; loadPlayerCard(); } }, roster.map((n) => h("option", { value: n, selected: n === GV.pc.name }, n))),
+    h("div", { class: "seg small" }, ["all", "1", "2", "3", "4", "OT"].map((q) => h("button", { class: GV.pc.quarter === q ? "on" : "", onclick: () => { GV.pc.quarter = q; loadPlayerCard(); } }, q === "all" ? "All plays" : q === "OT" ? "OT" : `Q${q}`))));
+  const d = await api.get(`/api/game/card?team=${encodeURIComponent(GV.pc.team)}&name=${encodeURIComponent(GV.pc.name)}`);
+  if (d.error) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, d.error)); return; }
+  const p = d.player;
+  const face = h("div", { class: "pcard-face", style: { "--c": d.team.color } }, p.name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
+  withImage(face, `/media/headshot?name=${encodeURIComponent(p.name)}`);
+  const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v));
+  const zoneBox = (title, z) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
+    h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))));
+  const qmatch = (pb) => GV.pc.quarter === "all" || String(periodIndex(pb.period) + 1) === GV.pc.quarter || (GV.pc.quarter === "OT" && periodIndex(pb.period) >= 4);
+  const plays = S.plays.filter((pb) => pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
+  $("#pcardBody").replaceChildren(
+    h("div", { class: "pcard-head" }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null),
+      h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.listed}${d.archetype ? ` · ${d.archetype}` : ""} · ${p.on ? "on the floor" : "bench"}`),
+      h("div", { class: "badges" }, d.badges.map((b) => h("span", { class: "badge" }, b.replace(/_/g, " "))))),
+      h("div", { class: "pcard-ovr" }, h("div", { class: "n" }, `${p.pts}`), h("small", {}, `pts · ${p.reb} reb · ${p.ast} ast`))),
+    h("div", { class: "stat-tiles" }, tile("MIN", p.min.toFixed(1)), tile("PTS", p.pts), tile("REB", p.reb), tile("AST", p.ast), tile("STL", p.stl), tile("BLK", p.blk), tile("TO", p.tov), tile("PF", p.pf),
+      tile("+/-", p.pm > 0 ? `+${p.pm}` : p.pm), tile("FG", `${p.fgm}/${p.fga}`), tile("3PT", `${p.tpm}/${p.tpa}`), tile("FT", `${p.ftm}/${p.fta}`), tile("FG%", pct1(p.fgm, p.fga)), tile("TS%", p.ts ?? "–")),
+    h("div", { class: "conf-grid" }, zoneBox("Shot diet", d.shots), zoneBox("Shots defended", d.defended)),
+    h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Plays involving ${p.name}`),
+    h("div", { class: "pc-plays" }, plays.length ? plays.map((pb) => h("div", { class: "ev score" }, h("div", { class: "rail", style: { background: "var(--line-strong)" } }, ""), h("div", {}, h("span", { class: "sc" }, `${pb.period} ${pb.clock} · ${pb.score}`), pb.text))) : h("div", { class: "muted" }, "No plays logged yet for this selection.")));
+}
+function zoneClass(key, made, att) {
+  if (!att) return "none";
+  const pct = 100 * made / att;
+  const [hi, lo] = key === "rim" ? [50, 40] : key === "mid" ? [40, 30] : key === "post" ? [48, 38] : [42, 33];
+  return pct > hi ? "good" : pct >= lo ? "ok" : "bad";
+}
+function zoneCard(label, v, key) {
+  const [m, a] = v || [0, 0];
+  return h("div", { class: `zone ${zoneClass(key, m, a)}` }, h("div", { class: "z" }, label), h("div", { class: "n" }, `${m}/${a}`), h("div", { class: "p" }, a ? `${(100 * m / a).toFixed(0)}%` : "–"));
+}
+
+// ---- shot chart
+async function loadShots() {
+  const d = await api.get("/api/game/shots");
+  if (!d.teams.length) { $("#shotBody").replaceChildren(h("div", { class: "empty" }, "The shot chart fills in as the game goes.")); return; }
+  $("#shotPick").replaceChildren(...d.teams.map((t, i) => h("select", { onchange: (e) => { GV.shot[i] = e.target.value; loadShots(); } },
+    h("option", { value: "Team" }, `${t.short} · whole team`), Object.keys(t.players).map((n) => h("option", { value: n, selected: n === GV.shot[i] }, n)))));
+  const W = 960, H = 520;
+  const ns = "http://www.w3.org/2000/svg";
+  const line = 'stroke="#e8edf6" stroke-opacity=".55" stroke-width="2" fill="none"';
+  const half = (t, i, flip) => {
+    const subj = GV.shot[i] !== "Team" && t.players[GV.shot[i]] ? t.players[GV.shot[i]] : t.team;
+    const name = GV.shot[i] !== "Team" && t.players[GV.shot[i]] ? GV.shot[i] : "TEAM";
+    const x0 = flip ? W / 2 : 0, sx = flip ? -1 : 1;
+    const X = (v) => (flip ? W - v : v);
+    const card = (cx, cy, label, v, key) => {
+      const [m, a] = v;
+      const cls = zoneClass(key, m, a);
+      const fill = { good: "#22c55e", ok: "#f5a524", bad: "#f43f5e", none: "#64748b" }[cls];
+      return `<g transform="translate(${X(cx) - 54},${cy - 34})"><rect width="108" height="68" rx="12" fill="${fill}" fill-opacity=".28" stroke="${fill}" stroke-width="2"/>
+        <text x="54" y="20" text-anchor="middle" fill="#e8edf6" font-size="12" font-weight="800" letter-spacing="1.4">${label}</text>
+        <text x="54" y="42" text-anchor="middle" fill="#fff" font-size="19" font-weight="800">${m}/${a}</text>
+        <text x="54" y="59" text-anchor="middle" fill="#e8edf6" font-size="12">${a ? Math.round(100 * m / a) + "%" : "–"}</text></g>`;
+    };
+    return `<g>
+      <path d="M ${X(0)} 80 L ${X(150)} 80 A 270 270 0 0 1 ${X(150)} 440 L ${X(0)} 440" ${line}/>
+      <rect x="${flip ? W - 190 : 0}" y="170" width="190" height="180" ${line}/>
+      <circle cx="${X(190)}" cy="260" r="60" ${line}/>
+      <circle cx="${X(52)}" cy="260" r="9" stroke="#f5a524" stroke-width="3" fill="none"/>
+      <path d="M ${X(34)} 236 L ${X(34)} 284" stroke="#e8edf6" stroke-width="3"/>
+      ${card(flip ? 190 : 190, 262, "RIM", subj.rim, "rim")}
+      ${card(flip ? 330 : 330, 160, "MID", subj.mid, "mid")}
+      ${card(flip ? 420 : 420, 330, "3PT", subj.three, "three")}
+      <text x="${X(flip ? 28 : 28)}" y="40" text-anchor="${flip ? "end" : "start"}" fill="${t.color}" font-size="20" font-weight="800">${t.short}</text>
+      <text x="${X(28)}" y="62" text-anchor="${flip ? "end" : "start"}" fill="#a7b2c5" font-size="13">${name}</text></g>`;
+  };
+  const svg = `<svg class="court-svg" viewBox="0 0 ${W} ${H}"><rect x="2" y="60" width="${W - 4}" height="400" rx="14" fill="#13203a" stroke="#e8edf6" stroke-opacity=".45" stroke-width="2"/>
+    <line x1="${W / 2}" y1="60" x2="${W / 2}" y2="460" ${line}/><circle cx="${W / 2}" cy="260" r="56" ${line}/>
+    ${half(d.teams[0], 0, false)}${half(d.teams[1], 1, true)}</svg>`;
+  $("#shotBody").innerHTML = svg;
+}
+
+// ---- compare
+const COMPARE_ROWS = [
+  ["Games", (s) => s.games, null], ["Minutes / game", (s, g) => s.minutes / 60 / g, "hi"], ["Points / game", (s, g) => s.pts / g, "hi"], ["Rebounds / game", (s, g) => s.reb / g, "hi"],
+  ["Assists / game", (s, g) => s.ast / g, "hi"], ["Steals / game", (s, g) => s.stl / g, "hi"], ["Blocks / game", (s, g) => s.blk / g, "hi"], ["Turnovers / game", (s, g) => s.tov / g, "lo"],
+  ["FG%", (s) => 100 * s.fgm / Math.max(1, s.fga), "hi"], ["3P%", (s) => 100 * s.tpm / Math.max(1, s.tpa), "hi"], ["FT%", (s) => 100 * s.ftm / Math.max(1, s.fta), "hi"],
+  ["eFG%", (s) => 100 * (s.fgm + 0.5 * s.tpm) / Math.max(1, s.fga), "hi"], ["TS%", (s) => 100 * s.pts / Math.max(1, 2 * (s.fga + 0.44 * s.fta)), "hi"],
+  ["Points / 36", (s) => 36 * s.pts / Math.max(1, s.minutes / 60), "hi"], ["Rebounds / 36", (s) => 36 * s.reb / Math.max(1, s.minutes / 60), "hi"], ["Assists / 36", (s) => 36 * s.ast / Math.max(1, s.minutes / 60), "hi"],
+  ["Stocks / 36", (s) => 36 * (s.stl + s.blk) / Math.max(1, s.minutes / 60), "hi"], ["AST / TOV", (s) => s.ast / Math.max(1, s.tov), "hi"], ["Plus-minus / game", (s, g) => s.plus_minus / g, "hi"],
+];
+async function loadCompare() {
+  const d = await api.get("/api/compare");
+  GV.comp.data = d;
+  const teams = Object.keys(d.teams).sort();
+  if (!teams.length) { $("#compBody").replaceChildren(h("div", { class: "empty" }, "Pick two players once games have been played.")); return; }
+  $("#compSource").textContent = `Uses the ${d.source} totals`;
+  for (const [i, side] of ["a", "b"].entries()) {
+    const c = GV.comp[side];
+    if (!c[0] || !d.teams[c[0]]) c[0] = teams[Math.min(i, teams.length - 1)];
+    const roster = Object.keys(d.teams[c[0]].players).sort((x, y) => d.teams[c[0]].players[y].minutes - d.teams[c[0]].players[x].minutes);
+    if (!c[1] || !roster.includes(c[1])) c[1] = roster[0];
+  }
+  renderCompare2();
+}
+function renderCompare2() {
+  const d = GV.comp.data;
+  const teams = Object.keys(d.teams).sort();
+  const pick = $("#compPick");
+  const selectors = ["a", "b"].map((side) => {
+    const c = GV.comp[side];
+    const roster = Object.keys(d.teams[c[0]].players).sort((x, y) => d.teams[c[0]].players[y].minutes - d.teams[c[0]].players[x].minutes);
+    return [h("select", { onchange: (e) => { c[0] = e.target.value; c[1] = null; loadCompare(); } }, teams.map((t) => h("option", { value: t, selected: t === c[0] }, d.teams[t].short + ` (${t.slice(0, 4)})`))),
+      h("select", { onchange: (e) => { c[1] = e.target.value; renderCompare2(); } }, roster.map((n) => h("option", { value: n, selected: n === c[1] }, n)))];
+  });
+  pick.replaceChildren(...selectors[0], h("span", { class: "muted", style: { alignSelf: "center" } }, "vs"), ...selectors[1]);
+  const sa = d.teams[GV.comp.a[0]].players[GV.comp.a[1]], sb = d.teams[GV.comp.b[0]].players[GV.comp.b[1]];
+  const ga = Math.max(1, sa.games), gb = Math.max(1, sb.games);
+  const body = COMPARE_ROWS.map(([label, fn, dir]) => {
+    const va = fn(sa, ga), vb = fn(sb, gb);
+    const better = dir === "hi" ? (va > vb ? 0 : vb > va ? 1 : -1) : dir === "lo" ? (va < vb ? 0 : vb < va ? 1 : -1) : -1;
+    const f = (v) => (Number.isInteger(v) ? v : v.toFixed(label === "AST / TOV" ? 2 : 1));
+    return h("tr", {}, h("td", {}, label), h("td", { class: better === 0 ? "better" : "" }, f(va)), h("td", { class: better === 1 ? "better" : "" }, f(vb)));
+  });
+  $("#compBody").replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "stats cmp-table" },
+    h("thead", {}, h("tr", {}, h("th", {}, "Stat"), h("th", {}, GV.comp.a[1]), h("th", {}, GV.comp.b[1]))), h("tbody", {}, body))));
+}
+
 // ───────────────────────── boot ─────────────────────────
 async function boot() {
   S.meta = await api.get("/api/meta");
@@ -806,6 +984,8 @@ async function boot() {
     if (b.dataset.view === "season") refreshSeason();
     if (b.dataset.view === "bracket") refreshBracket();
     if (b.dataset.view === "cards" && !CD.data) loadRoster(S.teamA);
+    if (["qtr", "pcard", "shots"].includes(b.dataset.view)) refreshGameViews();
+    if (b.dataset.view === "comp") loadCompare();
   }));
   document.addEventListener("keydown", (e) => {
     if (e.target.matches("input, select, textarea")) return;

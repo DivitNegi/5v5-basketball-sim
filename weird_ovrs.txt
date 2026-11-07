@@ -1,0 +1,147 @@
+1. OVR ABOVE 99 (only centers are capped at 99)
+
+  101  Michael Jordan             1992 USA Dream Team          SG usage 0.35  
+  101  Stephen Curry              2024 Olympic USA             PG usage 0.30  
+
+2. LOW-USAGE ROLE-PLAYER CENTERS RATED 80+ (they barely touch the ball; the center formula rewards rim/defense/rebounding only)
+Rated like stars next to players who score far more.
+   94  Wilt Chamberlain           1972 Los Angeles Lakers      C  usage 0.16  rim 0.93 idef 0.98 3pt 0.33
+   93  Rudy Gobert                2021 Utah Jazz               C  usage 0.16  rim 0.92 idef 0.99 3pt 0.05
+   92  Rudy Gobert                2027 Minnesota Timberwolves  C  usage 0.11  rim 0.92 idef 0.99 3pt 0.05
+   91  DeAndre Jordan             2018 Los Angeles Clippers    C  usage 0.05  rim 0.94 idef 0.93 3pt 0.19
+   87  Clint Capela               2021 Atlanta Hawks           C  usage 0.14  rim 0.92 idef 0.88 3pt 0.05
+   87  Rudy Gobert                2024 Minnesota Timberwolves  C  usage 0.14  rim 0.92 idef 0.99 3pt 0.05
+   86  Daniel Theis               2018 Boston Celtics          C  usage 0.04  rim 0.92 idef 0.86 3pt 0.64
+   86  Steven Adams               2018 Oklahoma City Thunder   C  usage 0.15  rim 0.93 idef 0.90 3pt 0.05
+   86  Rudy Gobert                2026 Minnesota Timberwolves  C  usage 0.13  rim 0.90 idef 0.95 3pt 0.05
+   85  Neemias Queta              2027 Boston Celtics          C  usage 0.10  rim 0.91 idef 0.92 3pt 0.00
+   85  Steven Adams               2016 Oklahoma City Thunder   C  usage 0.16  rim 0.92 idef 0.83 3pt 0.19
+   84  Tyson Chandler             2013 New York Knicks         C  usage 0.10  rim 0.92 idef 0.95 3pt 0.05
+   84  Mitchell Robinson          2026 New York Knicks         C  usage 0.10  rim 0.92 idef 0.83 3pt 0.05
+   84  Jalen Duren                2027 Detroit Pistons         C  usage 0.14  rim 0.96 idef 0.89 3pt 0.35
+   82  Jarrett Allen              2018 Brooklyn Nets           C  usage 0.12  rim 0.92 idef 0.95 3pt 0.23
+   82  Rudy Gobert                2024 Olympic France          C  usage 0.14  rim 0.88 idef 0.99 3pt 0.35
+   82  Jakob Poeltl               2027 Toronto Raptors         C  usage 0.05  rim 0.92 idef 0.85 3pt 0.05
+   81  Dwight Howard              2020 Los Angeles Lakers      C  usage 0.10  rim 0.88 idef 0.97 3pt 0.05
+   81  Daniel Gafford             2027 Dallas Mavericks        C  usage 0.13  rim 0.93 idef 0.86 3pt 0.05
+   81  David Robinson             2003 San Antonio Spurs       C  usage 0.16  rim 0.88 idef 0.95 3pt 0.08
+   80  Donovan Clingan            2027 Portland Trail Blazers  C  usage 0.14  rim 0.94 idef 0.89 3pt 0.75
+   80  Mason Plumlee              2018 Denver Nuggets          C  usage 0.08  rim 0.92 idef 0.91 3pt 0.19
+   80  Andre Drummond             2018 Detroit Pistons         C  usage 0.15  rim 0.89 idef 0.95 3pt 0.17
+
+3. SHOOTING BIGS RATED UNDER 70 (good shooters, but the center formula only counts dunks, blocks and rim protection)
+
+   53  Marreese Speights          2018 Orlando Magic           C  usage 0.23  3pt 0.76 mid 0.71 rim 0.64
+   55  Moritz Wagner              2024 Orlando Magic           C  usage 0.12  3pt 0.78 mid 0.78 rim 0.86
+   56  Spencer Hawes              2015 Los Angeles Clippers    C  usage 0.08  3pt 0.76 mid 0.76 rim 0.78
+   57  Ousmane Dieng              2026 Milwaukee Bucks         C  usage 0.21  3pt 0.73 mid 0.70 rim 0.73
+   57  Hannes Steinbach           2027 Charlotte Hornets       C  usage 0.13  3pt 0.70 mid 0.70 rim 0.75
+   57  Dirk Nowitzki              2018 Dallas Mavericks        C  usage 0.18  3pt 0.84 mid 0.74 rim 0.85
+   58  Pero Antic                 2015 Atlanta Hawks           C  usage 0.06  3pt 0.76 mid 0.72 rim 0.74
+   58  Dario Saric                2021 Phoenix Suns            C  usage 0.14  3pt 0.80 mid 0.82 rim 0.80
+   58  Frank Kaminsky             2021 Phoenix Suns            C  usage 0.10  3pt 0.76 mid 0.80 rim 0.78
+   59  PJ Tucker                  2020 Houston Rockets         C  usage 0.10  3pt 0.78 mid 0.70 rim 0.78
+   60  Marvin Bagley III          2027 Denver Nuggets          C  usage 0.20  3pt 0.72 mid 0.78 rim 0.81
+   60  Thomas Bryant              2025 Indiana Pacers          C  usage 0.10  3pt 0.76 mid 0.76 rim 0.86
+   61  Zach Collins               2027 Chicago Bulls           C  usage 0.12  3pt 0.79 mid 0.79 rim 0.89
+   61  Maxime Raynaud             2026 Sacramento Kings        C  usage 0.18  3pt 0.68 mid 0.82 rim 0.84
+   61  Duop Reath                 2024 Olympic Australia       C  usage 0.14  3pt 0.79 mid 0.76 rim 0.82
+   61  Micah Potter               2026 Indiana Pacers          C  usage 0.18  3pt 0.83 mid 0.82 rim 0.88
+   61  Mehmet Okur                2004 Detroit Pistons         C  usage 0.16  3pt 0.80 mid 0.82 rim 0.82
+   62  Thomas Bryant              2027 Cleveland Cavaliers     C  usage 0.10  3pt 0.79 mid 0.85 rim 0.97
+   62  Nikola Vučević             2026 Boston Celtics          C  usage 0.21  3pt 0.71 mid 0.70 rim 0.75
+   62  Luka Garza                 2026 Boston Celtics          C  usage 0.18  3pt 0.80 mid 0.86 rim 0.91
+   62  Mike Muscala               2018 Atlanta Hawks           C  usage 0.07  3pt 0.79 mid 0.83 rim 0.90
+   62  Kyle Filipowski            2026 Utah Jazz               C  usage 0.20  3pt 0.70 mid 0.77 rim 0.83
+   62  Santi Aldama               2027 Dallas Mavericks        C  usage 0.16  3pt 0.83 mid 0.80 rim 0.82
+   63  Jock Landale               2027 Atlanta Hawks           C  usage 0.12  3pt 0.81 mid 0.72 rim 0.98
+   63  Maxime Raynaud             2027 Sacramento Kings        C  usage 0.12  3pt 0.72 mid 0.85 rim 0.98
+   63  Day'Ron Sharpe             2027 Brooklyn Nets           C  usage 0.12  3pt 0.69 mid 0.74 rim 0.90
+   63  Sandro Mamukelashvili      2026 Toronto Raptors         C  usage 0.19  3pt 0.77 mid 0.81 rim 0.86
+   63  Jaylin Williams            2024 Oklahoma City Thunder   C  usage 0.10  3pt 0.76 mid 0.74 rim 0.82
+   64  Brook Lopez                2026 Los Angeles Clippers    C  usage 0.17  3pt 0.76 mid 0.71 rim 0.76
+   64  Kyle Filipowski            2027 Utah Jazz               C  usage 0.14  3pt 0.76 mid 0.70 rim 0.97
+   64  Brook Lopez                2018 Los Angeles Lakers      C  usage 0.24  3pt 0.79 mid 0.84 rim 0.92
+   64  Wendell Carter Jr.         2024 Orlando Magic           C  usage 0.14  3pt 0.78 mid 0.78 rim 0.86
+   64  Wendell Carter Jr.         2027 Orlando Magic           C  usage 0.14  3pt 0.75 mid 0.86 rim 0.86
+   64  Nikola Vučević             2027 Orlando Magic           C  usage 0.16  3pt 0.81 mid 0.83 rim 0.92
+   64  LaMarcus Aldridge          2022 Brooklyn Nets           C  usage 0.16  3pt 0.78 mid 0.88 rim 0.82
+   64  Bill Laimbeer              1989 Detroit Pistons         C  usage 0.18  3pt 0.69 mid 0.85 rim 0.84
+   64  Jaylin Williams            2027 Oklahoma City Thunder   C  usage 0.12  3pt 0.82 mid 0.85 rim 0.83
+   65  Nikola Vučević             2026 Chicago Bulls           C  usage 0.21  3pt 0.78 mid 0.79 rim 0.79
+   65  Jock Landale               2026 Memphis Grizzlies       C  usage 0.19  3pt 0.77 mid 0.78 rim 0.82
+   65  Onyeka Okongwu             2027 Atlanta Hawks           C  usage 0.16  3pt 0.83 mid 0.82 rim 0.88
+   65  Jusuf Nurkic               2027 Utah Jazz               C  usage 0.12  3pt 0.79 mid 0.88 rim 0.97
+   65  Moritz Wagner              2024 Olympic Germany         C  usage 0.18  3pt 0.78 mid 0.80 rim 0.86
+   65  JT Thor                    2024 Olympic South Sudan     C  usage 0.15  3pt 0.76 mid 0.74 rim 0.82
+   65  Larry Nance Jr.            2024 New Orleans Pelicans    C  usage 0.08  3pt 0.76 mid 0.74 rim 0.86
+   65  Marreese Speights          2016 Golden State Warriors   C  usage 0.14  3pt 0.72 mid 0.82 rim 0.82
+   66  Brook Lopez                2021 Milwaukee Bucks         C  usage 0.18  3pt 0.80 mid 0.82 rim 0.84
+   66  Aron Baynes                2018 Boston Celtics          C  usage 0.13  3pt 0.70 mid 0.70 rim 0.88
+   66  Jusuf Nurkic               2026 Utah Jazz               C  usage 0.19  3pt 0.72 mid 0.75 rim 0.79
+   66  Jock Landale               2024 Olympic Australia       C  usage 0.22  3pt 0.70 mid 0.78 rim 0.86
+   66  Josh Hawkinson             2024 Olympic Japan           C  usage 0.23  3pt 0.82 mid 0.80 rim 0.84
+   66  Naz Reid                   2024 Minnesota Timberwolves  C  usage 0.18  3pt 0.84 mid 0.82 rim 0.86
+   66  Naz Reid                   2026 Minnesota Timberwolves  C  usage 0.22  3pt 0.79 mid 0.75 rim 0.79
+   67  Jalen Smith                2026 Chicago Bulls           C  usage 0.19  3pt 0.78 mid 0.79 rim 0.85
+   67  Brook Lopez                2027 Los Angeles Clippers    C  usage 0.12  3pt 0.80 mid 0.74 rim 0.94
+   67  Onyeka Okongwu             2026 Atlanta Hawks           C  usage 0.20  3pt 0.80 mid 0.78 rim 0.81
+   67  Wendell Carter Jr.         2026 Orlando Magic           C  usage 0.16  3pt 0.69 mid 0.81 rim 0.87
+   67  Goga Bitadze               2027 Orlando Magic           C  usage 0.10  3pt 0.69 mid 0.72 rim 0.98
+   67  Jay Huff                   2027 Indiana Pacers          C  usage 0.10  3pt 0.77 mid 0.82 rim 0.98
+   68  Naz Reid                   2027 Charlotte Hornets       C  usage 0.16  3pt 0.83 mid 0.73 rim 0.97
+   68  Jonas Valanciunas          2024 New Orleans Pelicans    C  usage 0.18  3pt 0.78 mid 0.82 rim 0.88
+   69  Isaiah Stewart             2027 Memphis Grizzlies       C  usage 0.12  3pt 0.77 mid 0.77 rim 0.92
+   69  Nikola Vučević             2018 Orlando Magic           C  usage 0.25  3pt 0.73 mid 0.70 rim 0.95
+   69  DeMarcus Cousins           2019 Golden State Warriors   C  usage 0.22  3pt 0.78 mid 0.82 rim 0.88
+   69  Al Horford                 2027 Golden State Warriors   C  usage 0.10  3pt 0.80 mid 0.79 rim 0.92
+
+4. STARS FROM BEFORE THE THREE-POINT LINE (1962-1979) RATED LOW (their three-point rating is a 0.33 placeholder that drags the guard/wing formula down)
+
+   64  Gus Williams               1979 Seattle SuperSonics     PG usage 0.26  three-point rating is the 0.33 placeholder; mid 0.85
+   69  Gail Goodrich              1972 Los Angeles Lakers      SG usage 0.34  three-point rating is the 0.33 placeholder; mid 0.90
+   70  Walt Frazier               1973 New York Knicks         PG usage 0.24  three-point rating is the 0.33 placeholder; mid 0.88
+   70  Jerry West                 1972 Los Angeles Lakers      PG usage 0.44  three-point rating is the 0.33 placeholder; mid 0.92
+   72  Sam Jones                  1962 Boston Celtics          SG usage 0.24  three-point rating is the 0.33 placeholder; mid 0.92
+   73  Hal Greer                  1967 Philadelphia 76ers      SG usage 0.26  three-point rating is the 0.33 placeholder; mid 0.92
+   74  Chet Walker                1967 Philadelphia 76ers      SF usage 0.22  three-point rating is the 0.33 placeholder; mid 0.85
+   75  Tom Heinsohn               1962 Boston Celtics          PF usage 0.24  three-point rating is the 0.33 placeholder; mid 0.86
+   77  Billy Cunningham           1967 Philadelphia 76ers      SF usage 0.24  three-point rating is the 0.33 placeholder; mid 0.83
+
+5. 94+ WITH A LOW USAGE (the formula likes playmaking, shooting and defense and ignores how much of the offense a player carries)
+
+   96  Kyrie Irving               2018 Boston Celtics          PG usage 0.23  
+   96  Tyrese Haliburton          2027 Indiana Pacers          PG usage 0.24  
+   95  Kevin Garnett              2012 Boston Celtics          PF usage 0.24  
+   95  LeBron James               2026 Los Angeles Lakers      PF usage 0.20  
+   95  Dirk Nowitzki              2011 Dallas Mavericks        PF usage 0.22  
+   95  Tim Duncan                 2014 San Antonio Spurs       PF usage 0.18  
+   95  Steve Nash                 2005 Phoenix Suns            PG usage 0.24  
+   94  Michael Jordan             1991 Chicago Bulls           SG usage 0.24  
+   94  Kevin McHale               1987 Boston Celtics          PF usage 0.15  
+   94  Scottie Pippen             1992 USA Dream Team          SF usage 0.21  
+   94  Kyrie Irving               2024 Dallas Mavericks        SG usage 0.20  
+   94  Anthony Davis              2018 New Orleans Pelicans    PF usage 0.25  
+   94  Stephen Curry              2027 Golden State Warriors   PG usage 0.23  
+
+6. THE TEAM'S USAGE LEADER IS RATED FAR BELOW A TEAMMATE (the usage number or the ovr is probably off)
+  Victor Oladipo 92 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Bojan Bogdanović 86 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Myles Turner 86 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Karl-Anthony Towns 88 vs Shabazz Muhammad 54 (usage 0.30)  | 2018 Minnesota Timberwolves
+  Darren Collison 84 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Thaddeus Young 79 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Cory Joseph 77 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Taj Gibson 79 vs Shabazz Muhammad 54 (usage 0.30)  | 2018 Minnesota Timberwolves
+  Jamal Crawford 79 vs Shabazz Muhammad 54 (usage 0.30)  | 2018 Minnesota Timberwolves
+  Wilt Chamberlain 94 vs Jerry West 70 (usage 0.44)  | 1972 Los Angeles Lakers
+  Glenn Robinson III 75 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Lance Stephenson 74 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  Tyus Jones 77 vs Shabazz Muhammad 54 (usage 0.30)  | 2018 Minnesota Timberwolves
+  Trevor Booker 73 vs Al Jefferson 51 (usage 0.45)  | 2018 Indiana Pacers
+  DeAndre Jordan 91 vs Austin Rivers 71 (usage 0.26)  | 2018 Los Angeles Clippers
+  Jimmy Butler 95 vs Ben Simmons 75 (usage 0.50)  | 2019 Philadelphia 76ers
+
+7. DATA THAT LOOKS WRONG
+  Kevin Durant 2026 Rockets: playmaking 0.01 (ball handle 0.85).
+  Al Jefferson 2018 Pacers: usage 0.45 but overall 51 (the usage looks inflated).

@@ -364,3 +364,24 @@ table.stats tr.cut td { border-bottom: 1px dashed rgba(245,165,36,.6); }
 .rbar .fill { height: 100%; border-radius: 99px; }
 .rbar .val { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
 @media (max-width: 1000px) { .cards-grid { grid-template-columns: 1fr; } }
+
+/* game views */
+.filters select { min-width: 190px; }
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 10px; margin: 14px 0; }
+.tile { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: rgba(2, 6, 15, .35); }
+.tile .k { font-size: 10.5px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+.tile .v { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.zone-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.zone { border-radius: 12px; padding: 10px 12px; border: 1px solid var(--line-strong); }
+.zone .z { font-size: 11px; letter-spacing: .14em; font-weight: 800; text-transform: uppercase; opacity: .9; }
+.zone .n { font-size: 20px; font-weight: 800; }
+.zone .p { font-size: 12px; opacity: .85; }
+.zone.good { background: rgba(34, 197, 94, .16); border-color: rgba(34, 197, 94, .45); }
+.zone.ok { background: rgba(245, 165, 36, .14); border-color: rgba(245, 165, 36, .4); }
+.zone.bad { background: rgba(244, 63, 94, .15); border-color: rgba(244, 63, 94, .4); }
+.zone.none { background: rgba(148, 163, 184, .08); }
+.pc-plays { margin-top: 18px; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.court-svg { width: 100%; max-width: 980px; display: block; margin: 0 auto; border-radius: 16px; background: #0b1324; border: 1px solid var(--line-strong); }
+.cmp-table td.better { color: var(--green); font-weight: 800; }
+table.cmp-table td, table.cmp-table th { text-align: center; }
+table.cmp-table td:first-child { text-align: left; color: var(--text-2); }

@@ -1092,8 +1092,8 @@ def make_warriors_2023() -> Team:
     players = [
         Player('Stephen Curry', 'PG',
                0.60, 0.14, 0.13, 0.02, 0.02, 0.65,
-               0.95, 0.92, 0.90, 0.58, 0.89,
-               0.32, 0.74, 0.88,
+               0.99, 0.92, 0.90, 0.58, 0.89,
+               0.32, 0.70, 0.96,
                0.40, 0.45, 0.46, 0.80, 0.59, 0.40,
                0.72, 0.55,
                clutchness=0.85, height=74, speed=0.83, shot_iq=0.75, archetype='legendary shooter', stamina=0.86),

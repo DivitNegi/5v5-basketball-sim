@@ -17,6 +17,10 @@
       <nav class="nav" id="nav">
         <button class="nav-item active" data-view="live"><span class="nav-icon">●</span>Live game</button>
         <button class="nav-item" data-view="box"><span class="nav-icon">▦</span>Box score</button>
+        <button class="nav-item" data-view="qtr"><span class="nav-icon">¼</span>Quarters</button>
+        <button class="nav-item" data-view="pcard"><span class="nav-icon">◉</span>Player card</button>
+        <button class="nav-item" data-view="shots"><span class="nav-icon">◌</span>Shot chart</button>
+        <button class="nav-item" data-view="comp"><span class="nav-icon">⇆</span>Compare</button>
         <button class="nav-item" data-view="flow"><span class="nav-icon">◠</span>Game flow</button>
         <div class="nav-section">Coming next</div>
         <button class="nav-item" data-view="season"><span class="nav-icon">☰</span>Season</button>
@@ -147,6 +151,36 @@
             <div id="rosterList" class="roster-list"></div>
           </div>
           <div class="panel" id="playerCard"><div class="empty">Pick a team, then a player.</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-qtr">
+        <div class="panel">
+          <div class="panel-head"><h2>Quarter box scores</h2><div class="seg small" id="qtrTabs"></div></div>
+          <div id="qtrBody"><div class="empty">Quarter box scores appear once a game is going.</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-pcard">
+        <div class="panel">
+          <div class="filters" id="pcardPick"></div>
+          <div id="pcardBody"><div class="empty">Start a game, then pick a player.</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-shots">
+        <div class="panel">
+          <div class="panel-head"><h2>Shot chart</h2><span class="muted">Zone shooting for the team, or any player</span></div>
+          <div class="filters" id="shotPick"></div>
+          <div id="shotBody"><div class="empty">The shot chart fills in as the game goes.</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-comp">
+        <div class="panel">
+          <div class="panel-head"><h2>Compare players</h2><span class="muted" id="compSource">Uses the season (or series) totals</span></div>
+          <div class="filters" id="compPick"></div>
+          <div id="compBody"><div class="empty">Pick two players once games have been played.</div></div>
         </div>
       </section>
 
