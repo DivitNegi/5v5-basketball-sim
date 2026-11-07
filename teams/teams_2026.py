@@ -97,7 +97,7 @@ def make_hawks_2026() -> Team:
                0.70, 0.48,
                clutchness=0.58, height=74, speed=0.83, shot_iq=0.46, archetype='shooter', stamina=0.78),
     ]
-    return _real_team('2026 Atlanta Hawks', players, (32.9, 30.5, 30.8, 27.9, 18.3, 25.4, 14.0, 18.0, 15.2, 11.2, 6.5, 9.3), 0.992)
+    return _real_team('2026 Atlanta Hawks', players, (32.9, 30.5, 30.8, 27.9, 18.3, 25.4, 14.0, 18.0, 15.2, 11.2, 6.5, 9.3), 1.025)
 
 
 def make_celtics_2026() -> Team:
@@ -187,7 +187,7 @@ def make_celtics_2026() -> Team:
                0.80, 0.67,
                clutchness=0.60, height=78, speed=0.76, shot_iq=0.57, archetype='balanced', stamina=0.78, rookie=True),
     ]
-    return _real_team('2026 Boston Celtics', players, (32.0, 31.6, 29.8, 21.4, 29.6, 20.9, 13.6, 14.4, 16.9, 12.0, 7.3, 10.5), 0.884)
+    return _real_team('2026 Boston Celtics', players, (32.0, 31.6, 29.8, 21.4, 29.6, 20.9, 13.6, 14.4, 16.9, 12.0, 7.3, 10.5), 0.940)
 
 
 def make_nets_2026() -> Team:
@@ -277,7 +277,7 @@ def make_nets_2026() -> Team:
                0.71, 0.57,
                clutchness=0.59, height=77, speed=0.76, shot_iq=0.56, archetype='shooter', stamina=0.74),
     ]
-    return _real_team('2026 Brooklyn Nets', players, (30.8, 25.2, 24.3, 22.2, 21.1, 18.8, 17.5, 17.3, 19.6, 15.7, 15.0, 12.5), 1.107)
+    return _real_team('2026 Brooklyn Nets', players, (30.8, 25.2, 24.3, 22.2, 21.1, 18.8, 17.5, 17.3, 19.6, 15.7, 15.0, 12.5), 1.085)
 
 
 def make_hornets_2026() -> Team:
@@ -367,7 +367,7 @@ def make_hornets_2026() -> Team:
                0.72, 0.52,
                clutchness=0.50, height=76, speed=0.82, shot_iq=0.91, archetype='balanced', stamina=0.65),
     ]
-    return _real_team('2026 Charlotte Hornets', players, (30.1, 29.4, 28.5, 25.7, 23.4, 18.1, 19.4, 16.4, 15.9, 12.1, 11.9, 9.1), 0.963)
+    return _real_team('2026 Charlotte Hornets', players, (30.1, 29.4, 28.5, 25.7, 23.4, 18.1, 19.4, 16.4, 15.9, 12.1, 11.9, 9.1), 0.935)
 
 
 def make_bulls_2026() -> Team:
@@ -457,7 +457,7 @@ def make_bulls_2026() -> Team:
                0.73, 0.50,
                height=75, archetype='balanced', stamina=0.55),
     ]
-    return _real_team('2026 Chicago Bulls', players, (23.6, 21.2, 26.5, 23.1, 22.6, 18.9, 21.3, 20.3, 15.1, 16.7, 14.9, 15.8), 0.973)
+    return _real_team('2026 Chicago Bulls', players, (23.6, 21.2, 26.5, 23.1, 22.6, 18.9, 21.3, 20.3, 15.1, 16.7, 14.9, 15.8), 0.953)
 
 
 def make_cavs_2026() -> Team:
@@ -547,7 +547,7 @@ def make_cavs_2026() -> Team:
                0.52, 0.70,
                clutchness=0.50, height=81, speed=0.62, shot_iq=0.50, archetype='stretch big', stamina=0.70),
     ]
-    return _real_team('2026 Cleveland Cavaliers', players, (29.9, 29.6, 27.8, 22.5, 21.8, 22.3, 17.4, 20.0, 16.5, 13.1, 11.1, 8.0), 1.064)
+    return _real_team('2026 Cleveland Cavaliers', players, (29.9, 29.6, 27.8, 22.5, 21.8, 22.3, 17.4, 20.0, 16.5, 13.1, 11.1, 8.0), 1.054)
 
 
 def make_mavs_2026() -> Team:
@@ -637,7 +637,7 @@ def make_mavs_2026() -> Team:
                0.66, 0.53,
                clutchness=0.84, height=78, speed=0.76, shot_iq=0.91, archetype='movement_shooter', stamina=0.58),
     ]
-    return _real_team('2026 Dallas Mavericks', players, (31.7, 28.6, 26.3, 18.0, 26.8, 17.3, 15.7, 18.5, 17.7, 10.9, 10.5, 18.0), 0.960)
+    return _real_team('2026 Dallas Mavericks', players, (31.7, 28.6, 26.3, 18.0, 26.8, 17.3, 15.7, 18.5, 17.7, 10.9, 10.5, 18.0), 0.953)
 
 
 def make_nuggets_2026() -> Team:
@@ -730,7 +730,7 @@ def make_nuggets_2026() -> Team:
     for player in players:
         if player.name == 'Nikola Jokić':
             player.assist_hub = True   # runs the offense from the post and the elbow (10.7 assists a night)
-    return _real_team('2026 Denver Nuggets', players, (29.9, 29.3, 26.0, 24.7, 22.0, 23.7, 16.2, 10.7, 9.9, 20.6, 8.5, 18.5), 0.895)
+    return _real_team('2026 Denver Nuggets', players, (29.9, 29.3, 26.0, 24.7, 22.0, 23.7, 16.2, 10.7, 9.9, 20.6, 8.5, 18.5), 0.899)
 
 
 def make_pistons_2026() -> Team:
@@ -820,7 +820,7 @@ def make_pistons_2026() -> Team:
                0.82, 0.68,
                clutchness=0.63, height=79, speed=0.77, shot_iq=0.50, archetype='defender', stamina=0.75),
     ]
-    return _real_team('2026 Detroit Pistons', players, (32.6, 25.7, 25.1, 24.7, 23.1, 16.6, 19.3, 10.2, 16.9, 16.3, 13.9, 15.6), 0.997)
+    return _real_team('2026 Detroit Pistons', players, (32.6, 25.7, 25.1, 24.7, 23.1, 16.6, 19.3, 10.2, 16.9, 16.3, 13.9, 15.6), 0.984)
 
 
 def make_warriors_2026() -> Team:
@@ -910,7 +910,7 @@ def make_warriors_2026() -> Team:
                0.84, 0.61,
                clutchness=0.53, height=77, speed=0.76, shot_iq=0.47, archetype='shooter', stamina=0.73),
     ]
-    return _real_team('2026 Golden State Warriors', players, (29.0, 28.5, 24.5, 22.4, 25.7, 19.4, 13.4, 16.7, 17.8, 16.2, 14.7, 11.7), 1.023)
+    return _real_team('2026 Golden State Warriors', players, (29.0, 28.5, 24.5, 22.4, 25.7, 19.4, 13.4, 16.7, 17.8, 16.2, 14.7, 11.7), 1.083)
 
 
 def make_rockets_2026() -> Team:
@@ -1000,7 +1000,7 @@ def make_rockets_2026() -> Team:
                0.69, 0.52,
                clutchness=0.50, height=76, speed=0.68, shot_iq=0.93, archetype='balanced', stamina=0.71),
     ]
-    return _real_team('2026 Houston Rockets', players, (34.7, 33.6, 32.0, 29.9, 21.5, 12.9, 21.9, 18.3, 12.3, 9.4, 8.2, 5.3), 0.874)
+    return _real_team('2026 Houston Rockets', players, (34.7, 33.6, 32.0, 29.9, 21.5, 12.9, 21.9, 18.3, 12.3, 9.4, 8.2, 5.3), 0.850)
 
 
 def make_pacers_2026() -> Team:
@@ -1090,7 +1090,7 @@ def make_pacers_2026() -> Team:
                0.75, 0.53,
                clutchness=0.62, height=73, speed=0.85, shot_iq=0.60, archetype='playmaker', stamina=0.84),
     ]
-    return _real_team('2026 Indiana Pacers', players, (30.5, 28.3, 19.6, 26.4, 16.8, 21.9, 20.8, 16.2, 14.1, 17.3, 15.1, 13.0), 1.030)
+    return _real_team('2026 Indiana Pacers', players, (30.5, 28.3, 19.6, 26.4, 16.8, 21.9, 20.8, 16.2, 14.1, 17.3, 15.1, 13.0), 0.954)
 
 
 def make_clippers_2026() -> Team:
@@ -1180,7 +1180,7 @@ def make_clippers_2026() -> Team:
                0.72, 0.53,
                height=77, archetype='balanced', stamina=0.55),
     ]
-    return _real_team('2026 Los Angeles Clippers', players, (30.1, 26.7, 24.2, 24.4, 24.3, 18.3, 16.3, 13.8, 25.4, 18.7, 12.2, 5.6), 0.949)
+    return _real_team('2026 Los Angeles Clippers', players, (30.1, 26.7, 24.2, 24.4, 24.3, 18.3, 16.3, 13.8, 25.4, 18.7, 12.2, 5.6), 0.921)
 
 
 def make_lakers_2026() -> Team:
@@ -1270,7 +1270,7 @@ def make_lakers_2026() -> Team:
                0.66, 0.57,
                height=79, archetype='three_and_d', stamina=0.55),
     ]
-    return _real_team('2026 Los Angeles Lakers', players, (32.3, 29.2, 22.6, 30.7, 24.0, 23.7, 20.3, 18.1, 13.5, 12.6, 6.7, 6.3), 1.034)
+    return _real_team('2026 Los Angeles Lakers', players, (32.3, 29.2, 22.6, 30.7, 24.0, 23.7, 20.3, 18.1, 13.5, 12.6, 6.7, 6.3), 1.110)
 
 
 def make_grizzlies_2026() -> Team:
@@ -1360,7 +1360,7 @@ def make_grizzlies_2026() -> Team:
                0.77, 0.55,
                height=77, archetype='balanced', stamina=0.63, rookie=True),
     ]
-    return _real_team('2026 Memphis Grizzlies', players, (22.6, 22.0, 27.9, 17.2, 14.4, 20.1, 24.3, 19.8, 17.1, 16.0, 21.1, 17.5), 0.974)
+    return _real_team('2026 Memphis Grizzlies', players, (22.6, 22.0, 27.9, 17.2, 14.4, 20.1, 24.3, 19.8, 17.1, 16.0, 21.1, 17.5), 0.942)
 
 
 def make_heat_2026() -> Team:
@@ -1450,7 +1450,7 @@ def make_heat_2026() -> Team:
                0.95, 0.63,
                clutchness=0.60, height=74, speed=0.82, shot_iq=0.56, archetype='defender', stamina=0.73),
     ]
-    return _real_team('2026 Miami Heat', players, (28.1, 25.7, 23.8, 24.9, 26.8, 21.5, 17.1, 12.9, 11.9, 23.5, 12.3, 11.5), 0.913)
+    return _real_team('2026 Miami Heat', players, (28.1, 25.7, 23.8, 24.9, 26.8, 21.5, 17.1, 12.9, 11.9, 23.5, 12.3, 11.5), 0.879)
 
 
 def make_bucks_2026() -> Team:
@@ -1630,7 +1630,7 @@ def make_timberwolves_2026() -> Team:
                0.69, 0.50,
                clutchness=0.60, height=78, speed=0.75, shot_iq=0.57, archetype='balanced', stamina=0.79),
     ]
-    return _real_team('2026 Minnesota Timberwolves', players, (30.9, 28.6, 27.1, 26.7, 25.7, 24.1, 13.4, 14.0, 21.1, 11.7, 8.6, 8.1), 0.868)
+    return _real_team('2026 Minnesota Timberwolves', players, (30.9, 28.6, 27.1, 26.7, 25.7, 24.1, 13.4, 14.0, 21.1, 11.7, 8.6, 8.1), 0.912)
 
 
 def make_pelicans_2026() -> Team:
@@ -1720,7 +1720,7 @@ def make_pelicans_2026() -> Team:
                0.62, 0.49,
                height=77, archetype='movement_shooter', stamina=0.55),
     ]
-    return _real_team('2026 New Orleans Pelicans', players, (33.4, 25.0, 28.3, 26.5, 22.1, 21.2, 16.9, 20.0, 15.5, 10.9, 10.6, 9.6), 0.964)
+    return _real_team('2026 New Orleans Pelicans', players, (33.4, 25.0, 28.3, 26.5, 22.1, 21.2, 16.9, 20.0, 15.5, 10.9, 10.6, 9.6), 0.948)
 
 
 def make_knicks_2026() -> Team:
@@ -1810,7 +1810,7 @@ def make_knicks_2026() -> Team:
                0.73, 0.53,
                clutchness=0.50, height=74, speed=0.82, shot_iq=0.94, archetype='connector', stamina=0.74),
     ]
-    return _real_team('2026 New York Knicks', players, (32.1, 29.9, 29.4, 27.4, 26.4, 22.1, 15.1, 18.6, 12.4, 5.6, 13.3, 7.7), 0.947)
+    return _real_team('2026 New York Knicks', players, (32.1, 29.9, 29.4, 27.4, 26.4, 22.1, 15.1, 18.6, 12.4, 5.6, 13.3, 7.7), 0.974)
 
 
 def make_thunder_2026() -> Team:
@@ -1924,7 +1924,7 @@ def make_thunder_2026() -> Team:
     }
     for player in players:   # minutes follow the real rotation (the 2025-26 table), pinned
         player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
-    return _real_team('2026 Oklahoma City Thunder', players, (31.8, 27.7, 27.3, 25.7, 23.2, 25.5, 24.8, 10.6, 9.6, 10.4, 8.8, 8.9, 5.7), 1.005)
+    return _real_team('2026 Oklahoma City Thunder', players, (31.8, 27.7, 27.3, 25.7, 23.2, 25.5, 24.8, 10.6, 9.6, 10.4, 8.8, 8.9, 5.7), 1.043)
 
 
 def make_magic_2026() -> Team:
@@ -2014,7 +2014,7 @@ def make_magic_2026() -> Team:
                0.72, 0.51,
                clutchness=0.72, height=76, speed=0.80, shot_iq=0.60, archetype='high flyer', stamina=0.82, rookie=True),
     ]
-    return _real_team('2026 Orlando Magic', players, (32.5, 31.1, 26.0, 24.1, 26.8, 26.6, 20.8, 16.2, 11.1, 8.9, 8.7, 7.2), 1.031)
+    return _real_team('2026 Orlando Magic', players, (32.5, 31.1, 26.0, 24.1, 26.8, 26.6, 20.8, 16.2, 11.1, 8.9, 8.7, 7.2), 1.071)
 
 
 def make_sixers_2026() -> Team:
@@ -2104,7 +2104,7 @@ def make_sixers_2026() -> Team:
                0.62, 0.62,
                height=81, archetype='stretch_big', stamina=0.55),
     ]
-    return _real_team('2026 Philadelphia 76ers', players, (33.8, 30.2, 26.5, 25.5, 26.4, 18.3, 14.1, 24.1, 12.2, 10.3, 11.2, 7.4), 1.052)
+    return _real_team('2026 Philadelphia 76ers', players, (33.8, 30.2, 26.5, 25.5, 26.4, 18.3, 14.1, 24.1, 12.2, 10.3, 11.2, 7.4), 1.081)
 
 
 def make_suns_2026() -> Team:
@@ -2194,7 +2194,7 @@ def make_suns_2026() -> Team:
                0.62, 0.64,
                height=81, archetype='stretch_big', stamina=0.55, rookie=True),
     ]
-    return _real_team('2026 Phoenix Suns', players, (30.3, 26.7, 24.4, 19.2, 21.7, 24.5, 24.9, 17.5, 14.9, 18.0, 9.8, 8.1), 0.952)
+    return _real_team('2026 Phoenix Suns', players, (30.3, 26.7, 24.4, 19.2, 21.7, 24.5, 24.9, 17.5, 14.9, 18.0, 9.8, 8.1), 0.950)
 
 
 def make_blazers_2026() -> Team:
@@ -2284,7 +2284,7 @@ def make_blazers_2026() -> Team:
                0.64, 0.88,
                clutchness=0.68, height=81, speed=0.54, shot_iq=0.82, archetype='rim protector', stamina=0.62),
     ]
-    return _real_team('2026 Portland Trail Blazers', players, (27.7, 28.0, 23.8, 21.5, 23.8, 24.1, 19.2, 17.7, 13.6, 15.1, 13.7, 11.8), 1.044)
+    return _real_team('2026 Portland Trail Blazers', players, (27.7, 28.0, 23.8, 21.5, 23.8, 24.1, 19.2, 17.7, 13.6, 15.1, 13.7, 11.8), 1.020)
 
 
 def make_kings_2026() -> Team:
@@ -2374,7 +2374,7 @@ def make_kings_2026() -> Team:
                0.58, 0.86,
                height=83, archetype='rim_protector', stamina=0.61, rookie=True),
     ]
-    return _real_team('2026 Sacramento Kings', players, (28.4, 24.9, 19.2, 25.2, 22.7, 20.2, 17.6, 18.8, 12.6, 20.1, 15.8, 14.5), 0.967)
+    return _real_team('2026 Sacramento Kings', players, (28.4, 24.9, 19.2, 25.2, 22.7, 20.2, 17.6, 18.8, 12.6, 20.1, 15.8, 14.5), 0.939)
 
 
 def make_spurs_2026() -> Team:
@@ -2464,7 +2464,7 @@ def make_spurs_2026() -> Team:
                0.71, 0.52,
                clutchness=0.50, height=74, speed=0.82, shot_iq=0.76, archetype='lockdown', stamina=0.72),
     ]
-    return _real_team('2026 San Antonio Spurs', players, (29.7, 29.1, 28.5, 27.5, 25.5, 23.4, 17.9, 19.7, 20.5, 8.2, 5.6, 4.4), 0.860)
+    return _real_team('2026 San Antonio Spurs', players, (29.7, 29.1, 28.5, 27.5, 25.5, 23.4, 17.9, 19.7, 20.5, 8.2, 5.6, 4.4), 0.903)
 
 
 def make_raptors_2026() -> Team:
@@ -2554,7 +2554,7 @@ def make_raptors_2026() -> Team:
                0.58, 0.76,
                height=83, archetype='rim_protector', stamina=0.55),
     ]
-    return _real_team('2026 Toronto Raptors', players, (32.9, 32.6, 30.6, 28.6, 22.3, 18.8, 17.2, 18.8, 19.5, 10.5, 5.5, 2.7), 0.915)
+    return _real_team('2026 Toronto Raptors', players, (32.9, 32.6, 30.6, 28.6, 22.3, 18.8, 17.2, 18.8, 19.5, 10.5, 5.5, 2.7), 0.863)
 
 
 def make_jazz_2026() -> Team:
@@ -2644,7 +2644,7 @@ def make_jazz_2026() -> Team:
                0.59, 0.65,
                clutchness=0.50, height=80, speed=0.68, shot_iq=0.88, archetype='balanced', stamina=0.62),
     ]
-    return _real_team('2026 Utah Jazz', players, (29.1, 27.6, 18.2, 20.6, 21.8, 17.3, 18.5, 17.6, 20.4, 19.9, 17.7, 11.3), 1.150)
+    return _real_team('2026 Utah Jazz', players, (29.1, 27.6, 18.2, 20.6, 21.8, 17.3, 18.5, 17.6, 20.4, 19.9, 17.7, 11.3), 1.038)
 
 
 def make_wizards_2026() -> Team:
@@ -2734,4 +2734,4 @@ def make_wizards_2026() -> Team:
                0.61, 0.45,
                height=75, archetype='playmaker', stamina=0.55),
     ]
-    return _real_team('2026 Washington Wizards', players, (28.2, 25.9, 24.7, 22.2, 26.6, 17.4, 19.8, 10.6, 18.1, 14.4, 17.9, 14.2), 1.147)
+    return _real_team('2026 Washington Wizards', players, (28.2, 25.9, 24.7, 22.2, 26.6, 17.4, 19.8, 10.6, 18.1, 14.4, 17.9, 14.2), 1.139)

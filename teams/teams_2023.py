@@ -80,7 +80,7 @@ def make_heat_2023() -> Team:
                0.38, 0.49, 0.73, 0.72, 0.600, 0.933,
                0.39, 0.62, stamina=0.65),
     ]
-    return _real_team("2023 Miami Heat", players, (), 1.023)
+    return _real_team("2023 Miami Heat", players, (), 1.041)
 
 
 def make_lakers_2023() -> Team:
@@ -183,7 +183,7 @@ def make_lakers_2023() -> Team:
                clutchness=0.58, secondary_positions=("PF",), badges=("lob_threat",),
                height=81, speed=0.68, shot_iq=0.66, iso_tendency=0.02, archetype="big", stamina=0.79),
     ]
-    return _real_team("2023 Los Angeles Lakers", players, (), 1.098)
+    return _real_team("2023 Los Angeles Lakers", players, (), 1.121)
 
 
 def make_nuggets_2023() -> Team:
@@ -265,7 +265,7 @@ def make_nuggets_2023() -> Team:
                0.48, 0.68,
                badges=("lob_threat",), shot_iq=0.68, stamina=0.6),
     ]
-    return _real_team("2023 Denver Nuggets", players, (), 1.003)
+    return _real_team("2023 Denver Nuggets", players, (), 1.039)
 
 
 def make_kings_2023() -> Team:
@@ -352,7 +352,7 @@ def make_kings_2023() -> Team:
 
 
     ]
-    return _real_team("2023 Sacramento Kings", players, (), 0.877)
+    return _real_team("2023 Sacramento Kings", players, (), 0.851)
 
 
 # ---- the other teams of 2022-23 (real Basketball-Reference data) ----
@@ -495,7 +495,7 @@ def make_celtics_2023() -> Team:
                0.30, 0.67, 0.45, 0.62, 0.59, 0.49,
                0.89, 0.63,
                clutchness=0.72, height=76, speed=0.77, shot_iq=0.77, archetype='shooter', stamina=0.79),
-        Player('Robert Williams III', 'C',
+        Player('Robert Williams', 'C',
                0.00, 0.04, 0.24, 0.04, 0.87, 0.11,
                0.23, 0.60, 0.90, 0.93, 0.68,
                0.10, 0.54, 0.47,
@@ -545,7 +545,7 @@ def make_celtics_2023() -> Team:
                0.57, 0.80,
                clutchness=0.40, height=85, speed=0.38, shot_iq=0.80, archetype='backup rim protector', stamina=0.62),
     ]
-    return _real_team('2023 Boston Celtics', players, (33.0, 31.8, 27.5, 25.7, 23.3, 18.3, 20.8, 11.3, 11.2, 8.8, 20.9, 7.4), 0.899)
+    return _real_team('2023 Boston Celtics', players, (33.0, 31.8, 27.5, 25.7, 23.3, 18.3, 20.8, 11.3, 11.2, 8.8, 20.9, 7.4), 0.964)
 
 
 def make_nets_2023() -> Team:
@@ -571,7 +571,7 @@ def make_nets_2023() -> Team:
                0.70, 0.47, 0.29, 0.40, 0.60, 0.45,
                0.69, 0.61,
                clutchness=0.66, height=80, speed=0.69, shot_iq=0.65, archetype='shooter', stamina=0.75),
-        Player('Nicolas Claxton', 'C',
+        Player('Nic Claxton', 'C',
                0.00, 0.02, 0.23, 0.04, 0.87, 0.09,
                0.20, 0.60, 0.82, 0.95, 0.56,
                0.11, 0.56, 0.50,
@@ -635,7 +635,7 @@ def make_nets_2023() -> Team:
                0.73, 0.62,
                clutchness=0.72, height=81, speed=0.70, shot_iq=0.82, archetype='3-and-D forward', stamina=0.79),
     ]
-    return _real_team('2023 Brooklyn Nets', players, (30.4, 29.2, 25.5, 24.5, 22.2, 20.8, 26.5, 15.1, 9.1, 14.4, 11.4, 10.9), 0.879)
+    return _real_team('2023 Brooklyn Nets', players, (30.4, 29.2, 25.5, 24.5, 22.2, 20.8, 26.5, 15.1, 9.1, 14.4, 11.4, 10.9), 0.850)
 
 
 def make_hornets_2023() -> Team:
@@ -725,7 +725,7 @@ def make_hornets_2023() -> Team:
                0.62, 0.64,
                clutchness=0.62, height=82, speed=0.76, shot_iq=0.74, archetype='long stretch big', stamina=0.80),
     ]
-    return _real_team('2023 Charlotte Hornets', players, (30.4, 30.2, 27.3, 26.2, 27.0, 16.9, 13.8, 20.1, 13.9, 11.8, 13.3, 9.1), 0.966)
+    return _real_team('2023 Charlotte Hornets', players, (30.4, 30.2, 27.3, 26.2, 27.0, 16.9, 13.8, 20.1, 13.9, 11.8, 13.3, 9.1), 0.965)
 
 
 def make_bulls_2023() -> Team:
@@ -815,7 +815,7 @@ def make_bulls_2023() -> Team:
                0.55, 0.53,
                clutchness=0.50, height=77, speed=0.68, shot_iq=0.82, archetype='balanced', stamina=0.63),
     ]
-    return _real_team('2023 Chicago Bulls', players, (33.8, 33.4, 30.6, 23.6, 24.5, 22.2, 19.3, 19.2, 10.8, 9.8, 8.7, 4.1), 0.865)
+    return _real_team('2023 Chicago Bulls', players, (33.8, 33.4, 30.6, 23.6, 24.5, 22.2, 19.3, 19.2, 10.8, 9.8, 8.7, 4.1), 0.850)
 
 
 def make_cavs_2023() -> Team:
@@ -905,7 +905,7 @@ def make_cavs_2023() -> Team:
                0.79, 0.55,
                clutchness=0.50, height=74, speed=0.82, shot_iq=0.93, archetype='playmaker', stamina=0.60),
     ]
-    return _real_team('2023 Cleveland Cavaliers', players, (33.1, 32.8, 31.5, 29.3, 17.3, 26.6, 13.7, 15.8, 12.8, 4.8, 15.6, 6.7), 0.858)
+    return _real_team('2023 Cleveland Cavaliers', players, (33.1, 32.8, 31.5, 29.3, 17.3, 26.6, 13.7, 15.8, 12.8, 4.8, 15.6, 6.7), 0.863)
 
 
 def make_mavs_2023() -> Team:
@@ -987,7 +987,7 @@ def make_mavs_2023() -> Team:
                0.27, 0.13, 0.27, 0.43, 0.59, 0.66,
                0.72, 0.53,
                clutchness=0.62, height=76, speed=0.70, shot_iq=0.74, archetype='defensive guard', stamina=0.78),
-        Player('Davis Bertans', 'PF',
+        Player('Dāvis Bertāns', 'PF',
                0.51, 0.01, 0.04, 0.04, 0.08, 0.07,
                0.92, 0.60, 0.89, 0.57, 0.74,
                0.04, 0.10, 0.53,
@@ -995,14 +995,14 @@ def make_mavs_2023() -> Team:
                0.59, 0.59,
                clutchness=0.50, height=82, speed=0.56, shot_iq=0.91, archetype='movement_shooter', stamina=0.66),
     ]
-    return _real_team('2023 Dallas Mavericks', players, (36.0, 33.6, 14.7, 26.6, 26.6, 21.7, 21.5, 20.9, 12.0, 10.5, 8.8, 7.1), 1.052)
+    return _real_team('2023 Dallas Mavericks', players, (36.0, 33.6, 14.7, 26.6, 26.6, 21.7, 21.5, 20.9, 12.0, 10.5, 8.8, 7.1), 1.099)
 
 
 def make_pistons_2023() -> Team:
     players = [
         Player('Bojan Bogdanović', 'PF',
                0.25, 0.24, 0.17, 0.10, 0.05, 0.35,
-               0.92, 0.85, 0.85, 0.86, 0.89,
+               0.92, 0.88, 0.89, 0.86, 0.89,
                0.20, 0.64, 0.65,
                0.37, 0.08, 0.33, 0.50, 0.72, 0.39,
                0.57, 0.51,
@@ -1085,7 +1085,7 @@ def make_pistons_2023() -> Team:
                0.80, 0.59,
                clutchness=0.50, height=77, speed=0.78, shot_iq=0.88, archetype='slasher', stamina=0.63),
     ]
-    return _real_team('2023 Detroit Pistons', players, (27.7, 26.6, 23.6, 20.3, 23.6, 18.6, 19.9, 18.1, 17.0, 16.9, 14.8, 12.9), 0.980)
+    return _real_team('2023 Detroit Pistons', players, (27.7, 26.6, 23.6, 20.3, 23.6, 18.6, 19.9, 18.1, 17.0, 16.9, 14.8, 12.9), 0.985)
 
 
 def make_warriors_2023() -> Team:
@@ -1175,7 +1175,7 @@ def make_warriors_2023() -> Team:
                0.70, 0.52,
                clutchness=0.45, height=77, speed=0.73, shot_iq=0.55, archetype='3-and-D wing', stamina=0.79),
     ]
-    return _real_team('2023 Golden State Warriors', players, (30.5, 28.6, 27.7, 26.9, 18.8, 25.3, 21.3, 15.7, 14.2, 13.1, 9.4, 8.5), 0.996)
+    return _real_team('2023 Golden State Warriors', players, (30.5, 28.6, 27.7, 26.9, 18.8, 25.3, 21.3, 15.7, 14.2, 13.1, 9.4, 8.5), 1.003)
 
 
 def make_rockets_2023() -> Team:
@@ -1201,7 +1201,7 @@ def make_rockets_2023() -> Team:
                0.29, 0.69, 0.64, 0.89, 0.56, 0.58,
                0.58, 0.67,
                clutchness=0.55, height=82, speed=0.76, shot_iq=0.70, archetype='stretch forward', stamina=0.80, rookie=True),
-        Player('Alperen Sengun', 'C',
+        Player('Alperen Şengün', 'C',
                0.07, 0.07, 0.14, 0.43, 0.27, 0.27,
                0.39, 0.78, 0.88, 0.88, 0.70,
                0.19, 0.84, 0.62,
@@ -1265,7 +1265,7 @@ def make_rockets_2023() -> Team:
                0.61, 0.73,
                clutchness=0.50, height=84, speed=0.60, shot_iq=0.90, archetype='balanced', stamina=0.62),
     ]
-    return _real_team('2023 Houston Rockets', players, (35.0, 34.8, 30.6, 28.0, 26.8, 19.4, 19.0, 13.0, 10.9, 9.8, 9.2, 3.5), 1.049)
+    return _real_team('2023 Houston Rockets', players, (35.0, 34.8, 30.6, 28.0, 26.8, 19.4, 19.0, 13.0, 10.9, 9.8, 9.2, 3.5), 1.068)
 
 
 def make_pacers_2023() -> Team:
@@ -1343,7 +1343,7 @@ def make_pacers_2023() -> Team:
         Player('T.J. McConnell', 'PG',
                0.03, 0.20, 0.34, 0.02, 0.02, 0.36,
                0.75, 0.85, 0.92, 0.51, 0.78,
-               0.26, 0.95, 0.82,
+               0.26, 0.89, 0.82,
                0.75, 0.10, 0.46, 0.63, 0.42, 0.45,
                0.78, 0.52,
                clutchness=0.65, height=73, speed=0.76, shot_iq=0.75, archetype='energy guard', stamina=0.84),
@@ -1355,7 +1355,7 @@ def make_pacers_2023() -> Team:
                0.61, 0.57,
                clutchness=0.50, height=79, speed=0.74, shot_iq=0.91, archetype='balanced', stamina=0.66),
     ]
-    return _real_team('2023 Indiana Pacers', players, (30.0, 25.4, 27.2, 23.4, 20.5, 20.1, 14.2, 14.9, 24.4, 12.0, 15.7, 12.2), 1.047)
+    return _real_team('2023 Indiana Pacers', players, (30.0, 25.4, 27.2, 23.4, 20.5, 20.1, 14.2, 14.9, 24.4, 12.0, 15.7, 12.2), 1.008)
 
 
 def make_clippers_2023() -> Team:
@@ -1485,7 +1485,7 @@ def make_grizzlies_2023() -> Team:
                0.77, 0.88, 0.97, 0.97, 0.89, 0.53,
                0.60, 0.85,
                clutchness=0.30, height=83, speed=0.48, shot_iq=0.25, archetype='physical big', stamina=0.72),
-        Player('Xavier Tillman', 'C',
+        Player('Xavier Tillman Sr.', 'C',
                0.04, 0.12, 0.18, 0.24, 0.22, 0.06,
                0.20, 0.85, 0.92, 0.93, 0.63,
                0.06, 0.60, 0.50,
@@ -1535,7 +1535,7 @@ def make_grizzlies_2023() -> Team:
                0.61, 0.59,
                height=81, archetype='stretch_big', stamina=0.57, rookie=True),
     ]
-    return _real_team('2023 Memphis Grizzlies', players, (27.6, 27.3, 25.8, 23.7, 22.2, 14.3, 19.3, 16.8, 15.8, 19.6, 14.5, 13.1), 1.017)
+    return _real_team('2023 Memphis Grizzlies', players, (27.6, 27.3, 25.8, 23.7, 22.2, 14.3, 19.3, 16.8, 15.8, 19.6, 14.5, 13.1), 1.008)
 
 
 def make_bucks_2023() -> Team:
@@ -1625,7 +1625,7 @@ def make_bucks_2023() -> Team:
                0.64, 0.46,
                clutchness=0.78, height=75, speed=0.82, shot_iq=0.93, archetype='three_and_d', stamina=0.60),
     ]
-    return _real_team('2023 Milwaukee Bucks', players, (30.1, 29.4, 27.4, 24.0, 20.5, 19.8, 18.3, 22.4, 9.5, 18.8, 11.7, 8.1), 1.075)
+    return _real_team('2023 Milwaukee Bucks', players, (30.1, 29.4, 27.4, 24.0, 20.5, 19.8, 18.3, 22.4, 9.5, 18.8, 11.7, 8.1), 1.096)
 
 
 def make_timberwolves_2023() -> Team:
@@ -1715,7 +1715,7 @@ def make_timberwolves_2023() -> Team:
                0.79, 0.59,
                clutchness=0.36, height=77, speed=0.78, shot_iq=0.85, archetype='3-and-D wing', stamina=0.79),
     ]
-    return _real_team('2023 Minnesota Timberwolves', players, (31.7, 28.2, 26.4, 25.6, 25.5, 23.2, 14.2, 13.2, 16.7, 14.0, 10.8, 10.5), 1.053)
+    return _real_team('2023 Minnesota Timberwolves', players, (31.7, 28.2, 26.4, 25.6, 25.5, 23.2, 14.2, 13.2, 16.7, 14.0, 10.8, 10.5), 1.032)
 
 
 def make_pelicans_2023() -> Team:
@@ -1748,7 +1748,7 @@ def make_pelicans_2023() -> Team:
                0.72, 0.63, 0.49, 0.48, 0.68, 0.66,
                0.90, 0.65,
                clutchness=0.30, height=79, speed=0.74, shot_iq=0.40, archetype='lockdown', stamina=0.85),
-        Player('Jonas Valanciunas', 'C',
+        Player('Jonas Valančiūnas', 'C',
                0.14, 0.17, 0.12, 0.34, 0.23, 0.49,
                0.50, 0.85, 0.95, 0.93, 0.81,
                0.30, 0.61, 0.58,
@@ -1805,7 +1805,7 @@ def make_pelicans_2023() -> Team:
                0.61, 0.74,
                clutchness=0.50, height=84, speed=0.58, shot_iq=0.60, archetype='athletic rim runner', stamina=0.77),
     ]
-    return _real_team('2023 New Orleans Pelicans', players, (29.7, 28.7, 27.4, 23.8, 19.0, 25.2, 17.4, 17.3, 15.7, 12.2, 15.4, 8.2), 1.038)
+    return _real_team('2023 New Orleans Pelicans', players, (29.7, 28.7, 27.4, 23.8, 19.0, 25.2, 17.4, 17.3, 15.7, 12.2, 15.4, 8.2), 1.003)
 
 
 def make_knicks_2023() -> Team:
@@ -1895,12 +1895,12 @@ def make_knicks_2023() -> Team:
                0.82, 0.54,
                clutchness=0.55, height=74, speed=0.86, shot_iq=0.80, archetype='defensive guard', stamina=0.78),
     ]
-    return _real_team('2023 New York Knicks', players, (30.8, 30.3, 29.1, 21.6, 24.7, 23.6, 11.9, 10.6, 14.4, 10.7, 24.8, 7.5), 0.955)
+    return _real_team('2023 New York Knicks', players, (30.8, 30.3, 29.1, 21.6, 24.7, 23.6, 11.9, 10.6, 14.4, 10.7, 24.8, 7.5), 0.945)
 
 
 def make_thunder_2023() -> Team:
     players = [
-        Player('Shai G-Alexander', 'PG',
+        Player('Shai Gilgeous-Alexander', 'PG',
                0.03, 0.32, 0.30, 0.02, 0.11, 0.57,
                0.83, 0.91, 0.91, 0.83, 0.90,
                0.31, 0.66, 0.88,
@@ -1985,7 +1985,7 @@ def make_thunder_2023() -> Team:
                0.56, 0.64,
                clutchness=0.50, height=82, speed=0.60, shot_iq=0.90, archetype='balanced', stamina=0.66),
     ]
-    return _real_team('2023 Oklahoma City Thunder', players, (34.5, 28.9, 28.4, 28.0, 16.9, 14.9, 15.1, 19.3, 14.7, 15.4, 13.9, 10.0), 1.006)
+    return _real_team('2023 Oklahoma City Thunder', players, (34.5, 28.9, 28.4, 28.0, 16.9, 14.9, 15.1, 19.3, 14.7, 15.4, 13.9, 10.0), 1.019)
 
 
 def make_magic_2023() -> Team:
@@ -1999,7 +1999,7 @@ def make_magic_2023() -> Team:
                clutchness=0.65, height=82, speed=0.80, shot_iq=0.60, archetype='elite scoring forward', stamina=0.79, rookie=True),
         Player('Franz Wagner', 'SF',
                0.24, 0.10, 0.29, 0.05, 0.09, 0.46,
-               0.92, 0.84, 0.93, 0.76, 0.85,
+               0.85, 0.84, 0.93, 0.76, 0.85,
                0.26, 0.57, 0.66,
                0.48, 0.30, 0.42, 0.54, 0.64, 0.46,
                0.72, 0.58,
@@ -2075,7 +2075,7 @@ def make_magic_2023() -> Team:
                0.61, 0.80,
                clutchness=0.30, height=83, speed=0.53, shot_iq=0.55, archetype='backup big', stamina=0.72),
     ]
-    return _real_team('2023 Orlando Magic', players, (30.5, 29.1, 25.6, 25.6, 20.3, 16.9, 19.0, 14.9, 14.6, 21.5, 11.4, 10.6), 1.060)
+    return _real_team('2023 Orlando Magic', players, (30.5, 29.1, 25.6, 25.6, 20.3, 16.9, 19.0, 14.9, 14.6, 21.5, 11.4, 10.6), 1.048)
 
 
 def make_sixers_2023() -> Team:
@@ -2101,7 +2101,7 @@ def make_sixers_2023() -> Team:
                0.43, 0.51, 0.45, 0.68, 0.44, 0.40,
                0.74, 0.63,
                clutchness=0.60, height=80, speed=0.75, shot_iq=0.60, archetype='scoring forward', stamina=0.68),
-        Player('PJ Tucker', 'PF',
+        Player('P.J. Tucker', 'PF',
                0.28, 0.05, 0.18, 0.10, 0.02, 0.02,
                0.85, 0.55, 0.78, 0.38, 0.74,
                0.01, 0.45, 0.42,
@@ -2165,7 +2165,7 @@ def make_sixers_2023() -> Team:
                0.69, 0.84,
                clutchness=0.65, height=81, speed=0.49, shot_iq=0.60, archetype='energy big', stamina=0.83),
     ]
-    return _real_team('2023 Philadelphia 76ers', players, (34.2, 31.6, 29.6, 21.3, 23.9, 30.4, 16.1, 13.0, 10.1, 7.9, 14.9, 7.0), 1.017)
+    return _real_team('2023 Philadelphia 76ers', players, (34.2, 31.6, 29.6, 21.3, 23.9, 30.4, 16.1, 13.0, 10.1, 7.9, 14.9, 7.0), 1.054)
 
 
 def make_suns_2023() -> Team:
@@ -2255,7 +2255,7 @@ def make_suns_2023() -> Team:
                0.81, 0.65,
                height=79, archetype='three_and_d', stamina=0.55),
     ]
-    return _real_team('2023 Phoenix Suns', players, (33.3, 32.0, 30.0, 28.1, 21.4, 15.0, 16.5, 10.5, 16.7, 10.4, 14.6, 11.5), 1.129)
+    return _real_team('2023 Phoenix Suns', players, (33.3, 32.0, 30.0, 28.1, 21.4, 15.0, 16.5, 10.5, 16.7, 10.4, 14.6, 11.5), 1.149)
 
 
 def make_blazers_2023() -> Team:
@@ -2345,7 +2345,7 @@ def make_blazers_2023() -> Team:
                0.67, 0.57,
                clutchness=0.50, height=78, speed=0.82, shot_iq=0.84, archetype='balanced', stamina=0.70),
     ]
-    return _real_team('2023 Portland Trail Blazers', players, (30.4, 29.7, 29.0, 21.4, 20.5, 21.3, 20.5, 14.3, 16.0, 13.2, 11.4, 12.3), 0.998)
+    return _real_team('2023 Portland Trail Blazers', players, (30.4, 29.7, 29.0, 21.4, 20.5, 21.3, 20.5, 14.3, 16.0, 13.2, 11.4, 12.3), 0.995)
 
 
 def make_spurs_2023() -> Team:
@@ -2435,7 +2435,7 @@ def make_spurs_2023() -> Team:
                0.71, 0.50,
                height=77, archetype='balanced', stamina=0.57, rookie=True),
     ]
-    return _real_team('2023 San Antonio Spurs', players, (28.8, 24.9, 21.4, 26.9, 16.9, 18.8, 14.8, 21.8, 18.5, 18.1, 15.7, 13.4), 0.979)
+    return _real_team('2023 San Antonio Spurs', players, (28.8, 24.9, 21.4, 26.9, 16.9, 18.8, 14.8, 21.8, 18.5, 18.1, 15.7, 13.4), 0.950)
 
 
 def make_raptors_2023() -> Team:
@@ -2525,7 +2525,7 @@ def make_raptors_2023() -> Team:
                0.71, 0.48,
                clutchness=0.50, height=73, speed=0.82, shot_iq=0.92, archetype='three_and_d', stamina=0.60),
     ]
-    return _real_team('2023 Toronto Raptors', players, (32.7, 32.1, 30.9, 30.0, 21.8, 27.0, 9.0, 15.3, 9.8, 8.5, 14.6, 8.3), 1.064)
+    return _real_team('2023 Toronto Raptors', players, (32.7, 32.1, 30.9, 30.0, 21.8, 27.0, 9.0, 15.3, 9.8, 8.5, 14.6, 8.3), 1.045)
 
 
 def make_jazz_2023() -> Team:
@@ -2555,8 +2555,8 @@ def make_jazz_2023() -> Team:
                0.00, 0.02, 0.23, 0.04, 0.84, 0.16,
                0.20, 0.59, 0.93, 0.92, 0.51,
                0.18, 0.48, 0.47,
-               0.36, 0.95, 0.92, 0.93, 0.77, 0.61,
-               0.57, 0.95,
+               0.36, 0.88, 0.92, 0.93, 0.77, 0.61,
+               0.57, 0.88,
                clutchness=0.62, height=86, speed=0.56, shot_iq=0.99, archetype='mashing board enforcer', stamina=0.68, rookie=True),
         Player('Ochai Agbaji', 'SG',
                0.33, 0.05, 0.17, 0.02, 0.14, 0.20,
@@ -2615,7 +2615,7 @@ def make_jazz_2023() -> Team:
                0.62, 0.63,
                clutchness=0.50, height=80, speed=0.68, shot_iq=0.93, archetype='movement_shooter', stamina=0.58),
     ]
-    return _real_team('2023 Utah Jazz', players, (34.2, 32.0, 27.0, 20.3, 17.5, 21.3, 17.2, 23.6, 11.9, 11.3, 12.5, 11.2), 1.033)
+    return _real_team('2023 Utah Jazz', players, (34.2, 32.0, 27.0, 20.3, 17.5, 21.3, 17.2, 23.6, 11.9, 11.3, 12.5, 11.2), 0.933)
 
 
 def make_wizards_2023() -> Team:
@@ -2705,4 +2705,4 @@ def make_wizards_2023() -> Team:
                0.58, 0.65,
                clutchness=0.50, height=81, speed=0.70, shot_iq=0.81, archetype='post_scorer', stamina=0.57),
     ]
-    return _real_team('2023 Washington Wizards', players, (32.9, 31.1, 30.0, 23.8, 25.0, 16.5, 23.0, 20.6, 13.7, 7.0, 10.1, 6.3), 0.989)
+    return _real_team('2023 Washington Wizards', players, (32.9, 31.1, 30.0, 23.8, 25.0, 16.5, 23.0, 20.6, 13.7, 7.0, 10.1, 6.3), 1.007)
