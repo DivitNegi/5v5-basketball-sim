@@ -44,7 +44,7 @@ const S = {
   live: null, prevOnCourt: [new Set(), new Set()],
   score: [0, 0], flow: [], series: null,
   active: false, paused: false, speed: 1,
-  feedFilter: "all", boxTeam: 0, boxSort: null,
+  feedFilter: "raw", boxTeam: 0, boxSort: null,
 };
 
 // ───────────────────────── logos & faces ─────────────────────────
@@ -273,10 +273,26 @@ function newBlock() {
   feed.lines = [];
 }
 
+// "X will guard Y" opening-matchup lines are left out of the play-by-play
+const GUARD_RE = /\bwill guard\b|^\s*When .+ are on offense:\s*$/;
+function rawLine(line) {
+  const root = $("#rawlog");
+  root.querySelector(".empty")?.remove();
+  const follow = root.scrollHeight - root.scrollTop - root.clientHeight < 40;
+  const t = line.trim();
+  const kind = SCORE_RE.test(t) ? "score" : /^-{2,}\s*(start|end) of|^(halftime|end of regulation|final)/i.test(t) ? "period" : /^\[(GUI|Simulation)/.test(t) ? "sys" : "";
+  root.append(h("div", { class: `ln ${kind}` }, line.replace(/\s+$/, "")));
+  while (root.children.length > 5000) root.firstChild.remove();
+  if (follow) root.scrollTop = root.scrollHeight;
+}
+
 function addFeedLine(line) {
   const root = $("#feed");
   const empty = $(".empty", root);
   if (empty) empty.remove();
+  if (GUARD_RE.test(line)) return;
+  if (!line.trim() && !$("#rawlog").lastChild?.textContent) return;
+  rawLine(line);
   if (!line.trim()) return;
   const m = line.match(SCORE_RE);
   if (m) { closeBlock(m); return; }
@@ -446,6 +462,7 @@ function resetGame(msg) {
   });
   feed.block = null; feed.lines = []; feed.last = [0, 0];
   $("#feed").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
+  $("#rawlog").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
   $("#sbSeries").textContent = "";
   $("#sbPeriod").textContent = "1ST"; $("#sbClock").textContent = S.rules === "FIBA" ? "10:00" : "12:00";
   $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
@@ -1019,6 +1036,8 @@ async function boot() {
 
   $$("#feedFilter button").forEach((b) => b.addEventListener("click", () => {
     $$("#feedFilter button").forEach((x) => x.classList.toggle("on", x === b)); S.feedFilter = b.dataset.v;
+    $("#rawlog").classList.toggle("hidden", S.feedFilter !== "raw");
+    $("#feed").classList.toggle("hidden", S.feedFilter === "raw");
     $$("#feed .ev").forEach((el) => el.dataset.kind && applyFeedFilter(el));
   }));
   $$("#boxTeam button").forEach((b) => b.addEventListener("click", () => {
