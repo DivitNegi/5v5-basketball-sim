@@ -19,7 +19,8 @@
         <button class="nav-item" data-view="box"><span class="nav-icon">▦</span>Box score</button>
         <button class="nav-item" data-view="flow"><span class="nav-icon">◠</span>Game flow</button>
         <div class="nav-section">Coming next</div>
-        <button class="nav-item soon" disabled><span class="nav-icon">☰</span>Season<em>soon</em></button>
+        <button class="nav-item" data-view="season"><span class="nav-icon">☰</span>Season</button>
+        <button class="nav-item" data-view="bracket"><span class="nav-icon">⛓</span>Playoffs</button>
         <button class="nav-item soon" disabled><span class="nav-icon">◎</span>Stats<em>soon</em></button>
         <button class="nav-item soon" disabled><span class="nav-icon">▣</span>Cards<em>soon</em></button>
         <button class="nav-item soon" disabled><span class="nav-icon">⇄</span>Draft &amp; trades<em>soon</em></button>
@@ -84,6 +85,7 @@
           <button class="chip" data-jump="last2">Last 2:00</button>
           <button class="chip strong" data-jump="game">Final</button>
           <button class="chip strong hidden" id="simSeries">Sim series</button>
+          <button class="chip strong hidden" id="simPlayoffs">Sim all playoffs</button>
         </div>
       </section>
 
@@ -112,6 +114,28 @@
               <div class="flow small" id="flowMini"></div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-season">
+        <div class="panel season-bar">
+          <div class="season-prog"><div class="season-prog-fill" id="seasonFill"></div></div>
+          <div class="season-prog-text" id="seasonProgText">No season running. Pick a season mode and tip off.</div>
+          <button class="btn primary hidden" id="nextPost">Next: play-in &amp; playoffs ▶</button>
+        </div>
+        <div class="subtabs seg" id="seasonTabs">
+          <button data-v="standings" class="on">Standings</button><button data-v="races">Races &amp; awards</button><button data-v="players">Player stats</button>
+        </div>
+        <div class="panel" id="seasonBody"><div class="empty">Standings appear as the season runs.</div></div>
+      </section>
+
+      <section class="view" id="view-bracket">
+        <div class="panel">
+          <div class="panel-head"><h2>Playoffs</h2>
+            <div class="seg small" id="brView"><button data-v="tree" class="on">Bracket</button><button data-v="playin">Play-in</button></div>
+          </div>
+          <div id="bracketBody"><div class="empty">The bracket appears when the play-in and playoffs start.</div></div>
+          <div id="seriesDetail"></div>
         </div>
       </section>
 

@@ -291,3 +291,49 @@ table.stats th.sorted { color: var(--accent-2); }
   .sb-team, .sb-team.right { justify-content: center; flex-direction: row; text-align: left; }
   .sb-score { font-size: 44px; }
 }
+
+/* season */
+.season-bar { display: flex; align-items: center; gap: 16px; }
+.season-prog { flex: 1; height: 10px; border-radius: 99px; background: rgba(148,163,184,.12); overflow: hidden; }
+.season-prog-fill { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--blue), var(--accent)); transition: width .4s ease; }
+.season-prog-text { color: var(--text-2); font-size: 13px; min-width: 260px; }
+.subtabs { margin: 2px 0; align-self: flex-start; }
+.conf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 18px; }
+.conf-grid h3, .race h3, .award-group h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-2); }
+table.stats tr.cut td { border-bottom: 1px dashed rgba(245,165,36,.6); }
+.seed { width: 26px; color: var(--muted); font-weight: 800; }
+.tcell { display: flex; align-items: center; gap: 10px; }
+.race-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.race-row { display: grid; grid-template-columns: 24px 1fr; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--line); align-items: center; }
+.race-row .rk { font-weight: 800; color: var(--muted); }
+.race-row .who { font-weight: 700; }
+.race-row .st { color: var(--muted); font-size: 12px; }
+.award-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-top: 18px; }
+.award-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: rgba(2,6,15,.35); }
+.award-card .a { color: var(--accent-2); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 800; }
+.award-card .p { font-weight: 800; font-size: 16px; margin-top: 4px; }
+.award-card .t, .award-card .s { color: var(--text-2); font-size: 12.5px; }
+.filters { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.filters input { background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 12px; min-width: 220px; outline: none; }
+
+/* bracket */
+.bracket { display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 14px; align-items: center; overflow-x: auto; padding-bottom: 6px; }
+.br-col { display: flex; flex-direction: column; justify-content: space-around; gap: 12px; min-height: 100%; }
+.br-col h4 { margin: 0 0 4px; text-align: center; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.br-card { border: 1px solid var(--line-strong); border-radius: 12px; background: rgba(2, 6, 15, .45); overflow: hidden; cursor: pointer; transition: border-color .15s, transform .1s; }
+.br-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.br-card.sel { border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2); }
+.br-team { display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-weight: 600; font-size: 13px; }
+.br-team + .br-team { border-top: 1px solid var(--line); }
+.br-team .logo { width: 22px; height: 22px; font-size: 8px; border-radius: 6px; }
+.br-team .w { margin-left: auto; font-weight: 800; font-variant-numeric: tabular-nums; }
+.br-team.lose { opacity: .45; }
+.br-team.win { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 28%, transparent), transparent); }
+.br-champ { text-align: center; padding: 16px; border: 1px solid rgba(245, 165, 36, .4); border-radius: 14px; background: rgba(245, 165, 36, .08); margin-bottom: 14px; }
+.br-champ .t { font-size: 22px; font-weight: 800; color: var(--accent-2); }
+.series-detail { margin-top: 18px; }
+.series-games { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; }
+.sg { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--panel-2); cursor: pointer; font-variant-numeric: tabular-nums; font-size: 13px; }
+.sg.on { border-color: var(--accent); }
+.sg b { color: var(--accent-2); }
+.playin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }

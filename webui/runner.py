@@ -10,13 +10,17 @@ from typing import Dict, Optional
 
 import sim_engine
 import players_data
+from season_2018 import run_2018_season, factories_2018
+from season_year import run_year_season, factories_for_year
 from gui_app import GuiOutputProxy, FANTASY_SEASON_MODES   # same play-by-play filter and scoreboard parsing as the Tk app
 
 from .hub import EventHub
 from .live import live_snapshot, team_identity
 
 # Modes the browser UI can run today. The rest of the Tk modes are added as their screens are built.
-SUPPORTED_MODES = ("Game", "Playoff series")
+SEASON_MODES = {"2021 season (82 games)": 2021, "2022 season (82 games)": 2022, "2023 season (82 games)": 2023, "2026 season (82 games)": 2026}
+SEASON_LIKE = tuple(SEASON_MODES) + ("2027 season (82 games)", "2018 season (82 games)")
+SUPPORTED_MODES = ("Game", "Playoff series") + SEASON_LIKE + ("2027 play-in & playoffs",)
 ALL_MODES = (
     "Game", "1-on-1", "Playoff series", "Custom 16-team playoffs", "Full 2027 playoffs", "2027 season (82 games)",
     "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)",
@@ -64,13 +68,20 @@ class SimRunner:
         self.series = None             # latest series record
         self.flow = []                 # (period, clock, margin) points for the game-flow chart
         self.last_live = None          # last live snapshot (kept after the game ends for the final box score)
-        self.sections: Dict[str, str] = {}
+        self.sections: Dict = {}
+        self.season = {"progress": None, "races": None, "standings": None, "ready": False}
+        self.post = {"standings": None, "factories": None, "year": None}
+        self.bracket = {}
         self._live_signature = None
         self._engine_queue = queue.Queue()
         threading.Thread(target=self._pump_engine_messages, daemon=True).start()
         threading.Thread(target=self._tick_live, daemon=True).start()
 
     # ---------------------------------------------------------------- state
+    def season_state(self) -> Dict:
+        sec = self.sections or {}
+        return {**self.season, "hasSections": bool(sec), "keys": sorted(k for k in sec if k.startswith("_"))}
+
     def meta(self) -> Dict:
         return {
             "teams": [team_identity(name) for name in self.factories],
@@ -82,7 +93,7 @@ class SimRunner:
         return {
             "active": self.active, "mode": self.mode, "status": self.status, "speed": self.speed,
             "paused": bool(sim_engine.SIM_PAUSED), "score": self.score, "series": self.series,
-            "flow": self.flow, "live": self.last_live, "sectionsReady": bool(self.sections),
+            "flow": self.flow, "live": self.last_live, "sectionsReady": bool(self.sections), "season": self.season_state(),
         }
 
     def set_status(self, text: str):
@@ -91,21 +102,30 @@ class SimRunner:
 
     # --------------------------------------------------------------- control
     def start(self, mode: str, team_a: str, team_b: str, rules: str = "NBA") -> Optional[str]:
+        if mode == "Next":
+            mode = "2027 play-in & playoffs"
+            if not self.season.get("ready"):
+                return "Finish a season first."
         if mode not in SUPPORTED_MODES:
             return f"{mode} is not in the browser UI yet. Use the Tk app for it for now."
-        if team_a not in self.factories or team_b not in self.factories:
+        needs_teams = mode in ("Game", "Playoff series")
+        if needs_teams and (team_a not in self.factories or team_b not in self.factories):
             return "Pick two teams from the list."
-        if team_a == team_b:
+        if needs_teams and team_a == team_b:
             return "Pick two different teams."
         with self.lock:
             if self.active:
                 return "A simulation is already running."
             self.active = True
         self.mode = mode
-        self.score, self.series, self.flow, self.sections, self.last_live = None, None, [], {}, None
+        keep = mode == "2027 play-in & playoffs"
+        self.score, self.series, self.flow, self.last_live = None, None, [], None
+        if not keep:
+            self.sections = {}
+            self.season = {"progress": None, "races": None, "standings": None, "ready": False}
         self._live_signature = None
         self.hub.clear_backlog()
-        self.hub.publish({"type": "reset", "mode": mode, "teams": [team_identity(team_a), team_identity(team_b)]})
+        self.hub.publish({"type": "reset", "mode": mode, "teams": [team_identity(team_a), team_identity(team_b)] if needs_teams else [None, None]})
         threading.Thread(target=self._run, args=(mode, team_a, team_b, rules), daemon=True).start()
         return None
 
@@ -128,6 +148,11 @@ class SimRunner:
             self.set_status({"game": "Simming to the end of the game", "end1": "Simming to the end of the 1st", "half": "Simming to halftime",
                              "end3": "Simming to the end of the 3rd", "last5": "Simming to the final 5 minutes",
                              "last2": "Simming to the final 2 minutes"}[value])
+        elif action == "simPlayoffs":
+            sim_engine.SIM_STICKY_FAST = "playoffs"
+            sim_engine.SIM_FAST_FORWARD = True
+            sim_engine.SIM_JUMP_TARGET = None
+            self.set_status("Simming all the playoffs")
         elif action == "simSeries":
             sim_engine.SIM_STICKY_FAST = "series"
             sim_engine.SIM_FAST_FORWARD = True
@@ -142,7 +167,34 @@ class SimRunner:
         line = text.rstrip("\n")
         self.hub.publish({"type": "pbp", "text": line}, keep=True)
 
+    def _on_section(self, sections):
+        if isinstance(sections, dict):
+            merged = dict(self.sections or {})
+            merged.update(sections)
+            self.sections = merged
+            self.hub.publish({"type": "sections", "keys": sorted(k for k in merged if k.startswith("_"))})
+
+    def _on_season_message(self, message: Dict) -> bool:
+        if message.get("season_progress"):
+            self.season["progress"] = {"completed": message.get("completed", 0), "total": message.get("total", 1230)}
+            self.hub.publish({"type": "season", "season": self.season_state()})
+        elif "season_races" in message:
+            self.season["races"] = message["season_races"]
+            self.season["progress"] = {"completed": message.get("completed", 0), "total": message.get("total", 1230)}
+            self.hub.publish({"type": "season", "season": self.season_state()})
+        elif "season_standings" in message:
+            self.season["standings"] = message["season_standings"]
+            self.hub.publish({"type": "season", "season": self.season_state()})
+        elif message.get("postseason_ready"):
+            self.season["ready"] = True
+            self.hub.publish({"type": "season", "season": self.season_state()})
+        else:
+            return False
+        return True
+
     def _on_score(self, message: Dict):
+        if self._on_season_message(message):
+            return
         if "period" in message and "clock" in message and "score_a" in message:
             self.score = message
             if self.status.startswith("Simming") and not sim_engine.SIM_FAST_FORWARD and not sim_engine.SIM_STICKY_FAST:
@@ -172,7 +224,8 @@ class SimRunner:
         sim_engine.SIM_PAUSED = False
         sim_engine.SIM_SLEEP_SCALE = 1.0 / self.speed
         sim_engine.set_ruleset(rules if rules in ("NBA", "FIBA") else "NBA")
-        players_data.POSTSEASON_PLAY_IN = True
+        if mode not in ("2018 season (82 games)", "2027 play-in & playoffs"):
+            players_data.POSTSEASON_PLAY_IN = True
         self.set_status("Running")
         error = None
         try:
@@ -185,6 +238,25 @@ class SimRunner:
                 sim_engine.simulate_game(team_a, team_b)
             elif mode == "Playoff series":
                 sim_engine.run_best_of_7_series(self.factories[team_a_name], self.factories[team_b_name])
+            elif mode in SEASON_LIKE:
+                sim_engine.GUI_SERIES_UPDATE_QUEUE = None
+                self.set_status("Season running")
+                sink_sections = _Sink(self._on_section)
+                if mode in SEASON_MODES:
+                    year = SEASON_MODES[mode]
+                    result = run_year_season(year, sink_sections, _Sink(self._on_score))
+                    self.post = {"standings": (result or {}).get("_season_standings"), "factories": factories_for_year(year), "year": year}
+                elif mode == "2027 season (82 games)":
+                    result = players_data.run_2027_season(sink_sections, _Sink(self._on_score))
+                    self.post = {"standings": (result or {}).get("_season_standings"), "factories": None, "year": 2027}
+                else:
+                    result = run_2018_season(sink_sections, _Sink(self._on_score))
+                    self.post = {"standings": (result or {}).get("_season_standings"), "factories": None, "year": 2018}
+                self._on_section(result or {})
+                self._on_score({"postseason_ready": True})
+            elif mode == "2027 play-in & playoffs":
+                sim_engine.GUI_SERIES_UPDATE_QUEUE = _Sink(self._on_section)
+                players_data.run_2027_postseason(self.post.get("standings"), self.post.get("factories"))
         except Exception:
             error = traceback.format_exc()
         finally:
@@ -236,5 +308,8 @@ class SimRunner:
                 continue
             if message.get("lineup_changed"):
                 self._push_live(force=True)      # a substitution: the on-court box switches right away
+            elif "bracket_state" in message:
+                self.bracket = message["bracket_state"]
+                self.hub.publish({"type": "bracket"})
             elif "series_status" in message or "game_result" in message or message.get("reset_series_score"):
                 self._on_score(message)

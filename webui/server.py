@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .hub import EventHub
 from .runner import SimRunner
+from .live import team_identity
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(ROOT, "static")
@@ -94,6 +95,49 @@ def _download_headshot(name: str):
             _headshot_jobs[name] = "failed"
 
 
+def _num(x, nd=1):
+    return round(x, nd) if isinstance(x, (int, float)) else x
+
+
+def season_payload(runner):
+    sec = runner.sections or {}
+    standings = sec.get("_season_standings") or runner.season.get("standings") or []
+    rows = []
+    for r in standings:
+        ident = team_identity(r.get("team", ""))
+        rows.append({**{k: v for k, v in r.items() if isinstance(v, (int, float, str))}, **{"short": ident["short"], "logo": ident["logo"], "color": ident["color"], "initials": ident["initials"], "year": ident["year"]}})
+    awards = sec.get("_season_awards_table") or []
+    games = sec.get("_season_games") or []
+    return {
+        "state": runner.season_state(), "standings": rows, "awards": awards,
+        "races": runner.season.get("races") or {},
+        "allStar": bool(sec.get("_all_star_game")),
+        "games": len(games),
+    }
+
+
+def players_payload(runner):
+    sec = runner.sections or {}
+    totals = sec.get("_season_player_totals") or {}
+    out = []
+    for team, players in totals.items():
+        ident = team_identity(team)
+        for name, st in players.items():
+            g = max(1, st.get("games", 0))
+            mins = st.get("minutes", 0) / 60.0
+            fga, fta, tpa = st.get("fga", 0), st.get("fta", 0), st.get("tpa", 0)
+            out.append({
+                "name": name, "team": team, "short": ident["short"], "logo": ident["logo"], "color": ident["color"], "gp": st.get("games", 0),
+                "mpg": _num(mins / g), "pts": _num(st.get("pts", 0) / g), "reb": _num(st.get("reb", 0) / g), "ast": _num(st.get("ast", 0) / g),
+                "stl": _num(st.get("stl", 0) / g), "blk": _num(st.get("blk", 0) / g), "tov": _num(st.get("tov", 0) / g),
+                "fgp": _num(100 * st.get("fgm", 0) / fga) if fga else None, "tpp": _num(100 * st.get("tpm", 0) / tpa) if tpa else None,
+                "ftp": _num(100 * st.get("ftm", 0) / fta) if fta else None,
+                "ts": _num(100 * st.get("pts", 0) / (2 * (fga + 0.44 * fta))) if (fga + fta) else None,
+                "pm": _num(st.get("plus_minus", 0) / g), "fga": _num(fga / g), "tpa": _num(tpa / g),
+            })
+    return {"players": out}
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -150,6 +194,12 @@ def build_app():
                 return self._json(runner.meta())
             if path == "/api/state":
                 return self._json(runner.state())
+            if path == "/api/bracket":
+                return self._json(runner.bracket or {})
+            if path == "/api/season":
+                return self._json(season_payload(runner))
+            if path == "/api/season/players":
+                return self._json(players_payload(runner))
             if path == "/api/sections":
                 return self._json(runner.sections)
             if path == "/media/logo":

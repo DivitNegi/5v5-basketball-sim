@@ -421,11 +421,20 @@ function applyStatus(s) {
   $("#pauseText").textContent = S.paused ? "Resume" : "Pause";
   $("#pauseIcon").textContent = S.paused ? "▶" : "❚❚";
   $("#start").disabled = S.active;
+  renderSeasonBar();
   const live = S.active && !S.paused;
   setStatus(s.text || (S.active ? "Running" : "Ready"), live);
 }
 
 function resetGame(msg) {
+  $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
+  $("#simPlayoffs").classList.toggle("hidden", msg.mode !== "2027 play-in & playoffs");
+  if (msg.mode === "2027 play-in & playoffs") { $('#nav .nav-item[data-view="bracket"]').click(); BR.selected = null; return; }
+  if (isSeasonMode(msg.mode)) {
+    $('#nav .nav-item[data-view="season"]').click();
+    SE.data = null; SE.players = null; refreshSeason();
+    return;
+  }
   S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
   S.identities = msg.teams || [null, null];
   (msg.teams || []).forEach((t, i) => {     // keep the setup bar on the teams actually playing
@@ -437,7 +446,8 @@ function resetGame(msg) {
   $("#feed").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
   $("#sbSeries").textContent = "";
   $("#sbPeriod").textContent = "1ST"; $("#sbClock").textContent = S.rules === "FIBA" ? "10:00" : "12:00";
-  $("#simSeries").classList.toggle("hidden", msg.mode !== "Playoff series");
+  $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
+  $("#simPlayoffs").classList.toggle("hidden", msg.mode !== "2027 play-in & playoffs");
   renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
 }
 
@@ -465,17 +475,197 @@ function connect() {
         else if (msg.series_status) { S.seriesText = msg.series_status; $("#sbSeries").textContent = msg.series_status; }
         else if (msg.game_result) toast(msg.game_result);
         break;
+      case "season": SE.data = { ...(SE.data || {}), state: msg.season }; renderSeasonBar(msg.season); scheduleSeasonRefresh(); break;
+      case "sections": scheduleSeasonRefresh(); break;
+      case "bracket": scheduleBracket(); break;
       case "finished": toast("Final. The box score has the full line."); break;
     }
   };
 }
+
+// ───────────────────────── season ─────────────────────────
+const SEASON_MODE_NAMES = ["2021 season", "2022 season", "2023 season", "2026 season", "2027 season", "2018 season", "2027 play-in"];
+const isSeasonMode = (m) => SEASON_MODE_NAMES.some((x) => (m || "").startsWith(x));
+const SE = { tab: "standings", data: null, players: null, sort: "pts", filter: "", loading: false };
+
+async function refreshSeason() {
+  if (SE.loading) return;
+  SE.loading = true;
+  try {
+    SE.data = await api.get("/api/season");
+    renderSeasonBar();
+    if ($("#view-season").classList.contains("active")) {
+      if (SE.tab === "players") SE.players = (await api.get("/api/season/players")).players;
+      renderSeasonBody();
+    }
+  } finally { SE.loading = false; }
+}
+let seasonTimer = null;
+function scheduleSeasonRefresh() {
+  clearTimeout(seasonTimer);
+  seasonTimer = setTimeout(refreshSeason, 700);
+}
+
+function renderSeasonBar(state) {
+  const st = state || SE.data?.state;
+  if (!st) return;
+  const p = st.progress;
+  const pct = p ? Math.min(100, (100 * p.completed) / Math.max(1, p.total)) : (st.ready ? 100 : 0);
+  $("#seasonFill").style.width = `${pct}%`;
+  $("#seasonProgText").textContent = st.ready ? "Regular season complete. Browse the tabs, or start the play-in and playoffs."
+    : p ? `Game ${p.completed} of ${p.total} (${pct.toFixed(0)}%)` : "Season running…";
+  $("#nextPost").classList.toggle("hidden", !st.ready || S.active);
+}
+
+function teamCell(r) {
+  return h("div", { class: "tcell" }, logoEl({ logo: r.logo, color: r.color, initials: r.initials }), h("span", { class: "pname" }, r.short));
+}
+
+function standingsTable(title, rows) {
+  const body = rows.map((r, i) => h("tr", { class: i === 5 || i === 9 ? "cut" : "" },
+    h("td", { class: "l" }, h("span", { class: "seed" }, i + 1), teamCell(r)),
+    h("td", {}, r.wins), h("td", {}, r.losses), h("td", {}, (r.pct ?? 0).toFixed(3)), h("td", {}, r.diff > 0 ? `+${r.diff.toFixed(1)}` : (r.diff ?? 0).toFixed(1))));
+  return h("div", {}, h("h3", {}, title),
+    h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Team"), h("th", {}, "W"), h("th", {}, "L"), h("th", {}, "PCT"), h("th", {}, "DIFF"))), h("tbody", {}, body)));
+}
+
+function renderStandings() {
+  const rows = SE.data?.standings || [];
+  if (!rows.length) return h("div", { class: "empty" }, "Standings appear as the season runs.");
+  const byConf = {};
+  rows.forEach((r) => { (byConf[r.conference || "League"] ||= []).push(r); });
+  return h("div", { class: "conf-grid" }, Object.keys(byConf).map((k) => standingsTable(k === "League" ? "League" : `${k} conference`, byConf[k])));
+}
+
+function renderRaces() {
+  const races = SE.data?.races || {};
+  const titles = { mvp: "MVP race", dpoy: "DPOY race", roy: "Rookie of the Year race" };
+  const cols = Object.keys(titles).filter((k) => (races[k] || []).length).map((k) =>
+    h("div", { class: "race" }, h("h3", {}, titles[k]),
+      (races[k] || []).map((r) => h("div", { class: "race-row" }, h("span", { class: "rk" }, r.rank),
+        h("div", {}, h("div", { class: "who" }, r.player, " ", h("span", { class: "muted" }, (r.team || "").replace(/^\d{4} /, ""))), h("div", { class: "st" }, r.stats))))));
+  const groups = {};
+  (SE.data?.awards || []).forEach((a) => { (groups[a.award] ||= []).push(a); });
+  const cards = Object.entries(groups).map(([name, list]) => h("div", { class: "award-card" }, h("div", { class: "a" }, name),
+    list.map((a) => h("div", { style: { marginTop: "6px" } }, h("div", { class: "p" }, a.player), h("div", { class: "t" }, (a.team || "").replace(/^\d{4} /, "")), h("div", { class: "s" }, a.stats)))));
+  return h("div", {}, cols.length ? h("div", { class: "race-grid" }, cols) : h("div", { class: "empty" }, "The award races appear once games are played."),
+    cards.length ? h("div", { class: "award-grid" }, cards) : null);
+}
+
+const PCOLS = [["gp", "GP"], ["mpg", "MPG"], ["pts", "PTS"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tov", "TO"], ["fgp", "FG%"], ["tpp", "3P%"], ["ftp", "FT%"], ["ts", "TS%"], ["pm", "+/-"]];
+function renderPlayers() {
+  const all = SE.players || [];
+  if (!all.length) return h("div", { class: "empty" }, "Player stats appear once games are played.");
+  const q = SE.filter.toLowerCase();
+  const minGp = Math.max(1, Math.floor(Math.max(...all.map((p) => p.gp)) * 0.4));
+  let rows = all.filter((p) => p.gp >= minGp && (!q || p.name.toLowerCase().includes(q) || p.short.toLowerCase().includes(q)));
+  rows.sort((a, b) => (b[SE.sort] ?? -999) - (a[SE.sort] ?? -999));
+  rows = rows.slice(0, 120);
+  const input = h("input", { placeholder: "Search player or team…", value: SE.filter, oninput: (e) => { SE.filter = e.target.value; const pos = e.target.selectionStart; renderSeasonBody(); const i = $("#seasonBody input"); i.focus(); i.setSelectionRange(pos, pos); } });
+  const head = h("tr", {}, h("th", { class: "l" }, "Player"), ...PCOLS.map(([k, l]) => h("th", { class: `sortable ${SE.sort === k ? "sorted" : ""}`, onclick: () => { SE.sort = k; renderSeasonBody(); } }, l)));
+  const body = rows.map((p) => h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name), h("span", { class: "muted" }, p.short))),
+    ...PCOLS.map(([k]) => h("td", { class: k === "pts" ? "pts" : "" }, p[k] == null ? "–" : k === "pm" && p[k] > 0 ? `+${p[k]}` : p[k]))));
+  return h("div", {}, h("div", { class: "filters" }, input, h("span", { class: "muted", style: { alignSelf: "center" } }, `Players with ${minGp}+ games · click a column to sort`)),
+    h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head), h("tbody", {}, body))));
+}
+
+function renderSeasonBody() {
+  const view = SE.tab === "standings" ? renderStandings() : SE.tab === "races" ? renderRaces() : renderPlayers();
+  $("#seasonBody").replaceChildren(view);
+}
+
+// ───────────────────────── playoffs bracket ─────────────────────────
+const BR = { data: null, view: "tree", selected: null, game: null };
+const identOf = (name) => (S.meta?.teams.find((t) => t.name === name)) || { name, short: (name || "").replace(/^\d{4} /, ""), initials: "TM", color: "#334155" };
+
+async function refreshBracket() {
+  BR.data = await api.get("/api/bracket");
+  renderBracket();
+}
+
+function brTeam(name, wins, winner, small) {
+  const t = identOf(name);
+  const cls = winner ? (winner === name ? "win" : "lose") : "";
+  return h("div", { class: `br-team ${cls}`, style: { "--c": t.color } }, logoEl(t), h("span", {}, t.short), wins != null ? h("span", { class: "w" }, wins) : null);
+}
+function seriesFor(a, b) {
+  const sr = BR.data?.series || {};
+  return sr[`${a}|${b}`] || sr[`${b}|${a}`] || null;
+}
+function brCard([a, b, winner]) {
+  const sr = seriesFor(a, b);
+  const wa = sr ? (sr.a === a ? sr.wins_a : sr.wins_b) : null, wb = sr ? (sr.a === a ? sr.wins_b : sr.wins_a) : null;
+  const key = `${a}|${b}`;
+  return h("div", { class: `br-card ${BR.selected === key ? "sel" : ""}`, onclick: () => { BR.selected = key; BR.game = null; renderBracket(); } },
+    brTeam(a, wa, winner), brTeam(b, wb, winner));
+}
+function renderTree() {
+  const d = BR.data || {};
+  const rounds = d.rounds || {};
+  if (!rounds.East) return h("div", { class: "empty" }, d.play_in ? "The play-in is running. The bracket fills in after it." : "The bracket appears when the playoffs start.");
+  const col = (title, list) => h("div", { class: "br-col" }, h("h4", {}, title), (list || []).map(brCard));
+  const E = rounds.East || {}, W = rounds.West || {}, F = rounds.Finals || {};
+  const finals = Object.values(F)[0] || [];
+  const tree = h("div", { class: "bracket" },
+    col("East · 1st round", E["First Round"]), col("East · semis", E["Semifinals"]), col("East · finals", E["Conference Finals"]),
+    col(Object.keys(F)[0] || "Finals", finals),
+    col("West · finals", W["Conference Finals"]), col("West · semis", W["Semifinals"]), col("West · 1st round", W["First Round"]));
+  const champ = d.champion ? h("div", { class: "br-champ" }, h("div", { class: "muted" }, "CHAMPIONS"), h("div", { class: "t" }, identOf(d.champion).short), d.finals_mvp ? h("div", { class: "muted" }, `Finals MVP: ${typeof d.finals_mvp === "string" ? d.finals_mvp : (d.finals_mvp.name || d.finals_mvp[0] || "")}`) : null) : null;
+  return h("div", {}, champ, tree);
+}
+function renderPlayIn() {
+  const pi = BR.data?.play_in;
+  if (!pi) return h("div", { class: "empty" }, "This season has no play-in.");
+  const cards = [];
+  for (const [conf, games] of Object.entries(pi)) for (const [label, g] of Object.entries(games)) {
+    cards.push(h("div", { class: "br-card", style: { cursor: "default" } },
+      h("div", { class: "muted", style: { padding: "6px 10px" } }, `${conf} · ${label.replace("v", " vs ")}`),
+      brTeam(g.a, g.score_a, g.winner), brTeam(g.b, g.score_b, g.winner)));
+  }
+  return h("div", { class: "playin-grid" }, cards);
+}
+function renderSeriesDetail() {
+  const root = $("#seriesDetail");
+  const key = BR.selected;
+  if (!key || BR.view !== "tree") { root.replaceChildren(); return; }
+  const [a, b] = key.split("|");
+  const sr = seriesFor(a, b);
+  if (!sr) { root.replaceChildren(); return; }
+  const A = identOf(sr.a), B = identOf(sr.b);
+  const games = h("div", { class: "series-games" }, (sr.games || []).map(([n, sa, sb, home]) =>
+    h("div", { class: `sg ${BR.game === n ? "on" : ""}`, onclick: () => { BR.game = n; renderSeriesDetail(); } }, `G${n} `, h("b", {}, `${sa}-${sb}`), ` · ${identOf(home).initials}`)));
+  const head = h("div", { class: "panel-head" }, h("h2", {}, `${A.short} vs ${B.short}`), h("span", { class: "muted" }, sr.winner ? `${identOf(sr.winner).short} won ${Math.max(sr.wins_a, sr.wins_b)}-${Math.min(sr.wins_a, sr.wins_b)}` : `${sr.wins_a}-${sr.wins_b}`));
+  let box = null;
+  const boxes = sr.boxes?.[BR.game];
+  if (boxes) {
+    box = h("div", { class: "conf-grid" }, boxes.map((tm) => h("div", {}, h("h3", {}, `${identOf(tm.name).short} · ${tm.score}`),
+      h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+        h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3PT", "FT", "+/-"].map((x) => h("th", {}, x)))),
+        h("tbody", {}, (tm.players || []).map((p) => h("tr", { class: p.st ? "" : "bench" }, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))),
+          h("td", {}, (p.min ?? 0).toFixed(1)), h("td", { class: "pts" }, p.pts), h("td", {}, p.reb), h("td", {}, p.ast), h("td", {}, p.stl), h("td", {}, p.blk), h("td", {}, p.tov),
+          h("td", {}, `${p.fgm}-${p.fga}`), h("td", {}, `${p.tpm}-${p.tpa}`), h("td", {}, `${p.ftm}-${p.fta}`), h("td", {}, p.pm)))))))));
+  }
+  root.replaceChildren(h("div", { class: "series-detail" }, head, games, box || h("div", { class: "muted" }, "Pick a game for its box score.")));
+}
+function renderBracket() {
+  $("#bracketBody").replaceChildren(BR.view === "tree" ? renderTree() : renderPlayIn());
+  renderSeriesDetail();
+}
+let bracketTimer = null;
+function scheduleBracket() { clearTimeout(bracketTimer); bracketTimer = setTimeout(refreshBracket, 600); }
 
 // ───────────────────────── boot ─────────────────────────
 async function boot() {
   S.meta = await api.get("/api/meta");
   const modeSel = $("#mode");
   for (const m of S.meta.modes) modeSel.append(h("option", { value: m.name, disabled: !m.ready }, m.ready ? m.name : `${m.name} (Tk app for now)`));
-  modeSel.addEventListener("change", () => { S.mode = modeSel.value; });
+  const syncMode = () => {
+    S.mode = modeSel.value;
+    const seasonal = isSeasonMode(S.mode);
+    $$("#setup .field.grow, #setup .vs").forEach((el) => { el.style.display = seasonal ? "none" : ""; });
+    $("#start").lastChild.textContent = seasonal ? " Start season" : " Tip off";
+  };
+  modeSel.addEventListener("change", syncMode);
 
   const pickA = makePicker($("#pickA"), (t) => { S.teamA = t.name; });
   const pickB = makePicker($("#pickB"), (t) => { S.teamB = t.name; });
@@ -492,6 +682,15 @@ async function boot() {
     try { await api.post("/api/start", { mode: S.mode, teamA: S.teamA, teamB: S.teamB, rules: S.rules }); }
     catch (err) { toast(err.message, "err"); }
   });
+  $$("#seasonTabs button").forEach((b) => b.addEventListener("click", () => {
+    $$("#seasonTabs button").forEach((x) => x.classList.toggle("on", x === b)); SE.tab = b.dataset.v; refreshSeason();
+  }));
+  $$("#brView button").forEach((b) => b.addEventListener("click", () => {
+    $$("#brView button").forEach((x) => x.classList.toggle("on", x === b)); BR.view = b.dataset.v; renderBracket();
+  }));
+  $("#nextPost").addEventListener("click", async () => {
+    try { await api.post("/api/start", { mode: "Next", teamA: "", teamB: "", rules: S.rules }); } catch (err) { toast(err.message, "err"); }
+  });
   $("#pause").addEventListener("click", () => api.post("/api/control", { action: "pause" }).catch((e) => toast(e.message, "err")));
   const speeds = [0.5, 0.75, 1, 1.5, 2, 3, 5, 10, 20];
   const stepSpeed = (dir) => {
@@ -502,6 +701,7 @@ async function boot() {
   $("#slower").addEventListener("click", () => stepSpeed(-1));
   $("#faster").addEventListener("click", () => stepSpeed(1));
   $$("[data-jump]").forEach((b) => b.addEventListener("click", () => api.post("/api/control", { action: "jump", value: b.dataset.jump }).catch((e) => toast(e.message, "err"))));
+  $("#simPlayoffs").addEventListener("click", () => api.post("/api/control", { action: "simPlayoffs" }).catch((e) => toast(e.message, "err")));
   $("#simSeries").addEventListener("click", () => api.post("/api/control", { action: "simSeries" }).catch((e) => toast(e.message, "err")));
 
   $$("#feedFilter button").forEach((b) => b.addEventListener("click", () => {
@@ -516,6 +716,8 @@ async function boot() {
     $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${b.dataset.view}`));
     if (b.dataset.view === "box") renderBox();
     if (b.dataset.view === "flow") renderFlow("#flowBig", 420);
+    if (b.dataset.view === "season") refreshSeason();
+    if (b.dataset.view === "bracket") refreshBracket();
   }));
   document.addEventListener("keydown", (e) => {
     if (e.target.matches("input, select, textarea")) return;
