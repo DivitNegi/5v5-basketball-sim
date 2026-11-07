@@ -1,5 +1,6 @@
 """Runs simulations for the browser UI on a background thread and turns the engine's output into events."""
 import builtins
+import copy
 import json
 import queue
 import sys
@@ -10,7 +11,7 @@ from typing import Dict, Optional
 
 import sim_engine
 import players_data
-from season_2018 import run_2018_season, factories_2018
+from season_2018 import run_2018_season, run_2018_playoffs, factories_2018
 from season_year import run_year_season, factories_for_year
 from gui_app import GuiOutputProxy, FANTASY_SEASON_MODES   # same play-by-play filter and scoreboard parsing as the Tk app
 
@@ -20,7 +21,13 @@ from .live import live_snapshot, team_identity
 # Modes the browser UI can run today. The rest of the Tk modes are added as their screens are built.
 SEASON_MODES = {"2021 season (82 games)": 2021, "2022 season (82 games)": 2022, "2023 season (82 games)": 2023, "2026 season (82 games)": 2026}
 SEASON_LIKE = tuple(SEASON_MODES) + ("2027 season (82 games)", "2018 season (82 games)")
-SUPPORTED_MODES = ("Game", "Playoff series") + SEASON_LIKE + ("2027 play-in & playoffs",)
+SUPPORTED_MODES = (
+    "Game", "1-on-1", "Playoff series", "Custom 16-team playoffs",
+    "Full 2027 playoffs", "Full 2018 playoffs", "Custom season (82 games)",
+    "Fantasy draft: 2027 players (season + playoffs)",
+    "Fantasy draft: all-time (season + playoffs)", "Fantasy draft playoffs",
+    "Olympic tournament",
+) + SEASON_LIKE + ("2027 play-in & playoffs", "Replay season game")
 ALL_MODES = (
     "Game", "1-on-1", "Playoff series", "Custom 16-team playoffs", "Full 2027 playoffs", "2027 season (82 games)",
     "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)",
@@ -72,6 +79,10 @@ class SimRunner:
         self.season = {"progress": None, "races": None, "standings": None, "ready": False}
         self.post = {"standings": None, "factories": None, "year": None}
         self.bracket = {}
+        self.options: Dict = {}
+        self.draft_prompt: Dict = {}
+        self._draft_choice = None
+        self._draft_event = threading.Event()
         self._live_signature = None
         self._engine_queue = queue.Queue()
         threading.Thread(target=self._pump_engine_messages, daemon=True).start()
@@ -101,23 +112,34 @@ class SimRunner:
         self.hub.publish({"type": "status", "text": text, "active": self.active, "paused": bool(sim_engine.SIM_PAUSED), "speed": self.speed})
 
     # --------------------------------------------------------------- control
-    def start(self, mode: str, team_a: str, team_b: str, rules: str = "NBA") -> Optional[str]:
+    def start(self, mode: str, team_a: str, team_b: str, rules: str = "NBA", options: Optional[Dict] = None) -> Optional[str]:
         if mode == "Next":
             mode = "2027 play-in & playoffs"
             if not self.season.get("ready"):
                 return "Finish a season first."
         if mode not in SUPPORTED_MODES:
             return f"{mode} is not in the browser UI yet. Use the Tk app for it for now."
+        options = dict(options or {})
         needs_teams = mode in ("Game", "Playoff series")
         if needs_teams and (team_a not in self.factories or team_b not in self.factories):
             return "Pick two teams from the list."
         if needs_teams and team_a == team_b:
             return "Pick two different teams."
+        selected = [n for n in options.get("teams", []) if n in self.factories]
+        if mode == "Custom 16-team playoffs" and len(selected) != 16:
+            return "Choose exactly 16 teams for the custom playoffs."
+        if mode == "Custom season (82 games)" and len(selected) != 30:
+            return "Choose exactly 30 teams for the custom season."
+        if mode == "1-on-1" and not all(options.get(k) for k in ("teamA", "playerA", "teamB", "playerB")):
+            return "Choose both players for 1-on-1."
+        if mode == "Replay season game" and not sim_engine.season_replay_available(options.get("order")):
+            return "That season game is not available for replay."
         with self.lock:
             if self.active:
                 return "A simulation is already running."
             self.active = True
         self.mode = mode
+        self.options = options
         keep = mode == "2027 play-in & playoffs"
         self.score, self.series, self.flow, self.last_live = None, None, [], None
         if not keep:
@@ -128,6 +150,54 @@ class SimRunner:
         self.hub.publish({"type": "reset", "mode": mode, "teams": [team_identity(team_a), team_identity(team_b)] if needs_teams else [None, None]})
         threading.Thread(target=self._run, args=(mode, team_a, team_b, rules), daemon=True).start()
         return None
+
+    def draft_state(self) -> Dict:
+        state = dict(getattr(sim_engine, "FANTASY_DRAFT_STATE", {}) or {})
+        state.pop("rosters", None)
+        return {"active": bool(self.draft_prompt), "prompt": self.draft_prompt, "state": state}
+
+    def draft_choose(self, value) -> Optional[str]:
+        if not self.draft_prompt:
+            return "The fantasy draft is not waiting for a choice."
+        self._draft_choice = value
+        self._draft_event.set()
+        return None
+
+    def _wait_draft_choice(self, prompt: Dict):
+        self.draft_prompt = prompt
+        self._draft_choice = None
+        self._draft_event.clear()
+        self.hub.publish({"type": "draft", "data": self.draft_state()})
+        while self.active and not self._draft_event.wait(0.2):
+            pass
+        value = self._draft_choice
+        self.draft_prompt = {}
+        self.hub.publish({"type": "draft", "data": self.draft_state()})
+        return value
+
+    def _web_fantasy_picker(self, pools, taken_names):
+        players = sim_engine.fantasy_available_players(pools, taken_names)
+        players.sort(key=sim_engine.fantasy_ovr, reverse=True)
+        by_key = {}
+        rows = []
+        for index, player in enumerate(players):
+            key = f"{index}:{getattr(player, 'fantasy_base_name', player.name)}"
+            by_key[key] = player
+            rows.append({"key": key, "name": player.name, "pos": player.position,
+                         "ovr": sim_engine.fantasy_ovr(player), "team": getattr(player, "source_team", "")})
+        value = self._wait_draft_choice({"kind": "player", "title": "You are on the clock", "players": rows})
+        if value == "__auto__":
+            return sim_engine.FANTASY_DRAFT_AUTO
+        return by_key.get(str(value))
+
+    def _web_option_picker(self, title, message, options):
+        value = self._wait_draft_choice({"kind": "option", "title": title, "message": message, "options": list(options)})
+        return value if value in options else (options[0] if options else None)
+
+    def _web_position_picker(self, player):
+        choices = ["PG", "SG", "SF", "PF", "C"]
+        value = self._wait_draft_choice({"kind": "option", "title": f"Position for {player.name}", "options": choices})
+        return value if value in choices else player.position
 
     def control(self, action: str, value=None) -> Optional[str]:
         if action == "speed":
@@ -213,11 +283,19 @@ class SimRunner:
     def _run(self, mode: str, team_a_name: str, team_b_name: str, rules: str):
         original_stdout, original_input = sys.stdout, builtins.input
         original_engine_queue = sim_engine.GUI_SCOREBOARD_QUEUE
+        original_series_queue = sim_engine.GUI_SERIES_UPDATE_QUEUE
+        original_fantasy_picker = sim_engine.GUI_FANTASY_PICKER
+        original_position_picker = sim_engine.GUI_POSITION_PICKER
+        original_option_picker = sim_engine.GUI_OPTION_PICKER
         original_ruleset = sim_engine.CURRENT_RULESET
         proxy = WebOutputProxy(_Sink(self._on_pbp), _Sink(self._on_score), original_stdout)
         sys.stdout = proxy
         builtins.input = lambda prompt="": ""
         sim_engine.GUI_SCOREBOARD_QUEUE = self._engine_queue
+        sim_engine.GUI_SERIES_UPDATE_QUEUE = _Sink(self._on_section)
+        sim_engine.GUI_FANTASY_PICKER = self._web_fantasy_picker
+        sim_engine.GUI_POSITION_PICKER = self._web_position_picker
+        sim_engine.GUI_OPTION_PICKER = self._web_option_picker
         sim_engine.SIM_FAST_FORWARD = False
         sim_engine.SIM_JUMP_TARGET = None
         sim_engine.SIM_STICKY_FAST = None
@@ -236,8 +314,56 @@ class SimRunner:
                 sim_engine.assign_player_badges(team_a)
                 sim_engine.assign_player_badges(team_b)
                 sim_engine.simulate_game(team_a, team_b)
+            elif mode == "Replay season game":
+                previous_cap = sim_engine.SEASON_STAR_MINUTES_CAP
+                sim_engine.SEASON_STAR_MINUTES_CAP = 34
+                try:
+                    team_a, team_b = sim_engine.build_season_replay_teams(self.options.get("order"))
+                    sim_engine.simulate_game(team_a, team_b)
+                finally:
+                    sim_engine.SEASON_STAR_MINUTES_CAP = previous_cap
+            elif mode == "1-on-1":
+                def resolve(team_name, player_name):
+                    if team_name not in self.factories:
+                        return None
+                    return next((copy.deepcopy(p) for p in self.factories[team_name]().roster if p.name == player_name), None)
+                player_a = resolve(self.options.get("teamA"), self.options.get("playerA"))
+                player_b = resolve(self.options.get("teamB"), self.options.get("playerB"))
+                if player_a is None or player_b is None:
+                    raise ValueError("Could not find one of the selected 1-on-1 players.")
+                sim_engine.assign_player_badges(sim_engine.Team("temp", [player_a]))
+                sim_engine.assign_player_badges(sim_engine.Team("temp", [player_b]))
+                sim_engine.simulate_1v1_game(player_a, player_b,
+                                             int(self.options.get("target", 11)), int(self.options.get("winBy", 2)))
             elif mode == "Playoff series":
                 sim_engine.run_best_of_7_series(self.factories[team_a_name], self.factories[team_b_name])
+            elif mode == "Custom 16-team playoffs":
+                sim_engine.run_custom_16_team_playoffs(self.options.get("teams", []), self.factories)
+            elif mode == "Full 2027 playoffs":
+                players_data.run_2027_playoffs()
+            elif mode == "Full 2018 playoffs":
+                run_2018_playoffs()
+            elif mode == "Olympic tournament":
+                sim_engine.set_ruleset("FIBA")
+                sim_engine.run_olympic_tournament(self.factories)
+            elif mode == "Fantasy draft playoffs":
+                sim_engine.run_fantasy_draft_playoffs()
+            elif mode in FANTASY_SEASON_MODES:
+                year_prefix = "2027 " if "2027" in mode else None
+                names, factories, user_team = sim_engine.run_fantasy_season_draft(year_prefix)
+                if names and factories:
+                    self.set_status("Fantasy season running")
+                    result = sim_engine.run_quiet_82_game_season(names, factories, _Sink(self._on_section), _Sink(self._on_score))
+                    self.post = {"standings": (result or {}).get("_season_standings"), "factories": dict(factories), "year": 2027 if year_prefix else None}
+                    self._on_section(result or {})
+                    self._on_score({"postseason_ready": True})
+            elif mode == "Custom season (82 games)":
+                selected = self.options.get("teams", [])
+                result = sim_engine.run_quiet_82_game_season(selected, self.factories, _Sink(self._on_section), _Sink(self._on_score))
+                self.post = {"standings": (result or {}).get("_season_standings"),
+                             "factories": {n: self.factories[n] for n in selected}, "year": None}
+                self._on_section(result or {})
+                self._on_score({"postseason_ready": True})
             elif mode in SEASON_LIKE:
                 sim_engine.GUI_SERIES_UPDATE_QUEUE = None
                 self.set_status("Season running")
@@ -269,6 +395,10 @@ class SimRunner:
                 self.sections = {}
             sys.stdout, builtins.input = original_stdout, original_input
             sim_engine.GUI_SCOREBOARD_QUEUE = original_engine_queue
+            sim_engine.GUI_SERIES_UPDATE_QUEUE = original_series_queue
+            sim_engine.GUI_FANTASY_PICKER = original_fantasy_picker
+            sim_engine.GUI_POSITION_PICKER = original_position_picker
+            sim_engine.GUI_OPTION_PICKER = original_option_picker
             sim_engine.SIM_FAST_FORWARD = False
             sim_engine.SIM_JUMP_TARGET = None
             sim_engine.SIM_STICKY_FAST = None
@@ -276,6 +406,7 @@ class SimRunner:
             sim_engine.set_ruleset(original_ruleset)
             with self.lock:
                 self.active = False
+            self.draft_prompt = {}
             if error:
                 print(error, file=original_stdout)
                 self.hub.publish({"type": "pbp", "text": "[Simulation stopped with an error: see the console]"}, keep=True)

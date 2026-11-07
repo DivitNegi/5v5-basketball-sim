@@ -450,3 +450,61 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .flow-plot { position: relative; }
 .flow-q { position: relative; height: 18px; }
 .flow-q span { position: absolute; transform: translateX(-50%); font-size: 11px; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+
+/* Browser equivalents of the Tk coach / league panels. */
+.box-scroll { height: calc(100vh - 330px); min-height: 360px; max-height: none; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable both-edges; }
+.box-scroll table { min-width: 1180px; }
+.box-scroll table.stats thead th { z-index: 4; box-shadow: 0 1px 0 var(--line-strong); }
+.coach-tools, .action-row { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.coach-status { min-height: 24px; color: var(--accent-2); font-weight: 700; margin: 4px 0 10px; }
+.panel h3 small { color: var(--muted); font-weight: 500; margin-left: 8px; }
+.player-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 8px 0 20px; }
+.coach-card { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: rgba(2,6,15,.38); cursor: pointer; text-align: left; color: var(--text); }
+.coach-card:hover { border-color: var(--accent); background: rgba(79,140,255,.08); }
+.coach-card.on { border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2); }
+.coach-card .face { grid-row: span 2; width: 44px; height: 44px; }
+.coach-card .nm { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coach-card .line { color: var(--muted); font-size: 12px; }
+.feature-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, .75fr); gap: 16px; align-items: start; }
+.draft-board { max-height: calc(100vh - 380px); overflow: auto; border-top: 1px solid var(--line); padding-top: 12px; }
+.draft-player { display: grid; grid-template-columns: 42px minmax(0,1fr) 44px 130px; gap: 10px; align-items: center; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.draft-player .ovr { font-weight: 800; color: var(--accent-2); }
+.team-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 7px; max-height: calc(100vh - 320px); overflow: auto; padding-right: 4px; }
+.team-check { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.team-check:has(input:checked) { border-color: var(--accent); background: rgba(79,140,255,.09); }
+.team-check .logo { width: 25px; height: 25px; }
+.one-panel { max-width: 980px; margin: 0 auto; }
+.one-grid { display: grid; grid-template-columns: 1fr 80px 1fr; gap: 18px; align-items: center; margin: 26px 0; }
+.one-grid > div:not(.one-vs) { display: grid; gap: 8px; }
+.one-vs { text-align: center; color: var(--accent-2); font-size: 26px; font-weight: 900; }
+.replay-list { display: grid; gap: 6px; max-height: calc(100vh - 300px); overflow: auto; }
+.replay-row { display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.broadcast-feed { height: calc(100vh - 300px); min-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.broadcast-event { display: grid; grid-template-columns: 74px 1fr; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(2,6,15,.35); }
+.broadcast-event .kind { color: var(--accent-2); font-weight: 800; text-transform: uppercase; font-size: 11px; letter-spacing: .1em; }
+.live-dot { color: var(--red); font-size: 11px; font-weight: 900; letter-spacing: .18em; }
+.lineup-input { width: 66px; min-width: 0; }
+.trade-rosters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.trade-list { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 6px; }
+.trade-player { display: flex; gap: 8px; padding: 5px 4px; font-size: 13px; }
+@media (max-width: 1000px) { .feature-grid { grid-template-columns: 1fr; } .one-grid { grid-template-columns: 1fr; } .one-vs { font-size: 15px; } }
+/* Fixed-size readable stats cells; overflow stays inside the panel. */
+.stats-scroll { max-height: 70vh; overflow: auto; scrollbar-gutter: stable; }
+.stats-scroll table { width: max-content; min-width: 100%; table-layout: auto; }
+.stats-scroll th, .stats-scroll td { min-width: 78px; padding: 13px 16px; font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.stats-scroll th:nth-child(1), .stats-scroll td:nth-child(1), .stats-scroll th:nth-child(2), .stats-scroll td:nth-child(2) { min-width: 210px; text-align: left; }
+.stats-scroll thead th { position: sticky; top: 0; z-index: 2; background: #19243b; }
+.stat-sort { color: inherit; font: inherit; font-weight: 700; background: none; border: 0; cursor: pointer; }
+.stats-scroll details { padding: 16px; }
+.stats-scroll pre { white-space: pre; font-size: 13px; }
+#court { max-height: 68vh; overflow: auto; scrollbar-gutter: stable; }
+#court table { min-width: 850px; }
+
+/* play-in bracket */
+.pi-wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 24px; }
+.pi-conf h3 { margin: 0 0 12px; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-2); }
+.pi-grid { display: grid; grid-template-columns: minmax(190px, 1fr) minmax(190px, 1fr) minmax(150px, .8fr); gap: 24px; align-items: stretch; }
+.pi-grid .br-col { min-height: 260px; }
+.pi-seed { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(2, 6, 15, .45); }
+.pi-seed .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(245, 165, 36, .16); color: var(--accent-2); font-weight: 800; font-size: 12px; }
+.pi-seed .logo { width: 22px; height: 22px; font-size: 8px; border-radius: 6px; }

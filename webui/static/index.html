@@ -22,13 +22,18 @@
         <button class="nav-item" data-view="shots"><span class="nav-icon">◌</span>Shot chart</button>
         <button class="nav-item" data-view="comp"><span class="nav-icon">⇆</span>Compare</button>
         <button class="nav-item" data-view="flow"><span class="nav-icon">◠</span>Game flow</button>
-        <div class="nav-section">Coming next</div>
+        <div class="nav-section">League &amp; coaching</div>
         <button class="nav-item" data-view="season"><span class="nav-icon">☰</span>Season</button>
         <button class="nav-item" data-view="bracket"><span class="nav-icon">⛓</span>Playoffs</button>
-        <button class="nav-item soon" disabled><span class="nav-icon">◎</span>Stats<em>soon</em></button>
+        <button class="nav-item" data-view="stats"><span class="nav-icon">◎</span>Stats</button>
         <button class="nav-item" data-view="cards"><span class="nav-icon">▣</span>Teams &amp; players</button>
-        <button class="nav-item soon" disabled><span class="nav-icon">⇄</span>Draft &amp; trades<em>soon</em></button>
-        <button class="nav-item soon" disabled><span class="nav-icon">✎</span>Coach<em>soon</em></button>
+        <button class="nav-item" data-view="coach"><span class="nav-icon">✎</span>Coach</button>
+        <button class="nav-item" data-view="lineup"><span class="nav-icon">⑤</span>Lineups</button>
+        <button class="nav-item" data-view="draft"><span class="nav-icon">⇄</span>Draft &amp; trades</button>
+        <button class="nav-item" data-view="modes"><span class="nav-icon">◆</span>Custom modes</button>
+        <button class="nav-item" data-view="one"><span class="nav-icon">①</span>1-on-1</button>
+        <button class="nav-item" data-view="replay"><span class="nav-icon">↺</span>Replay</button>
+        <button class="nav-item" data-view="broadcast"><span class="nav-icon">◉</span>Broadcast booth</button>
       </nav>
       <div class="sidebar-foot">
         <div class="conn" id="conn"><span class="dot"></span><span>Connecting…</span></div>
@@ -122,6 +127,20 @@
         </div>
       </section>
 
+      <section class="view" id="view-stats">
+        <div class="panel">
+          <div class="panel-head"><h2>Stats</h2><button class="btn" id="statsRefresh">Refresh</button></div>
+          <div class="filters">
+            <label>Display <select id="statsKind"><option value="averages">Player averages</option><option value="advanced">Advanced</option><option value="shots">Shot diet</option><option value="defense">Defended shots</option><option value="matchups">Defensive matchups</option><option value="awards">Awards</option><option value="reports">Box scores, recaps &amp; reports</option></select></label>
+            <label>Source <select id="statsSource"><option>Live</option></select></label>
+            <label>Team <select id="statsTeam"><option>All teams</option></select></label>
+            <label id="statsQuarterLabel">Shot quarter <select id="statsQuarter"><option value="All">All</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option><option value="5">OT1</option></select></label>
+            <label>Find player <input id="statsSearch" type="search" placeholder="Player name"></label>
+          </div>
+          <div class="table-wrap stats-scroll" id="statsBody"><div class="empty">Stats appear as games are played.</div></div>
+        </div>
+      </section>
+
       <section class="view" id="view-season">
         <div class="panel season-bar">
           <div class="season-prog"><div class="season-prog-fill" id="seasonFill"></div></div>
@@ -190,7 +209,7 @@
           <div class="panel-head"><h2>Box score</h2>
             <div class="seg small" id="boxTeam"><button data-v="0" class="on">Team A</button><button data-v="1">Team B</button></div>
           </div>
-          <div class="table-wrap" id="boxTable"><div class="empty">No game yet.</div></div>
+          <div class="table-wrap box-scroll" id="boxTable"><div class="empty">No game yet.</div></div>
         </div>
       </section>
 
@@ -199,6 +218,63 @@
           <div class="panel-head"><h2>Game flow</h2><span class="muted">Scoring margin through the game</span></div>
           <div class="flow big" id="flowBig"></div>
         </div>
+      </section>
+
+      <section class="view" id="view-coach">
+        <div class="panel">
+          <div class="panel-head"><h2>Coach · live substitutions</h2><span class="muted" id="coachNote">Start a game to coach either team.</span></div>
+          <div class="coach-tools"><div class="seg" id="coachTeams"></div><button class="btn" data-coach="timeout">Call timeout</button><button class="btn" data-coach="offense">Cycle offense</button><button class="btn" data-coach="defense">Cycle defense</button><button class="btn" data-coach="focus">Help on star</button></div>
+          <div class="coach-status" id="coachStatus"></div>
+          <h3>On the floor <small>select the player going out</small></h3><div class="player-card-grid" id="coachFloor"></div>
+          <h3>Bench <small>then select the player coming in</small></h3><div class="player-card-grid" id="coachBench"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-lineup">
+        <div class="panel">
+          <div class="panel-head"><h2>Fantasy lineup &amp; usage</h2><div><button class="btn" id="lineupReset">Reset automatic</button> <button class="btn primary" id="lineupSave">Save lineup</button></div></div>
+          <p class="muted">The same starters, positions, rotation order, minutes and usage controls used by the Tk Coach tab.</p>
+          <div class="table-wrap tall" id="lineupBody"><div class="empty">Start a fantasy draft season to edit a lineup.</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-draft">
+        <div class="feature-grid">
+          <div class="panel">
+            <div class="panel-head"><h2>Fantasy draft</h2></div>
+            <p class="muted">Draft through the same snake-draft engine as Tkinter. Choose each pick here or auto-draft the rest.</p>
+            <div class="action-row"><button class="btn primary" data-fantasy="2027">2027 player draft</button><button class="btn" data-fantasy="all">All-time draft</button><button class="btn" data-fantasy="playoffs">Draft playoffs</button></div>
+            <div id="draftBoard" class="draft-board"><div class="empty">Start a draft to open the board.</div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Trade center</h2><button class="btn" id="tradeRefresh">Refresh</button></div>
+            <div id="tradeBody"><div class="empty">Trades unlock after a fantasy draft.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-modes">
+        <div class="panel">
+          <div class="panel-head"><h2>Custom playoffs, seasons &amp; Olympics</h2><span class="muted" id="customCount">0 teams selected</span></div>
+          <div class="action-row"><button class="btn" id="select2027">Select 2027 teams</button><button class="btn" id="clearCustom">Clear</button><button class="btn primary" id="customPlayoffs">Run 16-team playoffs</button><button class="btn primary" id="customSeason">Run 30-team season</button><button class="btn primary" id="olympics">Run Olympics (FIBA)</button></div>
+          <div class="team-check-grid" id="customTeams"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-one">
+        <div class="panel one-panel">
+          <div class="panel-head"><h2>1-on-1</h2><span class="muted">Race to 11, win by 2</span></div>
+          <div class="one-grid"><div><label>Team A</label><select id="oneTeamA"></select><label>Player A</label><select id="onePlayerA"></select></div><div class="one-vs">VS</div><div><label>Team B</label><select id="oneTeamB"></select><label>Player B</label><select id="onePlayerB"></select></div></div>
+          <button class="btn primary big" id="oneStart">Start 1-on-1</button>
+        </div>
+      </section>
+
+      <section class="view" id="view-replay">
+        <div class="panel"><div class="panel-head"><h2>Season replay</h2><button class="btn" id="replayRefresh">Refresh</button></div><p class="muted">Finished season games are rebuilt with their saved seed and rosters, exactly like Tkinter Replay.</p><div class="replay-list" id="replayBody"><div class="empty">Complete a season to create replays.</div></div></div>
+      </section>
+
+      <section class="view" id="view-broadcast">
+        <div class="panel broadcast-panel"><div class="panel-head"><h2>Broadcast booth</h2><span class="live-dot">LIVE</span></div><div class="broadcast-feed" id="broadcastBody"><div class="empty">Broadcast events appear once a game starts.</div></div></div>
       </section>
     </main>
   </div>

@@ -45,7 +45,16 @@ const S = {
   score: [0, 0], flow: [], series: null,
   active: false, paused: false, speed: 1,
   feedFilter: "raw", boxTeam: 0, boxSort: null,
+  gameNo: 1, gameSnapshots: new Map(), goodPlays: [], lastScoreClock: null,
 };
+
+function cleanBadges(values) {
+  const seen = new Set();
+  return (values || []).map((value) => String(value).replace(/_/g, " ").trim().toLowerCase()
+    .replace(/\s+(bronze|silver|gold|hall of fame|hof)$/i, "").trim())
+    .filter((value) => value && !seen.has(value) && seen.add(value))
+    .map((value) => value.charAt(0).toUpperCase() + value.slice(1));
+}
 
 // ───────────────────────── logos & faces ─────────────────────────
 // Each image is probed once; afterwards a known-missing one is never requested again (the live view redraws several times a second).
@@ -368,6 +377,13 @@ function closeBlock(m) {
     h("div", { class: scored >= 0 ? "result made" : "result" }, result),
     detail.length ? h("div", { class: "detail" }, detail.slice(-2).join(" ")) : null,
   ].filter(Boolean));
+  const positive = scored >= 0
+    ? feed.lines.filter((line) => /\b(buries|drills|hits|makes|cash|scores|finishes|slams|dunks|lays? it in|knocks? down|connects|assist|finds)\b/i.test(line))
+    : feed.lines.filter((line) => /\b(steals?|stolen|picks? .* off|blocks?|swats?|chasedown|forces? the turnover|draws? (?:the )?charge)\b/i.test(line));
+  for (const line of positive) {
+    S.goodPlays.unshift({ game: S.gameNo, period, clock, score: `${now[0]}-${now[1]}`, text: line });
+  }
+  S.goodPlays.length = Math.min(S.goodPlays.length, 3000);
   S.plays.unshift({ period, clock, score: `${now[0]}-${now[1]}`, text: feed.lines.join(" ") });
   S.plays.length = Math.min(S.plays.length, 1500);
   root.prepend(block);
@@ -465,6 +481,11 @@ function applyLive(snap) {
 }
 
 function applyScore(msg) {
+  const startsFresh = /^1st$/i.test(msg.period || "") && /^(12|10):00$/.test(msg.clock || "") && Number(msg.score_a) === 0 && Number(msg.score_b) === 0;
+  if (startsFresh && S.lastScoreClock === "0:00" && S.live) {
+    S.gameSnapshots.set(S.gameNo, structuredClone(S.live));
+    S.gameNo += 1;
+  }
   $("#sbPeriod").textContent = (msg.period || "").toUpperCase();
   $("#sbClock").textContent = msg.clock || "";
   const lastFlow = S.flow[S.flow.length - 1];
@@ -474,6 +495,7 @@ function applyScore(msg) {
   S.score = newScore;
   renderScoreboard();
   changed.forEach((c, i) => c && bumpScore(i));
+  S.lastScoreClock = msg.clock || null;
   renderFlow("#flowMini", 170);
   if ($("#view-flow").classList.contains("active")) renderFlow("#flowBig", 420);
 }
@@ -498,9 +520,11 @@ function resetGame(msg) {
     SE.data = null; SE.players = null; refreshSeason();
     return;
   }
-  S.plays = []; S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
+  S.plays = []; S.goodPlays = []; S.gameNo = 1; S.gameSnapshots = new Map(); S.lastScoreClock = null;
+  S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
   S.identities = msg.teams || [null, null];
   (msg.teams || []).forEach((t, i) => {     // keep the setup bar on the teams actually playing
+    if (!t) return;
     const full = S.meta?.teams.find((x) => x.name === t.name) || t;
     S.pickers?.[i]?.set(full);
     if (i === 0) S.teamA = t.name; else S.teamB = t.name;
@@ -533,17 +557,17 @@ function connect() {
       case "reset": resetGame(msg); break;
       case "pbp": addFeedLine(msg.text); break;
       case "score": applyScore(msg); break;
-      case "live": applyLive(msg.data); scheduleGameViews(); break;
+      case "live": applyLive(msg.data); scheduleGameViews(); scheduleStats(); break;
       case "status": applyStatus(msg); break;
       case "series":
         if (msg.series_status?.startsWith("SERIES FINAL")) $("#sbSeries").textContent = `${S.seriesText || "Series"} · Final`;
         else if (msg.series_status) { S.seriesText = msg.series_status; $("#sbSeries").textContent = msg.series_status; }
-        else if (msg.game_result) toast(msg.game_result);
         break;
       case "season": SE.data = { ...(SE.data || {}), state: msg.season }; renderSeasonBar(msg.season); scheduleSeasonRefresh(); break;
-      case "sections": scheduleSeasonRefresh(); break;
+      case "sections": scheduleSeasonRefresh(); scheduleStats(); break;
+      case "draft": loadDraft(); break;
       case "bracket": scheduleBracket(); break;
-      case "finished": toast("Final. The box score has the full line."); break;
+      case "finished": scheduleStats(); scheduleSeasonRefresh(); break;
     }
   };
 }
@@ -772,23 +796,32 @@ function renderTree() {
   const solo = (list, side) => h("div", { class: "br-stack" }, h("div", { class: `br-solo ${side}` }, (list || []).map((s) => brCard(s))));
   const col = (title, body, cls = "") => h("div", { class: `br-col ${cls}` }, h("h4", {}, title), body);
   const champ = d.champion ? h("div", { class: "br-champ" }, h("div", { class: "muted" }, "CHAMPIONS"), h("div", { class: "t" }, identOf(d.champion).short),
-    d.finals_mvp ? h("div", { class: "muted" }, `Finals MVP: ${typeof d.finals_mvp === "string" ? d.finals_mvp : (d.finals_mvp.name || d.finals_mvp[0] || "")}`) : null) : null;
+    d.finals_mvp ? h("div", { class: "muted" }, `Finals MVP: ${typeof d.finals_mvp === "string" ? d.finals_mvp : `${d.finals_mvp.player || d.finals_mvp.name || ""}${d.finals_mvp.line ? " · " + d.finals_mvp.line : ""}`}`) : null) : null;
   const center = h("div", { class: "br-col br-finals-col" }, h("h4", {}, Object.keys(F)[0] || "NBA Finals"), h("div", { class: "br-trophy" }, "🏆"), finals.map((s) => brCard(s, "final")));
   return h("div", {}, champ, h("div", { class: "bracket-wrap" }, h("div", { class: "bracket" },
     col("East · 1st round", pairs(E["First Round"], "east")), col("East · semis", pairs(E["Semifinals"], "east")), col("East · finals", solo(E["Conference Finals"], "east")),
     center,
     col("West · finals", solo(W["Conference Finals"], "west"), "west"), col("West · semis", pairs(W["Semifinals"], "west"), "west"), col("West · 1st round", pairs(W["First Round"], "west"), "west"))));
 }
+function piCard(g, note) {
+  return h("div", { class: "br-card", style: { cursor: "default" } }, brTeam(g.a, g.score_a, g.winner), brTeam(g.b, g.score_b, g.winner), note ? h("div", { class: "br-note" }, note) : null);
+}
 function renderPlayIn() {
   const pi = BR.data?.play_in;
   if (!pi) return h("div", { class: "empty" }, "This season has no play-in.");
-  const cards = [];
-  for (const [conf, games] of Object.entries(pi)) for (const [label, g] of Object.entries(games)) {
-    cards.push(h("div", { class: "br-card", style: { cursor: "default" } },
-      h("div", { class: "muted", style: { padding: "6px 10px" } }, `${conf} · ${label.replace("v", " vs ")}`),
-      brTeam(g.a, g.score_a, g.winner), brTeam(g.b, g.score_b, g.winner)));
-  }
-  return h("div", { class: "playin-grid" }, cards);
+  const confs = Object.entries(pi).map(([conf, g]) => {
+    const g78 = g["7v8"], g910 = g["9v10"], g8 = g["8seed"];
+    const seedLine = (n, who) => h("div", { class: "pi-seed" }, h("span", { class: "n" }, n), who ? [logoEl(identOf(who)), h("b", {}, identOf(who).short)] : h("span", { class: "muted" }, "TBD"));
+    return h("div", { class: "pi-conf" }, h("h3", {}, `${conf} play-in`),
+      h("div", { class: "pi-grid" },
+        h("div", { class: "br-col" }, h("h4", {}, "Round 1"), h("div", { class: "br-stack" }, h("div", { class: "br-pair" },
+          g78 ? piCard(g78, g78.winner ? `${identOf(g78.winner).initials} take the 7 seed` : "Winner gets the 7 seed") : null,
+          g910 ? piCard(g910, g910.winner ? `${identOf(g910.winner === g910.a ? g910.b : g910.a).initials} eliminated` : "Loser eliminated") : null))),
+        h("div", { class: "br-col" }, h("h4", {}, "8 seed game"), h("div", { class: "br-stack" }, h("div", { class: "br-solo east" }, g8 ? piCard(g8, g8.winner ? `${identOf(g8.winner).initials} take the 8 seed` : "") : h("div", { class: "muted", style: { padding: "10px" } }, "Loser of 7v8 vs winner of 9v10")))),
+        h("div", { class: "br-col" }, h("h4", {}, "Advance"), h("div", { class: "br-stack", style: { justifyContent: "center", gap: "10px" } },
+          seedLine(7, g78?.winner), seedLine(8, g8?.winner)))));
+  });
+  return h("div", { class: "pi-wrap" }, confs);
 }
 function renderSeriesDetail() {
   const root = $("#seriesDetail");
@@ -814,7 +847,13 @@ function renderSeriesDetail() {
   root.replaceChildren(h("div", { class: "series-detail" }, head, games, box || h("div", { class: "muted" }, "Pick a game for its box score.")));
 }
 function renderBracket() {
+  // rebuilding the DOM on every finished game would snap the bracket back to its left edge: keep the scroll position
+  const wrap = $("#bracketBody .bracket-wrap");
+  const left = wrap ? wrap.scrollLeft : 0, top = window.scrollY;
   $("#bracketBody").replaceChildren(BR.view === "tree" ? renderTree() : renderPlayIn());
+  const nw = $("#bracketBody .bracket-wrap");
+  if (nw && left) nw.scrollLeft = left;
+  if (window.scrollY !== top) window.scrollTo(0, top);
   renderSeriesDetail();
 }
 let bracketTimer = null;
@@ -846,14 +885,14 @@ function renderPlayerCard() {
   root.replaceChildren(
     h("div", { class: "pcard-head" }, face,
       h("div", {}, h("div", { class: "pcard-name" }, p.name), h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.pos}${p.height ? ` · ${ft}'${inch}"` : ""}${p.archetype ? ` · ${p.archetype}` : ""}`),
-        h("div", { class: "badges" }, (p.badges || []).map((b) => h("span", { class: "badge" }, b.replace(/_/g, " "))), p.rookie ? h("span", { class: "badge", style: { background: "rgba(167,139,250,.15)", color: "#c4b5fd", borderColor: "rgba(167,139,250,.35)" } }, "Rookie") : null)),
+        h("div", { class: "badges" }, cleanBadges(p.badges).map((b) => h("span", { class: "badge" }, b)), p.rookie ? h("span", { class: "badge", style: { background: "rgba(167,139,250,.15)", color: "#c4b5fd", borderColor: "rgba(167,139,250,.35)" } }, "Rookie") : null)),
       h("div", { class: "pcard-ovr" }, h("div", { class: "n" }, p.ovr ?? "–"), h("small", {}, "Overall"))),
     h("div", { class: "rating-groups" }, p.groups.map((g) => h("div", {}, h("h3", {}, g.title), g.items.map((it) => h("div", { class: "rbar" },
       h("span", {}, it.label), h("div", { class: "track" }, h("div", { class: "fill", style: { width: `${it.value}%`, background: ratingColor(it.value) } })), h("span", { class: "val" }, it.value)))))));
 }
 
 // ───────────────────────── in-game views: player card, shot chart, quarters, compare ─────────────────────────
-const GV = { qtr: "1", pc: { team: null, name: null, quarter: "all" }, shot: [ "Team", "Team" ], comp: { a: [null, null], b: [null, null], data: null } };
+const GV = { qtr: "1", pc: { team: null, name: null, quarter: "all", game: "live" }, shot: [ "Team", "Team" ], comp: { a: [null, null], b: [null, null], data: null } };
 S.plays = [];
 let gvTimer = null;
 function scheduleGameViews() {
@@ -898,6 +937,16 @@ async function loadQuarters() {
 }
 
 // ---- player card
+function cardFromSnapshot(snap, teamName, playerName) {
+  const team = snap?.teams?.find((t) => t.name === teamName);
+  const opp = snap?.teams?.find((t) => t.name !== teamName);
+  const p = team?.box?.find((row) => row.name === playerName);
+  if (!team || !p) return null;
+  const tsd = 2 * (p.fga + .44 * p.fta);
+  return { team, opp, score: [team.score, opp?.score || 0], player: { ...p, ts: tsd ? +(100 * p.pts / tsd).toFixed(1) : null },
+    archetype: "", badges: [], shots: { rim:[0,0], mid:[0,0], three:[0,0], post:[0,0] }, defended: { rim:[0,0], mid:[0,0], three:[0,0], post:[0,0] } };
+}
+
 async function loadPlayerCard() {
   const list = await api.get("/api/game/players");
   const pick = $("#pcardPick");
@@ -908,8 +957,14 @@ async function loadPlayerCard() {
   pick.replaceChildren(
     h("select", { onchange: (e) => { GV.pc.team = e.target.value; GV.pc.name = null; loadPlayerCard(); } }, list.map((t) => h("option", { value: t.team, selected: t.team === GV.pc.team }, t.short))),
     h("select", { onchange: (e) => { GV.pc.name = e.target.value; loadPlayerCard(); } }, roster.map((n) => h("option", { value: n, selected: n === GV.pc.name }, n))),
+    h("select", { onchange: (e) => { GV.pc.game = e.target.value; loadPlayerCard(); } },
+      h("option", { value: "live", selected: GV.pc.game === "live" }, `Live / Game ${S.gameNo}`),
+      [...S.gameSnapshots.keys()].sort((a,b) => b-a).map((n) => h("option", { value: String(n), selected: GV.pc.game === String(n) }, `Game ${n}`))),
     h("div", { class: "seg small" }, ["all", "1", "2", "3", "4", "OT"].map((q) => h("button", { class: GV.pc.quarter === q ? "on" : "", onclick: () => { GV.pc.quarter = q; loadPlayerCard(); } }, q === "all" ? "All plays" : q === "OT" ? "OT" : `Q${q}`))));
-  const d = await api.get(`/api/game/card?team=${encodeURIComponent(GV.pc.team)}&name=${encodeURIComponent(GV.pc.name)}`);
+  const d = GV.pc.game === "live"
+    ? await api.get(`/api/game/card?team=${encodeURIComponent(GV.pc.team)}&name=${encodeURIComponent(GV.pc.name)}`)
+    : cardFromSnapshot(S.gameSnapshots.get(Number(GV.pc.game)), GV.pc.team, GV.pc.name);
+  if (!d) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, "That player was not in this game.")); return; }
   if (d.error) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, d.error)); return; }
   const p = d.player;
   const face = h("div", { class: "pcard-face", style: { "--c": d.team.color } }, p.name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
@@ -918,16 +973,17 @@ async function loadPlayerCard() {
   const zoneBox = (title, z) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
     h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))));
   const qmatch = (pb) => GV.pc.quarter === "all" || String(periodIndex(pb.period) + 1) === GV.pc.quarter || (GV.pc.quarter === "OT" && periodIndex(pb.period) >= 4);
-  const plays = S.plays.filter((pb) => pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
+  const chosenGame = GV.pc.game === "live" ? S.gameNo : Number(GV.pc.game);
+  const plays = S.goodPlays.filter((pb) => pb.game === chosenGame && pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
   $("#pcardBody").replaceChildren(
     h("div", { class: "pcard-head" }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null),
       h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.listed}${d.archetype ? ` · ${d.archetype}` : ""} · ${p.on ? "on the floor" : "bench"}`),
-      h("div", { class: "badges" }, d.badges.map((b) => h("span", { class: "badge" }, b.replace(/_/g, " "))))),
+      h("div", { class: "badges" }, cleanBadges(d.badges).map((b) => h("span", { class: "badge" }, b)))),
       h("div", { class: "pcard-ovr" }, h("div", { class: "n" }, `${p.pts}`), h("small", {}, `pts · ${p.reb} reb · ${p.ast} ast`))),
     h("div", { class: "stat-tiles" }, tile("MIN", p.min.toFixed(1)), tile("PTS", p.pts), tile("REB", p.reb), tile("AST", p.ast), tile("STL", p.stl), tile("BLK", p.blk), tile("TO", p.tov), tile("PF", p.pf),
       tile("+/-", p.pm > 0 ? `+${p.pm}` : p.pm), tile("FG", `${p.fgm}/${p.fga}`), tile("3PT", `${p.tpm}/${p.tpa}`), tile("FT", `${p.ftm}/${p.fta}`), tile("FG%", pct1(p.fgm, p.fga)), tile("TS%", p.ts ?? "–")),
     h("div", { class: "conf-grid" }, zoneBox("Shot diet", d.shots), zoneBox("Shots defended", d.defended)),
-    h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Plays involving ${p.name}`),
+    h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Positive plays · ${p.name}`),
     h("div", { class: "pc-plays" }, plays.length ? plays.map((pb) => h("div", { class: "ev score" }, h("div", { class: "rail", style: { background: "var(--line-strong)" } }, ""), h("div", {}, h("span", { class: "sc" }, `${pb.period} ${pb.clock} · ${pb.score}`), pb.text))) : h("div", { class: "muted" }, "No plays logged yet for this selection.")));
 }
 function zoneClass(key, made, att) {
@@ -1033,6 +1089,118 @@ function renderCompare2() {
     h("thead", {}, h("tr", {}, h("th", {}, "Stat"), h("th", {}, GV.comp.a[1]), h("th", {}, GV.comp.b[1]))), h("tbody", {}, body))));
 }
 
+// ───────────────────────── Tk-equivalent coach and mode tools ─────────────────────────
+const CO = { team: 0, out: null };
+async function loadCoach() {
+  const d = await api.get("/api/coach");
+  if (!d.active) {
+    $("#coachTeams").replaceChildren(); $("#coachFloor").replaceChildren(); $("#coachBench").replaceChildren();
+    $("#coachStatus").textContent = "Start a live game to use substitutions and adjustments."; return;
+  }
+  if (!d.teams[CO.team]) CO.team = 0;
+  $("#coachTeams").replaceChildren(...d.teams.map((t, i) => h("button", { class: i === CO.team ? "on" : "", onclick: () => { CO.team = i; CO.out = null; renderCoach(d); } }, t.team.short)));
+  renderCoach(d);
+}
+function renderCoach(d) {
+  const t = d.teams[CO.team]; if (!t) return;
+  const queued = new Map(t.queued.map((x) => [x.out, x.in]));
+  $("#coachStatus").textContent = `${t.timeouts} timeouts · ${t.offense.replaceAll("_", " ")} offense · ${t.defense.replaceAll("_", " ")} defense${t.focus ? ` · help toward ${t.focus}` : ""}`;
+  const card = (p, floor) => h("button", { class: `coach-card ${floor && CO.out === p.name ? "on" : ""}`, onclick: async () => {
+    if (floor) { CO.out = p.name; renderCoach(d); return; }
+    if (!CO.out) { toast("Select the player going out first."); return; }
+    try { await api.post("/api/coach", { action: "sub", team: CO.team, out: CO.out, in: p.name }); CO.out = null; await loadCoach(); }
+    catch (err) { toast(err.message, "err"); }
+  } }, faceEl(p.name), h("span", { class: "nm" }, p.name), h("span", { class: "line" }, `${p.pos} · ${p.min} min · ${p.pts} pts · ${p.pf} PF${queued.get(p.name) ? ` · OUT → ${queued.get(p.name)}` : ""}`));
+  $("#coachFloor").replaceChildren(...t.floor.map((p) => card(p, true)));
+  $("#coachBench").replaceChildren(...t.bench.map((p) => card(p, false)));
+}
+
+async function loadLineup() {
+  const d = await api.get("/api/fantasy"), root = $("#lineupBody");
+  if (!d.active) { root.replaceChildren(h("div", { class: "empty" }, d.message)); return; }
+  const rows = d.userRoster.map((p, i) => h("tr", { "data-name": p.name },
+    h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))),
+    h("td", {}, p.ovr), h("td", {}, h("input", { type: "checkbox", class: "lu-start", checked: p.starter })),
+    h("td", {}, h("select", { class: "lu-pos" }, ["PG","SG","SF","PF","C"].map((x) => h("option", { value:x, selected:x===p.pos }, x)))),
+    h("td", {}, h("input", { class: "lineup-input lu-min", type:"number", min:"0", max:"48", value:p.minutes ?? 0 })),
+    h("td", {}, h("input", { class: "lineup-input lu-use", type:"number", min:"0.05", max:"0.5", step:"0.01", value:(p.usage ?? .2).toFixed(2) })),
+    h("td", {}, i + 1)));
+  root.replaceChildren(h("table", { class:"stats lineup-table" }, h("thead", {}, h("tr", {}, ["Player","OVR","Start","Pos","Minutes","Usage","Rotation"].map((x,i) => h("th", { class:i===0?"l":"" }, x)))), h("tbody", {}, rows)));
+}
+async function saveLineup(reset=false) {
+  if (reset) { await api.post("/api/fantasy/lineup", { reset:true }); await loadLineup(); return; }
+  const rows = $$("#lineupBody tbody tr"), starters=[], positions={}, minutes={}, usage={}, rotation=[];
+  rows.forEach((tr) => { const n=tr.dataset.name; rotation.push(n); if ($(".lu-start",tr).checked) starters.push(n); positions[n]=$(".lu-pos",tr).value; minutes[n]=Number($(".lu-min",tr).value); usage[n]=Number($(".lu-use",tr).value); });
+  if (starters.length !== 5) throw new Error("Choose exactly five starters.");
+  await api.post("/api/fantasy/lineup", { starters, positions, minutes, usage, rotation }); toast("Lineup saved.", "ok"); await loadLineup();
+}
+
+async function loadDraft() {
+  const d = await api.get("/api/draft"), root=$("#draftBoard");
+  if (!d.active) { root.replaceChildren(h("div", { class:"empty" }, d.state?.on_clock ? `${d.state.on_clock} are picking…` : "Start a draft to open the board.")); return; }
+  const p=d.prompt;
+  if (p.kind === "option") root.replaceChildren(h("h3",{},p.title), p.message?h("p",{class:"muted"},p.message):null, h("div",{class:"action-row"},p.options.map((x)=>h("button",{class:"btn",onclick:()=>chooseDraft(x)},x))));
+  else root.replaceChildren(h("div",{class:"panel-head"},h("h3",{},p.title),h("button",{class:"btn",onclick:()=>chooseDraft("__auto__")},"Auto-draft the rest")),
+    ...p.players.map((pl)=>h("div",{class:"draft-player"},h("span",{class:"pos"},pl.pos),h("div",{},h("b",{},pl.name),h("div",{class:"muted"},pl.team)),h("span",{class:"ovr"},pl.ovr),h("button",{class:"btn",onclick:()=>chooseDraft(pl.key)},"Draft"))));
+}
+async function chooseDraft(value) { try { await api.post("/api/draft",{value}); setTimeout(loadDraft,250); } catch(e) { toast(e.message,"err"); } }
+
+async function loadTrades() {
+  const d=await api.get("/api/fantasy"), root=$("#tradeBody");
+  if (!d.active) { root.replaceChildren(h("div",{class:"empty"},d.message)); return; }
+  const teams=d.teams.filter((x)=>x!==d.userTeam), sel=h("select",{id:"tradeTeam",onchange:loadTradeOpponent},teams.map((x)=>h("option",{value:x},x)));
+  const mine=h("div",{class:"trade-list",id:"tradeMine"},d.userRoster.map((p)=>h("label",{class:"trade-player"},h("input",{type:"checkbox",value:p.name}),`${p.name} · ${p.pos} · ${p.ovr}`)));
+  root.replaceChildren(h("p",{},h("b",{},d.userTeam),` · deadline ${d.deadlinePassed?"passed":`game ${d.deadline}`}`),sel,h("div",{class:"trade-rosters"},mine,h("div",{class:"trade-list",id:"tradeTheirs"})),h("div",{class:"action-row"},h("button",{class:"btn primary",onclick:findTrades},"Find offers")),h("div",{id:"tradeOffers"})); await loadTradeOpponent();
+}
+async function loadTradeOpponent(){ const el=$("#tradeTeam"); if(!el)return; const d=await api.get(`/api/fantasy/roster?team=${encodeURIComponent(el.value)}`); $("#tradeTheirs").replaceChildren(...d.players.map((p)=>h("label",{class:"trade-player"},h("input",{type:"checkbox",value:p.name}),`${p.name} · ${p.pos} · ${p.ovr}`))); }
+async function findTrades(){ const userGives=$$("#tradeMine input:checked").map((x)=>x.value); if(!userGives.length){toast("Choose at least one of your players.");return;} const d=await api.post("/api/fantasy/trade",{action:"find",userGives}); $("#tradeOffers").replaceChildren(...(d.offers.length?d.offers.map((o)=>h("div",{class:"replay-row"},h("b",{},o.ai_team),h("span",{},`${o.user_gives.join(", ")} ⇄ ${o.ai_gives.join(", ")}`),h("button",{class:"btn",onclick:async()=>{await api.post("/api/fantasy/trade",{action:"submit",team:o.ai_team,userGives:o.user_gives,aiGives:o.ai_gives});loadTrades();}},"Accept"))):[h("div",{class:"empty"},"No acceptable offers found.")])); }
+
+const customSelected=new Set();
+function renderCustomTeams(){ const root=$("#customTeams"); root.replaceChildren(...S.meta.teams.map((t)=>h("label",{class:"team-check"},h("input",{type:"checkbox",checked:customSelected.has(t.name),onchange:(e)=>{e.target.checked?customSelected.add(t.name):customSelected.delete(t.name);$("#customCount").textContent=`${customSelected.size} teams selected`;}}),logoEl(t),h("span",{},t.name)))); $("#customCount").textContent=`${customSelected.size} teams selected`; }
+async function startSpecial(mode,options={}){ try{await api.post("/api/start",{mode,teamA:S.teamA,teamB:S.teamB,rules:S.rules,options});}catch(e){toast(e.message,"err");} }
+
+async function fillOnePlayers(side){ const team=$("#oneTeam"+side).value,d=await api.get(`/api/roster?team=${encodeURIComponent(team)}`),sel=$("#onePlayer"+side); sel.replaceChildren(...d.players.map((p)=>h("option",{value:p.name},`${p.name} · ${p.pos} · ${p.ovr}`))); }
+async function loadReplays(){ const d=await api.get("/api/replays"),root=$("#replayBody"); root.replaceChildren(...(d.games.length?d.games.map((g)=>h("div",{class:"replay-row"},h("b",{},`Game ${g.game}`),h("span",{},`${g.teamA} vs ${g.teamB}`),h("button",{class:"btn",disabled:!g.available,onclick:()=>startSpecial("Replay season game",{order:g.order})},"Replay"))):[h("div",{class:"empty"},"Complete a season to create replays.")])); }
+function broadcastText(e){ const names=Object.entries(e).filter(([k])=>k!=="kind").map(([k,v])=>`${k.replaceAll("_"," ")}: ${v}`).join(" · "); return names||"Live game event"; }
+async function loadBroadcast(){ const d=await api.get("/api/broadcast"),root=$("#broadcastBody"),follow=root.scrollHeight-root.scrollTop-root.clientHeight<60; root.replaceChildren(...(d.events.length?d.events.map((e)=>h("div",{class:"broadcast-event"},h("span",{class:"kind"},e.kind),h("span",{},broadcastText(e)))):[h("div",{class:"empty"},"Broadcast events appear once a game starts.")])); if(follow)root.scrollTop=root.scrollHeight; }
+
+// Tables retain their scroll position and update only when the data changes.
+let statsData = null, statsTimer = null, statsSignature = "", statsRequest = 0;
+let statsSort = {column: -1, direction: 1};
+function scheduleStats() {
+  if (!$("#view-stats").classList.contains("active") || statsTimer) return;
+  statsTimer = setTimeout(() => {statsTimer = null; loadStats().catch(e => toast(e.message,"err"));}, 700);
+}
+async function loadStats() {
+  const request = ++statsRequest;
+  const query = new URLSearchParams({kind:$("#statsKind").value,source:$("#statsSource").value,team:$("#statsTeam").value,quarter:$("#statsQuarter").value});
+  const data = await api.get(`/api/stats?${query}`);
+  if(request !== statsRequest) return;
+  for (const [id, options, selected] of [["statsSource",data.sources.length ? data.sources : ["Live"],data.source],["statsTeam",["All teams",...data.teams],$("#statsTeam").value]]) {
+    const select = $("#"+id);
+    if(JSON.stringify([...select.options].map(o=>o.value)) !== JSON.stringify(options)) select.replaceChildren(...options.map(v=>h("option",{value:v},v)));
+    select.value = options.includes(selected) ? selected : options[0];
+  }
+  $("#statsQuarterLabel").hidden = $("#statsKind").value !== "shots";
+  const signature = JSON.stringify(data);
+  statsData=data;
+  if(signature !== statsSignature) {statsSignature=signature; renderStats();}
+}
+function renderStats() {
+  if(!statsData)return;
+  const root=$("#statsBody"), left=root.scrollLeft, top=root.scrollTop;
+  if(statsData.reports) {
+    root.replaceChildren(...Object.entries(statsData.reports).map(([title,text])=>h("details",{},h("summary",{},title.replaceAll("_"," ")),h("pre",{},text))));
+  } else {
+    const search=$("#statsSearch").value.toLowerCase();
+    let rows=statsData.rows.filter(r=>!search || String(r[1]).toLowerCase().includes(search));
+    const c=statsSort.column;
+    if(c>=0) rows=[...rows].sort((a,b)=>statsSort.direction*(typeof a[c]==="number" && typeof b[c]==="number" ? a[c]-b[c] : String(a[c]??"").localeCompare(String(b[c]??""),undefined,{numeric:true})));
+    root.replaceChildren(rows.length ? h("table",{class:"stats"},h("thead",{},h("tr",{},statsData.columns.map((label,i)=>h("th",{},h("button",{class:"stat-sort",onclick:()=>{statsSort={column:i,direction:statsSort.column===i?-statsSort.direction:1};renderStats();}},label+(c===i?(statsSort.direction===1?" ↑":" ↓"):"")))))),h("tbody",{},rows.map(row=>h("tr",{},row.map(value=>h("td",{},value??"—")))))) : h("div",{class:"empty"},"No stats for this selection yet. Start a game or choose another source."));
+  }
+  root.scrollLeft=left;root.scrollTop=top;
+}
+
 // ───────────────────────── boot ─────────────────────────
 async function boot() {
   S.meta = await api.get("/api/meta");
@@ -1055,11 +1223,17 @@ async function boot() {
   S.pickers = [pickA, pickB];
   CD.picker = makePicker($("#pickCards"), (t) => loadRoster(t.name));
   CD.picker.set(first);
+  for (const sel of [$("#oneTeamA"), $("#oneTeamB")]) sel.append(...S.meta.teams.map((t)=>h("option",{value:t.name},t.name)));
+  $("#oneTeamA").value=first.name; $("#oneTeamB").value=second.name;
+  await fillOnePlayers("A"); await fillOnePlayers("B"); renderCustomTeams();
 
   $$("#rules button").forEach((b) => b.addEventListener("click", () => {
     $$("#rules button").forEach((x) => x.classList.toggle("on", x === b)); S.rules = b.dataset.v;
   }));
   $("#start").addEventListener("click", async () => {
+    if(S.mode === "1-on-1") {$('#nav [data-view="one"]').click(); return;}
+    if(S.mode.startsWith("Custom ")) {$('#nav [data-view="modes"]').click(); return;}
+    if(S.mode.startsWith("Fantasy draft")) {$('#nav [data-view="draft"]').click();}
     try { await api.post("/api/start", { mode: S.mode, teamA: S.teamA, teamB: S.teamB, rules: S.rules }); }
     catch (err) { toast(err.message, "err"); }
   });
@@ -1084,6 +1258,22 @@ async function boot() {
   $$("[data-jump]").forEach((b) => b.addEventListener("click", () => api.post("/api/control", { action: "jump", value: b.dataset.jump }).catch((e) => toast(e.message, "err"))));
   $("#simPlayoffs").addEventListener("click", () => api.post("/api/control", { action: "simPlayoffs" }).catch((e) => toast(e.message, "err")));
   $("#simSeries").addEventListener("click", () => api.post("/api/control", { action: "simSeries" }).catch((e) => toast(e.message, "err")));
+  $$('[data-coach]').forEach((b)=>b.addEventListener('click',async()=>{try{await api.post('/api/coach',{action:b.dataset.coach,team:CO.team});await loadCoach();}catch(e){toast(e.message,'err');}}));
+  $("#lineupSave").addEventListener("click",()=>saveLineup(false).catch((e)=>toast(e.message,"err")));
+  $("#lineupReset").addEventListener("click",()=>saveLineup(true).catch((e)=>toast(e.message,"err")));
+  $$('[data-fantasy]').forEach((b)=>b.addEventListener('click',()=>startSpecial(b.dataset.fantasy==='2027'?'Fantasy draft: 2027 players (season + playoffs)':b.dataset.fantasy==='all'?'Fantasy draft: all-time (season + playoffs)':'Fantasy draft playoffs')));
+  $("#tradeRefresh").addEventListener("click",loadTrades);
+  $("#select2027").addEventListener("click",()=>{customSelected.clear();S.meta.teams.filter((t)=>t.year==='2027').slice(0,30).forEach((t)=>customSelected.add(t.name));renderCustomTeams();});
+  $("#clearCustom").addEventListener("click",()=>{customSelected.clear();renderCustomTeams();});
+  $("#customPlayoffs").addEventListener("click",()=>startSpecial("Custom 16-team playoffs",{teams:[...customSelected]}));
+  $("#customSeason").addEventListener("click",()=>startSpecial("Custom season (82 games)",{teams:[...customSelected]}));
+  $("#olympics").addEventListener("click",()=>startSpecial("Olympic tournament"));
+  $("#oneTeamA").addEventListener("change",()=>fillOnePlayers("A")); $("#oneTeamB").addEventListener("change",()=>fillOnePlayers("B"));
+  $("#oneStart").addEventListener("click",()=>startSpecial("1-on-1",{teamA:$("#oneTeamA").value,playerA:$("#onePlayerA").value,teamB:$("#oneTeamB").value,playerB:$("#onePlayerB").value,target:11,winBy:2}));
+  $("#replayRefresh").addEventListener("click",loadReplays);
+  $("#statsRefresh").addEventListener("click",()=>loadStats().catch(e=>toast(e.message,"err")));
+  for(const id of ["statsKind","statsSource","statsTeam","statsQuarter"]) $("#"+id).addEventListener("change",()=>{statsSignature="";statsSort.column=-1;loadStats().catch(e=>toast(e.message,"err"));});
+  $("#statsSearch").addEventListener("input",renderStats);
 
   $$("#feedFilter button").forEach((b) => b.addEventListener("click", () => {
     $$("#feedFilter button").forEach((x) => x.classList.toggle("on", x === b)); S.feedFilter = b.dataset.v;
@@ -1100,10 +1290,17 @@ async function boot() {
     if (b.dataset.view === "box") renderBox();
     if (b.dataset.view === "flow") renderFlow("#flowBig", 420);
     if (b.dataset.view === "season") refreshSeason();
+    if (b.dataset.view === "stats") loadStats().catch(e=>toast(e.message,"err"));
     if (b.dataset.view === "bracket") refreshBracket();
     if (b.dataset.view === "cards" && !CD.data) loadRoster(S.teamA);
     if (["qtr", "pcard", "shots"].includes(b.dataset.view)) refreshGameViews();
     if (b.dataset.view === "comp") loadCompare();
+    if (b.dataset.view === "coach") loadCoach();
+    if (b.dataset.view === "lineup") loadLineup();
+    if (b.dataset.view === "draft") { loadDraft(); loadTrades(); }
+    if (b.dataset.view === "modes") renderCustomTeams();
+    if (b.dataset.view === "replay") loadReplays();
+    if (b.dataset.view === "broadcast") loadBroadcast();
   }));
   document.addEventListener("keydown", (e) => {
     if (e.target.matches("input, select, textarea")) return;
@@ -1112,6 +1309,7 @@ async function boot() {
 
   renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
   connect();
+  setInterval(()=>{ const view=$(".view.active")?.id; if(view==="view-coach")loadCoach(); else if(view==="view-draft")loadDraft(); else if(view==="view-broadcast")loadBroadcast(); },1000);
 }
 
 boot().catch((err) => toast(`Could not load: ${err.message}`, "err"));

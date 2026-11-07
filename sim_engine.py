@@ -4609,7 +4609,7 @@ def _balance_lineup_positions_impl(team: Team):
     # One big man at a time: two centers / 7-footers never share the floor (a PF who is not a true big, like Giannis or LeBron, is a forward).
     # The better of the two stays; the other sits for the best forward on the bench. Only when no non-big is left does a second one play.
     def _center_type(p: Player) -> bool:
-        return p.name != "LeBron James" and (p.position.upper() == "C" or p.height >= 84)
+        return p.name != "LeBron James" and p.position.upper() == "C"
 
     bigs = [p for p in current if _center_type(p)]
     while len(bigs) >= 2:
@@ -14393,11 +14393,11 @@ def end_of_quarter_catch_shoot_three(off: Team, dff: Team, period: int, period_t
         if inbounder is not shooter:
             record_assist(inbounder, off, 3)
         record_score_event(off, dff, 3, period, 0, teamA, teamB)
-        print_scoreboard(period, 0, teamA, teamB)
         print(f"{shooter.name} buries the catch-and-shoot three before the horn.")
-    else:
         print_scoreboard(period, 0, teamA, teamB)
+    else:
         print(f"{shooter.name}'s catch-and-shoot three at the horn is off.")
+        print_scoreboard(period, 0, teamA, teamB)
     time.sleep(SLEEP * 0.9)
 
 

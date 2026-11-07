@@ -10,10 +10,13 @@ import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import sim_engine
+
 from .hub import EventHub
 from .runner import SimRunner
 from .live import team_identity
 from . import live
+from .stats import payload as stats_payload
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(ROOT, "static")
@@ -495,6 +498,104 @@ def compare_payload(runner):
     return {"teams": out, "source": "game"}
 
 
+def _coach_player(player):
+    return {"name": player.name, "pos": player.position, "min": round(getattr(player, "minutes", 0) / 60, 1),
+            "pts": player.pts, "reb": player.reb, "ast": player.ast, "pf": player.pf,
+            "out": bool(getattr(player, "fouled_out", False))}
+
+
+def coach_payload():
+    teams = [sim_engine.SIM_CONTEXT.get("teamA"), sim_engine.SIM_CONTEXT.get("teamB")]
+    rows = []
+    for index, team in enumerate(t for t in teams if t is not None):
+        ident = team_identity(team.name)
+        rows.append({"index": index, "team": ident, "timeouts": getattr(team, "timeouts", 0),
+                     "offense": sim_engine.OFFENSIVE_SET_OVERRIDES.get(team.name, getattr(team, "game_plan", {}).get("offense", "balanced")),
+                     "defense": sim_engine.DEFENSIVE_SCHEME_OVERRIDES.get(team.name, getattr(team, "game_plan", {}).get("defense", "standard")),
+                     "focus": getattr(team, "defensive_focus", None), "timeoutOpen": bool(getattr(team, "coach_timeout_open", False)),
+                     "floor": [_coach_player(p) for p in team.on_floor], "bench": [_coach_player(p) for p in team.bench],
+                     "queued": [{"out": out_name, "in": in_name} for out_name, in_name in list(getattr(team, "manual_substitution", []) or [])]})
+    return {"active": bool(rows), "teams": rows}
+
+
+def coach_action(data):
+    teams = [sim_engine.SIM_CONTEXT.get("teamA"), sim_engine.SIM_CONTEXT.get("teamB")]
+    try:
+        team = teams[int(data.get("team", 0))]
+    except (TypeError, ValueError, IndexError):
+        team = None
+    if team is None:
+        return "No live team is available."
+    action = data.get("action")
+    if action == "sub":
+        return None if sim_engine.gui_substitute(team, str(data.get("out", "")), str(data.get("in", ""))) else None
+    if action == "timeout":
+        team.manual_timeout_requested = True
+        return None
+    if action == "subs":
+        team.manual_sub_request = True
+        return None
+    if action == "offense":
+        options = ("balanced", "five_out", "four_out_one_in", "three_out_two_in", "post_heavy", "motion", "star_spread")
+        current = sim_engine.OFFENSIVE_SET_OVERRIDES.get(team.name, getattr(team, "game_plan", {}).get("offense", "balanced"))
+        code = options[(options.index(current) + 1) % len(options)] if current in options else options[0]
+        sim_engine.OFFENSIVE_SET_OVERRIDES[team.name] = code
+        sim_engine.apply_offensive_set_override(team)
+        return None
+    if action == "defense":
+        options = ("standard", "switch", "drop", "show_recover", "blitz", "stay_home", "top_lock", "pack_paint", "wall_paint", "zone", "load_star")
+        current = sim_engine.DEFENSIVE_SCHEME_OVERRIDES.get(team.name, getattr(team, "game_plan", {}).get("defense", "standard"))
+        code = options[(options.index(current) + 1) % len(options)] if current in options else options[0]
+        sim_engine.DEFENSIVE_SCHEME_OVERRIDES[team.name] = code
+        sim_engine.apply_defensive_scheme_override(team)
+        return None
+    if action == "focus":
+        opponent = teams[1] if team is teams[0] else teams[0]
+        if opponent is not None and opponent.on_floor:
+            target = max(opponent.on_floor, key=lambda p: p.pts + p.usage * 20 + p.shot_tendency * 10)
+            team.defensive_focus = target.name
+        return None
+    return "Unknown coach action."
+
+
+def fantasy_payload():
+    if not sim_engine.fantasy_trade_available():
+        return {"active": False, "message": "Start a fantasy draft season to manage lineups and trades."}
+    state = sim_engine.FANTASY_TRADE_STATE
+    user = state["user_team"]
+    line = sim_engine.fantasy_lineup_defaults()
+    usage = sim_engine.fantasy_usage_defaults()
+    def roster(name):
+        return [{"name": p.name, "pos": p.position, "ovr": sim_engine.fantasy_ovr(p),
+                 "minutes": line["minutes"].get(p.name) if name == user else None,
+                 "starter": p.name in line["starters"] if name == user else False,
+                 "usage": usage.get(p.name, {}).get("usage") if name == user else None}
+                for p in sim_engine.fantasy_trade_roster(name)]
+    return {"active": True, "userTeam": user, "teams": list(state["factories"]), "userRoster": roster(user),
+            "lineup": line, "usage": usage, "block": list(state.get("block", set())),
+            "deadline": state.get("deadline_game"), "deadlinePassed": state.get("deadline_passed"), "log": state.get("log", [])[-20:]}
+
+
+def replay_payload():
+    rows = []
+    for order, spec in sorted(sim_engine.SEASON_REPLAY.get("games", {}).items()):
+        rows.append({"order": order, "game": order + 1, "teamA": spec[0], "teamB": spec[1],
+                     "available": sim_engine.season_replay_available(order)})
+    return {"games": rows}
+
+
+def broadcast_payload():
+    rows = []
+    for event in list(sim_engine.BROADCAST_EVENTS)[-300:]:
+        row = {"kind": event.get("kind", "event")}
+        for key, value in event.items():
+            if key == "kind":
+                continue
+            row[key] = getattr(value, "name", str(value)) if not isinstance(value, (str, int, float, bool, type(None))) else value
+        rows.append(row)
+    return {"events": rows}
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -551,6 +652,27 @@ def build_app():
                 return self._json(runner.meta())
             if path == "/api/state":
                 return self._json(runner.state())
+            if path == "/api/stats":
+                return self._json(stats_payload(runner,
+                    (params.get("source") or ["Live"])[0],
+                    (params.get("kind") or ["averages"])[0],
+                    (params.get("team") or ["All teams"])[0],
+                    (params.get("quarter") or ["All"])[0]))
+            if path == "/api/coach":
+                return self._json(coach_payload())
+            if path == "/api/fantasy":
+                return self._json(fantasy_payload())
+            if path == "/api/fantasy/roster":
+                team = (params.get("team") or [""])[0]
+                if not sim_engine.fantasy_trade_available() or team not in (sim_engine.FANTASY_TRADE_STATE.get("factories") or {}):
+                    return self._json({"players": []})
+                return self._json({"players": [{"name": p.name, "pos": p.position, "ovr": sim_engine.fantasy_ovr(p)} for p in sim_engine.fantasy_trade_roster(team)]})
+            if path == "/api/draft":
+                return self._json(runner.draft_state())
+            if path == "/api/replays":
+                return self._json(replay_payload())
+            if path == "/api/broadcast":
+                return self._json(broadcast_payload())
             if path == "/api/bracket":
                 return self._json(runner.bracket or {})
             if path == "/api/season":
@@ -634,11 +756,39 @@ def build_app():
             path = urllib.parse.urlparse(self.path).path
             data = self._body()
             if path == "/api/start":
-                error = runner.start(data.get("mode", "Game"), data.get("teamA", ""), data.get("teamB", ""), data.get("rules", "NBA"))
+                error = runner.start(data.get("mode", "Game"), data.get("teamA", ""), data.get("teamB", ""), data.get("rules", "NBA"), data.get("options"))
                 return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)
             if path == "/api/control":
                 error = runner.control(data.get("action", ""), data.get("value"))
                 return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)
+            if path == "/api/coach":
+                error = coach_action(data)
+                runner._push_live(force=True)
+                return self._json({"ok": error is None, "error": error, "coach": coach_payload()}, 200 if error is None else 400)
+            if path == "/api/draft":
+                error = runner.draft_choose(data.get("value"))
+                return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)
+            if path == "/api/fantasy/lineup":
+                result = sim_engine.fantasy_lineup_submit(data.get("starters", []), data.get("positions", {}), data.get("minutes", {}),
+                                                          bool(data.get("reset")), rotation=data.get("rotation", []))
+                if result.get("ok") and "usage" in data:
+                    result = sim_engine.fantasy_usage_submit(data.get("usage") or {})
+                return self._json(result, 200 if result.get("ok") else 400)
+            if path == "/api/fantasy/trade":
+                action = data.get("action")
+                if not sim_engine.fantasy_trade_available():
+                    return self._json({"ok": False, "error": "No fantasy league is active."}, 400)
+                if action == "find":
+                    return self._json({"ok": True, "offers": sim_engine.fantasy_trade_find_offers(data.get("userGives", []))})
+                if action == "ask":
+                    return self._json({"ok": True, "offers": sim_engine.fantasy_trade_find_asks(data.get("team", ""), data.get("aiGives", []))})
+                if action == "submit":
+                    result = sim_engine.fantasy_trade_submit(data.get("team", ""), data.get("userGives", []), data.get("aiGives", []))
+                    return self._json(result, 200 if result.get("ok") else 400)
+                if action == "block":
+                    block = sim_engine.fantasy_trade_block_toggle(data.get("players", []))
+                    return self._json({"ok": True, "block": list(block)})
+                return self._json({"ok": False, "error": "Unknown trade action."}, 400)
             self._send(404, b"not found", "text/plain")
 
     return Handler, runner
