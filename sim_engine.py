@@ -17964,6 +17964,14 @@ def choose_secondary_assist_passer(team: Team, shooter: Player, primary: Player 
     return random.choices(candidates, weights=weights, k=1)[0]
 
 
+def playmaking_look_curve(playmaking: float) -> float:
+    """0..1: how reliably a passer's pass turns into a direct, open catch-and-shoot. Rises steadily with playmaking; below 0.75 it falls away
+    quickly, so a player under 0.75 only produces a few of these a game, and a non-passer almost none."""
+    if playmaking >= 0.75:
+        return min(1.0, 0.55 + 0.45 * (playmaking - 0.75) / 0.24)
+    return 0.55 * max(0.0, (playmaking - 0.45) / 0.30) ** 1.8
+
+
 def immediate_catch_chance(passer: Player, base: float, slope: float = 0.44,
                            lo: float = 0.20, hi: float = 0.78, bonus: float = 0.0) -> float:
     """
@@ -17978,7 +17986,9 @@ def immediate_catch_chance(passer: Player, base: float, slope: float = 0.44,
     its own base/slope/bonus so the exact numbers per pathway are unchanged;
     this just stops the formula shape itself from being re-typed everywhere.
     """
-    return max(lo, min(hi, base + slope * passer.playmaking + bonus))
+    ceiling = base + slope * 0.99          # what the best passer in the league gets on this pathway
+    floor = 0.04
+    return max(min(lo, 0.05), min(hi, floor + (ceiling - floor) * playmaking_look_curve(passer.playmaking) + bonus))
 
 
 ASSIST_CREDIT_SCALE = 1.32  # delayed (non-quick) finishes: league team assists were ~22.8/game vs ~26 real
@@ -17990,7 +18000,11 @@ def assist_credit_chance(passer: Player, shooter: Player, shot_type: str,
     chance = _assist_credit_chance_core(passer, shooter, shot_type, pnr_result, quick_shot)
     if quick_shot:
         return chance
-    return min(0.97, chance * ASSIST_CREDIT_SCALE)
+    chance = min(0.97, chance * ASSIST_CREDIT_SCALE)
+    if passer.playmaking < 0.75:
+        # below 0.75 a player only turns a few passes a game into assists: his credit tapers off the same way his direct looks do
+        chance *= 0.35 + 0.65 * (playmaking_look_curve(passer.playmaking) / 0.55)
+    return chance
 
 
 def _assist_credit_chance_core(passer: Player, shooter: Player, shot_type: str,
@@ -19182,18 +19196,18 @@ def simulate_possession(off: Team, dff: Team,
             # place, so the passer's playmaking is the dominant term here,
             # not the shooter's own profile.
             immediate_chance = (
-                0.10
-                + 0.16 * shooter.three_tendency
-                + 0.10 * shooter.shot_iq
-                + 0.06 * shooter.shot_tendency
-                + 0.40 * (play_passer.playmaking if play_passer is not None else handler.playmaking)
+                0.04
+                + 0.10 * shooter.three_tendency
+                + 0.06 * shooter.shot_iq
+                + 0.04 * shooter.shot_tendency
+                + 0.62 * playmaking_look_curve(play_passer.playmaking if play_passer is not None else handler.playmaking)
             )
             if play_context in ("floppy", "elevator", "handoff"):
                 immediate_chance += 0.10
             elif play_context in ("horns", "post_split"):
                 immediate_chance -= 0.08
             immediate_chance *= 0.72
-            immediate_chance = max(0.22, min(0.62, immediate_chance))
+            immediate_chance = max(0.04, min(0.62, immediate_chance))
             if random.random() >= immediate_chance:
                 quick_shot_for_assist = False
     if (
