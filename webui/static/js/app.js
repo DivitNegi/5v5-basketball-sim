@@ -497,7 +497,7 @@ async function refreshSeason() {
     SE.data = await api.get("/api/season");
     renderSeasonBar();
     if ($("#view-season").classList.contains("active")) {
-      if (SE.tab === "players") SE.players = (await api.get("/api/season/players")).players;
+      if (SE.tab === "players") { const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source }); AV.data = await api.get(`/api/season/avg?${q}`); }
       if (SE.tab === "advanced") SE.adv = (await api.get("/api/season/advanced")).players;
       if (SE.tab === "teams") SE.teams = (await api.get("/api/season/teams")).teams;
       if (SE.tab === "highs") SE.highs = await api.get("/api/season/highs");
@@ -558,21 +558,60 @@ function renderRaces() {
     cards.length ? h("div", { class: "award-grid" }, cards) : null);
 }
 
-const PCOLS = [["gp", "GP"], ["mpg", "MPG"], ["pts", "PTS"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tov", "TO"], ["fgp", "FG%"], ["tpp", "3P%"], ["ftp", "FT%"], ["ts", "TS%"], ["pm", "+/-"]];
+const AV = { team: "All Teams", quarter: "All", rank: "Team order", source: "Season", sort: null, dir: -1, filter: "", data: null };
+const AVG_RANKS = ["Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-", "STK", "AST/TOV", "STL/TOV", "PTS/48", "REB/48", "AST/48", "STL/48", "BLK/48"];
+// [key, header, sort key, formatter]
+const f1 = (v) => (v == null ? "–" : v.toFixed(1));
+const PCOLS = [["gp", "GP", "gp", (v) => v], ["min", "MIN", "min", f1], ["pts", "PTS", "pts", f1], ["reb", "REB", "reb", f1], ["orb", "ORB", "orb", f1], ["ast", "AST", "ast", f1],
+  ["stl", "STL", "stl", f1], ["blk", "BLK", "blk", f1], ["tov", "TOV", "tov", f1], ["fg", "FG", "fgm", null], ["fgp", "FG%", "fgp", f1], ["tp", "3P", "tpm", null], ["tpp", "3P%", "tpp", f1],
+  ["ft", "FT", "ftm", null], ["ftp", "FT%", "ftp", f1], ["ts", "TS%", "ts", f1], ["pm", "+/-", "pm", (v) => (v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1))]];
+const madeAtt = (r, m, a) => `${r[m].toFixed(1)}/${r[a].toFixed(1)}`;
+
+async function loadAvg() {
+  const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source });
+  AV.data = await api.get(`/api/season/avg?${q}`);
+  if (AV.data.source && AV.data.sources.length && !AV.data.sources.includes(AV.source)) AV.source = AV.data.source;
+  renderSeasonBody();
+}
+function avSelect(label, value, options, onchange) {
+  return h("label", { class: "fsel" }, h("span", { class: "muted" }, label), h("select", { onchange: (e) => onchange(e.target.value) }, options.map((o) => h("option", { value: o.v ?? o, selected: (o.v ?? o) === value }, o.t ?? o))));
+}
 function renderPlayers() {
-  const all = SE.players || [];
-  if (!all.length) return h("div", { class: "empty" }, "Player stats appear once games are played.");
-  const q = SE.filter.toLowerCase();
-  const minGp = Math.max(1, Math.floor(Math.max(...all.map((p) => p.gp)) * 0.4));
-  let rows = all.filter((p) => p.gp >= minGp && (!q || p.name.toLowerCase().includes(q) || p.short.toLowerCase().includes(q)));
-  rows.sort((a, b) => (b[SE.sort] ?? -999) - (a[SE.sort] ?? -999));
-  rows = rows.slice(0, 120);
-  const input = h("input", { placeholder: "Search player or team…", value: SE.filter, oninput: (e) => { SE.filter = e.target.value; const pos = e.target.selectionStart; renderSeasonBody(); const i = $("#seasonBody input"); i.focus(); i.setSelectionRange(pos, pos); } });
-  const head = h("tr", {}, h("th", { class: "l" }, "Player"), ...PCOLS.map(([k, l]) => h("th", { class: `sortable ${SE.sort === k ? "sorted" : ""}`, onclick: () => { SE.sort = k; renderSeasonBody(); } }, l)));
-  const body = rows.map((p) => h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name), h("span", { class: "muted" }, p.short))),
-    ...PCOLS.map(([k]) => h("td", { class: k === "pts" ? "pts" : "" }, p[k] == null ? "–" : k === "pm" && p[k] > 0 ? `+${p[k]}` : p[k]))));
-  return h("div", {}, h("div", { class: "filters" }, input, h("span", { class: "muted", style: { alignSelf: "center" } }, `Players with ${minGp}+ games · click a column to sort`)),
-    h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head), h("tbody", {}, body))));
+  const d = AV.data;
+  if (!d) { loadAvg(); return h("div", { class: "empty" }, "Loading player stats…"); }
+  if (!d.teams.length) return h("div", { class: "empty" }, "Player stats appear once games are played.");
+  const set = (k) => (v) => { AV[k] = v; if (k === "rank") { AV.sort = null; } loadAvg(); };
+  const teamOpts = [{ v: "All Teams", t: "All Teams" }, ...d.teams.map((t) => ({ v: t, t: identOf(t).short }))];
+  const q = AV.filter.toLowerCase();
+  const input = h("input", { placeholder: "Search player…", value: AV.filter, oninput: (e) => { AV.filter = e.target.value; const pos = e.target.selectionStart; renderSeasonBody(); const i = $("#seasonBody input"); i.focus(); i.setSelectionRange(pos, pos); } });
+  const filters = h("div", { class: "filters" }, avSelect("Team", AV.team, teamOpts, set("team")), avSelect("Quarter", AV.quarter, ["All", "Q1", "Q2", "Q3", "Q4", "OT"], set("quarter")),
+    avSelect("Rank by", AV.rank, AVG_RANKS, set("rank")), avSelect("Show", d.source, (d.sources.length ? d.sources : [d.source]), set("source")), input);
+  let rows = d.rows.filter((r) => !q || (r.kind === "player" && r.name.toLowerCase().includes(q)) || (r.kind === "team" && q.length < 1));
+  let sorted = false;
+  if (AV.sort && !d.flat) {
+    rows = rows.filter((r) => r.kind === "player").sort((a, b) => AV.dir * ((a[AV.sort] ?? -1e9) - (b[AV.sort] ?? -1e9)));
+    sorted = true;
+  }
+  const flat = d.flat || sorted;
+  const sortBy = (key) => () => { if (d.flat) { AV.rank = "Team order"; AV.sort = key; AV.dir = -1; loadAvg(); return; } if (AV.sort === key) AV.dir *= -1; else { AV.sort = key; AV.dir = -1; } renderSeasonBody(); };
+  const head = h("tr", {}, h("th", { class: "l sortable", onclick: () => { AV.sort = null; AV.dir = -1; if (d.flat) { AV.rank = "Team order"; loadAvg(); } else renderSeasonBody(); } }, flat ? "Team" : "Team / player"),
+    ...(flat ? [h("th", { class: "l" }, "Player")] : []),
+    ...PCOLS.map(([k, l, sk]) => h("th", { class: `sortable ${AV.sort === sk && !d.flat ? "sorted" : ""}`, onclick: sortBy(sk) }, l, AV.sort === sk && !d.flat ? (AV.dir < 0 ? " ▾" : " ▴") : "")));
+  const cells = (r) => PCOLS.map(([k, , sk, fmt]) => {
+    let v;
+    if (k === "fg") v = madeAtt(r, "fgm", "fga"); else if (k === "tp") v = madeAtt(r, "tpm", "tpa"); else if (k === "ft") v = madeAtt(r, "ftm", "fta");
+    else if (k === "min" && r.kind === "team") v = "--"; else v = fmt(r[sk]);
+    return h("td", { class: k === "pts" ? "pts" : k === "pm" ? (r.pm > 0 ? "pm-pos" : r.pm < 0 ? "pm-neg" : "") : "" }, v);
+  });
+  const body = rows.map((r) => {
+    if (r.kind === "team") return h("tr", { class: "team-row" }, h("td", { class: "l", colspan: 1 }, h("div", { class: "tcell" }, logoEl(r), h("span", { class: "pname" }, r.short), h("span", { class: "muted" }, `${AV.quarter === "All" ? "team avg" : AV.quarter + " avg"}`))), ...cells(r));
+    const who = h("div", { class: "pcell" }, faceEl(r.name), h("span", { class: "pname" }, r.rank ? `${r.rank}. ${r.name}` : r.name));
+    return flat ? h("tr", {}, h("td", { class: "l" }, h("div", { class: "tcell" }, logoEl(r), h("span", { class: "pname" }, r.short))), h("td", { class: "l" }, who), ...cells(r))
+      : h("tr", {}, h("td", { class: "l" }, who), ...cells(r));
+  });
+  const note = d.flat ? `Ranked by ${AV.rank}${["FG%", "FT%", "3P%", "AST/TOV", "STL/TOV"].includes(AV.rank) || AV.rank.endsWith("/48") ? " (NBA leaderboard minimums apply)" : ""}` : AV.sort ? "Sorted across all players · click Team to go back to team order" : "Grouped by team · click any column to sort";
+  return h("div", {}, filters, h("div", { class: "muted", style: { margin: "2px 2px 10px" } }, `${d.source} · per-game averages · ${note}`),
+    h("div", { class: "table-wrap tall" }, h("table", { class: "stats avg" }, h("thead", {}, head), h("tbody", {}, body))));
 }
 
 

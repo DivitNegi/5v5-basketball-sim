@@ -208,6 +208,140 @@ def players_payload(runner):
     return {"players": out}
 
 
+_AVG_KEYS = ("games", "minutes", "pts", "reb", "oreb", "ast", "stl", "blk", "tov", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus")
+
+
+def _pc(s, m, a):
+    return 100.0 * s.get(m, 0) / s.get(a, 0) if s.get(a, 0) else 0.0
+
+
+def _ts(s):
+    d = 2 * (s.get("fga", 0) + 0.44 * s.get("fta", 0))
+    return 100.0 * s.get("pts", 0) / d if d else 0.0
+
+
+def _p48(s, k):
+    m = s.get("minutes", 0) / 60
+    return s.get(k, 0) * 48 / m if m > 0 else 0.0
+
+
+_RANK_VALUE = {
+    "GP": lambda s, g: s.get("games", 0), "MIN": lambda s, g: s.get("minutes", 0) / 60 / g, "PTS": lambda s, g: s.get("pts", 0) / g,
+    "REB": lambda s, g: s.get("reb", 0) / g, "ORB": lambda s, g: s.get("oreb", 0) / g, "AST": lambda s, g: s.get("ast", 0) / g,
+    "STL": lambda s, g: s.get("stl", 0) / g, "BLK": lambda s, g: s.get("blk", 0) / g, "STK": lambda s, g: (s.get("stl", 0) + s.get("blk", 0)) / g,
+    "TOV": lambda s, g: s.get("tov", 0) / g, "FG": lambda s, g: s.get("fgm", 0) / g, "FG%": lambda s, g: _pc(s, "fgm", "fga"),
+    "3P": lambda s, g: s.get("tpm", 0) / g, "3P%": lambda s, g: _pc(s, "tpm", "tpa"), "FT": lambda s, g: s.get("ftm", 0) / g,
+    "FT%": lambda s, g: _pc(s, "ftm", "fta"), "TS%": lambda s, g: _ts(s), "+/-": lambda s, g: s.get("plus_minus", 0) / g,
+    "AST/TOV": lambda s, g: s.get("ast", 0) / max(1, s.get("tov", 0)), "STL/TOV": lambda s, g: s.get("stl", 0) / max(1, s.get("tov", 0)),
+    "PTS/48": lambda s, g: _p48(s, "pts"), "REB/48": lambda s, g: _p48(s, "reb"), "AST/48": lambda s, g: _p48(s, "ast"),
+    "STL/48": lambda s, g: _p48(s, "stl"), "BLK/48": lambda s, g: _p48(s, "blk"),
+}
+_RANK_MINIMUMS = {"FG%": ("fgm", 300), "FT%": ("ftm", 125), "3P%": ("tpm", 82), "AST/TOV": ("ast", 200), "STL/TOV": ("stl", 82),
+                  "PTS/48": ("minutes", 2000), "REB/48": ("minutes", 2000), "AST/48": ("minutes", 2000), "STL/48": ("minutes", 2000), "BLK/48": ("minutes", 2000)}
+
+
+def _period_stats(stats, period):
+    if period is None:
+        return stats
+    q = stats.get("quarter_stats") or {}
+    if period == 5:
+        rows = [r for n, r in q.items() if int(n) >= 5]
+        if not rows:
+            return {}
+        merged = {}
+        for r in rows:
+            for k, v in r.items():
+                if isinstance(v, (int, float)):
+                    merged[k] = merged.get(k, 0) + v
+        merged["games"] = max((r.get("games", 0) for r in rows), default=0)
+        return merged
+    return q.get(period) or q.get(str(period)) or {}
+
+
+def _avg_row(s, g, team, name, kind="player", rank=None):
+    g = max(1, g)
+    ident = team_identity(team)
+    return {"kind": kind, "team": team, "short": ident["short"], "logo": ident["logo"], "color": ident["color"], "initials": ident["initials"],
+            "name": name, "rank": rank, "gp": s.get("games", 0) or g, "min": s.get("minutes", 0) / 60 / g,
+            "pts": s.get("pts", 0) / g, "reb": s.get("reb", 0) / g, "orb": s.get("oreb", 0) / g, "ast": s.get("ast", 0) / g,
+            "stl": s.get("stl", 0) / g, "blk": s.get("blk", 0) / g, "tov": s.get("tov", 0) / g,
+            "fgm": s.get("fgm", 0) / g, "fga": s.get("fga", 0) / g, "fgp": _pc(s, "fgm", "fga"),
+            "tpm": s.get("tpm", 0) / g, "tpa": s.get("tpa", 0) / g, "tpp": _pc(s, "tpm", "tpa"),
+            "ftm": s.get("ftm", 0) / g, "fta": s.get("fta", 0) / g, "ftp": _pc(s, "ftm", "fta"),
+            "ts": _ts(s), "pm": s.get("plus_minus", 0) / g}
+
+
+def avg_payload(runner, team="All Teams", quarter="All", rank="Team order", source="Season"):
+    sec = runner.sections or {}
+    season_p, season_t = sec.get("_season_player_totals") or {}, sec.get("_season_team_totals") or {}
+    po_p, po_t = sec.get("_playoff_player_totals") or {}, sec.get("_playoff_team_totals") or {}
+    ser_p, ser_t = sec.get("_series_totals") or {}, sec.get("_series_team_totals") or {}
+    if not po_p and ser_p and ser_p is not season_p:
+        po_p, po_t = ser_p, ser_t
+    if not season_p and not po_p:
+        players, teams, label = ser_p, ser_t, "Series"
+    elif source == "Season" and season_p:
+        players, teams, label = season_p, season_t, "Season"
+    elif source != "Season" and po_p:
+        players, teams, label = po_p, po_t, "Playoffs"
+    elif season_p:
+        players, teams, label = season_p, season_t, "Season"
+    else:
+        players, teams, label = po_p, po_t, "Playoffs"
+    period = None
+    if quarter != "All":
+        period = 5 if quarter == "OT" else (int(quarter.replace("Q", "")) if quarter.replace("Q", "").isdigit() else None)
+    names = list(players.keys())
+    if team != "All Teams":
+        names = [team] if team in players else []
+    out = {"teams": sorted(players.keys()), "sources": [x for x, ok in (("Season", bool(season_p)), ("Playoffs", bool(po_p))) if ok],
+           "source": label, "rows": [], "flat": False}
+    if rank in _RANK_VALUE:
+        share = 1.0 if period is None else (5 / 48 if period == 5 else 12 / 48)
+        entries = []
+        for tn in names:
+            tp = players.get(tn) or {}
+            tg = max((x.get("games", 0) for x in tp.values()), default=0)
+            for pn, st in tp.items():
+                rs = _period_stats(st, period)
+                if not rs:
+                    continue
+                rule = _RANK_MINIMUMS.get(rank)
+                if rule:
+                    key, base = rule
+                    need = base * min(1.0, max(1, tg * share) / 82)
+                    have = rs.get("minutes", 0) / 60 if key == "minutes" else rs.get(key, 0)
+                    if have < need:
+                        continue
+                g = max(1, rs.get("games", 0))
+                entries.append((_RANK_VALUE[rank](rs, g), tn, pn, rs, g))
+        entries.sort(key=lambda e: e[0], reverse=True)
+        out["rows"] = [_avg_row(rs, g, tn, pn, rank=i) for i, (_v, tn, pn, rs, g) in enumerate(entries, 1)]
+        out["flat"] = True
+        return out
+    for tn in names:
+        tp = players.get(tn) or {}
+        if period is None:
+            tot = teams.get(tn) or {}
+        else:
+            tot = {k: 0 for k in _AVG_KEYS}
+            for st in tp.values():
+                rs = _period_stats(st, period)
+                for k in _AVG_KEYS:
+                    if k != "games":
+                        tot[k] += rs.get(k, 0)
+            tot["games"] = max((st.get("games", 0) for st in tp.values()), default=0)
+        row = _avg_row(tot, tot.get("games", 0) or 1, tn, "", kind="team")
+        row["min"] = None
+        row["name"] = row["short"]
+        out["rows"].append(row)
+        pr = [(pn, _period_stats(st, period)) for pn, st in tp.items()]
+        pr = [(pn, rs) for pn, rs in pr if rs]
+        for pn, rs in sorted(pr, key=lambda it: it[1].get("pts", 0) / max(1, it[1].get("games", 1)), reverse=True):
+            out["rows"].append(_avg_row(rs, max(1, rs.get("games", 0)), tn, pn))
+    return out
+
+
 def teams_payload(runner):
     sec = runner.sections or {}
     out = []
@@ -441,6 +575,10 @@ def build_app():
                 return self._json(compare_payload(runner))
             if path == "/api/roster":
                 return self._json(roster_payload(runner, (params.get("team") or [""])[0]))
+            if path == "/api/season/avg":
+                def q(k, d):
+                    return (params.get(k) or [d])[0]
+                return self._json(avg_payload(runner, q("team", "All Teams"), q("quarter", "All"), q("rank", "Team order"), q("source", "Season")))
             if path == "/api/season/players":
                 return self._json(players_payload(runner))
             if path == "/api/sections":
