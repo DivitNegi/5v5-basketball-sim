@@ -1,5 +1,6 @@
 """HTTP server for the browser UI: static files, a JSON API, a Server-Sent Events stream and team/player images."""
 import json
+import socket
 import mimetypes
 import os
 import queue
@@ -794,12 +795,23 @@ def build_app():
     return Handler, runner
 
 
+class _ExclusiveServer(ThreadingHTTPServer):
+    """Windows lets a second server bind a port an old one still holds (SO_REUSEADDR), so the browser reaches the dead
+    one and times out. Bind exclusively: a busy port raises, and run() moves on to the next one."""
+    allow_reuse_address = False
+
+    def server_bind(self):
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def run(open_browser: bool = True, port: int = 8790):
     handler, runner = build_app()
     server = None
     for candidate in range(port, port + 20):
         try:
-            server = ThreadingHTTPServer(("127.0.0.1", candidate), handler)
+            server = _ExclusiveServer(("127.0.0.1", candidate), handler)
             break
         except OSError:
             continue
