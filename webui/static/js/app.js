@@ -357,15 +357,22 @@ function periodIndex(label) {
   if (ot) return 3 + (Number(ot[1]) || 1);
   return 0;
 }
-function flowPoints() {
+function flowElapsed(period, clock) {
   const qLen = S.rules === "FIBA" ? 600 : 720;
-  return S.flow.map(([period, clock, margin]) => {
-    const idx = periodIndex(period);
-    const [mm, ss] = (clock || "0:00").split(":").map(Number);
-    const left = mm * 60 + ss;
-    const elapsed = idx < 4 ? idx * qLen + (qLen - left) : 4 * qLen + (idx - 4) * 300 + (300 - left);
-    return [elapsed, margin];
-  });
+  const idx = periodIndex(period);
+  const [mm, ss] = (clock || "0:00").split(":").map(Number);
+  const left = mm * 60 + ss;
+  return idx < 4 ? idx * qLen + (qLen - left) : 4 * qLen + (idx - 4) * 300 + (300 - left);
+}
+function flowPoints() {
+  // time only moves forward: a point that goes backwards is a replay of one already drawn (e.g. after a reconnect)
+  const out = [];
+  for (const [period, clock, margin] of S.flow) {
+    const t = flowElapsed(period, clock);
+    if (out.length && t < out[out.length - 1][0]) continue;
+    out.push([t, margin]);
+  }
+  return out;
 }
 function renderFlow(rootSel, height) {
   const root = $(rootSel);
@@ -394,11 +401,12 @@ function renderFlow(rootSel, height) {
       <path d="${area}" fill="url(#ga${height})" clip-path="url(#up${height})"/>
       <path d="${area}" fill="url(#gb${height})" clip-path="url(#dn${height})"/>
       <path d="${d}" fill="none" stroke="rgba(232,237,246,.85)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
-      <text x="${pad}" y="16">${A?.short || ""} +${Math.round(maxM / 1.15)}</text>
-      <text x="${pad}" y="${H - 6}">${B?.short || ""} +${Math.round(maxM / 1.15)}</text>
-      ${["Q1", "Q2", "Q3", "Q4"].map((q, i) => `<text x="${x(i * qLen + qLen / 2) - 8}" y="${H - 6}">${q}</text>`).join("")}
     </svg>`;
-  root.innerHTML = svg;
+  const lead = Math.round(maxM / 1.15);
+  const dot = (c) => `<i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${c};margin-right:6px"></i>`;
+  const legend = `<div class="flow-legend"><span>${dot(A?.color || "#4f8cff")}${A?.short || "A"} ahead (up)</span><span>${dot(B?.color || "#f43f5e")}${B?.short || "B"} ahead (down)</span><span class="muted">scale ±${lead}</span></div>`;
+  const qlabels = `<div class="flow-q">${["Q1", "Q2", "Q3", "Q4"].map((q, i) => `<span style="left:${100 * x(i * qLen + qLen / 2) / W}%">${q}</span>`).join("")}</div>`;
+  root.innerHTML = legend + `<div class="flow-plot">${svg}${qlabels}</div>`;
   const last = pts[pts.length - 1][1];
   const big = Math.max(...pts.map((p) => p[1])), small = Math.min(...pts.map((p) => p[1]));
   $("#flowNote").textContent = `Largest leads: ${A?.short || "A"} ${Math.max(0, big)}, ${B?.short || "B"} ${Math.max(0, -small)} · now ${last > 0 ? `${A?.short} by ${last}` : last < 0 ? `${B?.short} by ${-last}` : "tied"}`;
@@ -423,7 +431,8 @@ function applyLive(snap) {
 function applyScore(msg) {
   $("#sbPeriod").textContent = (msg.period || "").toUpperCase();
   $("#sbClock").textContent = msg.clock || "";
-  S.flow.push([msg.period, msg.clock, Number(msg.score_a) - Number(msg.score_b)]);
+  const lastFlow = S.flow[S.flow.length - 1];
+  if (!lastFlow || flowElapsed(msg.period, msg.clock) >= flowElapsed(lastFlow[0], lastFlow[1])) S.flow.push([msg.period, msg.clock, Number(msg.score_a) - Number(msg.score_b)]);
   const newScore = [Number(msg.score_a), Number(msg.score_b)];
   const changed = [newScore[0] !== S.score[0], newScore[1] !== S.score[1]];
   S.score = newScore;
@@ -901,37 +910,42 @@ async function loadShots() {
   if (!d.teams.length) { $("#shotBody").replaceChildren(h("div", { class: "empty" }, "The shot chart fills in as the game goes.")); return; }
   $("#shotPick").replaceChildren(...d.teams.map((t, i) => h("select", { onchange: (e) => { GV.shot[i] = e.target.value; loadShots(); } },
     h("option", { value: "Team" }, `${t.short} · whole team`), Object.keys(t.players).map((n) => h("option", { value: n, selected: n === GV.shot[i] }, n)))));
-  const W = 960, H = 520;
-  const ns = "http://www.w3.org/2000/svg";
-  const line = 'stroke="#e8edf6" stroke-opacity=".55" stroke-width="2" fill="none"';
+  // NBA court at 10px per foot: 94 x 50 ft, basket 5.25 ft from the baseline, 3-pt arc 23.75 ft, lane 16 x 19 ft.
+  const W = 1000, H = 600, X0 = 30, Y0 = 70, CW = 940, CH = 500, CY = Y0 + CH / 2;
+  const line = 'stroke="#c9d3e6" stroke-opacity=".55" stroke-width="2" fill="none"';
   const half = (t, i, flip) => {
-    const subj = GV.shot[i] !== "Team" && t.players[GV.shot[i]] ? t.players[GV.shot[i]] : t.team;
-    const name = GV.shot[i] !== "Team" && t.players[GV.shot[i]] ? GV.shot[i] : "TEAM";
-    const x0 = flip ? W / 2 : 0, sx = flip ? -1 : 1;
+    const own = GV.shot[i] !== "Team" && t.players[GV.shot[i]];
+    const subj = own ? t.players[GV.shot[i]] : t.team;
+    const name = own ? GV.shot[i] : "Whole team";
     const X = (v) => (flip ? W - v : v);
+    const hoopX = X0 + 52.5, arcX = X0 + 142;
     const card = (cx, cy, label, v, key) => {
-      const [m, a] = v;
-      const cls = zoneClass(key, m, a);
-      const fill = { good: "#22c55e", ok: "#f5a524", bad: "#f43f5e", none: "#64748b" }[cls];
-      return `<g transform="translate(${X(cx) - 54},${cy - 34})"><rect width="108" height="68" rx="12" fill="${fill}" fill-opacity=".28" stroke="${fill}" stroke-width="2"/>
-        <text x="54" y="20" text-anchor="middle" fill="#e8edf6" font-size="12" font-weight="800" letter-spacing="1.4">${label}</text>
-        <text x="54" y="42" text-anchor="middle" fill="#fff" font-size="19" font-weight="800">${m}/${a}</text>
-        <text x="54" y="59" text-anchor="middle" fill="#e8edf6" font-size="12">${a ? Math.round(100 * m / a) + "%" : "–"}</text></g>`;
+      const [m, a2] = v;
+      const cls = zoneClass(key, m, a2);
+      const col = { good: "#22c55e", ok: "#f5a524", bad: "#f43f5e", none: "#64748b" }[cls];
+      return `<g transform="translate(${X(cx) - 50},${cy - 32})"><rect width="100" height="64" rx="12" fill="#0e1830"/><rect width="100" height="64" rx="12" fill="${col}" fill-opacity=".26" stroke="${col}" stroke-width="2"/>
+        <text x="50" y="19" text-anchor="middle" fill="#e8edf6" font-size="12" font-weight="800" letter-spacing="1.4">${label}</text>
+        <text x="50" y="40" text-anchor="middle" fill="#fff" font-size="19" font-weight="800">${m}/${a2}</text>
+        <text x="50" y="56" text-anchor="middle" fill="#cbd5e1" font-size="12">${a2 ? Math.round(100 * m / a2) + "%" : "–"}</text></g>`;
     };
+    const anchor = flip ? "end" : "start";
     return `<g>
-      <path d="M ${X(0)} 80 L ${X(150)} 80 A 270 270 0 0 1 ${X(150)} 440 L ${X(0)} 440" ${line}/>
-      <rect x="${flip ? W - 190 : 0}" y="170" width="190" height="180" ${line}/>
-      <circle cx="${X(190)}" cy="260" r="60" ${line}/>
-      <circle cx="${X(52)}" cy="260" r="9" stroke="#f5a524" stroke-width="3" fill="none"/>
-      <path d="M ${X(34)} 236 L ${X(34)} 284" stroke="#e8edf6" stroke-width="3"/>
-      ${card(flip ? 190 : 190, 262, "RIM", subj.rim, "rim")}
-      ${card(flip ? 330 : 330, 160, "MID", subj.mid, "mid")}
-      ${card(flip ? 420 : 420, 330, "3PT", subj.three, "three")}
-      <text x="${X(flip ? 28 : 28)}" y="40" text-anchor="${flip ? "end" : "start"}" fill="${t.color}" font-size="20" font-weight="800">${t.short}</text>
-      <text x="${X(28)}" y="62" text-anchor="${flip ? "end" : "start"}" fill="#a7b2c5" font-size="13">${name}</text></g>`;
+      <path d="M ${X(X0)} ${Y0 + 30} L ${X(arcX)} ${Y0 + 30} A 237.5 237.5 0 0 ${flip ? 0 : 1} ${X(arcX)} ${Y0 + CH - 30} L ${X(X0)} ${Y0 + CH - 30}" ${line}/>
+      <rect x="${flip ? W - (X0 + 190) : X0}" y="${CY - 80}" width="190" height="160" ${line}/>
+      <path d="M ${X(X0 + 190)} ${CY - 60} A 60 60 0 0 ${flip ? 0 : 1} ${X(X0 + 190)} ${CY + 60}" ${line}/>
+      <path d="M ${X(X0 + 190)} ${CY - 60} A 60 60 0 0 ${flip ? 1 : 0} ${X(X0 + 190)} ${CY + 60}" ${line} stroke-dasharray="6 6"/>
+      <path d="M ${X(hoopX)} ${CY - 40} A 40 40 0 0 ${flip ? 0 : 1} ${X(hoopX)} ${CY + 40}" ${line}/>
+      <line x1="${X(X0 + 40)}" y1="${CY - 30}" x2="${X(X0 + 40)}" y2="${CY + 30}" stroke="#e8edf6" stroke-width="3"/>
+      <circle cx="${X(hoopX)}" cy="${CY}" r="7.5" stroke="#f5a524" stroke-width="3" fill="none"/>
+      ${card(X0 + 150, CY, "RIM", subj.rim, "rim")}
+      ${card(X0 + 175, Y0 + 125, "MID", subj.mid, "mid")}
+      ${card(X0 + 335, CY, "3PT", subj.three, "three")}
+      <text x="${X(X0)}" y="34" text-anchor="${anchor}" fill="${t.color}" font-size="22" font-weight="800">${t.short}</text>
+      <text x="${X(X0)}" y="56" text-anchor="${anchor}" fill="#a7b2c5" font-size="13">${name}</text></g>`;
   };
-  const svg = `<svg class="court-svg" viewBox="0 0 ${W} ${H}"><rect x="2" y="60" width="${W - 4}" height="400" rx="14" fill="#13203a" stroke="#e8edf6" stroke-opacity=".45" stroke-width="2"/>
-    <line x1="${W / 2}" y1="60" x2="${W / 2}" y2="460" ${line}/><circle cx="${W / 2}" cy="260" r="56" ${line}/>
+  const svg = `<svg class="court-svg" viewBox="0 0 ${W} ${H}">
+    <rect x="${X0}" y="${Y0}" width="${CW}" height="${CH}" rx="6" fill="#13203a" stroke="#c9d3e6" stroke-opacity=".6" stroke-width="2.5"/>
+    <line x1="${W / 2}" y1="${Y0}" x2="${W / 2}" y2="${Y0 + CH}" ${line}/><circle cx="${W / 2}" cy="${CY}" r="60" ${line}/>
     ${half(d.teams[0], 0, false)}${half(d.teams[1], 1, true)}</svg>`;
   $("#shotBody").innerHTML = svg;
 }

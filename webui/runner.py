@@ -201,7 +201,7 @@ class SimRunner:
                 self.set_status("Paused" if sim_engine.SIM_PAUSED else "Running")   # the jump target was reached
             try:
                 self.flow.append([message["period"], message["clock"], int(message["score_a"]) - int(message["score_b"])])
-                del self.flow[:-400]
+                del self.flow[:-3000]
             except (TypeError, ValueError):
                 pass
             self.hub.publish({"type": "score", **message})
