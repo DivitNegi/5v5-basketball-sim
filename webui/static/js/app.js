@@ -707,6 +707,38 @@ function renderBracket() {
 let bracketTimer = null;
 function scheduleBracket() { clearTimeout(bracketTimer); bracketTimer = setTimeout(refreshBracket, 600); }
 
+// ───────────────────────── teams & players ─────────────────────────
+const CD = { team: null, data: null, sel: 0, picker: null };
+const ratingColor = (v) => v >= 90 ? "#22c55e" : v >= 80 ? "#84cc16" : v >= 70 ? "#f5a524" : v >= 55 ? "#fb923c" : "#f43f5e";
+
+async function loadRoster(name) {
+  CD.team = name; CD.sel = 0;
+  CD.data = await api.get(`/api/roster?team=${encodeURIComponent(name)}`);
+  renderRoster(); renderPlayerCard();
+}
+function renderRoster() {
+  const d = CD.data;
+  if (!d?.players) return;
+  $("#rosterList").replaceChildren(...d.players.map((p, i) => h("div", { class: `roster-row ${i === CD.sel ? "on" : ""}`, onclick: () => { CD.sel = i; renderRoster(); renderPlayerCard(); } },
+    h("span", { class: "pos" }, p.pos), faceEl(p.name), h("div", {}, h("div", { class: "pname" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null), h("div", { class: "muted" }, `${p.archetype || ""}`)),
+    h("span", { class: "ovr", style: { color: ratingColor(p.ovr || 0) } }, p.ovr ?? "–"))));
+}
+function renderPlayerCard() {
+  const d = CD.data, p = d?.players?.[CD.sel];
+  const root = $("#playerCard");
+  if (!p) { root.replaceChildren(h("div", { class: "empty" }, "Pick a team, then a player.")); return; }
+  const face = h("div", { class: "pcard-face", style: { "--c": d.team.color } }, (p.name.split(" ")[0]?.[0] || "") + (p.name.split(" ").slice(-1)[0]?.[0] || ""));
+  withImage(face, `/media/headshot?name=${encodeURIComponent(p.name)}`);
+  const ft = Math.floor(p.height / 12), inch = p.height % 12;
+  root.replaceChildren(
+    h("div", { class: "pcard-head" }, face,
+      h("div", {}, h("div", { class: "pcard-name" }, p.name), h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.pos}${p.height ? ` · ${ft}'${inch}"` : ""}${p.archetype ? ` · ${p.archetype}` : ""}`),
+        h("div", { class: "badges" }, (p.badges || []).map((b) => h("span", { class: "badge" }, b.replace(/_/g, " "))), p.rookie ? h("span", { class: "badge", style: { background: "rgba(167,139,250,.15)", color: "#c4b5fd", borderColor: "rgba(167,139,250,.35)" } }, "Rookie") : null)),
+      h("div", { class: "pcard-ovr" }, h("div", { class: "n" }, p.ovr ?? "–"), h("small", {}, "Overall"))),
+    h("div", { class: "rating-groups" }, p.groups.map((g) => h("div", {}, h("h3", {}, g.title), g.items.map((it) => h("div", { class: "rbar" },
+      h("span", {}, it.label), h("div", { class: "track" }, h("div", { class: "fill", style: { width: `${it.value}%`, background: ratingColor(it.value) } })), h("span", { class: "val" }, it.value)))))));
+}
+
 // ───────────────────────── boot ─────────────────────────
 async function boot() {
   S.meta = await api.get("/api/meta");
@@ -727,6 +759,8 @@ async function boot() {
   S.teamA = first.name; S.teamB = second.name;
   pickA.set(first); pickB.set(second);
   S.pickers = [pickA, pickB];
+  CD.picker = makePicker($("#pickCards"), (t) => loadRoster(t.name));
+  CD.picker.set(first);
 
   $$("#rules button").forEach((b) => b.addEventListener("click", () => {
     $$("#rules button").forEach((x) => x.classList.toggle("on", x === b)); S.rules = b.dataset.v;
@@ -771,6 +805,7 @@ async function boot() {
     if (b.dataset.view === "flow") renderFlow("#flowBig", 420);
     if (b.dataset.view === "season") refreshSeason();
     if (b.dataset.view === "bracket") refreshBracket();
+    if (b.dataset.view === "cards" && !CD.data) loadRoster(S.teamA);
   }));
   document.addEventListener("keydown", (e) => {
     if (e.target.matches("input, select, textarea")) return;

@@ -224,6 +224,46 @@ def highs_payload(runner):
     return out
 
 
+RATING_FIELDS = [
+    ("Scoring", [("three_rating", "3PT"), ("mid_rating", "Mid-range"), ("rim_rating", "Finishing"), ("dunk_rating", "Dunking"), ("ft_rating", "Free throw")]),
+    ("Playmaking", [("playmaking", "Playmaking"), ("ball_handle", "Ball handle"), ("usage", "Usage")]),
+    ("Defense", [("perimeter_def", "Perimeter D"), ("interior_def", "Interior D"), ("steal", "Steals"), ("block", "Blocks")]),
+    ("Rebounding & more", [("oreb", "Off. rebound"), ("dreb", "Def. rebound"), ("foul_draw", "Draws fouls"), ("clutchness", "Clutch")]),
+    ("Tendencies", [("three_tendency", "Threes"), ("mid_tendency", "Mid-range"), ("drive_tendency", "Drives"), ("post_tendency", "Post"), ("dunk_tendency", "Dunks"), ("shot_tendency", "Shot-taking")]),
+]
+
+
+def _player_card(p):
+    import sim_engine
+    try:
+        ovr = sim_engine.fantasy_ovr_uncapped(p)
+    except Exception:
+        ovr = None
+    groups = []
+    for title, fields in RATING_FIELDS:
+        groups.append({"title": title, "items": [{"label": label, "value": round(float(getattr(p, key, 0) or 0) * 100)} for key, label in fields]})
+    return {
+        "name": p.name, "pos": getattr(p, "position", ""), "ovr": ovr, "height": getattr(p, "height", 0), "archetype": getattr(p, "archetype", ""),
+        "badges": list(getattr(p, "badges", ()) or ()), "rookie": bool(getattr(p, "rookie", False)),
+        "stamina": round(float(getattr(p, "stamina", 0) or 0) * 100), "groups": groups,
+    }
+
+
+def roster_payload(runner, team_name):
+    factory = runner.factories.get(team_name)
+    if not factory:
+        return {"error": "Unknown team"}
+    team = factory()
+    import sim_engine
+    try:
+        sim_engine.assign_player_badges(team)
+    except Exception:
+        pass
+    players = sorted((_player_card(p) for p in team.roster), key=lambda c: -(c["ovr"] or 0))
+    ident = team_identity(team.name)
+    return {"team": ident, "players": players}
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -292,6 +332,8 @@ def build_app():
                 return self._json(highs_payload(runner))
             if path == "/api/season/schedule":
                 return self._json(schedule_payload(runner, (params.get("team") or [""])[0]))
+            if path == "/api/roster":
+                return self._json(roster_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/season/players":
                 return self._json(players_payload(runner))
             if path == "/api/sections":

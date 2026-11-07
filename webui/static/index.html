@@ -22,7 +22,7 @@
         <button class="nav-item" data-view="season"><span class="nav-icon">☰</span>Season</button>
         <button class="nav-item" data-view="bracket"><span class="nav-icon">⛓</span>Playoffs</button>
         <button class="nav-item soon" disabled><span class="nav-icon">◎</span>Stats<em>soon</em></button>
-        <button class="nav-item soon" disabled><span class="nav-icon">▣</span>Cards<em>soon</em></button>
+        <button class="nav-item" data-view="cards"><span class="nav-icon">▣</span>Teams &amp; players</button>
         <button class="nav-item soon" disabled><span class="nav-icon">⇄</span>Draft &amp; trades<em>soon</em></button>
         <button class="nav-item soon" disabled><span class="nav-icon">✎</span>Coach<em>soon</em></button>
       </nav>
@@ -136,6 +136,17 @@
           </div>
           <div id="bracketBody"><div class="empty">The bracket appears when the play-in and playoffs start.</div></div>
           <div id="seriesDetail"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-cards">
+        <div class="cards-grid">
+          <div class="panel">
+            <div class="panel-head"><h2>Roster</h2></div>
+            <div class="picker" id="pickCards"></div>
+            <div id="rosterList" class="roster-list"></div>
+          </div>
+          <div class="panel" id="playerCard"><div class="empty">Pick a team, then a player.</div></div>
         </div>
       </section>
 
