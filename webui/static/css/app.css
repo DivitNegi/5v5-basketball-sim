@@ -508,3 +508,9 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .pi-seed { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(2, 6, 15, .45); }
 .pi-seed .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(245, 165, 36, .16); color: var(--accent-2); font-weight: 800; font-size: 12px; }
 .pi-seed .logo { width: 22px; height: 22px; font-size: 8px; border-radius: 6px; }
+
+/* on-the-floor tables scroll sideways instead of clipping the right-hand stats */
+.court-team { overflow: visible; }
+.court-team-head { border-radius: 12px 12px 0 0; }
+.court-scroll { overflow-x: auto; max-width: 100%; border-radius: 0 0 12px 12px; }
+.court-scroll table { min-width: 640px; }

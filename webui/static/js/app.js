@@ -205,9 +205,11 @@ function renderCourt() {
     const tot = t.totals;
     return h("div", { class: "court-team", style: { "--c": t.color } },
       h("div", { class: "court-team-head" }, logoEl(t), t.short, h("span", { class: "tot" }, `FG ${tot.fgm}-${tot.fga} · 3PT ${tot.tpm}-${tot.tpa} · FT ${tot.ftm}-${tot.fta}`)),
-      h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...STAT_COLS.map(([, l]) => h("th", {}, l)))), h("tbody", {}, rows)));
+      h("div", { class: "court-scroll" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...STAT_COLS.map(([, l]) => h("th", {}, l)))), h("tbody", {}, rows))));
   });
+  const keep = $$("#court .court-scroll").map((el) => el.scrollLeft);   // a re-render must not snap the scroll back
   root.replaceChildren(...blocks);
+  $$("#court .court-scroll").forEach((el, i) => { el.scrollLeft = keep[i] || 0; });
 }
 
 // ───────────────────────── team compare ─────────────────────────
