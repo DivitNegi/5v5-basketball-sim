@@ -5664,10 +5664,11 @@ def run_gui_app():
     season_races_painted = {"signature": None, "at": 0.0}
 
     def show_season_races(races: Dict, completed=None):
-        """Season tab: only the MVP race and the DPOY race, the top five of each, re-ranked as games finish."""
+        """Season tab: the MVP, DPOY and Rookie of the Year races, the top five of each, re-ranked as games finish."""
         mvp_rows = (races or {}).get("mvp") or []
         dpoy_rows = (races or {}).get("dpoy") or []
-        signature = (repr(mvp_rows), repr(dpoy_rows), completed)
+        roy_rows = (races or {}).get("roy") or []
+        signature = (repr(mvp_rows), repr(dpoy_rows), repr(roy_rows), completed)
         if season_races_painted.get("signature") == signature:
             return   # nothing changed: do not clear and refill the table (that is what made the window stutter)
         season_races_painted["signature"] = signature
@@ -5677,7 +5678,10 @@ def run_gui_app():
             season_awards_tree.insert("", "end", values=("The MVP and DPOY races will appear here during Season mode.", "", "", ""))
             return
         after = f"  (after {completed} games)" if completed else ""
-        for title, rows in (("MVP Race" + after, mvp_rows), ("DPOY Race" + after, dpoy_rows)):
+        race_sections = [("MVP Race" + after, mvp_rows), ("DPOY Race" + after, dpoy_rows)]
+        if roy_rows:
+            race_sections.append(("Rookie of the Year Race" + after, roy_rows))   # only in seasons that have a rookie class
+        for title, rows in race_sections:
             season_awards_tree.insert("", "end", values=(title, "", "", ""), tags=("section",))
             for row in rows:
                 season_awards_tree.insert("", "end", values=(

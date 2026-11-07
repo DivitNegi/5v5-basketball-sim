@@ -24453,7 +24453,7 @@ def build_season_sections(entries: List[Dict],
 
     awards = []
     awards_table = []
-    season_races = {"mvp": [], "dpoy": []}
+    season_races = {"mvp": [], "dpoy": [], "roy": []}
     if all_players:
         def stat_line(team_name: str, stats: Dict) -> str:
             gp = max(1, stats.get("games", 1))
@@ -24660,11 +24660,30 @@ def build_season_sections(entries: List[Dict],
             if games < max(1, int(0.4 * gp)):
                 return False
             return gp < 10 or item[2].get("minutes", 0) / 60 / max(1, games) >= 15
+        def _is_rookie(item) -> bool:
+            _pl = player_lookup.get((item[0], item[1]))
+            if _pl is not None and getattr(_pl, "rookie", False):
+                return True
+            return bool(include_rookies and rookie_name_key(item[1]) in ROOKIE_KEYS_2026)
+
+        def rookie_in_race(item) -> bool:
+            # a rookie who barely played (a few games, a few minutes) is not in the running
+            gp = team_gp.get(item[0], 0)
+            games = item[2].get("games", 0)
+            if games < max(1, int(0.4 * gp)):
+                return False
+            return gp < 10 or item[2].get("minutes", 0) / 60 / max(1, games) >= 12
+        rookie_pool = [item for item in all_players if _is_rookie(item) and rookie_in_race(item)]
+
+        def roy_key(item):
+            return award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05
         season_races = {
             "mvp": [{"rank": i, "player": it[1], "team": it[0], "stats": stat_line(it[0], it[2])}
                     for i, it in enumerate(sorted([x for x in mvp_pool if in_race(x)], key=mvp_key, reverse=True)[:5], start=1)],
             "dpoy": [{"rank": i, "player": it[1], "team": it[0], "stats": defense_stat_line(it[0], it[2])}
                      for i, it in enumerate([x for x in defenders if in_race(x)][:5], start=1)],
+            "roy": [{"rank": i, "player": it[1], "team": it[0], "stats": stat_line(it[0], it[2])}
+                    for i, it in enumerate(sorted(rookie_pool, key=roy_key, reverse=True)[:5], start=1)],
         }
         if races_only:
             return {"_season_races": season_races}
@@ -24855,17 +24874,8 @@ def build_season_sections(entries: List[Dict],
             except Exception:
                 pass
 
-        # Rookie of the Year / All-Rookie teams: the players marked rookie=True in that season's team file (first NBA season that year),
-        # plus the 2026 draft class in the 2027 season.
-        def _is_rookie(item) -> bool:
-            _pl = player_lookup.get((item[0], item[1]))
-            if _pl is not None and getattr(_pl, "rookie", False):
-                return True
-            return bool(include_rookies and rookie_name_key(item[1]) in ROOKIE_KEYS_2026)
-        # a rookie who barely played (a few games, a few minutes) is not in the running
-        rookies = [item for item in all_players if _is_rookie(item)
-                   and item[2].get("games", 0) >= max(1, int(0.4 * team_gp.get(item[0], 0)))
-                   and item[2].get("minutes", 0) / 60 / max(1, item[2].get("games", 1)) >= 12]
+        # Rookie of the Year / All-Rookie teams: the rookies in the pool built above the live races.
+        rookies = rookie_pool
         all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams
         if rookies:
             roy = max(rookies, key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
@@ -25113,8 +25123,8 @@ def live_season_races_payload(entries, player_totals, team_totals, completed: in
     if completed <= 1:
         _RACE_QUALITY_CACHE.clear()
         _RACE_ADVANCED_CACHE.clear()
-    sections = build_season_sections(entries, player_totals, team_totals, include_rookies=False, races_only=True)
-    return {"season_races": sections.get("_season_races") or {"mvp": [], "dpoy": []}, "completed": completed, "total": total}
+    sections = build_season_sections(entries, player_totals, team_totals, include_rookies=True, races_only=True)
+    return {"season_races": sections.get("_season_races") or {"mvp": [], "dpoy": [], "roy": []}, "completed": completed, "total": total}
 
 
 def copy_season_totals(value):
