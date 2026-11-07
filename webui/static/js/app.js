@@ -275,13 +275,49 @@ function newBlock() {
 
 // "X will guard Y" opening-matchup lines are left out of the play-by-play
 const GUARD_RE = /\bwill guard\b|^\s*When .+ are on offense:\s*$/;
+const rawState = { last: [0, 0], namesKey: "", re: null };
+const escHtml = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function nameRegex() {
+  const names = (S.live?.teams || []).flatMap((t) => (t.box || []).map((p) => p.name)).filter(Boolean);
+  const key = names.join("|");
+  if (key !== rawState.namesKey) {
+    rawState.namesKey = key;
+    rawState.re = names.length ? new RegExp(`(${names.sort((x, y) => y.length - x.length).map((n) => escHtml(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g") : null;
+  }
+  return rawState.re;
+}
 function rawLine(line) {
   const root = $("#rawlog");
   root.querySelector(".empty")?.remove();
-  const follow = root.scrollHeight - root.scrollTop - root.clientHeight < 40;
+  const follow = root.scrollHeight - root.scrollTop - root.clientHeight < 60;
   const t = line.trim();
-  const kind = SCORE_RE.test(t) ? "score" : /^-{2,}\s*(start|end) of|^(halftime|end of regulation|final)/i.test(t) ? "period" : /^\[(GUI|Simulation)/.test(t) ? "sys" : "";
-  root.append(h("div", { class: `ln ${kind}` }, line.replace(/\s+$/, "")));
+  let el;
+  const sm = t.match(SCORE_RE);
+  if (sm) {
+    const [, period, clock, na, sa, nb, sb] = sm;
+    const idA = S.identities?.find((x) => x && x.name === na), idB = S.identities?.find((x) => x && x.name === nb);
+    const now = [Number(sa), Number(sb)];
+    const scored = now[0] > rawState.last[0] ? 0 : now[1] > rawState.last[1] ? 1 : -1;
+    if (scored >= 0) root.lastElementChild?.classList.add("made");
+    rawState.last = now;
+    const side = (id, name, sc, hot) => h("span", { class: `sb-side ${hot ? "hot" : ""}`, style: { "--c": id?.color || "#64748b" } }, h("span", { class: "sb-name" }, id?.short || name.replace(/^\d{4} /, "")), h("b", {}, sc));
+    el = h("div", { class: "pbp-score" }, h("span", { class: "pbp-clock" }, `${period} · ${clock}`), side(idA, na, sa, scored === 0), h("span", { class: "sb-dash" }, "–"), side(idB, nb, sb, scored === 1));
+  } else if (/^-{2,}\s*(start|end) of|^(halftime|end of regulation|final)/i.test(t)) {
+    el = h("div", { class: "pbp-period" }, h("span", {}, t.replace(/-/g, "").trim().toUpperCase()));
+    rawState.last = rawState.last;
+  } else if (/^\[(GUI|Simulation)/.test(t)) {
+    el = h("div", { class: "pbp-sys" }, t.replace(/^\[GUI\]\s*/, ""));
+  } else {
+    el = h("div", { class: "pbp-line" });
+    let html = escHtml(line.replace(/\s+$/, ""));
+    const re = nameRegex();
+    if (re) html = html.replace(re, '<b class="nm">$1</b>');
+    el.innerHTML = html;
+    if (/steal|stolen|turnover|loses the|travel/i.test(t)) el.classList.add("tov");
+    else if (/foul/i.test(t)) el.classList.add("foul");
+    else if (/\b(misses|missed|no good|rims out|off the iron|blocked|swats?)\b/i.test(t)) el.classList.add("miss");
+  }
+  root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
   if (follow) root.scrollTop = root.scrollHeight;
 }
@@ -472,6 +508,7 @@ function resetGame(msg) {
   feed.block = null; feed.lines = []; feed.last = [0, 0];
   $("#feed").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
   $("#rawlog").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
+  rawState.last = [0, 0];
   $("#sbSeries").textContent = "";
   $("#sbPeriod").textContent = "1ST"; $("#sbClock").textContent = S.rules === "FIBA" ? "10:00" : "12:00";
   $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
