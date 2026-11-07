@@ -10884,9 +10884,13 @@ def run_gui_app():
             # or reload.
             latest_scoreboard = None
             latest_races = None
+            lineup_changed = False
             try:
                 while True:
                     message = scoreboard_queue.get_nowait()
+                    if isinstance(message, dict) and message.get("lineup_changed"):
+                        lineup_changed = True   # a substitution: redraw the on-court box score right now
+                        continue
                     if isinstance(message, dict) and "season_races" in message:
                         latest_races = message
                         continue
@@ -10931,6 +10935,9 @@ def run_gui_app():
                         update_season_progress(latest_scoreboard.get("completed", 0), latest_scoreboard.get("total", 1230))
             except queue.Empty:
                 pass
+            if lineup_changed:
+                gui_refresh_state["live_dirty"] = True
+                gui_refresh_state["live_at"] = 0.0
             if latest_races is not None and running["active"]:
                 show_season_races(latest_races.get("season_races"), latest_races.get("completed"))
             if bracket_ui["dirty"]:

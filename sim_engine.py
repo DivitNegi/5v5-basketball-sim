@@ -4438,6 +4438,18 @@ def balanced_lineup_order(players: List[Player]) -> List[Player]:
     return ordered[:5]
 
 
+def notify_lineup_change(team: Team):
+    """Tell the live GUI right away when the five on the floor change (a substitution), so the on-court box score switches the moment it
+    happens instead of waiting for the next scoreboard update."""
+    queue_ = GUI_SCOREBOARD_QUEUE
+    if queue_ is None:
+        return
+    key = frozenset(id(p) for p in team.on_floor)
+    if getattr(team, "_notified_lineup", None) != key:
+        team._notified_lineup = key
+        queue_.put({"lineup_changed": True})
+
+
 def balance_lineup_positions(team: Team):
     # This runs after nearly every possession/substitution but the lineup
     # almost never changes between calls. If the floor, bench and foul
@@ -4445,6 +4457,7 @@ def balance_lineup_positions(team: Team):
     roster = getattr(team, "roster", None)
     if not roster:
         return
+    notify_lineup_change(team)
     try:
         key = (
             tuple(id(p) for p in team.on_floor),
@@ -4592,6 +4605,24 @@ def _balance_lineup_positions_impl(team: Team):
         bench_pool.remove(sub_in)
         bench_pool.append(sit)
         plain = [p for p in current if is_plain_center(p)]
+
+    # One big man at a time: two centers / 7-footers never share the floor (a PF who is not a true big, like Giannis or LeBron, is a forward).
+    # The better of the two stays; the other sits for the best forward on the bench. Only when no non-big is left does a second one play.
+    def _center_type(p: Player) -> bool:
+        return p.name != "LeBron James" and (p.position.upper() == "C" or p.height >= 84)
+
+    bigs = [p for p in current if _center_type(p)]
+    while len(bigs) >= 2:
+        keep = max(bigs, key=overall_rating)
+        sit = min((p for p in bigs if p is not keep), key=lambda p: (overall_rating(p), -p.minutes))
+        replacements = [p for p in bench_pool if not _center_type(p) and not identity_contains(current, p)]
+        if not replacements:
+            break
+        sub_in = max(replacements, key=lambda p: (lineup_slot_eligible(p, "PF"), starter_minute_need(p, team), overall_rating(p)))
+        current[current.index(sit)] = sub_in
+        bench_pool.remove(sub_in)
+        bench_pool.append(sit)
+        bigs = [p for p in current if _center_type(p)]
 
     team.on_floor = balanced_lineup_order(current)
     team.bench = [p for p in team.roster if not identity_contains(team.on_floor, p) and not p.fouled_out]
@@ -7807,6 +7838,7 @@ def apply_manual_substitution(team: Team) -> bool:
         team.on_floor[idx] = in_player
         team.bench.remove(in_player)
         team.bench.append(out_player)
+        notify_lineup_change(team)
         out_player.current_stint = 0
         in_player.current_stint = 0
         team.manual_lineup_lock = getattr(team, "current_period", 0)
@@ -7854,6 +7886,7 @@ def gui_substitute(team: Team, out_name: str, in_name: str) -> str:
         team.on_floor[index] = in_player
         team.bench.remove(in_player)
         team.bench.append(out_player)
+        notify_lineup_change(team)
         out_player.current_stint = 0
         in_player.current_stint = 0
         team.manual_lineup_lock = getattr(team, "current_period", 0)
@@ -10669,6 +10702,7 @@ def swap_players(team: Team, out_player: Player, sub_in: Player, label: str) -> 
     team.on_floor[idx] = sub_in
     team.bench.remove(sub_in)
     team.bench.append(out_player)
+    notify_lineup_change(team)
     balance_lineup_positions(team)
     out_player.current_stint = 0
     sub_in.current_stint = 0
@@ -17988,10 +18022,19 @@ def immediate_catch_chance(passer: Player, base: float, slope: float = 0.44,
     """
     ceiling = base + slope * 0.99          # what the best passer in the league gets on this pathway
     floor = 0.04
-    return max(min(lo, 0.05), min(hi, floor + (ceiling - floor) * playmaking_look_curve(passer.playmaking) + bonus))
+    return max(min(lo, 0.05), min(hi * 1.2, ASSIST_VOLUME_BOOST * (floor + (ceiling - floor) * playmaking_look_curve(passer.playmaking) + bonus)))
 
 
 ASSIST_CREDIT_SCALE = 1.32  # delayed (non-quick) finishes: league team assists were ~22.8/game vs ~26 real
+ASSIST_VOLUME_BOOST = 3.00  # overall: 20% more of the league's baskets come off a pass (the playmaking taper had left teams at ~20 assists a game vs ~24.5 real)
+
+
+def receiver_assist_factor(shooter: Player, shot_type: str) -> float:
+    """A basket is more likely to come off a pass when the teammate catching it is a good finisher at that shot and not a self-creator."""
+    rating = {"three": shooter.three_rating, "mid": shooter.mid_rating, "rim": shooter.rim_rating, "dunk": shooter.dunk_rating}.get(shot_type, shooter.rim_rating)
+    quality = 0.8 * rating + 0.2 * getattr(shooter, "shot_iq", 0.6)
+    factor = 1.0 + 0.9 * (quality - 0.78) - 0.6 * max(0.0, shooter.usage - 0.25)
+    return max(0.78, min(1.25, factor))
 
 
 def assist_credit_chance(passer: Player, shooter: Player, shot_type: str,
@@ -18000,7 +18043,7 @@ def assist_credit_chance(passer: Player, shooter: Player, shot_type: str,
     chance = _assist_credit_chance_core(passer, shooter, shot_type, pnr_result, quick_shot)
     if quick_shot:
         return chance
-    chance = min(0.97, chance * ASSIST_CREDIT_SCALE)
+    chance = min(0.97, chance * ASSIST_CREDIT_SCALE * ASSIST_VOLUME_BOOST * receiver_assist_factor(shooter, shot_type))
     if passer.playmaking < 0.75:
         # below 0.75 a player only turns a few passes a game into assists: his credit tapers off the same way his direct looks do
         chance *= 0.35 + 0.65 * (playmaking_look_curve(passer.playmaking) / 0.55)
@@ -19201,13 +19244,14 @@ def simulate_possession(off: Team, dff: Team,
                 + 0.06 * shooter.shot_iq
                 + 0.04 * shooter.shot_tendency
                 + 0.62 * playmaking_look_curve(play_passer.playmaking if play_passer is not None else handler.playmaking)
+                + 0.10 * (0.8 * shooter.three_rating + 0.2 * shooter.shot_iq - 0.78)   # the teammate catching it: a better shooter turns more passes into clean looks
             )
             if play_context in ("floppy", "elevator", "handoff"):
                 immediate_chance += 0.10
             elif play_context in ("horns", "post_split"):
                 immediate_chance -= 0.08
             immediate_chance *= 0.72
-            immediate_chance = max(0.04, min(0.62, immediate_chance))
+            immediate_chance = max(0.04, min(0.74, immediate_chance * ASSIST_VOLUME_BOOST))
             if random.random() >= immediate_chance:
                 quick_shot_for_assist = False
     if (
