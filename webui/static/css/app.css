@@ -514,3 +514,36 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .court-team-head { border-radius: 12px 12px 0 0; }
 .court-scroll { overflow-x: auto; max-width: 100%; border-radius: 0 0 12px 12px; }
 .court-scroll table { min-width: 640px; }
+
+/* draft & trades: player tables, lineup panels */
+.draft-layout, .trade-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.trade-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pl-table .pos, .lineup-panel .pos { display: inline-block; min-width: 26px; text-align: center; color: var(--muted); font-size: 11px; font-weight: 800; }
+.pl-row { cursor: pointer; }
+.pl-row.open { background: rgba(245, 165, 36, .07); }
+.pl-expand td { padding: 0 !important; background: rgba(2, 6, 15, .45); }
+.pl-detail { padding: 12px 16px 16px; }
+.pl-meta { color: var(--text-2); font-size: 13px; margin-bottom: 8px; }
+.pl-table-wrap .table-wrap { max-height: 540px; }
+.lineup-panel { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: rgba(2, 6, 15, .35); margin-bottom: 14px; }
+.lineup-panel h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-2); }
+.lu-h { margin: 8px 0 4px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.lu-row { display: flex; align-items: center; gap: 10px; padding: 5px 4px; border-radius: 8px; }
+.lu-row.mine { background: rgba(245, 165, 36, .08); }
+.lu-row .lu-name { display: flex; flex-direction: column; flex: 1; min-width: 0; line-height: 1.2; }
+.trade-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); cursor: pointer; }
+@media (max-width: 1100px) { .draft-layout, .trade-layout { grid-template-columns: 1fr; } }
+
+/* trade offer popup */
+.tm-backdrop { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: rgba(2, 6, 15, .72); backdrop-filter: blur(6px); padding: 20px; }
+.tm-box { width: min(620px, 100%); border: 1px solid rgba(245, 165, 36, .45); border-radius: 18px; padding: 22px 24px; background: linear-gradient(180deg, #131c31, #0b1222); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
+.tm-box h2 { margin: 4px 0 6px; font-size: 22px; color: var(--accent-2); }
+.tm-kicker { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.tm-deal { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin: 14px 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(2, 6, 15, .45); }
+.tm-p { font-weight: 700; margin-top: 6px; }
+.tm-arrow { font-size: 22px; color: var(--accent-2); }
+.tm-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 6px; }
+
+/* draft & trades: full-width stacked panels so the player tables have room */
+#view-draft .feature-grid { grid-template-columns: 1fr; }
+#view-draft .draft-board { max-height: none; overflow: visible; }

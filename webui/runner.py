@@ -37,6 +37,19 @@ ALL_MODES = (
 JUMP_TARGETS = {"game": None, "end1": "end1", "half": "half", "end3": "end3", "last5": "last5", "last2": "last2"}
 
 
+def rating_summary(p) -> Dict:
+    """A player's ratings on the 0-100 scale the Tk draft board shows, for the draft pool, the roster panels and the trade lists."""
+    def g(k):
+        return round(float(getattr(p, k, 0) or 0) * 100)
+    return {
+        "name": p.name, "pos": p.position, "ovr": sim_engine.fantasy_ovr(p), "ht": getattr(p, "height", 0), "arch": getattr(p, "archetype", ""),
+        "badges": list(getattr(p, "badges", ()) or ()), "team": getattr(p, "source_team", ""),
+        "r": {"3PT": g("three_rating"), "MID": g("mid_rating"), "RIM": g("rim_rating"), "DUNK": g("dunk_rating"), "FT": g("ft_rating"),
+              "PLAY": g("playmaking"), "HANDLE": g("ball_handle"), "PERIM D": g("perimeter_def"), "INT D": g("interior_def"),
+              "STL": g("steal"), "BLK": g("block"), "OREB": g("oreb"), "DREB": g("dreb"), "USAGE": g("usage")},
+    }
+
+
 class WebOutputProxy(GuiOutputProxy):
     """The Tk app's output proxy, minus its 1 ms pause per write while a "sim to" jump is fast-forwarding."""
     def write(self, text):
@@ -81,6 +94,7 @@ class SimRunner:
         self.bracket = {}
         self.options: Dict = {}
         self.draft_prompt: Dict = {}
+        self.trade_prompt: Dict = {}
         self._draft_choice = None
         self._draft_event = threading.Event()
         self._live_signature = None
@@ -151,10 +165,61 @@ class SimRunner:
         threading.Thread(target=self._run, args=(mode, team_a, team_b, rules), daemon=True).start()
         return None
 
+    # ------------------------------------------------------------ trade offers
+    def _show_trade_prompt(self, kind: str, info: Dict):
+        """The engine paused the season for an AI trade offer (or the deadline) and is waiting: ask the user in the browser."""
+        prompt = {"kind": kind, **dict(info)}
+        if kind == "offer":
+            mine = {p.name: p for p in sim_engine.fantasy_trade_roster(sim_engine.FANTASY_TRADE_STATE["user_team"])}
+            prompt["send"] = [sim_engine.fantasy_trade_describe(mine[n]) for n in info.get("user_gives", []) if n in mine]
+            prompt["receive"] = list(info.get("detail", []))
+        self.trade_prompt = prompt
+        sim_engine.SIM_PAUSED = True
+        self.set_status("Trade offer: the season is paused until you answer." if kind == "offer" else "Trade deadline: the season is paused for your last trades.")
+        self.hub.publish({"type": "trade_prompt", "data": prompt})
+
+    def _clear_trade_prompt(self, resume: bool):
+        self.trade_prompt = {}
+        sim_engine.FANTASY_TRADE_STATE["offer"] = None
+        if resume:
+            sim_engine.SIM_PAUSED = False
+            self.set_status("Running")
+        self.hub.publish({"type": "trade_prompt", "data": {}})
+
+    def trade_respond(self, action: str) -> Dict:
+        prompt = self.trade_prompt
+        if not prompt:
+            return {"ok": False, "error": "There is no trade waiting for an answer."}
+        if prompt["kind"] == "deadline":
+            if action == "resume":
+                self._clear_trade_prompt(True)
+                return {"ok": True}
+            return {"ok": False, "error": "Resume the season when you are done trading."}
+        if action == "reject":
+            self._clear_trade_prompt(True)
+            return {"ok": True}
+        if action == "negotiate":
+            preset = {"team": prompt["ai_team"], "give": prompt["user_gives"], "get": prompt["ai_gives"]}
+            self._clear_trade_prompt(False)           # the season stays paused: press Resume when the negotiating is done
+            self.set_status("Paused: negotiating a trade. Press Resume when you are done.")
+            return {"ok": True, "preset": preset}
+        if action == "accept":
+            check = sim_engine.evaluate_fantasy_trade(prompt["ai_team"], prompt["user_gives"], prompt["ai_gives"], allow_counter=False)
+            if check["decision"] != "accept":
+                self._clear_trade_prompt(True)
+                return {"ok": False, "error": "That offer is no longer available (the rosters have changed). The season resumed."}
+            outcome = sim_engine.fantasy_trade_submit(prompt["ai_team"], prompt["user_gives"], prompt["ai_gives"])
+            if not outcome.get("ok"):
+                return {"ok": False, "error": outcome.get("error") or "The trade could not be completed."}
+            self._clear_trade_prompt(True)
+            return {"ok": True}
+        return {"ok": False, "error": "Unknown trade action."}
+
     def draft_state(self) -> Dict:
         state = dict(getattr(sim_engine, "FANTASY_DRAFT_STATE", {}) or {})
-        state.pop("rosters", None)
-        return {"active": bool(self.draft_prompt), "prompt": self.draft_prompt, "state": state}
+        rosters = state.pop("rosters", None) or {}
+        mine = [rating_summary(pl) for pl in list(rosters.get(state.get("user_team"), []))]
+        return {"active": bool(self.draft_prompt), "prompt": self.draft_prompt, "state": state, "roster": mine}
 
     def draft_choose(self, value) -> Optional[str]:
         if not self.draft_prompt:
@@ -183,8 +248,7 @@ class SimRunner:
         for index, player in enumerate(players):
             key = f"{index}:{getattr(player, 'fantasy_base_name', player.name)}"
             by_key[key] = player
-            rows.append({"key": key, "name": player.name, "pos": player.position,
-                         "ovr": sim_engine.fantasy_ovr(player), "team": getattr(player, "source_team", "")})
+            rows.append({**rating_summary(player), "key": key})
         value = self._wait_draft_choice({"kind": "player", "title": "You are on the clock", "players": rows})
         if value == "__auto__":
             return sim_engine.FANTASY_DRAFT_AUTO
@@ -263,6 +327,12 @@ class SimRunner:
         return True
 
     def _on_score(self, message: Dict):
+        if "trade_offer" in message:
+            self._show_trade_prompt("offer", message["trade_offer"])
+            return
+        if "trade_deadline" in message:
+            self._show_trade_prompt("deadline", message["trade_deadline"])
+            return
         if self._on_season_message(message):
             return
         if "period" in message and "clock" in message and "score_a" in message:

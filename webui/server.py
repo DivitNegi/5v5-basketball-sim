@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import sim_engine
 
 from .hub import EventHub
-from .runner import SimRunner
+from .runner import rating_summary, SimRunner
 from .live import team_identity
 from . import live
 from .stats import payload as stats_payload
@@ -567,7 +567,7 @@ def fantasy_payload():
     line = sim_engine.fantasy_lineup_defaults()
     usage = sim_engine.fantasy_usage_defaults()
     def roster(name):
-        return [{"name": p.name, "pos": p.position, "ovr": sim_engine.fantasy_ovr(p),
+        return [{**rating_summary(p),
                  "minutes": line["minutes"].get(p.name) if name == user else None,
                  "starter": p.name in line["starters"] if name == user else False,
                  "usage": usage.get(p.name, {}).get("usage") if name == user else None}
@@ -667,9 +667,11 @@ def build_app():
                 team = (params.get("team") or [""])[0]
                 if not sim_engine.fantasy_trade_available() or team not in (sim_engine.FANTASY_TRADE_STATE.get("factories") or {}):
                     return self._json({"players": []})
-                return self._json({"players": [{"name": p.name, "pos": p.position, "ovr": sim_engine.fantasy_ovr(p)} for p in sim_engine.fantasy_trade_roster(team)]})
+                return self._json({"players": [rating_summary(p) for p in sim_engine.fantasy_trade_roster(team)]})
             if path == "/api/draft":
                 return self._json(runner.draft_state())
+            if path == "/api/trade/prompt":
+                return self._json({"prompt": runner.trade_prompt})
             if path == "/api/replays":
                 return self._json(replay_payload())
             if path == "/api/broadcast":
@@ -766,6 +768,9 @@ def build_app():
                 error = coach_action(data)
                 runner._push_live(force=True)
                 return self._json({"ok": error is None, "error": error, "coach": coach_payload()}, 200 if error is None else 400)
+            if path == "/api/trade/respond":
+                result = runner.trade_respond(str(data.get("action", "")))
+                return self._json(result, 200 if result.get("ok") else 400)
             if path == "/api/draft":
                 error = runner.draft_choose(data.get("value"))
                 return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)

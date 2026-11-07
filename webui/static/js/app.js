@@ -550,6 +550,7 @@ function connect() {
     const st = await api.get("/api/state");
     applyStatus({ text: st.status, active: st.active, paused: st.paused, speed: st.speed });
     if (st.live) applyLive(st.live);
+    api.get("/api/trade/prompt").then((r) => showTradePrompt(r.prompt)).catch(() => {});
     if (st.flow?.length) { S.flow = st.flow; renderFlow("#flowMini", 170); }
   };
   es.onerror = () => { conn.className = "conn bad"; conn.lastElementChild.textContent = "Reconnecting…"; };
@@ -568,6 +569,7 @@ function connect() {
       case "season": SE.data = { ...(SE.data || {}), state: msg.season }; renderSeasonBar(msg.season); scheduleSeasonRefresh(); break;
       case "sections": scheduleSeasonRefresh(); scheduleStats(); break;
       case "draft": loadDraft(); break;
+      case "trade_prompt": showTradePrompt(msg.data); break;
       case "bracket": scheduleBracket(); break;
       case "finished": scheduleStats(); scheduleSeasonRefresh(); break;
     }
@@ -1137,25 +1139,97 @@ async function saveLineup(reset=false) {
   await api.post("/api/fantasy/lineup", { starters, positions, minutes, usage, rotation }); toast("Lineup saved.", "ok"); await loadLineup();
 }
 
-async function loadDraft() {
-  const d = await api.get("/api/draft"), root=$("#draftBoard");
-  if (!d.active) { root.replaceChildren(h("div", { class:"empty" }, d.state?.on_clock ? `${d.state.on_clock} are picking…` : "Start a draft to open the board.")); return; }
-  const p=d.prompt;
-  if (p.kind === "option") root.replaceChildren(h("h3",{},p.title), p.message?h("p",{class:"muted"},p.message):null, h("div",{class:"action-row"},p.options.map((x)=>h("button",{class:"btn",onclick:()=>chooseDraft(x)},x))));
-  else root.replaceChildren(h("div",{class:"panel-head"},h("h3",{},p.title),h("button",{class:"btn",onclick:()=>chooseDraft("__auto__")},"Auto-draft the rest")),
-    ...p.players.map((pl)=>h("div",{class:"draft-player"},h("span",{class:"pos"},pl.pos),h("div",{},h("b",{},pl.name),h("div",{class:"muted"},pl.team)),h("span",{class:"ovr"},pl.ovr),h("button",{class:"btn",onclick:()=>chooseDraft(pl.key)},"Draft"))));
+// ratings shown beside every player in the draft and trade screens (the Tk draft board's columns)
+const RATE_COLS = [["3PT", "3PT"], ["MID", "MID"], ["RIM", "RIM"], ["PLAY", "PLAY"], ["PERIM D", "PD"], ["INT D", "ID"]];
+const RATE_GROUPS = [["Scoring", ["3PT", "MID", "RIM", "DUNK", "FT"]], ["Playmaking", ["PLAY", "HANDLE", "USAGE"]], ["Defense", ["PERIM D", "INT D", "STL", "BLK"]], ["Rebounding", ["OREB", "DREB"]]];
+const fmtHt = (n) => (n ? `${Math.floor(n / 12)}'${n % 12}"` : "");
+function ratingDetail(p) {
+  return h("div", { class: "pl-detail" },
+    h("div", { class: "pl-meta" }, [fmtHt(p.ht), p.arch, p.team].filter(Boolean).join(" · "), (p.badges || []).length ? h("div", { class: "badges" }, p.badges.map((b) => h("span", { class: "badge" }, b.replace(/_/g, " ")))) : null),
+    h("div", { class: "rating-groups" }, RATE_GROUPS.map(([title, keys]) => h("div", {}, h("h3", {}, title), keys.map((k) => h("div", { class: "rbar" },
+      h("span", {}, k), h("div", { class: "track" }, h("div", { class: "fill", style: { width: `${p.r[k]}%`, background: ratingColor(p.r[k]) } })), h("span", { class: "val" }, p.r[k])))))));
 }
-async function chooseDraft(value) { try { await api.post("/api/draft",{value}); setTimeout(loadDraft,250); } catch(e) { toast(e.message,"err"); } }
+// one table of players: sortable columns, click a row for the full rating card. `action` adds a button/checkbox column.
+function playerTable(players, { id, action, sortKey = "ovr", extra = [] } = {}) {
+  const st = (playerTable.state[id] ||= { sort: sortKey, dir: -1, open: null, q: "" });
+  const val = (p, k) => (k === "ovr" ? p.ovr : k === "name" ? p.name : k === "pos" ? p.pos : k === "minutes" ? (p.minutes ?? -1) : (p.r?.[k] ?? 0));
+  let rows = players.filter((p) => !st.q || p.name.toLowerCase().includes(st.q));
+  rows = rows.sort((x, y) => (typeof val(x, st.sort) === "string" ? st.dir * -val(x, st.sort).localeCompare(val(y, st.sort)) : st.dir * (val(x, st.sort) - val(y, st.sort))));
+  const redraw = () => { const t = $("#" + id); if (t) t.replaceWith(playerTable(players, { id, action, sortKey, extra })); };
+  const th = (label, key, cls = "") => h("th", { class: `sortable ${cls} ${st.sort === key ? "sorted" : ""}`, onclick: () => { st.dir = st.sort === key ? -st.dir : (key === "name" || key === "pos" ? 1 : -1); st.sort = key; redraw(); } }, label, st.sort === key ? (st.dir < 0 ? " ▾" : " ▴") : "");
+  const body = [];
+  for (const p of rows) {
+    const open = st.open === p.name;
+    body.push(h("tr", { class: `pl-row ${open ? "open" : ""}`, onclick: (e) => { if (e.target.closest("button,input,label")) return; st.open = open ? null : p.name; redraw(); } },
+      h("td", {}, h("span", { class: "pos" }, p.pos)), h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("div", {}, h("div", { class: "pname" }, p.name), h("div", { class: "muted" }, p.team || "")))),
+      h("td", {}, h("b", { style: { color: ratingColor(p.ovr || 0) } }, p.ovr)), ...RATE_COLS.map(([k]) => h("td", { style: { color: ratingColor(p.r[k]) } }, p.r[k])),
+      ...extra.map(([, f]) => h("td", {}, f(p))), action ? h("td", {}, action(p)) : null));
+    if (open) body.push(h("tr", { class: "pl-expand" }, h("td", { colspan: 9 + extra.length }, ratingDetail(p))));
+  }
+  return h("div", { id, class: "pl-table-wrap" },
+    h("div", { class: "filters" }, h("input", { placeholder: "Search player…", value: st.q, oninput: (e) => { st.q = e.target.value.toLowerCase(); const pos = e.target.selectionStart; redraw(); const i = $(`#${id} input`); i.focus(); i.setSelectionRange(pos, pos); } }),
+      h("span", { class: "muted" }, `${rows.length} players · click a column to sort, click a player for the full ratings`)),
+    h("div", { class: "table-wrap" }, h("table", { class: "stats pl-table" }, h("thead", {}, h("tr", {}, th("POS", "pos"), th("Player", "name", "l"), th("OVR", "ovr"), ...RATE_COLS.map(([k, l]) => th(l, k)), ...extra.map(([l, , k]) => th(l, k || "ovr")), action ? h("th", {}, "") : null)), h("tbody", {}, body))));
+}
+playerTable.state = {};
+
+function lineupPanel(roster, title = "Your lineup") {
+  const starters = roster.filter((p) => p.starter), bench = roster.filter((p) => !p.starter);
+  const row = (p) => h("div", { class: "lu-row" }, h("span", { class: "pos" }, p.pos), faceEl(p.name), h("div", { class: "lu-name" }, h("b", {}, p.name), h("span", { class: "muted" }, p.minutes != null ? `${p.minutes} min` : (p.arch || ""))), h("b", { style: { color: ratingColor(p.ovr || 0) } }, p.ovr));
+  return h("div", { class: "lineup-panel" }, h("h3", {}, title), starters.length ? [h("div", { class: "muted lu-h" }, "Starters"), ...starters.map(row)] : null,
+    bench.length ? [h("div", { class: "muted lu-h" }, starters.length ? "Bench" : `Roster (${bench.length})`), ...bench.map(row)] : null,
+    !roster.length ? h("div", { class: "empty" }, "No players yet.") : null);
+}
+
+async function loadDraft() {
+  const d = await api.get("/api/draft"), root = $("#draftBoard");
+  const mine = d.roster || [];
+  const picks = d.state?.log ? d.state.log.slice(-10).reverse() : [];
+  const side = h("div", { class: "draft-side" }, lineupPanel(mine, `Your roster (${mine.length})`),
+    picks.length ? h("div", { class: "lineup-panel" }, h("h3", {}, "Recent picks"), picks.map((x) => h("div", { class: `lu-row ${x.user ? "mine" : ""}` }, h("span", { class: "pos" }, `#${x.overall}`), h("div", { class: "lu-name" }, h("b", {}, x.player), h("span", { class: "muted" }, `${x.team.replace(/^\d{4} /, "")} · ${x.pos}`)), h("b", {}, x.ovr)))) : null);
+  if (!d.active) { root.replaceChildren(h("div", { class: "draft-layout" }, h("div", {}, h("div", { class: "empty" }, d.state?.on_clock ? `${d.state.on_clock} are picking…` : "Start a draft to open the board.")), mine.length ? side : null)); return; }
+  const p = d.prompt;
+  if (p.kind === "option") { root.replaceChildren(h("div", { class: "draft-layout" }, h("div", {}, h("h3", {}, p.title), p.message ? h("p", { class: "muted" }, p.message) : null, h("div", { class: "action-row" }, p.options.map((x) => h("button", { class: "btn", onclick: () => chooseDraft(x) }, x)))), side)); return; }
+  const st = d.state || {};
+  root.replaceChildren(h("div", { class: "draft-layout" }, h("div", {},
+    h("div", { class: "panel-head" }, h("h3", {}, `${p.title}${st.round ? ` · round ${st.round} of ${st.rounds}, pick ${st.pick_in_round}` : ""}`), h("button", { class: "btn", onclick: () => chooseDraft("__auto__") }, "Auto-draft the rest")),
+    playerTable(p.players, { id: "draftPool", action: (pl) => h("button", { class: "btn", onclick: () => chooseDraft(pl.key) }, "Draft") })), side));
+}
+async function chooseDraft(value) { try { await api.post("/api/draft", { value }); setTimeout(loadDraft, 250); } catch (e) { toast(e.message, "err"); } }
 
 async function loadTrades() {
-  const d=await api.get("/api/fantasy"), root=$("#tradeBody");
-  if (!d.active) { root.replaceChildren(h("div",{class:"empty"},d.message)); return; }
-  const teams=d.teams.filter((x)=>x!==d.userTeam), sel=h("select",{id:"tradeTeam",onchange:loadTradeOpponent},teams.map((x)=>h("option",{value:x},x)));
-  const mine=h("div",{class:"trade-list",id:"tradeMine"},d.userRoster.map((p)=>h("label",{class:"trade-player"},h("input",{type:"checkbox",value:p.name}),`${p.name} · ${p.pos} · ${p.ovr}`)));
-  root.replaceChildren(h("p",{},h("b",{},d.userTeam),` · deadline ${d.deadlinePassed?"passed":`game ${d.deadline}`}`),sel,h("div",{class:"trade-rosters"},mine,h("div",{class:"trade-list",id:"tradeTheirs"})),h("div",{class:"action-row"},h("button",{class:"btn primary",onclick:findTrades},"Find offers")),h("div",{id:"tradeOffers"})); await loadTradeOpponent();
+  const d = await api.get("/api/fantasy"), root = $("#tradeBody");
+  if (!d.active) { root.replaceChildren(h("div", { class: "empty" }, d.message)); return; }
+  window.__tradeTeams = d.teams.filter((x) => x !== d.userTeam);
+  const sel = h("select", { id: "tradeTeam", onchange: loadTradeOpponent }, window.__tradeTeams.map((x) => h("option", { value: x }, x)));
+  const give = new Set();
+  const tick = (set) => (p) => h("label", { class: "trade-pick" }, h("input", { type: "checkbox", value: p.name, checked: set.has(p.name), onchange: (e) => (e.target.checked ? set.add(p.name) : set.delete(p.name)) }), "Trade");
+  window.__tradeGive = give; window.__tradeGet = new Set();
+  root.replaceChildren(h("p", {}, h("b", {}, d.userTeam), ` · deadline ${d.deadlinePassed ? "passed" : `game ${d.deadline}`}`),
+    h("div", { class: "trade-layout" }, h("div", {}, h("h3", {}, "Your players"), playerTable(d.userRoster, { id: "tradeMineTbl", extra: [["MIN", (p) => (p.minutes ?? ""), "minutes"]], action: tick(give) })),
+      h("div", {}, h("div", { class: "filters" }, h("h3", { style: { margin: 0 } }, "Trade with"), sel), h("div", { id: "tradeTheirs" }))),
+    h("div", { class: "action-row" }, h("button", { class: "btn primary", onclick: findTrades }, "Find offers")), h("div", { id: "tradeOffers" }),
+    h("div", { class: "trade-layout" }, lineupPanel(d.userRoster, "Your current lineup")));
+  const pre = window.__tradePreset; window.__tradePreset = null;
+  if (pre) {
+    sel.value = pre.team; (pre.give || []).forEach((n) => give.add(n)); window.__tradeGet = new Set(pre.get || []);
+    root.prepend(h("div", { class: "lineup-panel" }, h("h3", {}, "Negotiating"), h("div", {}, `${pre.team} offered ${(pre.get || []).join(", ")} for ${(pre.give || []).join(", ")}. Change it, press Find offers, then Resume the season (Pause button) when you are done.`)));
+    $("#tradeMineTbl")?.replaceWith(playerTable(d.userRoster, { id: "tradeMineTbl", extra: [["MIN", (p) => (p.minutes ?? ""), "minutes"]], action: tick(give) }));
+  }
+  await loadTradeOpponent();
 }
-async function loadTradeOpponent(){ const el=$("#tradeTeam"); if(!el)return; const d=await api.get(`/api/fantasy/roster?team=${encodeURIComponent(el.value)}`); $("#tradeTheirs").replaceChildren(...d.players.map((p)=>h("label",{class:"trade-player"},h("input",{type:"checkbox",value:p.name}),`${p.name} · ${p.pos} · ${p.ovr}`))); }
-async function findTrades(){ const userGives=$$("#tradeMine input:checked").map((x)=>x.value); if(!userGives.length){toast("Choose at least one of your players.");return;} const d=await api.post("/api/fantasy/trade",{action:"find",userGives}); $("#tradeOffers").replaceChildren(...(d.offers.length?d.offers.map((o)=>h("div",{class:"replay-row"},h("b",{},o.ai_team),h("span",{},`${o.user_gives.join(", ")} ⇄ ${o.ai_gives.join(", ")}`),h("button",{class:"btn",onclick:async()=>{await api.post("/api/fantasy/trade",{action:"submit",team:o.ai_team,userGives:o.user_gives,aiGives:o.ai_gives});loadTrades();}},"Accept"))):[h("div",{class:"empty"},"No acceptable offers found.")])); }
+async function loadTradeOpponent() {
+  const el = $("#tradeTeam"); if (!el) return;
+  const d = await api.get(`/api/fantasy/roster?team=${encodeURIComponent(el.value)}`);
+  $("#tradeTheirs").replaceChildren(playerTable(d.players, { id: "tradeTheirsTbl" }));
+}
+async function findTrades() {
+  const userGives = [...(window.__tradeGive || [])];
+  if (!userGives.length) { toast("Choose at least one of your players."); return; }
+  const d = await api.post("/api/fantasy/trade", { action: "find", userGives });
+  $("#tradeOffers").replaceChildren(...(d.offers.length ? d.offers.map((o) => h("div", { class: "replay-row" }, h("b", {}, o.ai_team), h("span", {}, `${o.user_gives.join(", ")} ⇄ ${o.ai_gives.join(", ")}`),
+    h("button", { class: "btn", onclick: async () => { await api.post("/api/fantasy/trade", { action: "submit", team: o.ai_team, userGives: o.user_gives, aiGives: o.ai_gives }); loadTrades(); } }, "Accept"))) : [h("div", { class: "empty" }, "No acceptable offers found.")]));
+}
 
 const customSelected=new Set();
 function renderCustomTeams(){ const root=$("#customTeams"); root.replaceChildren(...S.meta.teams.map((t)=>h("label",{class:"team-check"},h("input",{type:"checkbox",checked:customSelected.has(t.name),onchange:(e)=>{e.target.checked?customSelected.add(t.name):customSelected.delete(t.name);$("#customCount").textContent=`${customSelected.size} teams selected`;}}),logoEl(t),h("span",{},t.name)))); $("#customCount").textContent=`${customSelected.size} teams selected`; }
@@ -1201,6 +1275,30 @@ function renderStats() {
     root.replaceChildren(rows.length ? h("table",{class:"stats"},h("thead",{},h("tr",{},statsData.columns.map((label,i)=>h("th",{},h("button",{class:"stat-sort",onclick:()=>{statsSort={column:i,direction:statsSort.column===i?-statsSort.direction:1};renderStats();}},label+(c===i?(statsSort.direction===1?" ↑":" ↓"):"")))))),h("tbody",{},rows.map(row=>h("tr",{},row.map(value=>h("td",{},value??"—")))))) : h("div",{class:"empty"},"No stats for this selection yet. Start a game or choose another source."));
   }
   root.scrollLeft=left;root.scrollTop=top;
+}
+
+// ───────────────────────── trade offers (the season pauses until you answer) ─────────────────────────
+function showTradePrompt(pr) {
+  document.getElementById("tradeModal")?.remove();
+  if (!pr || !pr.kind) return;
+  const respond = async (action) => {
+    try {
+      const r = await api.post("/api/trade/respond", { action });
+      document.getElementById("tradeModal")?.remove();
+      if (action === "negotiate" && r.preset) { window.__tradePreset = r.preset; $('#nav [data-view=draft]').click(); }
+    } catch (e) { toast(e.message, "err"); }
+  };
+  const box = pr.kind === "deadline"
+    ? h("div", { class: "tm-box" }, h("h2", {}, "Trade deadline"), h("p", { class: "muted" }, `Game ${pr.completed} of ${pr.total}. The season is paused for your last trades: after you resume, nothing can be traded this year.`),
+        h("div", { class: "tm-actions" }, h("button", { class: "btn", onclick: () => { document.getElementById("tradeModal")?.remove(); window.__tradeWait = true; $('#nav [data-view=draft]').click(); } }, "Open the trade window"),
+          h("button", { class: "btn primary", onclick: () => respond("resume") }, "Finish: resume the season")))
+    : h("div", { class: "tm-box" }, h("div", { class: "tm-kicker" }, "Trade offer · the season is paused"), h("h2", {}, `${pr.ai_team} want ${(pr.user_gives || [])[0] || "a player"}`), h("p", { class: "muted" }, pr.pitch || ""),
+        h("div", { class: "tm-deal" }, h("div", {}, h("div", { class: "muted" }, "You send"), (pr.send || pr.user_gives || []).map((x) => h("div", { class: "tm-p" }, x))),
+          h("div", { class: "tm-arrow" }, "⇄"), h("div", {}, h("div", { class: "muted" }, "You receive"), (pr.receive || pr.ai_gives || []).map((x) => h("div", { class: "tm-p" }, x)))),
+        h("p", { class: "muted" }, `Effect on your top-ten rotation value: ${pr.user_change >= 0 ? "+" : ""}${(100 * (pr.user_change || 0)).toFixed(1)}%`),
+        h("div", { class: "tm-actions" }, h("button", { class: "btn primary", onclick: () => respond("accept") }, "Accept"), h("button", { class: "btn", onclick: () => respond("negotiate") }, "Negotiate"), h("button", { class: "btn", onclick: () => respond("reject") }, "Reject")),
+        h("p", { class: "muted", style: { fontSize: "12px" } }, "Negotiate opens the trade screen with this deal filled in; the season stays paused until you press Resume."));
+  document.body.append(h("div", { id: "tradeModal", class: "tm-backdrop" }, box));
 }
 
 // ───────────────────────── boot ─────────────────────────
