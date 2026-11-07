@@ -262,7 +262,9 @@ class SimRunner:
         finally:
             self._push_live(force=True)
             try:
-                self.sections = sim_engine.split_gui_series_sections("".join(proxy.full_output))
+                merged = dict(self.sections or {})
+                merged.update(sim_engine.split_gui_series_sections("".join(proxy.full_output)))
+                self.sections = merged
             except Exception:
                 self.sections = {}
             sys.stdout, builtins.input = original_stdout, original_input

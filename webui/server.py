@@ -138,6 +138,92 @@ def players_payload(runner):
     return {"players": out}
 
 
+def teams_payload(runner):
+    sec = runner.sections or {}
+    out = []
+    for name, t in (sec.get("_season_team_totals") or {}).items():
+        g = max(1, t.get("games", 0))
+        ident = team_identity(name)
+        poss = t["fga"] + 0.44 * t["fta"] - t["oreb"] + t["tov"]
+        opp_poss = t.get("opp_fga", 0) + 0.44 * t.get("opp_fta", 0) - t.get("opp_oreb", 0) + t.get("opp_tov", 0)
+        ortg = 100 * t["pts"] / poss if poss else 0
+        drtg = 100 * t.get("opp_pts", 0) / opp_poss if opp_poss else 0
+        out.append({
+            "team": name, "short": ident["short"], "logo": ident["logo"], "color": ident["color"], "initials": ident["initials"],
+            "w": t.get("wins", 0), "l": t.get("games", 0) - t.get("wins", 0),
+            "pts": _num(t["pts"] / g), "opp": _num(t.get("opp_pts", 0) / g), "diff": _num((t["pts"] - t.get("opp_pts", 0)) / g),
+            "ortg": _num(ortg), "drtg": _num(drtg), "net": _num(ortg - drtg), "pace": _num(0.5 * (poss + opp_poss) / g),
+            "fgp": _num(100 * t["fgm"] / t["fga"]) if t["fga"] else None, "tpp": _num(100 * t["tpm"] / t["tpa"]) if t["tpa"] else None,
+            "ftp": _num(100 * t["ftm"] / t["fta"]) if t["fta"] else None,
+            "efg": _num(100 * (t["fgm"] + 0.5 * t["tpm"]) / t["fga"]) if t["fga"] else None,
+            "ts": _num(100 * t["pts"] / (2 * (t["fga"] + 0.44 * t["fta"]))) if t["fga"] else None,
+            "reb": _num(t["reb"] / g), "ast": _num(t["ast"] / g), "stl": _num(t["stl"] / g), "blk": _num(t["blk"] / g), "tov": _num(t["tov"] / g),
+            "oppfg": _num(100 * t.get("opp_fgm", 0) / t["opp_fga"]) if t.get("opp_fga") else None,
+            "opp3": _num(100 * t.get("opp_tpm", 0) / t["opp_tpa"]) if t.get("opp_tpa") else None,
+        })
+    return {"teams": out}
+
+
+def advanced_payload(runner):
+    sec = runner.sections or {}
+    totals = sec.get("_season_player_totals") or {}
+    teams = sec.get("_season_team_totals") or {}
+    out = []
+    for team, players in totals.items():
+        tt = teams.get(team) or {}
+        ident = team_identity(team)
+        team_min = tt.get("games", 0) * 240.0
+        tposs = tt.get("fga", 0) + 0.44 * tt.get("fta", 0) + tt.get("tov", 0)
+        for name, st in players.items():
+            mins = st.get("minutes", 0) / 60.0
+            if mins < 100:
+                continue
+            fga, fta, tov = st.get("fga", 0), st.get("fta", 0), st.get("tov", 0)
+            tsa = fga + 0.44 * fta
+            usg = 100 * (tsa + tov) * (team_min / 5.0) / (mins * tposs) if mins and tposs else None
+            out.append({
+                "name": name, "team": team, "short": ident["short"], "logo": ident["logo"], "gp": st.get("games", 0), "mpg": _num(mins / max(1, st.get("games", 1))),
+                "ts": _num(100 * st.get("pts", 0) / (2 * tsa)) if tsa else None,
+                "efg": _num(100 * (st.get("fgm", 0) + 0.5 * st.get("tpm", 0)) / fga) if fga else None,
+                "usg": _num(usg), "astto": _num(st.get("ast", 0) / max(1, tov), 2),
+                "p36": _num(36 * st.get("pts", 0) / mins), "r36": _num(36 * st.get("reb", 0) / mins), "a36": _num(36 * st.get("ast", 0) / mins),
+                "s36": _num(36 * (st.get("stl", 0) + st.get("blk", 0)) / mins),
+                "ftr": _num(fta / fga, 2) if fga else None, "tpar": _num(st.get("tpa", 0) / fga, 2) if fga else None,
+                "pm": _num(st.get("plus_minus", 0) / max(1, st.get("games", 1))),
+            })
+    return {"players": out}
+
+
+def schedule_payload(runner, team):
+    sec = runner.sections or {}
+    rows = []
+    for g in sec.get("_season_games") or []:
+        if team and team not in (g.get("home"), g.get("away")):
+            continue
+        home = g.get("home") == team if team else True
+        hs, as_ = g.get("home_score"), g.get("away_score")
+        if team:
+            mine, theirs = (hs, as_) if home else (as_, hs)
+            rows.append({"n": len(rows) + 1, "gid": g.get("gid"), "home": home, "opp": g["away"] if home else g["home"], "mine": mine, "theirs": theirs, "win": mine is not None and mine > theirs})
+        else:
+            rows.append({"n": g.get("order"), "gid": g.get("gid"), "home": g["home"], "away": g["away"], "hs": hs, "as": as_})
+    return {"games": rows}
+
+
+def highs_payload(runner):
+    sec = runner.sections or {}
+    fields = sec.get("_season_game_log_fields") or []
+    log = sec.get("_season_game_log") or []
+    idx = {f: i for i, f in enumerate(fields)}
+    cats = {"pts": "Points", "reb": "Rebounds", "ast": "Assists", "stl": "Steals", "blk": "Blocks", "tpm": "Threes made"}
+    out = {}
+    for key, label in cats.items():
+        top = sorted(log, key=lambda r: r[idx[key]], reverse=True)[:10]
+        out[key] = {"label": label, "rows": [{"player": r[idx["player"]], "team": r[idx["team"]], "opp": r[idx["opp"]], "value": r[idx[key]],
+                                               "line": f"{r[idx['pts']]} pts, {r[idx['reb']]} reb, {r[idx['ast']]} ast", "result": r[idx["result"]]} for r in top]}
+    return out
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -198,6 +284,14 @@ def build_app():
                 return self._json(runner.bracket or {})
             if path == "/api/season":
                 return self._json(season_payload(runner))
+            if path == "/api/season/teams":
+                return self._json(teams_payload(runner))
+            if path == "/api/season/advanced":
+                return self._json(advanced_payload(runner))
+            if path == "/api/season/highs":
+                return self._json(highs_payload(runner))
+            if path == "/api/season/schedule":
+                return self._json(schedule_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/season/players":
                 return self._json(players_payload(runner))
             if path == "/api/sections":

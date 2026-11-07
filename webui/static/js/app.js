@@ -496,6 +496,10 @@ async function refreshSeason() {
     renderSeasonBar();
     if ($("#view-season").classList.contains("active")) {
       if (SE.tab === "players") SE.players = (await api.get("/api/season/players")).players;
+      if (SE.tab === "advanced") SE.adv = (await api.get("/api/season/advanced")).players;
+      if (SE.tab === "teams") SE.teams = (await api.get("/api/season/teams")).teams;
+      if (SE.tab === "highs") SE.highs = await api.get("/api/season/highs");
+      if (SE.tab === "schedule" && SE.team) SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
       renderSeasonBody();
     }
   } finally { SE.loading = false; }
@@ -569,8 +573,57 @@ function renderPlayers() {
     h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head), h("tbody", {}, body))));
 }
 
+
+const TCOLS = [["w", "W"], ["l", "L"], ["pts", "PTS"], ["opp", "OPP"], ["diff", "DIFF"], ["ortg", "ORtg"], ["drtg", "DRtg"], ["net", "NET"], ["pace", "PACE"], ["efg", "eFG%"], ["ts", "TS%"], ["tpp", "3P%"], ["reb", "REB"], ["ast", "AST"], ["tov", "TO"], ["oppfg", "OPP FG%"], ["opp3", "OPP 3P%"]];
+const ACOLS = [["gp", "GP"], ["mpg", "MPG"], ["ts", "TS%"], ["efg", "eFG%"], ["usg", "USG%"], ["astto", "AST/TO"], ["p36", "PTS/36"], ["r36", "REB/36"], ["a36", "AST/36"], ["s36", "STK/36"], ["tpar", "3PAr"], ["ftr", "FTr"], ["pm", "+/-"]];
+
+function simpleTable(head, rows) {
+  return h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head), h("tbody", {}, rows)));
+}
+function renderTeamsTab() {
+  const rows = SE.teams || [];
+  if (!rows.length) return h("div", { class: "empty" }, "Team stats appear once games are played.");
+  const key = SE.tsort || "net";
+  const lowIsGood = ["opp", "drtg", "tov", "oppfg", "opp3"].includes(key);
+  const sorted = [...rows].sort((a, b) => lowIsGood ? (a[key] ?? 999) - (b[key] ?? 999) : (b[key] ?? -999) - (a[key] ?? -999));
+  const head = h("tr", {}, h("th", { class: "l" }, "Team"), ...TCOLS.map(([k, l]) => h("th", { class: `sortable ${key === k ? "sorted" : ""}`, onclick: () => { SE.tsort = k; renderSeasonBody(); } }, l)));
+  return simpleTable(head, sorted.map((t) => h("tr", {}, h("td", { class: "l" }, teamCell(t)), ...TCOLS.map(([k]) => h("td", { class: k === "net" ? "pts" : "" }, t[k] == null ? "–" : (k === "diff" || k === "net") && t[k] > 0 ? `+${t[k]}` : t[k])))));
+}
+function renderAdvancedTab() {
+  const all = SE.adv || [];
+  if (!all.length) return h("div", { class: "empty" }, "Advanced stats appear once games are played.");
+  const key = SE.asort || "ts";
+  const minGp = Math.max(1, Math.floor(Math.max(...all.map((p) => p.gp)) * 0.4));
+  const q = (SE.afilter || "").toLowerCase();
+  const rows = all.filter((p) => p.gp >= minGp && p.mpg >= 15 && (!q || p.name.toLowerCase().includes(q))).sort((a, b) => (b[key] ?? -999) - (a[key] ?? -999)).slice(0, 120);
+  const input = h("input", { placeholder: "Search player…", value: SE.afilter || "", oninput: (e) => { SE.afilter = e.target.value; const pos = e.target.selectionStart; renderSeasonBody(); const i = $("#seasonBody input"); i.focus(); i.setSelectionRange(pos, pos); } });
+  const head = h("tr", {}, h("th", { class: "l" }, "Player"), ...ACOLS.map(([k, l]) => h("th", { class: `sortable ${key === k ? "sorted" : ""}`, onclick: () => { SE.asort = k; renderSeasonBody(); } }, l)));
+  return h("div", {}, h("div", { class: "filters" }, input, h("span", { class: "muted", style: { alignSelf: "center" } }, `${minGp}+ games, 15+ mpg`)),
+    simpleTable(head, rows.map((p) => h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name), h("span", { class: "muted" }, p.short))), ...ACOLS.map(([k]) => h("td", {}, p[k] == null ? "–" : p[k]))))));
+}
+function renderScheduleTab() {
+  const teams = (S.meta?.teams || []).map((t) => t.name).filter((n) => (SE.data?.standings || []).some((r) => r.team === n));
+  const sel = h("select", { onchange: (e) => { SE.team = e.target.value; loadSchedule(); } }, h("option", { value: "" }, "Pick a team"), teams.map((n) => h("option", { value: n, selected: n === SE.team }, n)));
+  const g = SE.sched || [];
+  const w = g.filter((x) => x.win).length;
+  const list = SE.team ? simpleTable(h("tr", {}, ...["#", "", "Opponent", "Result", "Score"].map((x, i) => h("th", { class: i === 2 ? "l" : "" }, x))),
+    g.map((x) => h("tr", {}, h("td", {}, x.n), h("td", {}, x.home ? "vs" : "@"), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(x.opp)), identOf(x.opp).short)), h("td", { class: x.win ? "pm-pos" : "pm-neg" }, x.mine == null ? "–" : x.win ? "W" : "L"), h("td", {}, x.mine == null ? "" : `${x.mine}-${x.theirs}`)))) : h("div", { class: "empty" }, "Choose a team to see its schedule and results.");
+  return h("div", {}, h("div", { class: "filters" }, sel, SE.team ? h("span", { class: "muted", style: { alignSelf: "center" } }, `${w}-${g.length - w} so far`) : null), list);
+}
+async function loadSchedule() {
+  if (!SE.team) { renderSeasonBody(); return; }
+  SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
+  renderSeasonBody();
+}
+function renderHighsTab() {
+  const hs = SE.highs;
+  if (!hs) return h("div", { class: "empty" }, "Single-game highs appear once games are played.");
+  return h("div", { class: "race-grid" }, Object.values(hs).map((c) => h("div", { class: "race" }, h("h3", {}, c.label),
+    c.rows.map((r, i) => h("div", { class: "race-row" }, h("span", { class: "rk" }, i + 1), h("div", {}, h("div", { class: "who" }, `${r.value} · ${r.player}`, " ", h("span", { class: "muted" }, `${identOf(r.team).short} vs ${identOf(r.opp).short}`)), h("div", { class: "st" }, `${r.line} · ${r.result}`)))))));
+}
+
 function renderSeasonBody() {
-  const view = SE.tab === "standings" ? renderStandings() : SE.tab === "races" ? renderRaces() : renderPlayers();
+  const view = { standings: renderStandings, races: renderRaces, players: renderPlayers, advanced: renderAdvancedTab, teams: renderTeamsTab, schedule: renderScheduleTab, highs: renderHighsTab }[SE.tab]();
   $("#seasonBody").replaceChildren(view);
 }
 
