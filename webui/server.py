@@ -52,6 +52,51 @@ def _fetch(url: str, path: str, timeout: int = 10):
     os.replace(path + ".part", path)
 
 
+_espn_idx = None
+
+
+def _norm_name(name: str) -> str:
+    s = re.sub(r"[^a-z ]", "", name.lower().replace(".", "").replace("'", ""))
+    return " ".join(w for w in s.split() if w not in ("jr", "sr", "ii", "iii", "iv"))
+
+
+def _espn_index():
+    """name -> headshot URL for every player on a current ESPN NBA roster (fetched once, kept on disk)."""
+    global _espn_idx
+    with _headshot_lock:
+        if _espn_idx is not None:
+            return _espn_idx
+    import urllib.request
+    path = os.path.join(HEADSHOT_DIR, "espn_index.json")
+    idx = {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            idx = json.load(fh)
+    except Exception:
+        pass
+    if not idx:
+        def get(u):
+            req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.load(resp)
+        try:
+            base = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams"
+            for t in get(base)["sports"][0]["leagues"][0]["teams"]:
+                for a in get(f"{base}/{t['team']['id']}/roster").get("athletes", []):
+                    href = (a.get("headshot") or {}).get("href")
+                    if href and a.get("fullName"):
+                        idx[_norm_name(a["fullName"])] = href
+            if idx:
+                os.makedirs(HEADSHOT_DIR, exist_ok=True)
+                with open(path, "w", encoding="utf-8") as fh:
+                    json.dump(idx, fh)
+        except Exception:
+            pass
+    with _headshot_lock:
+        _espn_idx = idx
+    return idx
+
+
 def _headshot_sources(name: str):
     """Where the Tk app looks for a player's picture, in its order: a direct URL, the NBA.com id, then an ESPN search."""
     import media_ids
@@ -76,11 +121,8 @@ def _download_headshot(name: str):
     import urllib.request
     try:
         for path, url in _headshot_sources(name):
-            if url is None:   # ESPN search
-                search = f"https://site.api.espn.com/apis/common/v3/search?query={urllib.parse.quote(name)}&limit=8"
-                req = urllib.request.Request(search, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    url = _find_espn_image(json.load(resp))
+            if url is None:   # ESPN roster index (their search endpoint no longer returns players)
+                url = _espn_index().get(_norm_name(name))
                 if not url:
                     continue
             try:
