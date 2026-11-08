@@ -787,14 +787,25 @@ function renderAdvancedTab() {
   renderStatsInto(box, SE.advStats);
   return box;
 }
+async function openScheduleBox(gid) {
+  const d = await api.get(`/api/season/box?gid=${encodeURIComponent(gid)}`);
+  if (d.error) { toast(d.error, "err"); return; }
+  SE.sbox = d; renderSeasonBody();
+}
 function renderScheduleTab() {
+  if (SE.sbox) {
+    const b = SE.sbox;
+    return h("div", {}, h("div", { class: "filters" }, h("button", { class: "btn", onclick: () => { SE.sbox = null; renderSeasonBody(); } }, "‹ Back to schedule"),
+      h("b", {}, b.teams.map((t) => `${t.short} ${t.score}`).join("  –  ")), h("span", { class: "muted" }, `(team game ${b.game})`),
+      b.order != null ? h("button", { class: "btn", onclick: () => startSpecial("Replay season game", { order: b.order }) }, "Replay this game") : null), fullBox(b));
+  }
   const teams = (S.meta?.teams || []).map((t) => t.name).filter((n) => (SE.data?.standings || []).some((r) => r.team === n));
-  const sel = h("select", { onchange: (e) => { SE.team = e.target.value; loadSchedule(); } }, h("option", { value: "" }, "Pick a team"), teams.map((n) => h("option", { value: n, selected: n === SE.team }, n)));
+  const sel = h("select", { onchange: (e) => { SE.team = e.target.value; loadSchedule(); } }, h("option", { value: "" }, "Pick a team"), teams.map((n) => h("option", { value: n, selected: n === SE.team }, shortTeam(n))));
   const g = SE.sched || [];
   const w = g.filter((x) => x.win).length;
   const list = SE.team ? simpleTable(h("tr", {}, ...["#", "", "Opponent", "Result", "Score"].map((x, i) => h("th", { class: i === 2 ? "l" : "" }, x))),
-    g.map((x) => h("tr", {}, h("td", {}, x.n), h("td", {}, x.home ? "vs" : "@"), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(x.opp)), identOf(x.opp).short)), h("td", { class: x.win ? "pm-pos" : "pm-neg" }, x.mine == null ? "–" : x.win ? "W" : "L"), h("td", {}, x.mine == null ? "" : `${x.mine}-${x.theirs}`)))) : h("div", { class: "empty" }, "Choose a team to see its schedule and results.");
-  return h("div", {}, h("div", { class: "filters" }, sel, SE.team ? h("span", { class: "muted", style: { alignSelf: "center" } }, `${w}-${g.length - w} so far`) : null), list);
+    g.map((x) => h("tr", { class: x.mine != null && x.gid != null ? "pl-row" : "", onclick: () => { if (x.mine != null && x.gid != null) openScheduleBox(x.gid); } }, h("td", {}, x.n), h("td", {}, x.home ? "vs" : "@"), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(x.opp)), shortTeam(x.opp))), h("td", { class: x.win ? "pm-pos" : "pm-neg" }, x.mine == null ? "–" : x.win ? "W" : "L"), h("td", {}, x.mine == null ? "" : `${x.mine}-${x.theirs}`)))) : h("div", { class: "empty" }, "Choose a team to see its schedule and results.");
+  return h("div", {}, h("div", { class: "filters" }, sel, SE.team ? h("span", { class: "muted" }, `${w}-${g.length - w} so far · click a game for its box score`) : null), list);
 }
 async function loadSchedule() {
   if (!SE.team) { renderSeasonBody(); return; }
@@ -849,7 +860,7 @@ function renderHighsTab() {
   const set = (k) => (e) => { HV[k] = e.target.value; loadHighs(); };
   const sel = (label, value, opts) => h("label", { class: "fsel" }, h("span", { class: "muted" }, label), h("select", { onchange: set(label === "View" ? "view" : label === "Stat" ? "stat" : "team") }, opts.map((o) => h("option", { value: o.v ?? o, selected: (o.v ?? o) === value }, o.t ?? o))));
   const filters = h("div", { class: "filters" }, sel("View", HV.view, hs.views), HV.view !== hs.views[0] ? sel("Stat", HV.stat, hs.stats) : null,
-    sel("Team", HV.team, [{ v: "All Teams", t: "All Teams" }, ...hs.teams.map((t) => ({ v: t, t: identOf(t).short }))]), h("span", { class: "muted" }, "click a row for the box score"));
+    sel("Team", HV.team, [{ v: "All Teams", t: "All Teams" }, ...hs.teams.map((t) => ({ v: t, t: identOf(t).short }))]), h("span", { class: "muted" }, "click a row for the box score" + (hs.note ? ` · ${hs.note}` : (HV.view === hs.views[0] ? " · FG% needs 20+ attempts, 3P% needs 10+" : ""))));
   const cols = ["Record", "Player", "Team", "Opponent", "Gm", "Result", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "PF", "FG", "3P", "FT", "+/-"];
   const rows = hs.rows.map((r) => h("tr", { class: "pl-row", onclick: () => openGameBox(r.gid, r.player, r.team) },
     h("td", { class: "l" }, h("b", { style: { color: "var(--accent-2)" } }, r.label)), h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(r.player), h("span", { class: "pname" }, r.player))),
@@ -1281,6 +1292,8 @@ function renderCoach(d) {
     h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(m.target), h("span", { class: "pname" }, m.target), h("span", { class: "muted" }, `${m.pos}${m.onFloor ? "" : " · bench"}`))),
     h("td", {}, h("select", { onchange: (e) => coachDo({ action: "matchup", target: m.target, defender: e.target.value }) }, defenders.map((o) => h("option", { value: o.value, selected: o.value === m.defender }, o.value === "" && m.auto ? `Coach auto (${m.auto})` : o.label)))),
     h("td", {}, h("select", { onchange: (e) => coachDo({ action: "matchup", target: m.target, coverage: e.target.value }) }, d.coverageOptions.map((o) => h("option", { value: o.value, selected: o.value === m.coverage }, o.label))))));
+  $("#coachLines").replaceChildren((t.lineups || []).length ? h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", {}, "+/-"), h("th", {}, "MIN"), h("th", {}, "PF"), h("th", {}, "PA"), h("th", { class: "l" }, "Lineup"))),
+    h("tbody", {}, t.lineups.map((l) => h("tr", {}, h("td", { class: l.pm > 0 ? "pm-pos" : l.pm < 0 ? "pm-neg" : "" }, l.pm > 0 ? `+${l.pm}` : l.pm), h("td", {}, l.min), h("td", {}, l.pf), h("td", {}, l.pa), h("td", { class: "l" }, l.players.join(" / ")))))) : h("div", { class: "empty" }, "Lineup plus-minus appears once the game gets going."));
   $("#coachMatch").replaceChildren(rows.length ? h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Opposing player"), h("th", {}, "Primary defender"), h("th", {}, "Coverage"))), h("tbody", {}, rows)) : h("div", { class: "empty" }, "Matchups appear once the game starts."));
 }
 

@@ -419,7 +419,10 @@ def schedule_payload(runner, team):
 
 
 HIGHS_STATS = {"PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk", "3PM": "tpm", "3PA": "tpa",
-               "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta", "STK": "stk", "TOV": "tov", "MIN": "min", "+/-": "pm"}
+               "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta", "STK": "stk", "TOV": "tov", "MIN": "min", "+/-": "pm",
+               "FG%": "fgp", "3P%": "tpp"}
+# percentage highs only count games with enough attempts: 20+ field-goal attempts, 10+ three-point attempts
+HIGHS_PCT_MINIMUM = {"fgp": ("fgm", "fga", 20), "tpp": ("tpm", "tpa", 10)}
 HIGHS_VIEWS = ("Season highs (every stat)", "Top games for stat", "Each player's best game")
 
 
@@ -438,7 +441,22 @@ def highs_payload(runner, view=HIGHS_VIEWS[0], stat="PTS", team="All Teams"):
         return out
 
     def stat_of(r, field):
+        if field in HIGHS_PCT_MINIMUM:
+            made, att, need = HIGHS_PCT_MINIMUM[field]
+            a = r[idx[att]]
+            return round(100.0 * r[idx[made]] / a, 1) if a >= need else None
         return r[idx["stl"]] + r[idx["blk"]] if field == "stk" else r[idx[field]]
+
+    def qualifies(r, field):
+        return field not in HIGHS_PCT_MINIMUM or stat_of(r, field) is not None
+
+    def shown(r, field):
+        """The record's value as text; percentages also show the shooting line behind them."""
+        v = stat_of(r, field)
+        if field in HIGHS_PCT_MINIMUM:
+            made, att, _ = HIGHS_PCT_MINIMUM[field]
+            return f"{v}% ({r[idx[made]]}/{r[idx[att]]})"
+        return round(v, 1) if isinstance(v, float) else v
 
     def tie(r):
         return (r[idx["pts"]], r[idx["reb"]] + r[idx["ast"]], r[idx["min"]])
@@ -455,23 +473,26 @@ def highs_payload(runner, view=HIGHS_VIEWS[0], stat="PTS", team="All Teams"):
     field = HIGHS_STATS.get(stat, "pts")
     if view == HIGHS_VIEWS[0]:
         for label, f in HIGHS_STATS.items():
-            best = max(rows, key=lambda r: (stat_of(r, f),) + tie(r))
-            v = stat_of(best, f)
-            out["rows"].append(line(f"{label}: {round(v, 1) if isinstance(v, float) else v}", best))
+            pool = [r for r in rows if qualifies(r, f)]
+            if not pool:
+                continue
+            best = max(pool, key=lambda r: (stat_of(r, f),) + tie(r))
+            out["rows"].append(line(f"{label}: {shown(best, f)}", best))
         return out
+    pool = [r for r in rows if qualifies(r, field)]
     if view == HIGHS_VIEWS[1]:
-        ranked = sorted(rows, key=lambda r: (stat_of(r, field),) + tie(r), reverse=True)[:60]
+        ranked = sorted(pool, key=lambda r: (stat_of(r, field),) + tie(r), reverse=True)[:60]
     else:
         best_by = {}
-        for r in rows:
+        for r in pool:
             key = (r[idx["team"]], r[idx["player"]])
             cur = best_by.get(key)
             if cur is None or (stat_of(r, field),) + tie(r) > (stat_of(cur, field),) + tie(cur):
                 best_by[key] = r
         ranked = sorted(best_by.values(), key=lambda r: (stat_of(r, field),) + tie(r), reverse=True)[:150]
     for rank, r in enumerate(ranked, start=1):
-        v = stat_of(r, field)
-        out["rows"].append(line(f"{rank}. {stat} {round(v, 1) if isinstance(v, float) else v}", r))
+        out["rows"].append(line(f"{rank}. {stat} {shown(r, field)}", r))
+    out["note"] = {"FG%": "Minimum 20 field-goal attempts in the game.", "3P%": "Minimum 10 three-point attempts in the game."}.get(stat) if view != HIGHS_VIEWS[0] else None
     return out
 
 
@@ -599,6 +620,12 @@ def _coach_player(player):
             "out": bool(getattr(player, "fouled_out", False))}
 
 
+def _coach_lineups(team):
+    """Tk's Lineups tab: this game's five-man units by plus-minus."""
+    rows = sorted((getattr(team, "lineup_plus_minus", {}) or {}).items(), key=lambda kv: (kv[1].get("plus_minus", 0), kv[1].get("minutes", 0)), reverse=True)[:8]
+    return [{"pm": r.get("plus_minus", 0), "min": round(r.get("minutes", 0) / 60.0, 1), "pf": r.get("pts_for", 0), "pa": r.get("pts_against", 0), "players": list(key)} for key, r in rows]
+
+
 def coach_payload():
     teams = [sim_engine.SIM_CONTEXT.get("teamA"), sim_engine.SIM_CONTEXT.get("teamB")]
     rows = []
@@ -610,6 +637,7 @@ def coach_payload():
                      "focus": getattr(team, "defensive_focus", None), "timeoutOpen": bool(getattr(team, "coach_timeout_open", False)),
                      "offenseSet": sim_engine.OFFENSIVE_SET_OVERRIDES.get(team.name, "auto"), "defenseSet": sim_engine.DEFENSIVE_SCHEME_OVERRIDES.get(team.name, "auto"),
                      "matchups": _coach_matchups(team, next((o for o in teams if o is not None and o is not team), None)),
+                     "lineups": _coach_lineups(team),
                      "floor": [_coach_player(p) for p in team.on_floor], "bench": [_coach_player(p) for p in team.bench],
                      "queued": [{"out": out_name, "in": in_name} for out_name, in_name in list(getattr(team, "manual_substitution", []) or [])]})
     return {"active": bool(rows), "teams": rows,
