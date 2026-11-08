@@ -120,6 +120,8 @@ def team_block(team) -> Dict:
 
 
 def live_snapshot() -> Optional[Dict]:
+    if getattr(sim_engine, "SILENT_SIM_DEPTH", 0) > 0:
+        return None   # a quiet season / All-Star game is not a live game
     ctx = sim_engine.SIM_CONTEXT
     team_a, team_b = ctx.get("teamA"), ctx.get("teamB")
     if team_a is None or team_b is None:
@@ -151,6 +153,8 @@ def zones(diet: Optional[Dict]) -> Dict:
 
 
 def _teams():
+    if getattr(sim_engine, "SILENT_SIM_DEPTH", 0) > 0:
+        return (None, None)
     ctx = sim_engine.SIM_CONTEXT
     a, b = ctx.get("teamA"), ctx.get("teamB")
     return (a, b) if a is not None and b is not None else (None, None)

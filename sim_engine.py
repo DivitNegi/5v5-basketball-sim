@@ -25080,13 +25080,19 @@ def build_season_replay_teams(order) -> Tuple[Team, Team]:
     return build_season_game_teams(season_replay_maker(name_a, order), season_replay_maker(name_b, order), seed)
 
 
+# How many silent (season / All-Star) games are being simulated right now. A live view must not show one of them as the game.
+SILENT_SIM_DEPTH = 0
+
+
 def simulate_silent_season_game(factory_a, factory_b, seed=None) -> Tuple[Team, Team]:
     import builtins
     import contextlib
     import io
 
     global SLEEP, SIM_FAST_FORWARD, SIM_JUMP_TARGET, SIM_PAUSED, SIM_SLEEP_SCALE
-    global GUI_SERIES_UPDATE_QUEUE, GUI_SCOREBOARD_QUEUE
+    global GUI_SERIES_UPDATE_QUEUE, GUI_SCOREBOARD_QUEUE, SILENT_SIM_DEPTH
+    SILENT_SIM_DEPTH += 1
+    saved_context = dict(SIM_CONTEXT)   # simulate_game overwrites the "current game"; put it back afterwards
 
     team_a, team_b = build_season_game_teams(factory_a, factory_b, seed)
 
@@ -25125,6 +25131,9 @@ def simulate_silent_season_game(factory_a, factory_b, seed=None) -> Tuple[Team, 
         builtins.input = original_input
         builtins.print = original_print
         time.sleep = original_time_sleep
+        SIM_CONTEXT.clear()
+        SIM_CONTEXT.update(saved_context)
+        SILENT_SIM_DEPTH = max(0, SILENT_SIM_DEPTH - 1)
 
     return team_a, team_b
 
