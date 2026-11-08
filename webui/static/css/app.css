@@ -600,3 +600,6 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .preset-h small { color: var(--muted); letter-spacing: 0; text-transform: none; margin-left: 8px; font-weight: 500; }
 
 .yr { font-size: 11px; font-weight: 800; color: var(--accent-2); background: rgba(245, 165, 36, .12); padding: 1px 6px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+
+/* play-by-play: shorter box, no smooth-scroll lag */
+.rawlog { height: 420px; scroll-behavior: auto; overflow-anchor: none; }

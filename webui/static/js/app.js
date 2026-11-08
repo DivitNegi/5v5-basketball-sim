@@ -300,7 +300,10 @@ function nameRegex() {
 function rawLine(line) {
   const root = $("#rawlog");
   root.querySelector(".empty")?.remove();
-  const follow = root.scrollHeight - root.scrollTop - root.clientHeight < 60;
+  if (!root.dataset.watch) {   // follow the newest line until the user scrolls up; following resumes when they scroll back to the bottom
+    root.dataset.watch = "1"; root._stick = true;
+    root.addEventListener("scroll", () => { root._stick = root.scrollHeight - root.scrollTop - root.clientHeight < 48; }, { passive: true });
+  }
   const t = line.trim();
   let el;
   const sm = t.match(SCORE_RE);
@@ -330,7 +333,10 @@ function rawLine(line) {
   }
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
-  if (follow) root.scrollTop = root.scrollHeight;
+  if (root._stick) {   // reading scrollHeight forces layout, so even a tall score bar is fully in view
+    root.scrollTop = root.scrollHeight;
+    if (!root._pinning) { root._pinning = true; setTimeout(() => { root._pinning = false; if (root._stick) root.scrollTop = root.scrollHeight; }, 60); }
+  }
 }
 
 function addFeedLine(line) {
@@ -535,7 +541,7 @@ function resetGame(msg) {
   });
   feed.block = null; feed.lines = []; feed.last = [0, 0];
   $("#feed").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
-  $("#rawlog").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
+  $("#rawlog").replaceChildren(h("div", { class: "empty" }, "Tipping off…")); $("#rawlog")._stick = true;
   rawState.last = [0, 0];
   $("#sbSeries").textContent = "";
   $("#sbPeriod").textContent = "1ST"; $("#sbClock").textContent = S.rules === "FIBA" ? "10:00" : "12:00";
