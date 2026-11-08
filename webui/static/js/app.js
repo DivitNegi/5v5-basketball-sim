@@ -617,7 +617,7 @@ function renderSeasonBar(state) {
 }
 
 function teamCell(r) {
-  return h("div", { class: "tcell" }, logoEl({ logo: r.logo, color: r.color, initials: r.initials }), h("span", { class: "pname" }, r.short));
+  return h("div", { class: "tcell" }, logoEl({ logo: r.logo, color: r.color, initials: r.initials }), r.year ? h("span", { class: "yr" }, r.year) : null, h("span", { class: "pname" }, r.short));
 }
 
 function standingsTable(title, rows) {
@@ -644,7 +644,7 @@ function statChips(text) {
     return m ? h("div", { class: "chip" }, h("b", {}, m[1]), h("span", {}, m[2])) : h("div", { class: "chip wide" }, h("span", {}, s));
   }));
 }
-const shortTeam = (t) => (t || "").replace(/^\d{4} /, "");
+const shortTeam = (t) => t || "";   // award / race lines keep the year: "2021 Brooklyn Nets"
 function raceCard(title, list) {
   return h("div", { class: "race-card" }, h("h3", {}, title),
     list.map((r, i) => {
@@ -1440,7 +1440,7 @@ function renderStatsInto(root, data, opts = {}) {
     items.forEach((x) => { (by.get(x.r[0]) || by.set(x.r[0], []).get(x.r[0])).push(x); });
     for (const [team, list] of by) {
       const id = identOf(team);
-      body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${list.length} players`)))));
+      body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "yr" }, id.year || ""), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${list.length} players`)))));
       list.sort((a, b) => numOf(b.r[defaultCol]) - numOf(a.r[defaultCol])).forEach((x) => body.push(rowEl(x, null)));
     }
   }
@@ -1485,18 +1485,24 @@ async function boot() {
   const modeSel = $("#mode");
   // the year seasons live on the Modes screen as buttons now, so the dropdown stays short
   const YEAR_SEASON = /^(\d{4}) season/;
-  for (const m of S.meta.modes) { if (YEAR_SEASON.test(m.name)) continue; modeSel.append(h("option", { value: m.name, disabled: !m.ready }, m.ready ? m.name : `${m.name} (Tk app for now)`)); }
+  for (const m of S.meta.modes) { if (YEAR_SEASON.test(m.name) || m.name === "Custom 16-team playoffs") continue; modeSel.append(h("option", { value: m.name, disabled: !m.ready }, m.ready ? m.name : `${m.name} (Tk app for now)`)); }
   $("#seasonPresets").replaceChildren(...S.meta.modes.filter((m) => YEAR_SEASON.test(m.name) && m.ready).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
     const year = m.name.match(YEAR_SEASON)[1];
     return h("button", { class: "btn primary", onclick: () => startSpecial(m.name) }, `${year} season`);
   }));
-  const pickStrongest = async (n) => {
+  const pickTeams = async (kind) => {
     const d = await api.get("/api/teams/strength");
-    customSelected.clear(); d.teams.slice(0, n).forEach((t) => customSelected.add(t.name)); renderCustomTeams();
-    toast(`Selected the ${n} strongest teams. Press ${n === 30 ? "Run 30-team season" : "Run 16-team playoffs"} to play them.`, "ok");
+    let chosen;
+    if (kind === "franchise") {   // the single best team-year of each franchise
+      const seen = new Map();
+      d.teams.forEach((t) => { if (!seen.has(t.franchise)) seen.set(t.franchise, t.name); });
+      chosen = [...seen.values()].slice(0, 30);
+    } else chosen = d.teams.slice(0, 30).map((t) => t.name);
+    customSelected.clear(); chosen.forEach((n) => customSelected.add(n)); renderCustomTeams();
+    toast(`${chosen.length} teams selected${kind === "franchise" ? " (the best team of each franchise)" : " (the 30 strongest)"}. Press Run 30-team season to play them.`, "ok");
   };
-  $("#strong30").addEventListener("click", () => pickStrongest(30).catch((e) => toast(e.message, "err")));
-  $("#strong16").addEventListener("click", () => pickStrongest(16).catch((e) => toast(e.message, "err")));
+  $("#strong30").addEventListener("click", () => pickTeams("top").catch((e) => toast(e.message, "err")));
+  $("#bestPerFranchise").addEventListener("click", () => pickTeams("franchise").catch((e) => toast(e.message, "err")));
   const syncMode = () => {
     S.mode = modeSel.value;
     const seasonal = isSeasonMode(S.mode);
@@ -1556,7 +1562,6 @@ async function boot() {
   $("#tradeRefresh").addEventListener("click",loadTrades);
   $("#select2027").addEventListener("click",()=>{customSelected.clear();S.meta.teams.filter((t)=>t.year==='2027').slice(0,30).forEach((t)=>customSelected.add(t.name));renderCustomTeams();});
   $("#clearCustom").addEventListener("click",()=>{customSelected.clear();renderCustomTeams();});
-  $("#customPlayoffs").addEventListener("click",()=>startSpecial("Custom 16-team playoffs",{teams:[...customSelected]}));
   $("#customSeason").addEventListener("click",()=>startSpecial("Custom season (82 games)",{teams:[...customSelected]}));
   $("#olympics").addEventListener("click",()=>startSpecial("Olympic tournament"));
   $("#oneTeamA").addEventListener("change",()=>fillOnePlayers("A")); $("#oneTeamB").addEventListener("change",()=>fillOnePlayers("B"));

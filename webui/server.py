@@ -769,7 +769,7 @@ def strength_payload(runner):
             except Exception:
                 continue
     ranked = sorted(_STRENGTH_CACHE.items(), key=lambda kv: kv[1], reverse=True)
-    return {"teams": [{"name": n, "strength": round(v, 2)} for n, v in ranked]}
+    return {"teams": [{"name": n, "strength": round(v, 2), "franchise": ("okc" if "supersonics" in n.lower() else team_identity(n)["logo"])} for n, v in ranked]}
 
 
 def build_app():
