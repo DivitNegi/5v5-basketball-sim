@@ -287,6 +287,16 @@ function newBlock() {
 // "X will guard Y" opening-matchup lines are left out of the play-by-play
 const GUARD_RE = /\bwill guard\b|^\s*When .+ are on offense:\s*$/;
 const rawState = { last: [0, 0], namesKey: "", re: null };
+// glide to the newest line; repeated calls just re-aim the same glide
+function pinBottom(root) {
+  root._stick = true; root._auto = true;
+  clearTimeout(root._autoT);
+  root.scrollTo({ top: root.scrollHeight, behavior: "smooth" });
+  root._autoT = setTimeout(() => {
+    if (root._auto) root.scrollTo({ top: root.scrollHeight, behavior: "instant" });   // the glide did not finish (busy or background tab): land exactly on the newest line
+    root._auto = false; root._stick = root.scrollHeight - root.scrollTop - root.clientHeight < 48; if (root._stick) { root._behind = 0; } syncLatestButton();
+  }, 450);
+}
 // the "Jump to latest" button: visible only while you are scrolled up, with how many new plays you are missing
 function syncLatestButton() {
   const root = $("#rawlog"), btn = $("#pbpLatest");
@@ -310,8 +320,16 @@ function rawLine(line) {
   root.querySelector(".empty")?.remove();
   if (!root.dataset.watch) {   // follow the newest line until the user scrolls up; following resumes when they scroll back to the bottom
     root.dataset.watch = "1"; root._stick = true;
-    root.addEventListener("scroll", () => { root._stick = root.scrollHeight - root.scrollTop - root.clientHeight < 48; if (root._stick) root._behind = 0; syncLatestButton(); }, { passive: true });
-    $("#pbpLatest").addEventListener("click", () => { root._stick = true; root._behind = 0; root.scrollTop = root.scrollHeight; syncLatestButton(); });
+    // our own smooth scrolling must not look like the user scrolling away: only user input (wheel, touch, keys, scrollbar drag) can unpin
+    const userScrolling = () => { root._auto = false; clearTimeout(root._autoT); };
+    ["wheel", "touchstart", "keydown", "pointerdown"].forEach((ev) => root.addEventListener(ev, userScrolling, { passive: true }));
+    root.addEventListener("scroll", () => {
+      if (root._auto) return;
+      root._stick = root.scrollHeight - root.scrollTop - root.clientHeight < 48;
+      if (root._stick) root._behind = 0;
+      syncLatestButton();
+    }, { passive: true });
+    $("#pbpLatest").addEventListener("click", () => { root._behind = 0; pinBottom(root); syncLatestButton(); });
   }
   const t = line.trim();
   let el;
@@ -343,10 +361,7 @@ function rawLine(line) {
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
   if (!root._stick && el.className !== "pbp-sys") { root._behind = (root._behind || 0) + 1; syncLatestButton(); }
-  if (root._stick) {   // reading scrollHeight forces layout, so even a tall score bar is fully in view
-    root.scrollTop = root.scrollHeight;
-    if (!root._pinning) { root._pinning = true; setTimeout(() => { root._pinning = false; if (root._stick) root.scrollTop = root.scrollHeight; }, 60); }
-  }
+  if (root._stick) pinBottom(root);
 }
 
 function addFeedLine(line) {

@@ -606,3 +606,15 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 
 .btn.latest { background: rgba(245, 165, 36, .16); border-color: rgba(245, 165, 36, .55); color: var(--accent-2); font-weight: 700; padding: 6px 12px; font-size: 12.5px; }
 .feed-panel .panel-head { flex-wrap: wrap; gap: 8px; }
+
+/* play-by-play: smooth scrolling again; the score bar is exactly one play line (same width and height) so every line scrolls the same amount */
+.rawlog { scroll-behavior: smooth; }
+.rawlog .pbp-score { display: flex; align-items: center; justify-content: flex-start; flex-wrap: nowrap; gap: 10px; margin: 0; padding: 5px 12px 5px 16px; border-radius: 8px;
+  font-size: 13.5px; line-height: 1.5; white-space: nowrap; overflow: hidden; min-height: 0; box-sizing: border-box; }
+.rawlog .pbp-clock { padding: 0 8px; font-size: 10.5px; line-height: 1.6; flex: none; }
+.rawlog .sb-side { gap: 6px; min-width: 0; flex: 0 1 auto; }
+.rawlog .sb-name { overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.rawlog .sb-side b { font-size: 13.5px; }
+.rawlog .sb-dash { flex: none; }
+
+.rawlog .pbp-score { height: 30px; }
