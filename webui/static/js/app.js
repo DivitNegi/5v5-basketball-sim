@@ -665,10 +665,15 @@ function renderRaces() {
   }
   const groups = {};
   (SE.data?.awards || []).forEach((a) => { (groups[a.award] ||= []).push(a); });
-  const cards = Object.entries(groups).map(([name, list]) => h("div", { class: "award-card" }, h("div", { class: "a" }, name),
+  // rookie awards sit above the All-Star entries
+  const order = (name) => (/all-star/i.test(name) ? 2 : /rookie|roy/i.test(name) ? 1 : 0);
+  const cleanName = (n) => String(n || "").replace(/^\d+\.\s*/, "").replace(/\s*\([A-Z]{1,2}\)\s*$/, "").trim();   // "1. LeBron James (G)" -> "LeBron James"
+  const cards = Object.entries(groups).sort((x, y) => order(x[0]) - order(y[0])).map(([name, list]) => h("div", { class: "award-card" }, h("div", { class: "a" }, name),
     list.map((a) => {
       const id = identOf(a.team);
-      return h("div", { class: "award-item", style: { "--c": id.color || "#64748b" } }, h("div", { class: "rtop" }, faceEl(a.player), h("div", {}, h("div", { class: "p" }, a.player), h("div", { class: "tm" }, logoEl(id), shortTeam(a.team)))), statChips(a.stats));
+      const nm = cleanName(a.player);
+      const isPlayer = !/\bwin\b/i.test(nm);
+      return h("div", { class: "award-item", style: { "--c": id.color || "#64748b" } }, h("div", { class: "rtop" }, isPlayer ? faceEl(nm) : null, h("div", {}, h("div", { class: "p" }, a.player), h("div", { class: "tm" }, logoEl(id), shortTeam(a.team)))), statChips(a.stats));
     })));
   return cards.length ? h("div", {}, h("div", { class: "muted", style: { marginBottom: "10px" } }, "Final season awards"), h("div", { class: "award-grid" }, cards)) : h("div", { class: "empty" }, "Awards are given out when the regular season ends.");
 }

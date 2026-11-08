@@ -485,6 +485,8 @@ class SimRunner:
 
     # --------------------------------------------------------- live updates
     def _push_live(self, force: bool = False):   # force: called on an event (score, substitution), not by the timer
+        if self.mode in SEASON_LIKE:
+            return   # a regular season is simulated quietly: its games (and the All-Star game) are not a live game to show
         try:
             snap = live_snapshot()
         except Exception:
