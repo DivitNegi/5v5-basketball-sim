@@ -154,7 +154,7 @@ class SimRunner:
             self.active = True
         self.mode = mode
         self.options = options
-        keep = mode == "2027 play-in & playoffs"
+        keep = mode in ("2027 play-in & playoffs", "Replay season game")   # a replay must leave the finished season as it was
         self.score, self.series, self.flow, self.last_live = None, None, [], None
         if not keep:
             self.sections = {}
@@ -458,9 +458,10 @@ class SimRunner:
         finally:
             self._push_live(force=True)
             try:
-                merged = dict(self.sections or {})
-                merged.update(sim_engine.split_gui_series_sections("".join(proxy.full_output)))
-                self.sections = merged
+                if mode != "Replay season game":   # the replayed game's own tables must not replace the season's
+                    merged = dict(self.sections or {})
+                    merged.update(sim_engine.split_gui_series_sections("".join(proxy.full_output)))
+                    self.sections = merged
             except Exception:
                 self.sections = {}
             sys.stdout, builtins.input = original_stdout, original_input

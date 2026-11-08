@@ -873,7 +873,7 @@ def build_app():
             if path == "/api/game/quarters":
                 return self._json(live.quarters_payload())
             if path == "/api/game/card":
-                return self._json(live.player_payload((params.get("team") or [""])[0], (params.get("name") or [""])[0]))
+                return self._json(live.player_payload((params.get("team") or [""])[0], (params.get("name") or [""])[0], (params.get("quarter") or [None])[0]))
             if path == "/api/game/players":
                 return self._json(live.players_for_card())
             if path == "/api/compare":

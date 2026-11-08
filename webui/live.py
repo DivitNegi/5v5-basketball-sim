@@ -217,7 +217,34 @@ def quarters_payload() -> Dict:
     return {"teams": out, "period": period}
 
 
-def player_payload(team_name: str, name: str) -> Dict:
+def _quarter_periods(quarter):
+    """'1'..'4' -> {n}; 'OT' -> every overtime period (5 and up); None/'all' -> None."""
+    if not quarter or quarter == "all":
+        return None
+    if quarter == "OT":
+        return {p for p in range(5, 12)}
+    try:
+        return {int(quarter)}
+    except ValueError:
+        return None
+
+
+def _quarter_line(team_name: str, name: str, periods):
+    """The player's box line for just those periods (summed), from the same quarter data the Quarters tab shows."""
+    entry = next((t for t in quarters_payload().get("teams", []) if t["name"] == team_name), None)
+    if entry is None:
+        return None
+    total = {}
+    seen = False
+    for key, per in (entry.get("periods") or {}).items():
+        if int(key) in periods and name in per.get("players", {}):
+            seen = True
+            for k, v in per["players"][name].items():
+                total[k] = total.get(k, 0) + (v or 0)
+    return total if seen else {}
+
+
+def player_payload(team_name: str, name: str, quarter=None) -> Dict:
     a, b = _teams()
     team = next((t for t in (a, b) if t is not None and t.name == team_name), None)
     if team is None:
@@ -231,10 +258,30 @@ def player_payload(team_name: str, name: str) -> Dict:
     line["ts"] = round(100 * p.pts / (2 * (fga + 0.44 * fta)), 1) if (fga + fta) else None
     line["dreb"] = getattr(p, "dreb_stat", 0)
     ident = team_identity(team.name)
+    shots, scope = zones(getattr(p, "shot_diet", {})), "game"
+    periods = _quarter_periods(quarter)
+    if periods:
+        q = _quarter_line(team.name, name, periods) or {}
+        mins = q.get("minutes", 0)
+        line.update({"min": round(mins / 60.0, 1), "pts": q.get("pts", 0), "reb": q.get("reb", 0), "oreb": q.get("oreb", 0), "dreb": q.get("dreb", 0),
+                     "ast": q.get("ast", 0), "stl": q.get("stl", 0), "blk": q.get("blk", 0), "tov": q.get("tov", 0), "pf": q.get("pf", 0),
+                     "fgm": q.get("fgm", 0), "fga": q.get("fga", 0), "tpm": q.get("tpm", 0), "tpa": q.get("tpa", 0), "ftm": q.get("ftm", 0), "fta": q.get("fta", 0),
+                     "pm": q.get("plus_minus", 0)})
+        line["fgp"], line["tpp"], line["ftp"] = _pct(line["fgm"], line["fga"]), _pct(line["tpm"], line["tpa"]), _pct(line["ftm"], line["fta"])
+        denom = 2 * (line["fga"] + 0.44 * line["fta"])
+        line["ts"] = round(100 * line["pts"] / denom, 1) if denom else None
+        qd = getattr(p, "quarter_shot_diet", {}) or {}
+        merged = {}
+        for n in periods:
+            for d in (qd.get(n), qd.get(str(n))):
+                for k, v in (d or {}).items():
+                    merged[k] = merged.get(k, 0) + v
+        shots, scope = zones(merged), "quarter"
     return {
+        "scope": scope, "quarter": quarter if periods else None,
         "team": ident, "opp": team_identity(opp.name) if opp else None, "score": [team.score, opp.score if opp else 0],
         "player": line, "archetype": getattr(p, "archetype", ""), "badges": list(getattr(p, "badges", ()) or ()),
-        "shots": zones(getattr(p, "shot_diet", {})), "defended": zones(getattr(p, "defended_diet", {})),
+        "shots": shots, "defended": zones(getattr(p, "defended_diet", {})),
         "period": sim_engine.SIM_CONTEXT.get("period"), "clock": sim_engine.SIM_CONTEXT.get("period_time"),
     }
 
