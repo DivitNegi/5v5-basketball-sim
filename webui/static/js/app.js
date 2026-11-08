@@ -1128,18 +1128,48 @@ async function loadCoach() {
   $("#coachTeams").replaceChildren(...d.teams.map((t, i) => h("button", { class: i === CO.team ? "on" : "", onclick: () => { CO.team = i; CO.out = null; renderCoach(d); } }, t.team.short)));
   renderCoach(d);
 }
+async function coachDo(body) {
+  try { await api.post("/api/coach", { team: CO.team, ...body }); await loadCoach(); }
+  catch (err) { toast(err.message, "err"); }
+}
 function renderCoach(d) {
   const t = d.teams[CO.team]; if (!t) return;
+  const opp = d.teams[1 - CO.team];
   const queued = new Map(t.queued.map((x) => [x.out, x.in]));
-  $("#coachStatus").textContent = `${t.timeouts} timeouts · ${t.offense.replaceAll("_", " ")} offense · ${t.defense.replaceAll("_", " ")} defense${t.focus ? ` · help toward ${t.focus}` : ""}`;
-  const card = (p, floor) => h("button", { class: `coach-card ${floor && CO.out === p.name ? "on" : ""}`, onclick: async () => {
-    if (floor) { CO.out = p.name; renderCoach(d); return; }
-    if (!CO.out) { toast("Select the player going out first."); return; }
-    try { await api.post("/api/coach", { action: "sub", team: CO.team, out: CO.out, in: p.name }); CO.out = null; await loadCoach(); }
-    catch (err) { toast(err.message, "err"); }
-  } }, faceEl(p.name), h("span", { class: "nm" }, p.name), h("span", { class: "line" }, `${p.pos} · ${p.min} min · ${p.pts} pts · ${p.pf} PF${queued.get(p.name) ? ` · OUT → ${queued.get(p.name)}` : ""}`));
+  $("#coachStatus").textContent = `${t.timeouts} timeouts${t.timeoutOpen ? " · timeout open" : ""} · ${t.offense.replaceAll("_", " ")} offense · ${t.defense.replaceAll("_", " ")} defense${t.focus ? ` · help toward ${t.focus}` : ""}`;
+  // schemes, picked directly (they used to only cycle)
+  const sel = (label, options, value, onchange) => h("label", { class: "fsel" }, h("span", { class: "muted" }, label), h("select", { onchange: (e) => onchange(e.target.value) }, options.map((o) => h("option", { value: o.value, selected: o.value === value }, o.label))));
+  const focusOpts = [{ value: "", label: "No extra help" }, ...(opp?.floor || []).concat(opp?.bench || []).map((p) => ({ value: p.name, label: p.name }))];
+  $("#coachPlan").replaceChildren(
+    sel("Offense", d.offenseOptions, t.offenseSet, (v) => coachDo({ action: "setoffense", value: v })),
+    sel("Defense", d.defenseOptions, t.defenseSet, (v) => coachDo({ action: "setdefense", value: v })),
+    sel("Help toward", focusOpts, t.focus || "", (v) => coachDo({ action: "setfocus", value: v })));
+  // players: click-to-sub or drag a bench player onto a floor player (or the other way round)
+  const subNow = (out, inn) => coachDo({ action: "sub", out, in: inn });
+  const card = (p, floor) => {
+    const c = h("button", { class: `coach-card ${floor && CO.out === p.name ? "on" : ""} ${p.out ? "fouled" : ""}`, draggable: "true",
+      onclick: async () => {
+        if (floor) { CO.out = CO.out === p.name ? null : p.name; renderCoach(d); return; }
+        if (!CO.out) { toast("Select the player going out first."); return; }
+        const out = CO.out; CO.out = null; subNow(out, p.name);
+      },
+      ondragstart: (e) => { e.dataTransfer.setData("text/plain", JSON.stringify({ name: p.name, floor })); e.dataTransfer.effectAllowed = "move"; },
+      ondragover: (e) => { e.preventDefault(); c.classList.add("drop"); }, ondragleave: () => c.classList.remove("drop"),
+      ondrop: (e) => { e.preventDefault(); c.classList.remove("drop"); try { const src = JSON.parse(e.dataTransfer.getData("text/plain")); if (src.floor === floor || src.name === p.name) return; floor ? subNow(p.name, src.name) : subNow(src.name, p.name); } catch (_) {} } },
+      faceEl(p.name), h("span", { class: "nm" }, p.name),
+      h("span", { class: "line" }, `${p.pos} · ${p.min} min · ${p.pts} pts · ${p.pf} PF${p.stint ? ` · stint ${p.stint}` : ""}${queued.get(p.name) ? ` · OUT → ${queued.get(p.name)}` : ""}`),
+      p.energy != null ? h("span", { class: "energy", title: `Energy ${p.energy}%` }, h("i", { style: { width: `${Math.max(4, Math.min(100, (p.energy - 85) / 15 * 100))}%`, background: p.energy >= 98 ? "var(--green)" : p.energy >= 93 ? "var(--accent)" : "var(--red)" } })) : null);
+    return c;
+  };
   $("#coachFloor").replaceChildren(...t.floor.map((p) => card(p, true)));
   $("#coachBench").replaceChildren(...t.bench.map((p) => card(p, false)));
+  // matchups: who guards whom and the coverage
+  const defenders = [{ value: "", label: "Coach auto" }, ...t.floor.concat(t.bench).map((p) => ({ value: p.name, label: p.name }))];
+  const rows = (t.matchups || []).map((m) => h("tr", { class: m.onFloor ? "" : "bench" },
+    h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(m.target), h("span", { class: "pname" }, m.target), h("span", { class: "muted" }, `${m.pos}${m.onFloor ? "" : " · bench"}`))),
+    h("td", {}, h("select", { onchange: (e) => coachDo({ action: "matchup", target: m.target, defender: e.target.value }) }, defenders.map((o) => h("option", { value: o.value, selected: o.value === m.defender }, o.value === "" && m.auto ? `Coach auto (${m.auto})` : o.label)))),
+    h("td", {}, h("select", { onchange: (e) => coachDo({ action: "matchup", target: m.target, coverage: e.target.value }) }, d.coverageOptions.map((o) => h("option", { value: o.value, selected: o.value === m.coverage }, o.label))))));
+  $("#coachMatch").replaceChildren(rows.length ? h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Opposing player"), h("th", {}, "Primary defender"), h("th", {}, "Coverage"))), h("tbody", {}, rows)) : h("div", { class: "empty" }, "Matchups appear once the game starts."));
 }
 
 async function loadLineup() {

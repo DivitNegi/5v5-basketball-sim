@@ -577,3 +577,12 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .stx-wrap { max-height: calc(100vh - 380px); }
 
 .filters label:has(#statsSearch) { display: none; }
+
+/* coach: scheme pickers, drag & drop, energy */
+.coach-plan { display: flex; gap: 16px; flex-wrap: wrap; margin: 10px 0 4px; }
+.coach-card { position: relative; }
+.coach-card.drop { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.coach-card.fouled { opacity: .5; }
+.coach-card .energy { display: block; height: 4px; border-radius: 99px; background: rgba(148, 163, 184, .15); overflow: hidden; margin-top: 6px; }
+.coach-card .energy i { display: block; height: 100%; border-radius: 99px; }
+#coachMatch select { min-width: 190px; }

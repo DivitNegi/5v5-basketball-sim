@@ -499,9 +499,26 @@ def compare_payload(runner):
     return {"teams": out, "source": "game"}
 
 
+COACH_OFFENSE = ("auto", "balanced", "five_out", "four_out_one_in", "three_out_two_in", "post_heavy", "motion", "star_spread")
+COACH_DEFENSE = ("auto", "standard", "switch", "drop", "show_recover", "blitz", "stay_home", "top_lock", "pack_paint", "wall_paint", "zone", "load_star")
+COACH_COVERAGE = ("standard", "shade_help", "sag_rim", "gap_help", "stay_home", "stay_close", "deny_catch", "full_pressure", "go_under", "no_help")
+
+
+def _label(code):
+    try:
+        return sim_engine.plan_label(code)
+    except Exception:
+        return str(code).replace("_", " ").title()
+
+
 def _coach_player(player):
+    try:
+        energy = round(100 * sim_engine.fatigue_factor(player))
+    except Exception:
+        energy = None
     return {"name": player.name, "pos": player.position, "min": round(getattr(player, "minutes", 0) / 60, 1),
             "pts": player.pts, "reb": player.reb, "ast": player.ast, "pf": player.pf,
+            "stint": round(getattr(player, "current_stint", 0) / 60, 1), "energy": energy,
             "out": bool(getattr(player, "fouled_out", False))}
 
 
@@ -514,9 +531,33 @@ def coach_payload():
                      "offense": sim_engine.OFFENSIVE_SET_OVERRIDES.get(team.name, getattr(team, "game_plan", {}).get("offense", "balanced")),
                      "defense": sim_engine.DEFENSIVE_SCHEME_OVERRIDES.get(team.name, getattr(team, "game_plan", {}).get("defense", "standard")),
                      "focus": getattr(team, "defensive_focus", None), "timeoutOpen": bool(getattr(team, "coach_timeout_open", False)),
+                     "offenseSet": sim_engine.OFFENSIVE_SET_OVERRIDES.get(team.name, "auto"), "defenseSet": sim_engine.DEFENSIVE_SCHEME_OVERRIDES.get(team.name, "auto"),
+                     "matchups": _coach_matchups(team, next((o for o in teams if o is not None and o is not team), None)),
                      "floor": [_coach_player(p) for p in team.on_floor], "bench": [_coach_player(p) for p in team.bench],
                      "queued": [{"out": out_name, "in": in_name} for out_name, in_name in list(getattr(team, "manual_substitution", []) or [])]})
-    return {"active": bool(rows), "teams": rows}
+    return {"active": bool(rows), "teams": rows,
+            "offenseOptions": [{"value": c, "label": "Coach decides" if c == "auto" else _label(c)} for c in COACH_OFFENSE],
+            "defenseOptions": [{"value": c, "label": "Coach decides" if c == "auto" else _label(c)} for c in COACH_DEFENSE],
+            "coverageOptions": [{"value": c, "label": _label(c)} for c in COACH_COVERAGE]}
+
+
+def _coach_matchups(team, opp):
+    """Who this team has on each opposing player: the coach's manual defender and coverage, or what the game is doing now."""
+    if opp is None:
+        return []
+    manual = getattr(team, "manual_matchups", {}) or {}
+    covers = getattr(team, "manual_player_coverages", {}) or {}
+    try:
+        auto = {off.name: dff.name for off, dff in sim_engine.build_defensive_matchups(opp, team).items()}
+    except Exception:
+        auto = {}
+    floor = {p.name for p in opp.on_floor}
+    rows = []
+    for p in opp.roster:
+        rows.append({"target": p.name, "pos": p.position, "onFloor": p.name in floor, "defender": manual.get(p.name, ""), "auto": auto.get(p.name, ""),
+                     "coverage": covers.get(p.name, "standard")})
+    rows.sort(key=lambda r: (not r["onFloor"], r["target"]))
+    return rows
 
 
 def coach_action(data):
@@ -549,6 +590,43 @@ def coach_action(data):
         code = options[(options.index(current) + 1) % len(options)] if current in options else options[0]
         sim_engine.DEFENSIVE_SCHEME_OVERRIDES[team.name] = code
         sim_engine.apply_defensive_scheme_override(team)
+        return None
+    if action == "setoffense" or action == "setdefense":
+        value = str(data.get("value", "auto"))
+        table = sim_engine.OFFENSIVE_SET_OVERRIDES if action == "setoffense" else sim_engine.DEFENSIVE_SCHEME_OVERRIDES
+        allowed = COACH_OFFENSE if action == "setoffense" else COACH_DEFENSE
+        if value not in allowed:
+            return "Unknown option."
+        if value == "auto":
+            table.pop(team.name, None)
+        else:
+            table[team.name] = value
+            (sim_engine.apply_offensive_set_override if action == "setoffense" else sim_engine.apply_defensive_scheme_override)(team)
+        return None
+    if action == "setfocus":
+        name = str(data.get("value", ""))
+        team.defensive_focus = name or None
+        return None
+    if action == "matchup":
+        target = str(data.get("target", ""))
+        if not hasattr(team, "manual_matchups"):
+            team.manual_matchups = {}
+        if not hasattr(team, "manual_player_coverages"):
+            team.manual_player_coverages = {}
+        if "defender" in data:
+            defender = str(data.get("defender") or "")
+            if defender:
+                team.manual_matchups[target] = defender
+            else:
+                team.manual_matchups.pop(target, None)
+        if "coverage" in data:
+            coverage = str(data.get("coverage") or "standard")
+            if coverage not in COACH_COVERAGE:
+                return "Unknown coverage."
+            if coverage == "standard":
+                team.manual_player_coverages.pop(target, None)
+            else:
+                team.manual_player_coverages[target] = coverage
         return None
     if action == "focus":
         opponent = teams[1] if team is teams[0] else teams[0]
