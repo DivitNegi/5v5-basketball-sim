@@ -603,3 +603,6 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 
 /* play-by-play: shorter box, no smooth-scroll lag */
 .rawlog { height: 420px; scroll-behavior: auto; overflow-anchor: none; }
+
+.btn.latest { background: rgba(245, 165, 36, .16); border-color: rgba(245, 165, 36, .55); color: var(--accent-2); font-weight: 700; padding: 6px 12px; font-size: 12.5px; }
+.feed-panel .panel-head { flex-wrap: wrap; gap: 8px; }

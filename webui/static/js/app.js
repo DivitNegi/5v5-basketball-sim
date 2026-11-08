@@ -287,6 +287,14 @@ function newBlock() {
 // "X will guard Y" opening-matchup lines are left out of the play-by-play
 const GUARD_RE = /\bwill guard\b|^\s*When .+ are on offense:\s*$/;
 const rawState = { last: [0, 0], namesKey: "", re: null };
+// the "Jump to latest" button: visible only while you are scrolled up, with how many new plays you are missing
+function syncLatestButton() {
+  const root = $("#rawlog"), btn = $("#pbpLatest");
+  if (!btn) return;
+  const behind = !root._stick && root.scrollHeight - root.scrollTop - root.clientHeight > 80;
+  btn.classList.toggle("hidden", !behind || S.feedFilter !== "raw");
+  btn.textContent = root._behind ? `Jump to latest · ${root._behind} new ⤓` : "Jump to latest ⤓";
+}
 const escHtml = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 function nameRegex() {
   const names = (S.live?.teams || []).flatMap((t) => (t.box || []).map((p) => p.name)).filter(Boolean);
@@ -302,7 +310,8 @@ function rawLine(line) {
   root.querySelector(".empty")?.remove();
   if (!root.dataset.watch) {   // follow the newest line until the user scrolls up; following resumes when they scroll back to the bottom
     root.dataset.watch = "1"; root._stick = true;
-    root.addEventListener("scroll", () => { root._stick = root.scrollHeight - root.scrollTop - root.clientHeight < 48; }, { passive: true });
+    root.addEventListener("scroll", () => { root._stick = root.scrollHeight - root.scrollTop - root.clientHeight < 48; if (root._stick) root._behind = 0; syncLatestButton(); }, { passive: true });
+    $("#pbpLatest").addEventListener("click", () => { root._stick = true; root._behind = 0; root.scrollTop = root.scrollHeight; syncLatestButton(); });
   }
   const t = line.trim();
   let el;
@@ -333,6 +342,7 @@ function rawLine(line) {
   }
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
+  if (!root._stick && el.className !== "pbp-sys") { root._behind = (root._behind || 0) + 1; syncLatestButton(); }
   if (root._stick) {   // reading scrollHeight forces layout, so even a tall score bar is fully in view
     root.scrollTop = root.scrollHeight;
     if (!root._pinning) { root._pinning = true; setTimeout(() => { root._pinning = false; if (root._stick) root.scrollTop = root.scrollHeight; }, 60); }
@@ -541,7 +551,7 @@ function resetGame(msg) {
   });
   feed.block = null; feed.lines = []; feed.last = [0, 0];
   $("#feed").replaceChildren(h("div", { class: "empty" }, "Tipping off…"));
-  $("#rawlog").replaceChildren(h("div", { class: "empty" }, "Tipping off…")); $("#rawlog")._stick = true;
+  $("#rawlog").replaceChildren(h("div", { class: "empty" }, "Tipping off…")); $("#rawlog")._stick = true; $("#rawlog")._behind = 0; syncLatestButton();
   rawState.last = [0, 0];
   $("#sbSeries").textContent = "";
   $("#sbPeriod").textContent = "1ST"; $("#sbClock").textContent = S.rules === "FIBA" ? "10:00" : "12:00";
@@ -1584,6 +1594,7 @@ async function boot() {
   $$("#feedFilter button").forEach((b) => b.addEventListener("click", () => {
     $$("#feedFilter button").forEach((x) => x.classList.toggle("on", x === b)); S.feedFilter = b.dataset.v;
     $("#rawlog").classList.toggle("hidden", S.feedFilter !== "raw");
+    syncLatestButton();
     $("#feed").classList.toggle("hidden", S.feedFilter === "raw");
     $$("#feed .ev").forEach((el) => el.dataset.kind && applyFeedFilter(el));
   }));
