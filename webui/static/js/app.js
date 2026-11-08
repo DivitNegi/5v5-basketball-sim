@@ -1483,7 +1483,20 @@ function showTradePrompt(pr) {
 async function boot() {
   S.meta = await api.get("/api/meta");
   const modeSel = $("#mode");
-  for (const m of S.meta.modes) modeSel.append(h("option", { value: m.name, disabled: !m.ready }, m.ready ? m.name : `${m.name} (Tk app for now)`));
+  // the year seasons live on the Modes screen as buttons now, so the dropdown stays short
+  const YEAR_SEASON = /^(\d{4}) season/;
+  for (const m of S.meta.modes) { if (YEAR_SEASON.test(m.name)) continue; modeSel.append(h("option", { value: m.name, disabled: !m.ready }, m.ready ? m.name : `${m.name} (Tk app for now)`)); }
+  $("#seasonPresets").replaceChildren(...S.meta.modes.filter((m) => YEAR_SEASON.test(m.name) && m.ready).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
+    const year = m.name.match(YEAR_SEASON)[1];
+    return h("button", { class: "btn primary", onclick: () => startSpecial(m.name) }, `${year} season`);
+  }));
+  const pickStrongest = async (n) => {
+    const d = await api.get("/api/teams/strength");
+    customSelected.clear(); d.teams.slice(0, n).forEach((t) => customSelected.add(t.name)); renderCustomTeams();
+    toast(`Selected the ${n} strongest teams. Press ${n === 30 ? "Run 30-team season" : "Run 16-team playoffs"} to play them.`, "ok");
+  };
+  $("#strong30").addEventListener("click", () => pickStrongest(30).catch((e) => toast(e.message, "err")));
+  $("#strong16").addEventListener("click", () => pickStrongest(16).catch((e) => toast(e.message, "err")));
   const syncMode = () => {
     S.mode = modeSel.value;
     const seasonal = isSeasonMode(S.mode);

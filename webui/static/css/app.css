@@ -595,3 +595,6 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 
 .sg.avg { border-color: rgba(245, 165, 36, .5); color: var(--accent-2); font-weight: 700; }
 .sg.avg.on { background: rgba(245, 165, 36, .14); }
+
+.preset-h { margin: 14px 0 8px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-2); }
+.preset-h small { color: var(--muted); letter-spacing: 0; text-transform: none; margin-left: 8px; font-weight: 500; }

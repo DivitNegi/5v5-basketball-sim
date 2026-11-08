@@ -752,6 +752,26 @@ def broadcast_payload():
     return {"events": rows}
 
 
+_STRENGTH_CACHE = {}
+
+
+def strength_payload(runner):
+    """Every team ranked by the same strength number the season sim uses (cached: it only changes with the team files)."""
+    if not _STRENGTH_CACHE:
+        for name, factory in runner.factories.items():
+            if "Olympic" in name or "USA " in name[:9]:
+                continue
+            try:
+                team = factory()
+                team.init_lineup()
+                sim_engine.build_best_lineup_by_overall(team)
+                _STRENGTH_CACHE[name] = sim_engine.fantasy_season_strength(team)
+            except Exception:
+                continue
+    ranked = sorted(_STRENGTH_CACHE.items(), key=lambda kv: kv[1], reverse=True)
+    return {"teams": [{"name": n, "strength": round(v, 2)} for n, v in ranked]}
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -839,6 +859,8 @@ def build_app():
                 return self._json(teams_payload(runner))
             if path == "/api/season/advanced":
                 return self._json(advanced_payload(runner))
+            if path == "/api/teams/strength":
+                return self._json(strength_payload(runner))
             if path == "/api/season/box":
                 return self._json(game_box_payload(runner, (params.get("gid") or [""])[0]))
             if path == "/api/season/highs":
