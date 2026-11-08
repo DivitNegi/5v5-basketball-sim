@@ -418,18 +418,95 @@ def schedule_payload(runner, team):
     return {"games": rows}
 
 
-def highs_payload(runner):
+HIGHS_STATS = {"PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk", "3PM": "tpm", "3PA": "tpa",
+               "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta", "STK": "stk", "TOV": "tov", "MIN": "min", "+/-": "pm"}
+HIGHS_VIEWS = ("Season highs (every stat)", "Top games for stat", "Each player's best game")
+
+
+def highs_payload(runner, view=HIGHS_VIEWS[0], stat="PTS", team="All Teams"):
+    """The Tk Highs tab: every stat's season high, the top games for one stat, or each player's best game."""
     sec = runner.sections or {}
     fields = sec.get("_season_game_log_fields") or []
     log = sec.get("_season_game_log") or []
+    out = {"views": list(HIGHS_VIEWS), "stats": list(HIGHS_STATS), "teams": [], "rows": []}
+    if not log or not fields:
+        return out
     idx = {f: i for i, f in enumerate(fields)}
-    cats = {"pts": "Points", "reb": "Rebounds", "ast": "Assists", "stl": "Steals", "blk": "Blocks", "tpm": "Threes made"}
-    out = {}
-    for key, label in cats.items():
-        top = sorted(log, key=lambda r: r[idx[key]], reverse=True)[:10]
-        out[key] = {"label": label, "rows": [{"player": r[idx["player"]], "team": r[idx["team"]], "opp": r[idx["opp"]], "value": r[idx[key]],
-                                               "line": f"{r[idx['pts']]} pts, {r[idx['reb']]} reb, {r[idx['ast']]} ast", "result": r[idx["result"]]} for r in top]}
+    out["teams"] = sorted({r[idx["team"]] for r in log})
+    rows = [r for r in log if team in ("All Teams", "") or r[idx["team"]] == team]
+    if not rows:
+        return out
+
+    def stat_of(r, field):
+        return r[idx["stl"]] + r[idx["blk"]] if field == "stk" else r[idx[field]]
+
+    def tie(r):
+        return (r[idx["pts"]], r[idx["reb"]] + r[idx["ast"]], r[idx["min"]])
+
+    def line(label, r):
+        ident = team_identity(r[idx["team"]])
+        return {"label": label, "gid": r[idx["gid"]] if "gid" in idx else None, "player": r[idx["player"]], "team": r[idx["team"]], "short": ident["short"],
+                "logo": ident["logo"], "color": ident["color"], "initials": ident["initials"],
+                "opp": ("vs " if r[idx["home"]] else "@ ") + team_identity(r[idx["opp"]])["short"], "game": r[idx["game"]], "result": r[idx["result"]],
+                "min": round(r[idx["min"]], 1), "pts": r[idx["pts"]], "reb": r[idx["reb"]], "ast": r[idx["ast"]], "stl": r[idx["stl"]], "blk": r[idx["blk"]],
+                "tov": r[idx["tov"]], "pf": r[idx["pf"]], "fg": f"{r[idx['fgm']]}/{r[idx['fga']]}", "tp": f"{r[idx['tpm']]}/{r[idx['tpa']]}",
+                "ft": f"{r[idx['ftm']]}/{r[idx['fta']]}", "pm": r[idx["pm"]]}
+
+    field = HIGHS_STATS.get(stat, "pts")
+    if view == HIGHS_VIEWS[0]:
+        for label, f in HIGHS_STATS.items():
+            best = max(rows, key=lambda r: (stat_of(r, f),) + tie(r))
+            v = stat_of(best, f)
+            out["rows"].append(line(f"{label}: {round(v, 1) if isinstance(v, float) else v}", best))
+        return out
+    if view == HIGHS_VIEWS[1]:
+        ranked = sorted(rows, key=lambda r: (stat_of(r, field),) + tie(r), reverse=True)[:60]
+    else:
+        best_by = {}
+        for r in rows:
+            key = (r[idx["team"]], r[idx["player"]])
+            cur = best_by.get(key)
+            if cur is None or (stat_of(r, field),) + tie(r) > (stat_of(cur, field),) + tie(cur):
+                best_by[key] = r
+        ranked = sorted(best_by.values(), key=lambda r: (stat_of(r, field),) + tie(r), reverse=True)[:150]
+    for rank, r in enumerate(ranked, start=1):
+        v = stat_of(r, field)
+        out["rows"].append(line(f"{rank}. {stat} {round(v, 1) if isinstance(v, float) else v}", r))
     return out
+
+
+def game_box_payload(runner, gid):
+    """One regular-season game's full box score (what Tk opens when you double-click a Highs or Schedule row)."""
+    sec = runner.sections or {}
+    rows = sec.get("_season_game_log") or []
+    fields = sec.get("_season_game_log_fields") or ()
+    if not rows or "gid" not in fields:
+        return {"error": "No box score is available yet."}
+    idx = {name: i for i, name in enumerate(fields)}
+    game_rows = [r for r in rows if str(r[idx["gid"]]) == str(gid)]
+    if not game_rows:
+        return {"error": "That game is no longer available."}
+    names = []
+    for r in game_rows:
+        if r[idx["team"]] not in names:
+            names.append(r[idx["team"]])
+    names.sort(key=lambda n: 0 if any(r[idx["team"]] == n and r[idx["home"]] for r in game_rows) else 1)
+    extras = (sec.get("_season_game_extras") or {}).get(game_rows[0][idx["gid"]], {})
+    teams = []
+    for name in names:
+        trs = [r for r in game_rows if r[idx["team"]] == name]
+        m = re.search(r"(\d+)-(\d+)", str(trs[0][idx["result"]]))
+        trs.sort(key=lambda r: (-r[idx["pts"]], -r[idx["min"]]))
+        ident = team_identity(name)
+        teams.append({"name": name, "short": ident["short"], "logo": ident["logo"], "color": ident["color"], "initials": ident["initials"],
+                      "score": int(m.group(1)) if m else 0, "extras": extras.get(name, {}),
+                      "players": [{"name": r[idx["player"]], "pos": r[idx["pos"]] if "pos" in idx else "", "st": bool(r[idx["st"]]) if "st" in idx else False,
+                                   "min": round(r[idx["min"]], 1), "pts": r[idx["pts"]], "reb": r[idx["reb"]], "ast": r[idx["ast"]], "stl": r[idx["stl"]],
+                                   "blk": r[idx["blk"]], "tov": r[idx["tov"]], "oreb": r[idx["oreb"]], "dreb": r[idx["dreb"]], "pf": r[idx["pf"]], "pm": r[idx["pm"]],
+                                   "fgm": r[idx["fgm"]], "fga": r[idx["fga"]], "tpm": r[idx["tpm"]], "tpa": r[idx["tpa"]], "ftm": r[idx["ftm"]], "fta": r[idx["fta"]]}
+                                  for r in trs]})
+    meta = next((g for g in sec.get("_season_games") or [] if str(g.get("gid")) == str(gid)), None)
+    return {"teams": teams, "game": game_rows[0][idx["game"]], "order": (meta["order"] - 1) if meta else None}
 
 
 RATING_FIELDS = [
@@ -762,8 +839,11 @@ def build_app():
                 return self._json(teams_payload(runner))
             if path == "/api/season/advanced":
                 return self._json(advanced_payload(runner))
+            if path == "/api/season/box":
+                return self._json(game_box_payload(runner, (params.get("gid") or [""])[0]))
             if path == "/api/season/highs":
-                return self._json(highs_payload(runner))
+                q = lambda k, d: (params.get(k) or [d])[0]
+                return self._json(highs_payload(runner, q("view", HIGHS_VIEWS[0]), q("stat", "PTS"), q("team", "All Teams")))
             if path == "/api/season/schedule":
                 return self._json(schedule_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/game/shots":

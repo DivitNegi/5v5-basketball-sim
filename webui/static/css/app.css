@@ -586,3 +586,12 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .coach-card .energy { display: block; height: 4px; border-radius: 99px; background: rgba(148, 163, 184, .15); overflow: hidden; margin-top: 6px; }
 .coach-card .energy i { display: block; height: 100%; border-radius: 99px; }
 #coachMatch select { min-width: 190px; }
+
+/* full box score (Highs / Schedule) */
+.fullbox { display: grid; gap: 16px; margin-top: 8px; }
+.fullbox-team { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.fullbox tr.focus td { color: var(--accent-2); font-weight: 800; background: rgba(245, 165, 36, .08); }
+.fullbox tr.totals td { font-weight: 800; background: rgba(148, 163, 184, .08); border-top: 1px solid var(--line-strong); }
+
+.sg.avg { border-color: rgba(245, 165, 36, .5); color: var(--accent-2); font-weight: 700; }
+.sg.avg.on { background: rgba(245, 165, 36, .14); }

@@ -593,7 +593,7 @@ async function refreshSeason() {
       if (SE.tab === "players") { const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source }); AV.data = await api.get(`/api/season/avg?${q}`); }
       if (SE.tab === "advanced") SE.advStats = await api.get("/api/stats?kind=advanced&source=Season&team=All+teams&quarter=All");
       if (SE.tab === "teams") SE.teams = (await api.get("/api/season/teams")).teams;
-      if (SE.tab === "highs") SE.highs = await api.get("/api/season/highs");
+      if (SE.tab === "highs" && !HV.box) SE.highs = await api.get(`/api/season/highs?${new URLSearchParams({ view: HV.view, stat: HV.stat, team: HV.team })}`);
       if (SE.tab === "schedule" && SE.team) SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
       renderSeasonBody();
     }
@@ -770,13 +770,62 @@ async function loadSchedule() {
   SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
   renderSeasonBody();
 }
-function renderHighsTab() {
-  const hs = SE.highs;
-  if (!hs) return h("div", { class: "empty" }, "Single-game highs appear once games are played.");
-  return h("div", { class: "race-grid" }, Object.values(hs).map((c) => h("div", { class: "race" }, h("h3", {}, c.label),
-    c.rows.map((r, i) => h("div", { class: "race-row" }, h("span", { class: "rk" }, i + 1), h("div", {}, h("div", { class: "who" }, `${r.value} · ${r.player}`, " ", h("span", { class: "muted" }, `${identOf(r.team).short} vs ${identOf(r.opp).short}`)), h("div", { class: "st" }, `${r.line} · ${r.result}`)))))));
+const HV = { view: "Season highs (every stat)", stat: "PTS", team: "All Teams", box: null };
+async function loadHighs() {
+  const q = new URLSearchParams({ view: HV.view, stat: HV.stat, team: HV.team });
+  SE.highs = await api.get(`/api/season/highs?${q}`);
+  renderSeasonBody();
 }
-
+async function openGameBox(gid, focusPlayer, focusTeam) {
+  const d = await api.get(`/api/season/box?gid=${encodeURIComponent(gid)}`);
+  if (d.error) { toast(d.error, "err"); return; }
+  HV.box = { ...d, focusPlayer, focusTeam };
+  renderSeasonBody();
+}
+// the full box score both Highs and Schedule open: every player by points, a totals row per team
+function fullBox(d, focus = {}) {
+  const pct = (m, a) => (a ? (100 * m / a).toFixed(1) : "0.0");
+  const ts = (pts, fga, fta) => { const dn = 2 * (fga + 0.44 * fta); return dn ? (100 * pts / dn).toFixed(1) : "0.0"; };
+  const head = ["Player", "POS", "ST", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "ORB", "DRB", "PF", "+/-", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%"];
+  return h("div", { class: "fullbox" }, d.teams.map((t) => {
+    const T = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0, oreb: 0, dreb: 0, pf: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, min: 0 };
+    const body = t.players.map((p) => {
+      Object.keys(T).forEach((k) => { T[k] += p[k] || 0; });
+      const hot = focus.player === p.name && focus.team === t.name;
+      return h("tr", { class: hot ? "focus" : "" }, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))), h("td", {}, p.pos), h("td", {}, p.st ? "★" : ""), h("td", {}, p.min.toFixed(1)), h("td", { class: "pts" }, p.pts), h("td", {}, p.reb), h("td", {}, p.ast),
+        h("td", {}, p.stl), h("td", {}, p.blk), h("td", {}, p.tov), h("td", {}, p.oreb), h("td", {}, p.dreb), h("td", {}, p.pf), h("td", {}, p.pm > 0 ? `+${p.pm}` : p.pm),
+        h("td", {}, `${p.fgm}-${p.fga}`), h("td", {}, pct(p.fgm, p.fga)), h("td", {}, `${p.tpm}-${p.tpa}`), h("td", {}, pct(p.tpm, p.tpa)), h("td", {}, `${p.ftm}-${p.fta}`), h("td", {}, pct(p.ftm, p.fta)), h("td", {}, ts(p.pts, p.fga, p.fta)));
+    });
+    body.push(h("tr", { class: "totals" }, h("td", { class: "l" }, "TEAM TOTALS"), h("td", {}), h("td", {}), h("td", {}, T.min.toFixed(0)), h("td", {}, T.pts), h("td", {}, T.reb), h("td", {}, T.ast), h("td", {}, T.stl), h("td", {}, T.blk), h("td", {}, T.tov), h("td", {}, T.oreb), h("td", {}, T.dreb), h("td", {}, T.pf), h("td", {}),
+      h("td", {}, `${T.fgm}-${T.fga}`), h("td", {}, pct(T.fgm, T.fga)), h("td", {}, `${T.tpm}-${T.tpa}`), h("td", {}, pct(T.tpm, T.tpa)), h("td", {}, `${T.ftm}-${T.fta}`), h("td", {}, pct(T.ftm, T.fta)), h("td", {}, ts(T.pts, T.fga, T.fta))));
+    const extras = Object.entries(t.extras || {});
+    return h("div", { class: "fullbox-team" }, h("div", { class: "court-team-head", style: { "--c": t.color } }, logoEl(t), t.short, h("span", { class: "tot" }, `${t.score}`)),
+      h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, head.map((x, i) => h("th", { class: i === 0 ? "l" : "" }, x)))), h("tbody", {}, body))),
+      extras.length ? h("div", { class: "muted", style: { padding: "6px 10px" } }, extras.map(([k, v]) => `${k}: ${v}`).join("  ·  ")) : null);
+  }));
+}
+function renderHighsTab() {
+  if (HV.box) {
+    const b = HV.box;
+    return h("div", {}, h("div", { class: "filters" }, h("button", { class: "btn", onclick: () => { HV.box = null; renderSeasonBody(); } }, "‹ Back to highs"),
+      h("b", {}, b.teams.map((t) => `${t.short} ${t.score}`).join("  –  ")), h("span", { class: "muted" }, `(team game ${b.game})`),
+      b.order != null ? h("button", { class: "btn", onclick: () => startSpecial("Replay season game", { order: b.order }) }, "Replay this game") : null),
+      fullBox(b, { player: b.focusPlayer, team: b.focusTeam }));
+  }
+  const hs = SE.highs;
+  if (!hs) { loadHighs(); return h("div", { class: "empty" }, "Loading highs…"); }
+  if (!hs.rows.length) return h("div", { class: "empty" }, "Season highs will appear here after Season mode.");
+  const set = (k) => (e) => { HV[k] = e.target.value; loadHighs(); };
+  const sel = (label, value, opts) => h("label", { class: "fsel" }, h("span", { class: "muted" }, label), h("select", { onchange: set(label === "View" ? "view" : label === "Stat" ? "stat" : "team") }, opts.map((o) => h("option", { value: o.v ?? o, selected: (o.v ?? o) === value }, o.t ?? o))));
+  const filters = h("div", { class: "filters" }, sel("View", HV.view, hs.views), HV.view !== hs.views[0] ? sel("Stat", HV.stat, hs.stats) : null,
+    sel("Team", HV.team, [{ v: "All Teams", t: "All Teams" }, ...hs.teams.map((t) => ({ v: t, t: identOf(t).short }))]), h("span", { class: "muted" }, "click a row for the box score"));
+  const cols = ["Record", "Player", "Team", "Opponent", "Gm", "Result", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "PF", "FG", "3P", "FT", "+/-"];
+  const rows = hs.rows.map((r) => h("tr", { class: "pl-row", onclick: () => openGameBox(r.gid, r.player, r.team) },
+    h("td", { class: "l" }, h("b", { style: { color: "var(--accent-2)" } }, r.label)), h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(r.player), h("span", { class: "pname" }, r.player))),
+    h("td", { class: "l" }, h("div", { class: "tcell" }, logoEl(r), h("span", {}, r.short))), h("td", { class: "l" }, r.opp), h("td", {}, r.game), h("td", {}, r.result), h("td", {}, r.min),
+    h("td", { class: "pts" }, r.pts), h("td", {}, r.reb), h("td", {}, r.ast), h("td", {}, r.stl), h("td", {}, r.blk), h("td", {}, r.tov), h("td", {}, r.pf), h("td", {}, r.fg), h("td", {}, r.tp), h("td", {}, r.ft), h("td", {}, r.pm > 0 ? `+${r.pm}` : r.pm)));
+  return h("div", {}, filters, h("div", { class: "table-wrap tall" }, h("table", { class: "stats avg" }, h("thead", {}, h("tr", {}, cols.map((c, i) => h("th", { class: i < 4 ? "l" : "" }, c)))), h("tbody", {}, rows))));
+}
 function renderSeasonBody() {
   const view = { standings: renderStandings, races: renderRaces, players: renderPlayers, advanced: renderAdvancedTab, teams: renderTeamsTab, schedule: renderScheduleTab, highs: renderHighsTab }[SE.tab]();
   $("#seasonBody").replaceChildren(view);
@@ -830,8 +879,9 @@ function renderTree() {
     center,
     col("West · finals", solo(W["Conference Finals"], "west"), "west"), col("West · semis", pairs(W["Semifinals"], "west"), "west"), col("West · 1st round", pairs(W["First Round"], "west"), "west"))));
 }
-function piCard(g, note) {
-  return h("div", { class: "br-card", style: { cursor: "default" } }, brTeam(g.a, g.score_a, g.winner), brTeam(g.b, g.score_b, g.winner), note ? h("div", { class: "br-note" }, note) : null);
+function piCard(g, note, conf, label) {
+  const sel = BR.pi && BR.pi[0] === conf && BR.pi[1] === label;
+  return h("div", { class: `br-card ${sel ? "sel" : ""}`, onclick: () => { BR.pi = [conf, label]; renderBracket(); } }, brTeam(g.a, g.score_a, g.winner), brTeam(g.b, g.score_b, g.winner), (note || g.boxes) ? h("div", { class: "br-note" }, [note, g.boxes ? "click for box score" : ""].filter(Boolean).join(" · ")) : null);
 }
 function renderPlayIn() {
   const pi = BR.data?.play_in;
@@ -842,36 +892,63 @@ function renderPlayIn() {
     return h("div", { class: "pi-conf" }, h("h3", {}, `${conf} play-in`),
       h("div", { class: "pi-grid" },
         h("div", { class: "br-col" }, h("h4", {}, "Round 1"), h("div", { class: "br-stack" }, h("div", { class: "br-pair" },
-          g78 ? piCard(g78, g78.winner ? `${identOf(g78.winner).initials} take the 7 seed` : "Winner gets the 7 seed") : null,
-          g910 ? piCard(g910, g910.winner ? `${identOf(g910.winner === g910.a ? g910.b : g910.a).initials} eliminated` : "Loser eliminated") : null))),
-        h("div", { class: "br-col" }, h("h4", {}, "8 seed game"), h("div", { class: "br-stack" }, h("div", { class: "br-solo east" }, g8 ? piCard(g8, g8.winner ? `${identOf(g8.winner).initials} take the 8 seed` : "") : h("div", { class: "muted", style: { padding: "10px" } }, "Loser of 7v8 vs winner of 9v10")))),
+          g78 ? piCard(g78, g78.winner ? `${identOf(g78.winner).initials} take the 7 seed` : "Winner gets the 7 seed", conf, "7v8") : null,
+          g910 ? piCard(g910, g910.winner ? `${identOf(g910.winner === g910.a ? g910.b : g910.a).initials} eliminated` : "Loser eliminated", conf, "9v10") : null))),
+        h("div", { class: "br-col" }, h("h4", {}, "8 seed game"), h("div", { class: "br-stack" }, h("div", { class: "br-solo east" }, g8 ? piCard(g8, g8.winner ? `${identOf(g8.winner).initials} take the 8 seed` : "", conf, "8seed") : h("div", { class: "muted", style: { padding: "10px" } }, "Loser of 7v8 vs winner of 9v10")))),
         h("div", { class: "br-col" }, h("h4", {}, "Advance"), h("div", { class: "br-stack", style: { justifyContent: "center", gap: "10px" } },
           seedLine(7, g78?.winner), seedLine(8, g8?.winner)))));
   });
   return h("div", { class: "pi-wrap" }, confs);
 }
+// box score tables for one game: [{name, score, players:[...]}]
+function bracketBoxTables(boxes) {
+  return h("div", { class: "conf-grid" }, boxes.map((tm) => h("div", {}, h("h3", {}, `${identOf(tm.name).short} · ${tm.score}`),
+    h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+      h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3PT", "FT", "+/-"].map((x) => h("th", {}, x)))),
+      h("tbody", {}, (tm.players || []).map((p) => h("tr", { class: p.st ? "" : "bench" }, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))),
+        h("td", {}, (p.min ?? 0).toFixed(1)), h("td", { class: "pts" }, p.pts), h("td", {}, p.reb), h("td", {}, p.ast), h("td", {}, p.stl), h("td", {}, p.blk), h("td", {}, p.tov),
+        h("td", {}, `${p.fgm}-${p.fga}`), h("td", {}, `${p.tpm}-${p.tpa}`), h("td", {}, `${p.ftm}-${p.fta}`), h("td", {}, p.pm)))))))));
+}
+// per-game player averages over the whole series, one table per team (the Tk "series averages")
+function seriesAverages(sr) {
+  const f1 = (v) => (v || 0).toFixed(1);
+  const pct = (m, a) => (a ? (100 * m / a).toFixed(1) : "0.0");
+  const cols = ["GP", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-"];
+  return h("div", { class: "conf-grid" }, Object.entries(sr.totals || {}).map(([team, players]) => {
+    const rows = Object.entries(players).filter(([, s]) => s.games).sort((x, y) => (y[1].pts / y[1].games) - (x[1].pts / x[1].games));
+    const body = rows.map(([name, s]) => {
+      const g = s.games, ts = 2 * (s.fga + 0.44 * s.fta);
+      return h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(name), h("span", { class: "pname" }, name))), h("td", {}, g), h("td", {}, f1(s.minutes / 60 / g)), h("td", { class: "pts" }, f1(s.pts / g)), h("td", {}, f1(s.reb / g)), h("td", {}, f1(s.ast / g)),
+        h("td", {}, f1(s.stl / g)), h("td", {}, f1(s.blk / g)), h("td", {}, f1(s.tov / g)), h("td", {}, `${f1(s.fgm / g)}/${f1(s.fga / g)}`), h("td", {}, pct(s.fgm, s.fga)),
+        h("td", {}, `${f1(s.tpm / g)}/${f1(s.tpa / g)}`), h("td", {}, pct(s.tpm, s.tpa)), h("td", {}, `${f1(s.ftm / g)}/${f1(s.fta / g)}`), h("td", {}, pct(s.ftm, s.fta)),
+        h("td", {}, ts ? (100 * s.pts / ts).toFixed(1) : "0.0"), h("td", {}, (s.plus_minus / g >= 0 ? "+" : "") + f1(s.plus_minus / g)));
+    });
+    return h("div", {}, h("h3", {}, `${identOf(team).short} · series averages`),
+      h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...cols.map((c) => h("th", {}, c)))), h("tbody", {}, body))));
+  }));
+}
 function renderSeriesDetail() {
   const root = $("#seriesDetail");
+  if (BR.view === "playin") {
+    const pi = BR.data?.play_in, g = pi && BR.pi && pi[BR.pi[0]]?.[BR.pi[1]];
+    if (!g || !g.boxes) { root.replaceChildren(); return; }
+    root.replaceChildren(h("div", { class: "series-detail" }, h("div", { class: "panel-head" }, h("h2", {}, `${identOf(g.a).short} vs ${identOf(g.b).short}`), h("span", { class: "muted" }, `${BR.pi[0]} play-in · ${BR.pi[1].replace("v", " vs ")}`)), bracketBoxTables(g.boxes)));
+    return;
+  }
   const key = BR.selected;
   if (!key || BR.view !== "tree") { root.replaceChildren(); return; }
   const [a, b] = key.split("|");
   const sr = seriesFor(a, b);
   if (!sr) { root.replaceChildren(); return; }
   const A = identOf(sr.a), B = identOf(sr.b);
-  const games = h("div", { class: "series-games" }, (sr.games || []).map(([n, sa, sb, home]) =>
-    h("div", { class: `sg ${BR.game === n ? "on" : ""}`, onclick: () => { BR.game = n; renderSeriesDetail(); } }, `G${n} `, h("b", {}, `${sa}-${sb}`), ` · ${identOf(home).initials}`)));
+  const games = h("div", { class: "series-games" },
+    h("div", { class: `sg avg ${BR.avg ? "on" : ""}`, onclick: () => { BR.avg = !BR.avg; BR.game = null; renderSeriesDetail(); } }, "Series averages"),
+    (sr.games || []).map(([n, sa, sb, home]) =>
+      h("div", { class: `sg ${!BR.avg && BR.game === n ? "on" : ""}`, onclick: () => { BR.avg = false; BR.game = n; renderSeriesDetail(); } }, `G${n} `, h("b", {}, `${sa}-${sb}`), ` · ${identOf(home).initials}`)));
   const head = h("div", { class: "panel-head" }, h("h2", {}, `${A.short} vs ${B.short}`), h("span", { class: "muted" }, sr.winner ? `${identOf(sr.winner).short} won ${Math.max(sr.wins_a, sr.wins_b)}-${Math.min(sr.wins_a, sr.wins_b)}` : `${sr.wins_a}-${sr.wins_b}`));
-  let box = null;
   const boxes = sr.boxes?.[BR.game];
-  if (boxes) {
-    box = h("div", { class: "conf-grid" }, boxes.map((tm) => h("div", {}, h("h3", {}, `${identOf(tm.name).short} · ${tm.score}`),
-      h("div", { class: "table-wrap" }, h("table", { class: "stats" },
-        h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3PT", "FT", "+/-"].map((x) => h("th", {}, x)))),
-        h("tbody", {}, (tm.players || []).map((p) => h("tr", { class: p.st ? "" : "bench" }, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))),
-          h("td", {}, (p.min ?? 0).toFixed(1)), h("td", { class: "pts" }, p.pts), h("td", {}, p.reb), h("td", {}, p.ast), h("td", {}, p.stl), h("td", {}, p.blk), h("td", {}, p.tov),
-          h("td", {}, `${p.fgm}-${p.fga}`), h("td", {}, `${p.tpm}-${p.tpa}`), h("td", {}, `${p.ftm}-${p.fta}`), h("td", {}, p.pm)))))))));
-  }
-  root.replaceChildren(h("div", { class: "series-detail" }, head, games, box || h("div", { class: "muted" }, "Pick a game for its box score.")));
+  const body = BR.avg ? seriesAverages(sr) : boxes ? bracketBoxTables(boxes) : h("div", { class: "muted" }, "Pick a game for its box score, or Series averages for the whole series.");
+  root.replaceChildren(h("div", { class: "series-detail" }, head, games, body));
 }
 function renderBracket() {
   // rebuilding the DOM on every finished game would snap the bracket back to its left edge: keep the scroll position
