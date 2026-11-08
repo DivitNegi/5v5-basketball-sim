@@ -19222,6 +19222,12 @@ def simulate_possession(off: Team, dff: Team,
         if pace_gap > 0.75 and random.random() < pace_keep_chance(pace_gap):
             play_shooter, play_passer, play_context = shooter, None, None
     off.current_play_initiator = None
+    if play_passer and play_passer is not play_shooter and play_shooter is handler:
+        # the designed shooter already has the ball (he just got it from the first handler): nobody passes it to him a second time
+        play_passer = previous_handler if previous_handler is not play_shooter else None
+        if play_passer is not None:
+            last_passer = play_passer     # the pass that actually got him the ball keeps the assist credit
+        play_passer = None
     if play_passer and play_passer is not play_shooter:
         last_passer = play_passer
         handler = play_passer
@@ -19254,6 +19260,7 @@ def simulate_possession(off: Team, dff: Team,
             immediate_chance = max(0.04, min(0.74, immediate_chance * ASSIST_VOLUME_BOOST))
             if random.random() >= immediate_chance:
                 quick_shot_for_assist = False
+    pass_already_narrated = False   # a pass announced above must not be narrated a second time by the entry-pass block below
     if (
         star_takeover_lock
         and closing_star is not None
@@ -19263,6 +19270,7 @@ def simulate_possession(off: Team, dff: Team,
     ):
         if ball_owner is not closing_star:
             announce_ball_transfer(ball_owner, closing_star, "closing_star")
+            pass_already_narrated = True
             last_passer = ball_owner
             quick_shot_for_assist = True
         shooter = closing_star
@@ -19272,6 +19280,7 @@ def simulate_possession(off: Team, dff: Team,
         rerouted = reroute_zero_tendency_shooter(off, shooter, ball_owner)
         if rerouted is not shooter:
             announce_ball_transfer(ball_owner, rerouted, "reroute")
+            pass_already_narrated = True
             last_passer = ball_owner
             shooter = rerouted
             ball_owner = shooter
@@ -19286,7 +19295,8 @@ def simulate_possession(off: Team, dff: Team,
                 f"{passer_for_entry.name} hits {shooter.name} on the seal in the paint.",
                 f"{passer_for_entry.name} gets it to {shooter.name} with position under the rim.",
             ]
-            print(random.choice(paint_entry_lines))
+            if not pass_already_narrated:
+                print(random.choice(paint_entry_lines))
             play_context = "deep_paint_touch"
             # A post-entry pass isn't automatically a direct assist feed --
             # the big still has to catch, seal, and go back up. Whether that
@@ -19298,7 +19308,7 @@ def simulate_possession(off: Team, dff: Team,
                 bonus=0.08 if "post_hub" in passer_for_entry.badges else 0.0,
             )
             quick_shot_for_assist = random.random() < paint_touch_chance
-        else:
+        elif not pass_already_narrated:
             pline = random.choice(pp5)
             print(f"{passer_for_entry.name} {pline} {shooter.name}.")
         time.sleep(SLEEP * 0.8)
