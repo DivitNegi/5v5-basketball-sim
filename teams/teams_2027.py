@@ -419,7 +419,7 @@ def make_raptors_2027() -> Team:
                0.30, 0.62, 0.70,
                0.94, 0.53, 0.46, 0.73, 0.867, 0.400,
                0.96, 0.82,
-               clutchness=0.79, height=78, speed=0.73,
+               clutchness=0.79, height=79, speed=0.73,
                shot_iq=0.99, archetype='defender', stamina=0.58),
         Player('Scottie Barnes', 'PF',
                0.22, 0.29, 0.24, 0.24, 0.50, 0.45,

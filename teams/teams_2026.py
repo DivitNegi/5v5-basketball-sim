@@ -1101,7 +1101,7 @@ def make_clippers_2026() -> Team:
                0.29, 0.60, 0.85,
                0.70, 0.43, 0.39, 0.61, 0.70, 0.30,
                0.90, 0.75,
-               clutchness=0.94, height=78, speed=0.73, shot_iq=0.76, archetype='defender', stamina=0.60),
+               clutchness=0.94, height=79, speed=0.73, shot_iq=0.76, archetype='defender', stamina=0.60),
         Player('Darius Garland', 'PG',
                0.48, 0.16, 0.17, 0.02, 0.02, 0.61,
                0.92, 0.79, 0.82, 0.36, 0.87,

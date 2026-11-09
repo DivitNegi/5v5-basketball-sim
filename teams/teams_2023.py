@@ -1373,7 +1373,7 @@ def make_clippers_2023() -> Team:
                0.30, 0.71, 0.72,
                0.51, 0.48, 0.60, 0.91, 0.69, 0.33,
                0.87, 0.63,
-               clutchness=0.79, height=78, speed=0.73, shot_iq=0.99, archetype='defender', stamina=0.58),
+               clutchness=0.79, height=79, speed=0.73, shot_iq=0.99, archetype='defender', stamina=0.58),
         Player('Russell Westbrook', 'PG',
                0.39, 0.18, 0.31, 0.02, 0.07, 0.66,
                0.78, 0.84, 0.88, 0.47, 0.65,

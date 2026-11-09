@@ -2355,7 +2355,7 @@ def make_spurs_2018() -> Team:
                0.290, 0.62, 0.62,
                0.90, 0.78, 0.44, 0.70, 0.950, 0.350,
                0.92, 0.65,
-               stamina=0.80, archetype="isolation_scorer", height=78),
+               stamina=0.80, archetype="isolation_scorer", height=79),
         Player("Pau Gasol", "C",
                0.05, 0.47, 0.29, 0.11, 0.18, 0.294,
                0.79, 0.77, 0.78, 0.45, 0.77,
