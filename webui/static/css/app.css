@@ -781,3 +781,8 @@ tr.clickable { cursor: pointer; }
 .pct-radar .pr-pct { fill: var(--muted); font-size: 12px; }
 .pct-radar .pr-tick { fill: var(--muted); font-size: 11px; }
 @media (prefers-reduced-motion: reduce) { .pct-radar .pr-shape, .pp-back { animation: none; } }
+
+/* stat tiles: long values (578/1061) shrink to fit instead of spilling out of the box */
+.stat-tiles .tile { min-width: 0; overflow: hidden; }
+.stat-tiles .tile .v { font-size: 20px; white-space: nowrap; }
+.stat-tiles .tile .v.frac { font-size: 13px; letter-spacing: -0.02em; }

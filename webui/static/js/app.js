@@ -886,8 +886,9 @@ function renderPlayers() {
   const body = rows.map((r) => {
     if (r.kind === "team") return h("tr", { class: "team-row" }, h("td", { class: "l", colspan: 1 }, h("div", { class: "tcell" }, logoEl(r), h("span", { class: "pname" }, r.short), h("span", { class: "muted" }, `${AV.quarter === "All" ? "team avg" : AV.quarter + " avg"}`))), ...cells(r));
     const who = h("div", { class: "pcell" }, faceEl(r.name), h("span", { class: "pname" }, r.rank ? `${r.rank}. ${r.name}` : r.name));
-    return flat ? h("tr", {}, h("td", { class: "l" }, h("div", { class: "tcell" }, logoEl(r), h("span", { class: "pname" }, r.short))), h("td", { class: "l" }, who), ...cells(r))
-      : h("tr", {}, h("td", { class: "l" }, who), ...cells(r));
+    const open = { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(r.team, r.name, d.source) };
+    return flat ? h("tr", open, h("td", { class: "l" }, h("div", { class: "tcell" }, logoEl(r), h("span", { class: "pname" }, r.short))), h("td", { class: "l" }, who), ...cells(r))
+      : h("tr", open, h("td", { class: "l" }, who), ...cells(r));
   });
   const note = d.flat ? `Ranked by ${AV.rank}${["FG%", "FT%", "3P%", "AST/TOV", "STL/TOV"].includes(AV.rank) || AV.rank.endsWith("/48") ? " (NBA leaderboard minimums apply)" : ""}` : AV.sort ? "Sorted across all players · click Team to go back to team order" : "Grouped by team · click any column to sort";
   return h("div", {}, filters, h("div", { class: "muted", style: { margin: "2px 2px 10px" } }, `${d.source} · per-game averages · ${note}`),
@@ -1344,7 +1345,7 @@ async function loadPlayerCard() {
   const face = h("div", { class: "pcard-face", style: { "--c": d.team.color } }, p.name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
   withImage(face, `/media/headshot?name=${encodeURIComponent(p.name)}`);
   const numTiles = [];   // plain numbers count up from their previous value on the next refresh
-  const tile = (k, v) => { const vEl = h("div", { class: "v", "data-k": k }, v); if (typeof v === "number") numTiles.push([vEl, v]); return h("div", { class: "tile" }, h("div", { class: "k" }, k), vEl); };
+  const tile = (k, v) => { const vEl = h("div", { class: `v${String(v).length > 6 ? " frac" : ""}`, "data-k": k }, v); if (typeof v === "number") numTiles.push([vEl, v]); return h("div", { class: "tile" }, h("div", { class: "k" }, k), vEl); };
   const form = GV.pc.game === "live" && GV.pc.quarter === "all" ? shotForm(p.name) : "";
   const zoneBox = (title, z) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
     h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))));
@@ -1907,7 +1908,7 @@ async function openStatsPlayer(team, name, source) {
   const pct1v = (m, a) => (a ? (100 * m / a).toFixed(1) : "–");
   const paint = () => {
     const src = mode === "pg" ? d.per_game : d.totals, t = d.totals;
-    const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v));
+    const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: `v${String(v).length > 6 ? " frac" : ""}` }, v));
     const f = (v) => (mode === "pg" ? Number(v).toFixed(1) : String(v));
     const pm = src.plus_minus, tsd = 2 * (t.fga + 0.44 * t.fta);
     tiles.replaceChildren(
