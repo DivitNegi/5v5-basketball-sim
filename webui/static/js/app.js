@@ -1261,7 +1261,7 @@ function pcRadar(p, color) {
   const shape = axes.map(([, v], i) => pt(i, Math.max(v, 0.04)).map((x) => x.toFixed(1)).join(",")).join(" ");
   const svg = svgEl("svg", { viewBox: "0 0 200 200", class: "pc-radar" });
   svg.innerHTML = [0.33, 0.66, 1].map((f) => `<polygon points="${ring(f)}" class="rg"/>`).join("")
-    + axes.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${C}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="rg"/>`; }).join("")
+    + axes.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="rg"/>`; }).join("")
     + `<polygon points="${shape}" class="rs" style="--c:${color}"/>`
     + axes.map(([l], i) => { const [x, y] = pt(i, 1.2); return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" class="rl" text-anchor="middle" dominant-baseline="middle">${l}</text>`; }).join("");
   return svg;
@@ -1872,6 +1872,65 @@ const numOf = (v) => {
   const m = s.includes("·") ? s.match(/\/(\d+)/) : s.match(/-?\d+(\.\d+)?/);
   return m ? parseFloat(m[1] !== undefined && s.includes("·") ? m[1] : m[0]) : -1e9;
 };
+// ---- player pop-up from the Stats tables: totals / per game, and where he ranks against the league (percentile radar)
+const ordinal = (n) => { const v = n % 100; return `${n}${(v >= 11 && v <= 13) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th")}`; };
+function percentileRadar(ranks, color) {
+  const N = ranks.length, C = 340, R = 170, W = 680, H = 560, CY = 280;
+  const pt = (i, f) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / N; return [C + R * f * Math.cos(a), CY + R * f * Math.sin(a)]; };
+  const shape = ranks.map((r, i) => pt(i, Math.max(0.03, (r.pct ?? 0) / 100)).map((v) => v.toFixed(1)).join(",")).join(" ");
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "pct-radar" });
+  let html = `<circle cx="${C}" cy="${CY}" r="${R}" class="pr-outer"/><circle cx="${C}" cy="${CY}" r="${R * 0.5}" class="pr-mid"/>`
+    + ranks.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="pr-spoke"/>`; }).join("")
+    + `<polygon points="${shape}" class="pr-shape" style="--c:${color}"/>`
+    + ranks.map((r, i) => { const [x, y] = pt(i, Math.max(0.03, (r.pct ?? 0) / 100)); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" class="pr-dot" style="--c:${color}"/>`; }).join("")
+    + `<text x="${C + 6}" y="${CY - R * 0.5 + 14}" class="pr-tick">50%</text><text x="${C + 6}" y="${CY - R + 14}" class="pr-tick">100%</text>`;
+  ranks.forEach((r, i) => {
+    const [x, y] = pt(i, 1.2), anchor = Math.abs(x - C) < 14 ? "middle" : x < C ? "end" : "start";
+    html += `<text x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="${anchor}" class="pr-lbl">${r.label}</text><text x="${x.toFixed(1)}" y="${(y + 12).toFixed(1)}" text-anchor="${anchor}" class="pr-pct">${r.pct == null ? "n/a" : (r.pct >= 99 ? "(leader)" : `(${ordinal(r.pct)})`)} · ${r.value ?? "–"}</text>`;
+  });
+  svg.innerHTML = html;
+  return svg;
+}
+async function openStatsPlayer(team, name, source) {
+  document.querySelector(".pp-back")?.remove();
+  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const body = h("div", { class: "pp-body" }, h("div", { class: "empty" }, "Loading…"));
+  const back = h("div", { class: "pp-back", onclick: (e) => { if (e.target === back) close(); } }, h("div", { class: "pp-card", role: "dialog" }, h("button", { class: "pp-x", onclick: close, title: "Close" }, "✕"), body));
+  document.body.append(back); document.addEventListener("keydown", onKey);
+  let d;
+  try { d = await api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`); } catch { d = { error: "Could not load that player." }; }
+  if (d.error) { body.replaceChildren(h("div", { class: "empty" }, d.error)); return; }
+  const id = identOf(team), color = id.color || "#e03a3e";
+  let mode = "pg";
+  const tiles = h("div", {});
+  const pct1v = (m, a) => (a ? (100 * m / a).toFixed(1) : "–");
+  const paint = () => {
+    const src = mode === "pg" ? d.per_game : d.totals, t = d.totals;
+    const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v));
+    const f = (v) => (mode === "pg" ? Number(v).toFixed(1) : String(v));
+    const pm = src.plus_minus, tsd = 2 * (t.fga + 0.44 * t.fta);
+    tiles.replaceChildren(
+      h("div", { class: "stat-tiles" }, tile("MIN", f(src.minutes)), tile("PTS", f(src.pts)), tile("REB", f(src.reb)), tile("AST", f(src.ast)), tile("STL", f(src.stl)), tile("BLK", f(src.blk)), tile("TO", f(src.tov)), tile("PF", f(src.pf)), tile("+/-", `${pm > 0 ? "+" : ""}${mode === "pg" ? Number(pm).toFixed(1) : pm}`),
+        tile("OREB", f(src.oreb)), tile("DREB", f(src.dreb)),
+        tile("FG", `${src.fgm}/${src.fga}`), tile("3PT", `${src.tpm}/${src.tpa}`), tile("FT", `${src.ftm}/${src.fta}`),
+        tile("FG%", pct1v(t.fgm, t.fga)), tile("3P%", pct1v(t.tpm, t.tpa)), tile("FT%", pct1v(t.ftm, t.fta)), tile("TS%", tsd ? (100 * t.pts / tsd).toFixed(1) : "–")));
+  };
+  const face = h("div", { class: "pcard-face", style: { "--c": color } }, name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
+  withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
+  const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
+  paint();
+  const zoneRow = h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
+  const hasZones = Object.values(d.shots).some((z) => z[1] > 0);
+  body.replaceChildren(
+    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`)), h("div", { style: { marginLeft: "auto" } }, seg)),
+    tiles,
+    h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, "Compared to the league"),
+      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} players with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
+      percentileRadar(d.ranks, color)),
+    hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(d.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null);
+}
+
 function renderStatsInto(root, data, opts = {}) {
   const st = (STX[root.id] ||= { rank: "Team order", flat: false, minGp: 0, search: "", sort: { column: -1, direction: -1 } });
   if (data.reports) { root.replaceChildren(...Object.entries(data.reports).map(([title, text]) => h("details", {}, h("summary", {}, title.replaceAll("_", " ")), h("pre", {}, text)))); return; }
@@ -1900,7 +1959,7 @@ function renderStatsInto(root, data, opts = {}) {
   const defaultCol = Math.max(2, cols.findIndex((c) => ["MPG", "MIN"].includes(c)) >= 0 ? cols.findIndex((c) => ["MPG", "MIN"].includes(c)) : (cols.indexOf("TOTAL") >= 0 ? cols.indexOf("TOTAL") : 2));
   const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;
   const head = h("tr", {}, cols.map((label, i) => h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
-  const rowEl = (x, rank) => h("tr", {}, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 && rank ? `${rank}. ${v}` : (v ?? "—"))));
+  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 && rank ? `${rank}. ${v}` : (v ?? "—"))));
   const body = [];
   if (flat) {
     let list = [...items];

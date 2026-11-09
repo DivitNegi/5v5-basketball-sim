@@ -102,3 +102,66 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
                 result["rows"].append([tn, pn, st["games"], round(st["minutes"]/60/g, 1)] + [round(st[k]/g, 1) for k in ("pts", "reb", "oreb", "ast", "stl", "blk", "tov", "pf")] + [pair("fgm", "fga"), pct("fgm", "fga"), pair("tpm", "tpa"), pct("tpm", "tpa"), pair("ftm", "fta"), pct("ftm", "fta"), round(st["plus_minus"]/g, 1)])
                 result["gp"].append(st["games"])
     return result
+
+
+# ---- player pop-up: season totals, per game, and where he ranks against the rest of the league
+PCT_METRICS = [   # (key, label, value(per-game stats dict -> number or None), needs)
+    ("pts", "Points"), ("ast", "Assists"), ("reb", "Total Rebounds"), ("oreb", "Off. Rebounds"), ("dreb", "Def. Rebounds"),
+    ("stl", "Steals"), ("blk", "Blocks"), ("fga", "FG Attempts"), ("fgp", "FG %"), ("tpp", "3-pt FG %"), ("efg", "Effective FG %"), ("ts", "True Shooting %"),
+]
+
+
+def _metrics(st):
+    g = max(1, st.get("games", 0) or 1)
+    fga, fgm, tpa, tpm, fta, pts = (st.get(k, 0) or 0 for k in ("fga", "fgm", "tpa", "tpm", "fta", "pts"))
+    out = {"pts": pts / g, "ast": (st.get("ast", 0) or 0) / g, "reb": (st.get("reb", 0) or 0) / g, "oreb": (st.get("oreb", 0) or 0) / g,
+           "dreb": (st.get("dreb", 0) or 0) / g, "stl": (st.get("stl", 0) or 0) / g, "blk": (st.get("blk", 0) or 0) / g, "fga": fga / g}
+    out["fgp"] = 100 * fgm / fga if fga else None
+    out["tpp"] = 100 * tpm / tpa if tpa else None
+    out["efg"] = 100 * (fgm + 0.5 * tpm) / fga if fga else None
+    out["ts"] = 100 * pts / (2 * (fga + 0.44 * fta)) if (fga + fta) else None
+    return out
+
+
+def player_detail(runner, source, team, name):
+    sec = runner.sections or {}
+    data = datasets(sec)
+    if source not in data:
+        source = next(iter(data), "Live")
+    players, _ = data.get(source, ({}, {}))
+    mine = (players.get(team) or {}).get(name)
+    if mine is None:
+        return {"error": "No stats for that player yet."}
+    pool = [(tn, pn, defaultdict(float, st)) for tn, pp in players.items() for pn, st in pp.items() if (st.get("games", 0) or 0) > 0]
+    max_gp = max((s["games"] for _, _, s in pool), default=1)
+    min_gp = max(1, round(0.2 * max_gp)) if max_gp > 1 else 1
+    qualified = [(tn, pn, s) for tn, pn, s in pool if s["games"] >= min_gp]
+    st = defaultdict(float, mine)
+    g = max(1, st["games"])
+    metrics = _metrics(st)
+    ranks = []
+    for key, label in PCT_METRICS:
+        val = metrics.get(key)
+        if val is None:
+            ranks.append({"key": key, "label": label, "value": None, "pct": None})
+            continue
+        pop = []
+        for _, _, s in qualified:
+            if key in ("fgp", "efg") and s["fga"] / s["games"] < 3:
+                continue   # a shooting % needs real volume
+            if key == "tpp" and s["tpa"] / s["games"] < 1:
+                continue
+            v = _metrics(s).get(key)
+            if v is not None:
+                pop.append(v)
+        below = sum(1 for v in pop if v < val - 1e-9)
+        equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
+        pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
+        ranks.append({"key": key, "label": label, "value": round(val, 1), "pct": pct})
+    keys = ("minutes", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus")
+    totals = {k: (round(st[k] / 60, 1) if k == "minutes" else round(st[k], 1) if k == "plus_minus" else int(st[k])) for k in keys}
+    per_game = {k: round(st[k] / g / (60 if k == "minutes" else 1), 1) for k in keys}
+    diet = st.get("shot_diet") or {}
+    zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
+    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks,
+            "pool": len(qualified), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")}}

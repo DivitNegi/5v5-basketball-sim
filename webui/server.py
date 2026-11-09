@@ -17,7 +17,7 @@ from .hub import EventHub
 from .runner import rating_summary, SimRunner
 from .live import team_identity
 from . import live
-from .stats import payload as stats_payload
+from .stats import payload as stats_payload, player_detail as stats_player_detail
 from .shots import payload as shots_payload
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -985,6 +985,8 @@ def build_app():
                     (params.get("kind") or ["averages"])[0],
                     (params.get("team") or ["All teams"])[0],
                     (params.get("quarter") or ["All"])[0]))
+            if path == "/api/stats/player":
+                return self._json(stats_player_detail(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
             if path == "/api/coach":
                 return self._json(coach_payload())
             if path == "/api/fantasy":
