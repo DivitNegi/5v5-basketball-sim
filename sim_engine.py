@@ -12171,7 +12171,7 @@ SHOT_RESULT_HOOK = None
 def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Player = None,
                      defender: Player = None, quality_mult: float | None = None):
     if SHOT_RESULT_HOOK is not None:
-        SHOT_RESULT_HOOK("attempt")
+        SHOT_RESULT_HOOK("attempt", team=team, player=player, shot_type=shot_type, context=context)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 
@@ -12220,7 +12220,7 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
 
 def record_shot_make(team: Team, shot_type: str, context: str = "", player: Player = None, defender: Player = None):
     if SHOT_RESULT_HOOK is not None:
-        SHOT_RESULT_HOOK("make")
+        SHOT_RESULT_HOOK("make", team=team, player=player, shot_type=shot_type, context=context)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 

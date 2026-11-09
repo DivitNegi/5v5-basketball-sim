@@ -1023,6 +1023,8 @@ def build_app():
                 return self._json(highs_payload(runner, q("view", HIGHS_VIEWS[0]), q("stat", "PTS"), q("team", "All Teams")))
             if path == "/api/season/schedule":
                 return self._json(schedule_payload(runner, (params.get("team") or [""])[0]))
+            if path == "/api/game/shotlog":
+                return self._json({"shots": list(runner.shots)})
             if path == "/api/game/shots":
                 return self._json(live.shots_payload())
             if path == "/api/game/quarters":

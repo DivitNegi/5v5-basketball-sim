@@ -134,6 +134,9 @@ class SimRunner:
         self.options: Dict = {}
         self.draft_prompt: Dict = {}
         self.trade_prompt: Dict = {}
+        self.shots: list = []          # this game's shot events, so a page opened mid-game can rebuild its shot map
+        self._shot_count = 0
+        self._pending_shot = None
         self._draft_choice = None
         self._draft_event = threading.Event()
         self._live_signature = None
@@ -195,6 +198,7 @@ class SimRunner:
         self.options = options
         keep = mode in ("2027 play-in & playoffs", "Replay season game")   # a replay must leave the finished season as it was
         self.score, self.series, self.flow, self.last_live = None, None, [], None
+        self.shots, self._shot_count, self._pending_shot = [], 0, None
         if not keep:
             self.sections = {}
             self.season = {"progress": None, "races": None, "standings": None, "ready": False}
@@ -336,7 +340,36 @@ class SimRunner:
         return None
 
     # ------------------------------------------------------------------ run
-    def _on_shot_hook(self, kind: str):
+    def _flush_shot(self, made: bool):
+        """Publish the shot that was waiting for its result (a make, or a miss at the rebound) as one {"type": "shot"} event."""
+        ev = getattr(self, "_pending_shot", None)
+        self._pending_shot = None
+        if not ev:
+            return
+        ev = {"type": "shot", **ev, "made": bool(made), "n": self._shot_count}
+        self._shot_count += 1
+        self.shots.append(ev)
+        del self.shots[:-3000]
+        self.hub.publish(ev)
+
+    def _track_shot(self, kind: str, info: Dict):
+        if getattr(sim_engine, "SILENT_SIM_DEPTH", 0) > 0 or self.mode in SEASON_LIKE:
+            return   # a quiet season game is not a live game: no shot map for it
+        if kind == "attempt":
+            self._flush_shot(False)   # the previous attempt never got a make or a rebound (e.g. a blocked shot): it missed
+            player, team = info.get("player"), info.get("team")
+            if player is None or team is None:
+                self._pending_shot = None
+                return
+            ctx = sim_engine.SIM_CONTEXT
+            self._pending_shot = {"team": team.name, "player": player.name, "zone": str(info.get("shot_type") or "mid"), "period": ctx.get("period"), "clock": ctx.get("period_time")}
+        elif kind == "make":
+            self._flush_shot(True)
+        elif kind == "miss":
+            self._flush_shot(False)
+
+    def _on_shot_hook(self, kind: str, **info):
+        self._track_shot(kind, info)
         # "make" arrives just before the made shot's result line, so that next line is the make. "miss" arrives when the rebound is
         # about to be resolved, i.e. just after the miss line, so the page marks the last line it received. (An attempt alone says
         # nothing: drives record it before their build-up lines, blocks after the block line.)
@@ -389,6 +422,8 @@ class SimRunner:
         if self._on_season_message(message):
             return
         if "period" in message and "clock" in message and "score_a" in message:
+            if str(message.get("period", "")).lower() == "1st" and str(message.get("clock")) in ("12:00", "10:00") and str(message.get("score_a")) == "0" and str(message.get("score_b")) == "0" and self.shots:
+                self.shots, self._shot_count, self._pending_shot = [], 0, None   # the next game of a series starts a fresh shot map
             self.score = message
             if self.status.startswith("Simming") and not sim_engine.SIM_FAST_FORWARD and not sim_engine.SIM_STICKY_FAST:
                 self.set_status("Paused" if sim_engine.SIM_PAUSED else "Running")   # the jump target was reached
@@ -511,6 +546,7 @@ class SimRunner:
         except Exception:
             error = traceback.format_exc()
         finally:
+            self._flush_shot(False)   # a last attempt that never got a rebound (the buzzer) was a miss
             self._push_live(force=True)
             try:
                 if mode != "Replay season game":   # the replayed game's own tables must not replace the season's

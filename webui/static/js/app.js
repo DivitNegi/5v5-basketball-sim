@@ -607,6 +607,7 @@ function resetGame(msg) {
     SE.data = null; SE.players = null; refreshSeason();
     return;
   }
+  S.shots = []; redrawShotCharts();
   S.plays = []; S.goodPlays = []; S.gameNo = 1; S.gameSnapshots = new Map(); S.lastScoreClock = null;
   S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
   S.identities = msg.teams || [null, null];
@@ -636,6 +637,7 @@ function connect() {
     applyStatus({ text: st.status, active: st.active, paused: st.paused, speed: st.speed });
     if (st.live) applyLive(st.live);
     api.get("/api/trade/prompt").then((r) => showTradePrompt(r.prompt)).catch(() => {});
+    api.get("/api/game/shotlog").then((r) => { S.shots = r.shots || []; redrawShotCharts(); }).catch(() => {});
     if (st.flow?.length) { S.flow = st.flow; renderFlow("#flowMini", 170); }
   };
   es.onerror = () => { conn.className = "conn bad"; conn.lastElementChild.textContent = "Reconnecting…"; };
@@ -669,6 +671,7 @@ function drainEvents() {
     const msg = evQueue.shift();
     if (msg.type === "pbp") addFeedLine(msg.text, msg.shot);
     else if (msg.type === "shotmark") markLastMiss();
+    else if (msg.type === "shot") addShot(msg, evQueue.length < 120);   // a long queue is a jump to Final: place the dots, do not animate them
     else if (msg.type === "score") { applyScore(msg, false); sawScore = true; }
     else if (msg.type === "live") lastLive = msg;
     else handleEvent(msg);
@@ -1798,6 +1801,122 @@ function renderStats() {
   renderStatsInto($("#statsBody"), statsData);
 }
 
+// ───────────────────────── live shot map ─────────────────────────
+// Every field-goal attempt arrives as a {"type":"shot"} event (shooter, zone, make or miss). The engine only knows the zone, so each dot is placed
+// at a random point inside its zone, seeded by the shot's number so a reload draws the same map. Team A attacks the left basket, team B the right.
+S.shots = [];
+const SHOT_CHARTS = [];
+const SC_GEO = { W: 1000, H: 600, X0: 30, Y0: 70, CW: 940, CH: 500, CY: 320, HX: 82.5 };
+const hashStr = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; };
+const rng = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+function shotSpot(ev, side) {
+  const rnd = rng(hashStr(ev.player) ^ Math.imul(ev.n + 1, 2654435761));
+  const { HX, CY, Y0, CH } = SC_GEO, HY = CY;
+  const polar = (rMin, rMax, aMax) => { const r = rMin + (rMax - rMin) * Math.sqrt(rnd()), a = (rnd() * 2 - 1) * aMax; return [HX + r * Math.cos(a), HY + r * Math.sin(a)]; };
+  let x, y;
+  const z = ev.zone;
+  if (z === "dunk") [x, y] = polar(2, 20, 1.2);
+  else if (z === "rim") [x, y] = polar(10, 40, 1.35);
+  else if (z === "post") [x, y] = polar(45, 105, 1.0);
+  else if (z === "three") {
+    if (rnd() < 0.2) { x = 45 + rnd() * 120; y = rnd() < 0.5 ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
+    else { for (let k = 0; k < 10; k++) { [x, y] = polar(248, 330, 1.25); if (y > Y0 + 14 && y < Y0 + CH - 14) break; } }
+  } else { for (let k = 0; k < 10; k++) { [x, y] = polar(75, 225, 1.4); if (Math.abs(y - HY) <= 205) break; } }   // mid-range, post fade and anything else: inside the arc
+  return side ? [1000 - x, y] : [x, y];
+}
+function courtLines() {
+  const { W, X0, Y0, CW, CH, CY, HX } = SC_GEO;
+  const ln = 'stroke="#c9d3e6" stroke-opacity=".5" stroke-width="2" fill="none"';
+  const half = (flip) => {
+    const X = (v) => (flip ? W - v : v), arcX = X0 + 142;
+    return `<path d="M ${X(X0)} ${Y0 + 30} L ${X(arcX)} ${Y0 + 30} A 237.5 237.5 0 0 ${flip ? 0 : 1} ${X(arcX)} ${Y0 + CH - 30} L ${X(X0)} ${Y0 + CH - 30}" ${ln}/>
+      <rect x="${flip ? W - (X0 + 190) : X0}" y="${CY - 80}" width="190" height="160" ${ln}/>
+      <path d="M ${X(X0 + 190)} ${CY - 60} A 60 60 0 0 ${flip ? 0 : 1} ${X(X0 + 190)} ${CY + 60}" ${ln}/>
+      <path d="M ${X(HX)} ${CY - 40} A 40 40 0 0 ${flip ? 0 : 1} ${X(HX)} ${CY + 40}" ${ln}/>
+      <line x1="${X(X0 + 40)}" y1="${CY - 30}" x2="${X(X0 + 40)}" y2="${CY + 30}" stroke="#e8edf6" stroke-width="3"/>
+      <circle cx="${X(HX)}" cy="${CY}" r="7.5" stroke="#f5a524" stroke-width="3" fill="none"/>`;
+  };
+  return `<rect x="${X0}" y="${Y0}" width="${CW}" height="${CH}" rx="6" fill="#13203a" stroke="#c9d3e6" stroke-opacity=".6" stroke-width="2.5"/>
+    <line x1="${W / 2}" y1="${Y0}" x2="${W / 2}" y2="${Y0 + CH}" ${ln}/><circle cx="${W / 2}" cy="${CY}" r="60" ${ln}/>${half(false)}${half(true)}`;
+}
+const NS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs = {}) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
+const teamSide = (name) => (S.identities?.[1]?.name === name ? 1 : 0);
+function mountShotChart(host, { big = false } = {}) {
+  host = typeof host === "string" ? $(host) : host; if (!host) return;
+  const st = { team: "all", player: "all", quarter: "all", result: "all", heat: false, drawn: 0, playersSig: "" };
+  const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 40}`, class: "court-svg shot-map" });
+  svg.innerHTML = courtLines();
+  const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }); svg.append(heat, dots);
+  const names = svgEl("g", { class: "court-names" }); svg.append(names);
+  const sel = (key, opts) => h("select", { onchange: (e) => { st[key] = e.target.value; redraw(); } }, opts.map(([v, t]) => h("option", { value: v, selected: v === st[key] }, t)));
+  const bar = h("div", { class: "filters sc-bar" });
+  const stats = h("div", { class: "sc-stats muted" });
+  const known = new Set(); let statsTimer = null;
+  const scheduleStats = () => { if (statsTimer) return; statsTimer = setTimeout(() => { statsTimer = null; if (st.heat) redraw(); else updateStats(S.shots.filter(passes)); }, 80); };   // once per burst, not once per shot
+  const legend = h("div", { class: "sc-legend" }, h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss"));
+  host.replaceChildren(bar, svg, h("div", { class: "sc-foot" }, stats, legend));
+  const passes = (ev) => (st.team === "all" || teamSide(ev.team) === Number(st.team)) && (st.player === "all" || ev.player === st.player)
+    && (st.quarter === "all" || (st.quarter === "OT" ? ev.period >= 5 : ev.period === Number(st.quarter))) && (st.result === "all" || (st.result === "make") === ev.made);
+  function dot(ev, animate) {
+    const [x, y] = shotSpot(ev, teamSide(ev.team));
+    const g = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}${animate ? " fresh" : ""}` });
+    if (ev.made) { g.append(svgEl("circle", { r: 8, class: "ring" })); if (animate) g.append(svgEl("circle", { r: 8, class: "pulse" })); }
+    else g.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
+    if (animate) {
+      const pts = ev.made ? (ev.zone === "three" ? "+3" : "+2") : "";
+      if (pts) { const t = svgEl("text", { class: "floater", y: -12, "text-anchor": "middle" }); t.textContent = pts; g.append(t); setTimeout(() => t.remove(), 1500); }
+      setTimeout(() => g.classList.remove("fresh"), 1400);
+    }
+    g.setAttribute("data-n", ev.n);
+    dots.append(g);
+    while (dots.childNodes.length > 420) dots.firstChild.remove();
+  }
+  function updateStats(list) {
+    const fg = (arr) => `${arr.filter((e) => e.made).length}/${arr.length}`, tp = list.filter((e) => e.zone === "three");
+    const by = (z) => list.filter((e) => e.zone === z || (z === "mid" && e.zone === "post_fade"));
+    stats.textContent = list.length ? `FG ${fg(list)} · 3PT ${fg(tp)} · rim ${fg([...by("rim"), ...by("dunk")])} · mid ${fg(by("mid"))} · post ${fg(by("post"))}` : "No shots yet.";
+  }
+  function redraw() {
+    dots.replaceChildren(); heat.replaceChildren();
+    const list = S.shots.filter(passes);
+    if (st.heat) {   // density view: 40 px bins coloured by shooting percentage, stronger where there are more shots
+      const bins = new Map();
+      for (const ev of list) { const [x, y] = shotSpot(ev, teamSide(ev.team)); const k = `${Math.floor(x / 40)},${Math.floor(y / 40)}`; const b = bins.get(k) || [0, 0]; b[0]++; if (ev.made) b[1]++; bins.set(k, b); }
+      for (const [k, [n, m]] of bins) { const [cx, cy] = k.split(",").map(Number); heat.append(svgEl("rect", { x: cx * 40, y: cy * 40, width: 40, height: 40, rx: 6, fill: `hsl(${Math.round(120 * m / n)} 70% 45%)`, opacity: Math.min(0.8, 0.22 + n * 0.1) })); }
+    } else for (const ev of list.slice(-420)) dot(ev, false);
+    updateStats(list); st.drawn = S.shots.length;
+    known.clear(); S.shots.forEach((e) => known.add(e.player));
+  }
+  function refreshControls() {
+    const players = [...new Set(S.shots.filter((e) => st.team === "all" || teamSide(e.team) === Number(st.team)).map((e) => e.player))].sort();
+    const sig = players.join("|") + (S.identities?.[0]?.short || "");
+    if (sig === st.playersSig) return; st.playersSig = sig;
+    if (st.player !== "all" && !players.includes(st.player)) st.player = "all";
+    bar.replaceChildren(sel("team", [["all", "Both teams"], ["0", S.identities?.[0]?.short || "Team A"], ["1", S.identities?.[1]?.short || "Team B"]]), sel("player", [["all", "All players"], ...players.map((n) => [n, n])]),
+      sel("quarter", [["all", "All quarters"], ["1", "Q1"], ["2", "Q2"], ["3", "Q3"], ["4", "Q4"], ["OT", "OT"]]), sel("result", [["all", "Makes & misses"], ["make", "Makes"], ["miss", "Misses"]]),
+      h("label", { class: "chk" }, h("input", { type: "checkbox", checked: st.heat, onchange: (e) => { st.heat = e.target.checked; redraw(); } }), " Heat map"));
+    names.replaceChildren();
+    [0, 1].forEach((i) => { const t = svgEl("text", { x: i ? 970 : 30, y: 50, "text-anchor": i ? "end" : "start", class: "court-team", fill: S.identities?.[i]?.color || "#a7b2c5" }); t.textContent = S.identities?.[i]?.short || ""; names.append(t); });
+  }
+  const chart = {
+    add(ev, animate) {
+      if (!known.has(ev.player)) { known.add(ev.player); st.playersSig = ""; refreshControls(); }
+      if (!st.heat && passes(ev)) dot(ev, animate);
+      scheduleStats();
+    },
+    redraw() { st.playersSig = ""; refreshControls(); redraw(); },
+  };
+  SHOT_CHARTS.push(chart); refreshControls(); redraw();
+  return chart;
+}
+function addShot(ev, animate) {
+  S.shots.push(ev); if (S.shots.length > 3000) S.shots.shift();
+  const calm = animate && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const c of SHOT_CHARTS) c.add(ev, calm);
+}
+const redrawShotCharts = () => SHOT_CHARTS.forEach((c) => c.redraw());
+
 // ---- Shots tab (Tk): shot diet / defense diet / matchup defense
 const SH = { mode: "Shot Diet", game: "All Games", quarter: "All Quarters", team: "All Teams", defender: "All Defenders", guarded: "All Guarded", rank: "Team order", rankStat: "Made", minAtt: "", minDef: "", source: "Season", data: null };
 async function loadShots2() {
@@ -1858,6 +1977,7 @@ function showTradePrompt(pr) {
 // ───────────────────────── boot ─────────────────────────
 async function boot() {
   S.meta = await api.get("/api/meta");
+  mountShotChart("#liveShotChart"); mountShotChart("#shotMapHost");
   const modeSel = $("#mode");
   // the year seasons live on the Modes screen as buttons now, so the dropdown stays short
   const YEAR_SEASON = /^(\d{4}) season/;
