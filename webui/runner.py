@@ -333,8 +333,13 @@ class SimRunner:
 
     # ------------------------------------------------------------------ run
     def _on_shot_hook(self, kind: str):
-        # "attempt" opens a shot, "make" turns it into a made one; the next line that is shown is that shot's result line
-        self._shot_state = "make" if kind == "make" else "miss"
+        # "make" arrives just before the made shot's result line, so that next line is the make. "miss" arrives when the rebound is
+        # about to be resolved, i.e. just after the miss line, so the page marks the last line it received. (An attempt alone says
+        # nothing: drives record it before their build-up lines, blocks after the block line.)
+        if kind == "make":
+            self._shot_state = "make"
+        elif kind == "miss":
+            self.hub.publish({"type": "shotmark", "result": "miss"}, keep=True)
 
     def _on_pbp(self, text: str):
         line = text.rstrip("\n")

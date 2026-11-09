@@ -12478,6 +12478,8 @@ def rebound_weight(player: Player, miss_type: str, offensive: bool) -> float:
 
 
 def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player]:
+    if SHOT_RESULT_HOOK is not None:
+        SHOT_RESULT_HOOK("miss")   # a rebound is needed, so the line just printed was a miss (blocked shots print their line before the attempt is recorded)
     sanitize_live_lineups(off, dff)
     # Real offensive rebound rate is ~26% overall (~20% off jumpers, ~33% off
     # rim/paint misses); the old 15% / 30% bases produced a ~16% league ORB%.

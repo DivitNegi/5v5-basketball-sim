@@ -610,6 +610,12 @@ function scheduleDrain() {
   requestAnimationFrame(run);
   setTimeout(run, 100);   // a hidden tab does not run animation frames
 }
+// the engine says the shot just described missed (a rebound is being resolved): colour that line red
+function markLastMiss() {
+  const last = $("#rawlog").lastElementChild;
+  if (last && last.classList.contains("pbp-line") && !last.classList.contains("made")) { last.classList.remove("tov", "foul"); last.classList.add("miss"); }
+  feed.miss = true;
+}
 function drainEvents() {
   const t0 = performance.now();
   const before = S.score.slice();
@@ -617,6 +623,7 @@ function drainEvents() {
   while (evQueue.length && performance.now() - t0 < 12) {
     const msg = evQueue.shift();
     if (msg.type === "pbp") addFeedLine(msg.text, msg.shot);
+    else if (msg.type === "shotmark") markLastMiss();
     else if (msg.type === "score") { applyScore(msg, false); sawScore = true; }
     else if (msg.type === "live") lastLive = msg;
     else handleEvent(msg);
