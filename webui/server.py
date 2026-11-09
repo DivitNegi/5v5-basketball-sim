@@ -419,6 +419,62 @@ def schedule_payload(runner, team):
     return {"games": rows}
 
 
+TEAM_METRICS = [   # (label, value(per-game totals), lower_is_better)
+    ("Points", lambda t, g: t.get("pts", 0) / g, False),
+    ("Defense (opp. pts)", lambda t, g: (t.get("opp_pts", 0) / max(1, t.get("opp_games", 0) or g)) if t.get("opp_pts") is not None else None, True),
+    ("Rebounds", lambda t, g: t.get("reb", 0) / g, False),
+    ("Off. Rebounds", lambda t, g: t.get("oreb", 0) / g, False),
+    ("Assists", lambda t, g: t.get("ast", 0) / g, False),
+    ("Steals", lambda t, g: t.get("stl", 0) / g, False),
+    ("Blocks", lambda t, g: t.get("blk", 0) / g, False),
+    ("Ball security (TOV)", lambda t, g: t.get("tov", 0) / g, True),
+    ("FG %", lambda t, g: 100 * t.get("fgm", 0) / t["fga"] if t.get("fga") else None, False),
+    ("3-pt FG %", lambda t, g: 100 * t.get("tpm", 0) / t["tpa"] if t.get("tpa") else None, False),
+    ("FT %", lambda t, g: 100 * t.get("ftm", 0) / t["fta"] if t.get("fta") else None, False),
+    ("Effective FG %", lambda t, g: 100 * (t.get("fgm", 0) + 0.5 * t.get("tpm", 0)) / t["fga"] if t.get("fga") else None, False),
+]
+
+
+def team_card_payload(runner, team):
+    sec = runner.sections or {}
+    teams = sec.get("_season_team_totals") or sec.get("_playoff_team_totals") or sec.get("_series_team_totals") or {}
+    mine = teams.get(team)
+    if not mine:
+        return {"error": "No team stats yet."}
+    g = max(1, mine.get("games", 0) or 1)
+    ranks = []
+    for label, fn, lower in TEAM_METRICS:
+        try:
+            val = fn(mine, g)
+        except Exception:
+            val = None
+        if val is None:
+            ranks.append({"label": label, "value": None, "pct": None})
+            continue
+        pop = []
+        for tn, t in teams.items():
+            try:
+                v = fn(t, max(1, t.get("games", 0) or 1))
+            except Exception:
+                v = None
+            if v is not None:
+                pop.append(v)
+        below = sum(1 for v in pop if v < val - 1e-9)
+        equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
+        pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
+        if pct is not None and lower:
+            pct = 100 - pct
+        ranks.append({"label": label, "value": round(val, 1), "pct": pct})
+    per = {k: round(mine.get(k, 0) / g, 1) for k in ("pts", "reb", "ast", "stl", "blk", "tov")}
+    per["opp_pts"] = round(mine.get("opp_pts", 0) / max(1, mine.get("opp_games", 0) or g), 1) if mine.get("opp_pts") is not None else None
+    pct = lambda m, a: round(100 * mine.get(m, 0) / mine[a], 1) if mine.get(a) else None
+    per.update(fgp=pct("fgm", "fga"), tpp=pct("tpm", "tpa"), ftp=pct("ftm", "fta"))
+    games = schedule_payload(runner, team)["games"]
+    played = [x for x in games if x.get("mine") is not None]
+    return {"team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
+            "recent": list(reversed(played[-8:])), "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"])}
+
+
 HIGHS_STATS = {"PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk", "3PM": "tpm", "3PA": "tpa",
                "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta", "STK": "stk", "TOV": "tov", "MIN": "min", "+/-": "pm",
                "FG%": "fgp", "3P%": "tpp"}
@@ -1023,6 +1079,8 @@ def build_app():
             if path == "/api/season/highs":
                 q = lambda k, d: (params.get(k) or [d])[0]
                 return self._json(highs_payload(runner, q("view", HIGHS_VIEWS[0]), q("stat", "PTS"), q("team", "All Teams")))
+            if path == "/api/team/card":
+                return self._json(team_card_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/season/schedule":
                 return self._json(schedule_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/game/shotlog":

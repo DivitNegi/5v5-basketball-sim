@@ -781,7 +781,7 @@ function teamCell(r) {
 }
 
 function standingsTable(title, rows) {
-  const body = rows.map((r, i) => h("tr", { class: i === 5 || i === 9 ? "cut" : "" },
+  const body = rows.map((r, i) => h("tr", { class: `clickable ${i === 5 || i === 9 ? "cut" : ""}`, title: "Click for the team card", onclick: () => openTeamCard(r.team) },
     h("td", { class: "l" }, h("span", { class: "seed" }, i + 1), teamCell(r)),
     h("td", {}, r.wins), h("td", {}, r.losses), h("td", {}, (r.pct ?? 0).toFixed(3)), h("td", {}, r.diff > 0 ? `+${r.diff.toFixed(1)}` : (r.diff ?? 0).toFixed(1))));
   return h("div", {}, h("h3", {}, title),
@@ -793,7 +793,8 @@ function renderStandings() {
   if (!rows.length) return h("div", { class: "empty" }, "Standings appear as the season runs.");
   const byConf = {};
   rows.forEach((r) => { (byConf[r.conference || "League"] ||= []).push(r); });
-  return h("div", { class: "conf-grid" }, Object.keys(byConf).map((k) => standingsTable(k === "League" ? "League" : `${k} conference`, byConf[k])));
+  const confOrder = (k) => (k === "West" ? 0 : k === "East" ? 1 : 2);   // West on the left, East on the right
+  return h("div", { class: "conf-grid" }, Object.keys(byConf).sort((a, b) => confOrder(a) - confOrder(b)).map((k) => standingsTable(k === "League" ? "League" : `${k} conference`, byConf[k])));
 }
 
 // "31.8 PPG, 6.5 RPG, ..." -> small stat tiles
@@ -1388,6 +1389,7 @@ function pcAfterRender(numTiles) {
 function zoneClass(key, made, att) {
   if (!att) return "none";
   const pct = 100 * made / att;
+  if (key === "three") return pct > 36 ? "good" : "ok";   // threes: green above 36% (40%+ included), yellow below
   const [hi, lo] = key === "rim" ? [50, 40] : key === "mid" ? [40, 30] : key === "post" ? [48, 38] : [42, 33];
   return pct > hi ? "good" : pct >= lo ? "ok" : "bad";
 }
@@ -1876,6 +1878,48 @@ const numOf = (v) => {
   const m = s.includes("·") ? s.match(/\/(\d+)/) : s.match(/-?\d+(\.\d+)?/);
   return m ? parseFloat(m[1] !== undefined && s.includes("·") ? m[1] : m[0]) : -1e9;
 };
+// ---- team card pop-up from the standings: record, per-game numbers, league percentile radar, latest games with box scores, schedule button
+async function openTeamCard(team) {
+  document.querySelector(".pp-back")?.remove();
+  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const body = h("div", { class: "pp-body" }, h("div", { class: "empty" }, "Loading…"));
+  const back = h("div", { class: "pp-back", onclick: (e) => { if (e.target === back) close(); } }, h("div", { class: "pp-card", role: "dialog" }, h("button", { class: "pp-x", onclick: close, title: "Close" }, "✕"), body));
+  document.body.append(back); document.addEventListener("keydown", onKey);
+  let d;
+  try { d = await api.get(`/api/team/card?team=${encodeURIComponent(team)}`); } catch { d = { error: "Could not load that team." }; }
+  if (d.error) { body.replaceChildren(h("div", { class: "empty" }, d.error)); return; }
+  const id = identOf(team), st = (SE.data?.standings || []).find((r) => r.team === team);
+  const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v ?? "–"));
+  const pg = d.per_game, fmt = (v) => (v == null ? "–" : v);
+  const goSchedule = () => {
+    close(); SE.team = team; SE.sbox = null;
+    $('#nav .nav-item[data-view="season"]').click();
+    $('#seasonTabs button[data-v="schedule"]')?.click();
+    loadSchedule();
+  };
+  const showBox = async (gid) => {
+    const b = await api.get(`/api/season/box?gid=${encodeURIComponent(gid)}`);
+    if (b.error) { toast(b.error, "err"); return; }
+    body.replaceChildren(h("div", { class: "filters" }, h("button", { class: "btn", onclick: render }, `‹ Back to ${id.short || team}`),
+      h("b", {}, b.teams.map((t) => `${t.short} ${t.score}`).join("  –  ")), b.order != null ? h("button", { class: "btn", onclick: () => { close(); startSpecial("Replay season game", { order: b.order }); } }, "Replay this game") : null), fullBox(b, { focusTeam: team }));
+  };
+  const render = () => {
+    const rows = d.recent.map((x) => h("tr", { class: "clickable", title: "Click for the box score", onclick: () => showBox(x.gid) },
+      h("td", { class: "l" }, h("span", { class: `wl ${x.win ? "w" : "l"}` }, x.win ? "W" : "L")), h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", {}, `${x.mine}-${x.theirs}`)));
+    body.replaceChildren(
+      h("div", { class: "pcard-head", style: { "--c": id.color || "#64748b" } }, logoEl(id), h("div", {}, h("div", { class: "pcard-name" }, `${id.year ? id.year + " " : ""}${id.short || team}`),
+        h("div", { class: "pcard-sub" }, `${st ? `${st.wins}-${st.losses}` : `${d.wins}-${d.losses}`}${st?.conference ? ` · ${st.conference}` : ""} · ${d.games} games`)),
+        h("div", { style: { marginLeft: "auto" } }, h("button", { class: "btn", onclick: goSchedule }, "View schedule ›"))),
+      h("div", { class: "stat-tiles" }, tile("PPG", fmt(pg.pts)), tile("OPP PPG", fmt(pg.opp_pts)), tile("RPG", fmt(pg.reb)), tile("APG", fmt(pg.ast)), tile("SPG", fmt(pg.stl)), tile("BPG", fmt(pg.blk)), tile("TOV", fmt(pg.tov)),
+        tile("FG%", fmt(pg.fgp)), tile("3P%", fmt(pg.tpp)), tile("FT%", fmt(pg.ftp))),
+      h("div", { class: "pc-viz", style: { gridTemplateColumns: "1.4fr 1fr", marginTop: "12px" } },
+        h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the other ${d.pool - 1} teams. Defense and turnovers are flipped so higher is always better.`), percentileRadar(d.ranks, chartColor())),
+        h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"))));
+  };
+  render();
+}
+
 // ---- player pop-up from the Stats tables: totals / per game, and where he ranks against the league (percentile radar)
 const ordinal = (n) => { const v = n % 100; return `${n}${(v >= 11 && v <= 13) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th")}`; };
 function percentileRadar(ranks, color) {

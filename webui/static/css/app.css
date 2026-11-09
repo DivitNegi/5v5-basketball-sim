@@ -786,3 +786,7 @@ tr.clickable { cursor: pointer; }
 .stat-tiles .tile { min-width: 0; overflow: hidden; }
 .stat-tiles .tile .v { font-size: 13px; white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }   /* a value that is too wide for its box scrolls sideways */
 .stat-tiles .tile .v.frac { font-size: 13px; }   /* every tile value is the same size */
+
+.wl { display: inline-block; width: 22px; text-align: center; border-radius: 6px; font-size: 11px; font-weight: 800; padding: 2px 0; }
+.wl.w { background: rgba(74, 222, 128, .16); color: var(--green); } .wl.l { background: rgba(244, 63, 94, .16); color: #fda4af; }
+@media (max-width: 760px) { .pc-viz[style*="1.4fr"] { grid-template-columns: 1fr !important; } }
