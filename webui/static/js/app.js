@@ -578,6 +578,9 @@ function renderFlow(rootSel, height) {
 
 // ───────────────────────── live data ─────────────────────────
 function applyLive(snap) {
+  // a live view whose score dropped is the next game of a series: keep the finished game's last view for its snapshot
+  const tot = (v) => (v?.teams || []).reduce((n, t) => n + (t.score || 0), 0);
+  if (S.live && snap?.teams && tot(snap) < tot(S.live) && tot(S.live) > 0 && S.live !== S.snappedLive) S.finishedLive = { n: S.gameNo, live: S.live };
   S.live = snap;
   if (snap?.teams) {
     S.identities = snap.teams.map((t) => ({ name: t.name, short: t.short, year: t.year, initials: t.initials, logo: t.logo, color: t.color, color2: t.color2 }));
@@ -594,8 +597,10 @@ function applyLive(snap) {
 
 function applyScore(msg, paint = true) {
   const startsFresh = /^1st$/i.test(msg.period || "") && /^(12|10):00$/.test(msg.clock || "") && Number(msg.score_a) === 0 && Number(msg.score_b) === 0;
-  if (startsFresh && S.lastScoreClock === "0:00" && S.live) {
-    S.gameSnapshots.set(S.gameNo, structuredClone(S.live));
+  // a new game in a series starts when a 1st-quarter score arrives right after a later period's (the 12:00 0-0 line is not always the first one seen)
+  const newGame = (startsFresh && S.lastScoreClock === "0:00") || (/^1st$/i.test(msg.period || "") && S.lastScorePeriod && !/^1st$/i.test(S.lastScorePeriod));
+  if (newGame && S.live) {
+    S.gameSnapshots.set(S.gameNo, structuredClone(S.finishedLive?.n === S.gameNo ? S.finishedLive.live : S.live)); S.snappedLive = S.live; S.finishedLive = null;
     S.gameShots.set(S.gameNo, S.shots); S.shots = []; redrawShotCharts();   // the finished game's shots are kept for its player cards
     S.gameNo += 1;
   }
@@ -607,6 +612,7 @@ function applyScore(msg, paint = true) {
   const before = S.score.slice();
   S.score = newScore;
   S.lastScoreClock = msg.clock || null;
+  S.lastScorePeriod = msg.period || null;
   if (paint) paintScore(before);
 }
 function paintScore(before) {
@@ -639,7 +645,7 @@ function resetGame(msg) {
     return;
   }
   S.shots = []; redrawShotCharts();
-  S.plays = []; S.goodPlays = []; S.gameNo = 1; S.gameSnapshots = new Map(); S.gameShots = new Map(); S.lastScoreClock = null;
+  S.plays = []; S.goodPlays = []; S.gameNo = 1; S.gameSnapshots = new Map(); S.gameShots = new Map(); S.lastScoreClock = null; S.lastScorePeriod = null;
   S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
   S.identities = msg.teams || [null, null];
   (msg.teams || []).forEach((t, i) => {     // keep the setup bar on the teams actually playing

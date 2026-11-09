@@ -815,6 +815,7 @@ def run_gui_app():
         textvariable=mode_var,
         values=(
             "Game",
+            "Game 7",
             "1-on-1",
             "Playoff series",
             "Custom 16-team playoffs",
@@ -10324,16 +10325,23 @@ def run_gui_app():
         sim_factories = active_team_factories()
         sim_completed = False
         sim_error = None
-        if mode not in ("2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Replay season game"):
+        if mode not in ("2018 season (82 games)", "Full 2018 playoffs", "2027 play-in & playoffs", "Replay season game", "Game"):
             _players_data_module.POSTSEASON_PLAY_IN = True
         try:
-            if mode == "Game":
-                team_a = sim_factories[team_a_var.get()]()
-                team_b = sim_factories[team_b_var.get()]()
-                apply_star_clutchness(team_a, team_b)
-                assign_player_badges(team_a)
-                assign_player_badges(team_b)
-                simulate_game(team_a, team_b)
+            if mode in ("Game", "Game 7"):
+                # "Game 7" is the playoff-intensity single game; "Game" is a regular-season game (paced star minutes, starters stay in a close 4th)
+                previous_cap = sim_engine.SEASON_STAR_MINUTES_CAP
+                if mode == "Game":
+                    sim_engine.SEASON_STAR_MINUTES_CAP = 34
+                try:
+                    team_a = sim_factories[team_a_var.get()]()
+                    team_b = sim_factories[team_b_var.get()]()
+                    apply_star_clutchness(team_a, team_b)
+                    assign_player_badges(team_a)
+                    assign_player_badges(team_b)
+                    simulate_game(team_a, team_b)
+                finally:
+                    sim_engine.SEASON_STAR_MINUTES_CAP = previous_cap
             elif mode == "Replay season game":
                 # The same game, from the same random seed and rosters, played live: play by play, box, ratings, cards.
                 previous_cap = sim_engine.SEASON_STAR_MINUTES_CAP

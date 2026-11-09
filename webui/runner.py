@@ -22,14 +22,14 @@ from .live import live_snapshot, team_identity
 SEASON_MODES = {"2021 season (82 games)": 2021, "2022 season (82 games)": 2022, "2023 season (82 games)": 2023, "2026 season (82 games)": 2026}
 SEASON_LIKE = tuple(SEASON_MODES) + ("2027 season (82 games)", "2018 season (82 games)")
 SUPPORTED_MODES = (
-    "Game", "1-on-1", "Playoff series", "Custom 16-team playoffs",
+    "Game", "Game 7", "1-on-1", "Playoff series", "Custom 16-team playoffs",
     "Full 2027 playoffs", "Full 2018 playoffs", "Custom season (82 games)",
     "Fantasy draft: 2027 players (season + playoffs)",
     "Fantasy draft: all-time (season + playoffs)", "Fantasy draft playoffs",
     "Olympic tournament",
 ) + SEASON_LIKE + ("2027 play-in & playoffs", "Replay season game")
 ALL_MODES = (
-    "Game", "1-on-1", "Playoff series", "Custom 16-team playoffs", "Full 2027 playoffs", "2027 season (82 games)",
+    "Game", "Game 7", "1-on-1", "Playoff series", "Custom 16-team playoffs", "Full 2027 playoffs", "2027 season (82 games)",
     "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)",
     "Full 2018 playoffs", "Custom season (82 games)", "Fantasy draft: 2027 players (season + playoffs)",
     "Fantasy draft: all-time (season + playoffs)", "Fantasy draft playoffs", "Olympic tournament",
@@ -176,7 +176,7 @@ class SimRunner:
         if mode not in SUPPORTED_MODES:
             return f"{mode} is not in the browser UI yet. Use the Tk app for it for now."
         options = dict(options or {})
-        needs_teams = mode in ("Game", "Playoff series")
+        needs_teams = mode in ("Game", "Game 7", "Playoff series")
         if needs_teams and (team_a not in self.factories or team_b not in self.factories):
             return "Pick two teams from the list."
         if needs_teams and team_a == team_b:
@@ -462,18 +462,26 @@ class SimRunner:
         sim_engine.SIM_PAUSED = False
         sim_engine.SIM_SLEEP_SCALE = 1.0 / self.speed
         sim_engine.set_ruleset(rules if rules in ("NBA", "FIBA") else "NBA")
-        if mode not in ("2018 season (82 games)", "2027 play-in & playoffs"):
+        if mode not in ("2018 season (82 games)", "2027 play-in & playoffs", "Game"):   # "Game" is a regular-season game
             players_data.POSTSEASON_PLAY_IN = True
         self.set_status("Running")
         error = None
         try:
-            if mode == "Game":
-                team_a = self.factories[team_a_name]()
-                team_b = self.factories[team_b_name]()
-                sim_engine.apply_star_clutchness(team_a, team_b)
-                sim_engine.assign_player_badges(team_a)
-                sim_engine.assign_player_badges(team_b)
-                sim_engine.simulate_game(team_a, team_b)
+            if mode in ("Game", "Game 7"):
+                # "Game 7" is the playoff-intensity single game; "Game" is a regular-season game: paced star minutes, but a close
+                # fourth quarter keeps the starters in (the same rules the season games use)
+                previous_cap = sim_engine.SEASON_STAR_MINUTES_CAP
+                if mode == "Game":
+                    sim_engine.SEASON_STAR_MINUTES_CAP = 34   # set before the teams are built, as in the season
+                try:
+                    team_a = self.factories[team_a_name]()
+                    team_b = self.factories[team_b_name]()
+                    sim_engine.apply_star_clutchness(team_a, team_b)
+                    sim_engine.assign_player_badges(team_a)
+                    sim_engine.assign_player_badges(team_b)
+                    sim_engine.simulate_game(team_a, team_b)
+                finally:
+                    sim_engine.SEASON_STAR_MINUTES_CAP = previous_cap
             elif mode == "Replay season game":
                 previous_cap = sim_engine.SEASON_STAR_MINUTES_CAP
                 sim_engine.SEASON_STAR_MINUTES_CAP = 34
