@@ -50,7 +50,7 @@ def rating_summary(p) -> Dict:
     }
 
 
-FF_LINE_PAUSE = 0.006   # seconds per play-by-play line while a "sim to" jump is running
+FF_LINE_PAUSE = 0.003   # seconds per play-by-play line while a "sim to" jump is running
 
 
 class WebOutputProxy(GuiOutputProxy):
@@ -72,7 +72,31 @@ class WebOutputProxy(GuiOutputProxy):
                     # a little slower than Sim Series, and it follows the speed buttons (higher speed = shorter pause)
                     time.sleep(FF_LINE_PAUSE * max(0.05, min(2.0, float(getattr(sim_engine, "SIM_SLEEP_SCALE", 1.0) or 1.0))))
             return
+        if sim_engine.SIM_STICKY_FAST == "series":   # Sim All Playoffs stays fully quiet, as before
+            self._write_quick(text)
+            return
         super().write(text)
+
+    def _write_quick(self, text):
+        """Sim Series: no play-by-play, but the scoreboard still ticks along (at most ~16 times a second)."""
+        self.full_output.append(text)
+        self.buffer += text
+        pending = None
+        while "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            clean = line.strip()
+            self._maybe_series_record(clean)
+            m = self.scoreboard_pattern.match(clean)
+            if m:
+                pending = m.groups()
+        now = time.perf_counter()
+        if pending is not None and now - getattr(self, "_last_quick_score", 0.0) >= 0.06:
+            period, clock, team_a, score_a, team_b, score_b = pending
+            self._last_quick_score = now
+            self.scoreboard_queue.put({"period": period, "clock": clock, "team_a": team_a, "score_a": score_a, "team_b": team_b, "score_b": score_b})
+        if now - self._last_yield > 0.12:   # hand the interpreter to the web thread now and then, like the Tk proxy does
+            time.sleep(0.03)
+            self._last_yield = time.perf_counter()
 
 
 class _Sink:
