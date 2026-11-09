@@ -9253,9 +9253,9 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 Oklahoma City Thunder":
         target_ranges = {
             "Shai G-Alexander": (34, 37), "Ajay Mitchell": (26, 32), "Alex Caruso": (24, 30),
-            "Jaylin Williams": (22, 28), "Isaiah Hartenstein": (24, 29),
-            "Jared McCain": (20, 26), "Kenrich Williams": (14, 20), "Aday Mara": (14, 20),
-            "Brooks Barnhizer": (12, 18), "Bennett Stirtz": (8, 14),
+            "Jaylin Williams": (18, 24), "Isaiah Hartenstein": (22, 27),
+            "Chet Holmgren": (26, 31), "Jared McCain": (16, 22), "Kenrich Williams": (8, 14), "Aday Mara": (10, 16),
+            "Brooks Barnhizer": (8, 14), "Bennett Stirtz": (6, 12),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))

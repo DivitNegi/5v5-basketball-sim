@@ -2251,7 +2251,7 @@ def make_knicks_2027() -> Team:
 
 def make_thunder_2027() -> Team:
     players = [
-        # Cason Wallace is injured and Chet Holmgren is out of the 2027 depth chart: Jaylin Williams starts at PF beside Hartenstein.
+        # Cason Wallace is injured for 2027; Chet Holmgren is back for the season (first big off the bench here, Jaylin Williams starts at PF).
         Player('Shai G-Alexander', 'PG',
                0.36, 0.34, 0.34, 0.50, 0.20, 0.85,
                0.880, 0.999, 0.999, 0.750, 0.880,
@@ -2262,7 +2262,7 @@ def make_thunder_2027() -> Team:
                shot_iq=0.750, archetype='MVP scorer', badges=('shot_creator_gold', 'clutch_hof'), stamina=0.91),
         Player('Ajay Mitchell', 'PG',
                0.40, 0.24, 0.26, 0.02, 0.12, 0.26,
-               0.790, 0.790, 0.950, 0.700, 0.870,
+               0.830, 0.790, 0.950, 0.700, 0.870,
                0.16, 0.727, 0.820,
                0.700, 0.520, 0.400, 0.520, 0.790, 0.467,
                0.770, 0.430,
@@ -2289,9 +2289,17 @@ def make_thunder_2027() -> Team:
                0.550, 0.790, 0.960, 0.800, 0.590,
                0.12, 0.600, 0.560,
                0.630, 0.710, 0.950, 0.880, 0.720, 0.600,
-               0.410, 0.830,
+               0.410, 0.8950,
                clutchness=0.350, height=84, speed=0.620,
                shot_iq=0.650, archetype='playmaking big', stamina=0.70),
+        Player('Chet Holmgren', 'PF',
+               0.40, 0.28, 0.16, 0.20, 0.32, 0.26,
+               0.790, 0.870, 0.920, 0.750, 0.800,
+               0.18, 0.517, 0.650,
+               0.670, 0.890, 0.610, 0.860, 0.850, 0.667,
+               0.750, 0.950,
+               clutchness=0.500, height=85, speed=0.750,
+               shot_iq=0.700, archetype='stretch shot-blocker', badges=('chasedown',), stamina=0.80),
         Player('Jared McCain', 'PG',
                0.48, 0.20, 0.18, 0.02, 0.10, 0.24,
                0.840, 0.770, 0.830, 0.700, 0.870,
