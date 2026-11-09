@@ -251,7 +251,7 @@ function courtPlayerCell(p, slot) {
   const form = shotForm(p.name), now = performance.now();
   const energy = p.energy == null ? null : Math.max(0, Math.min(100 - (p.stint || 0) * 6, ((p.energy - 85) / 15) * 100));
   const rec = S.recentScores[p.name], age = rec ? now - rec.at : 1e9;
-  const pips = h("span", { class: "pips", title: `${p.pf} personal fouls` }, [0, 1, 2, 3, 4].map((i) => h("i", { class: i < p.pf ? (p.pf >= 5 ? "red" : p.pf >= 3 ? "yel" : "on") : "" })));
+  const pips = h("span", { class: "pips", title: `${p.pf} personal fouls` }, Array.from({ length: p.foul_limit || 6 }, (_, i) => i).map((i) => h("i", { class: i < p.pf ? (p.pf >= 5 ? "red" : p.pf >= 3 ? "yel" : "on") : "" })));
   return h("td", { class: "l" }, h("div", { class: "pcell" }, slot ? h("span", { class: "slot" }, slot) : null, faceEl(p.name),
     h("div", { class: "pstack" },
       h("span", { class: "pname" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null,

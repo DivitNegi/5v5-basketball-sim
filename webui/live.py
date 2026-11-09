@@ -95,7 +95,7 @@ def player_line(player, slot: Optional[str] = None, on_court: bool = False) -> D
         "out": bool(getattr(player, "fouled_out", False)),
         "rookie": bool(getattr(player, "rookie", False)),
         "starter": bool(getattr(player, "started_game", False)),
-        "energy": _energy(player), "stint": round(getattr(player, "current_stint", 0) / 60.0, 1),
+        "foul_limit": 5 if getattr(sim_engine, "CURRENT_RULESET", "NBA") == "FIBA" else 6, "energy": _energy(player), "stint": round(getattr(player, "current_stint", 0) / 60.0, 1),
     }
 
 
