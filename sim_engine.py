@@ -22177,6 +22177,8 @@ def fantasy_player_clone(player: Player, team_name: str) -> Player:
     clone = copy.deepcopy(player)
     clone.source_team = team_name
     clone.fantasy_base_name = player.name
+    import types
+    apply_star_clutchness(types.SimpleNamespace(name=team_name, roster=[clone]))   # his season's clutch fill-in travels with him into the draft pool
 
     clone.pts = clone.reb = clone.ast = clone.stl = clone.blk_stat = clone.tov = 0
     clone.assist_pts_created = 0
