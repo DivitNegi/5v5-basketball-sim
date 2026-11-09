@@ -285,7 +285,15 @@ def player_payload(team_name: str, name: str, quarter=None) -> Dict:
                 for k, v in (d or {}).items():
                     merged[k] = merged.get(k, 0) + v
         shots, scope = zones(merged), "quarter"
+    by_quarter = []
+    try:
+        entry = next((t for t in quarters_payload().get("teams", []) if t["name"] == team.name), None)
+        for key, per in sorted((entry or {}).get("periods", {}).items(), key=lambda kv: int(kv[0])):
+            by_quarter.append({"period": int(key), "pts": (per.get("players", {}).get(name) or {}).get("pts", 0)})
+    except Exception:
+        by_quarter = []
     return {
+        "by_quarter": by_quarter,
         "scope": scope, "quarter": quarter if periods else None,
         "team": ident, "opp": team_identity(opp.name) if opp else None, "score": [team.score, opp.score if opp else 0],
         "player": line, "archetype": getattr(p, "archetype", ""), "badges": list(getattr(p, "badges", ()) or ()),

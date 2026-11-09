@@ -725,3 +725,28 @@ tr.leaving td { color: var(--muted); font-size: 12px; padding-top: 4px; padding-
 @keyframes subSlide { 0% { transform: translateX(-26px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @keyframes subOut { 0% { opacity: .9; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .form.hot, .floater2, tr.entered, tr.entered .pcell, tr.leaving td { animation: none; } }
+
+/* player card visuals */
+.pcard-head { position: relative; border-radius: 16px; transition: transform .2s ease, box-shadow .3s ease; box-shadow: 0 0 0 1px color-mix(in srgb, var(--c, #888) 35%, transparent), 0 8px 40px -12px color-mix(in srgb, var(--c, #888) 60%, transparent); will-change: transform; }
+.pc-viz { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+.pc-panel { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.pc-panel h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-2); }
+.pc-radar { width: 100%; max-width: 220px; display: block; margin: 0 auto; }
+.pc-radar .rg { fill: none; stroke: rgba(148,163,184,.25); stroke-width: 1; }
+.pc-radar .rs { fill: color-mix(in srgb, var(--c) 50%, transparent); stroke: var(--c); stroke-width: 2.5; transform-origin: 100px 100px; animation: radarIn .7s cubic-bezier(.2,.9,.3,1) both; }
+.pc-radar .rl { fill: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+@keyframes radarIn { from { transform: scale(.2); opacity: 0; } to { transform: none; opacity: 1; } }
+.pc-donut-wrap { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pc-donut { width: 112px; height: 112px; flex: none; }
+.pc-donut .dn-bg { fill: none; stroke: rgba(148,163,184,.15); stroke-width: 14; }
+.pc-donut .dn-seg { fill: none; stroke-width: 14; animation: dnIn .8s ease-out both; }
+@keyframes dnIn { from { opacity: 0; } to { opacity: 1; } }
+.pc-donut .dn-n { fill: var(--text, #e5e7eb); font-size: 20px; font-weight: 800; }
+.pc-donut .dn-l { fill: var(--muted); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.dn-legend { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.dn-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.pc-spark { width: 100%; display: block; }
+.pc-spark .sp-v { fill: var(--text, #e5e7eb); font-size: 10px; font-weight: 700; }
+.sp-lbl { display: flex; justify-content: space-between; padding: 0 4px; font-size: 11px; color: var(--muted); }
+.pc-map { max-height: 380px; }
+@media (prefers-reduced-motion: reduce) { .pc-radar .rs, .pc-donut .dn-seg { animation: none; } .pcard-head { transition: none; } }

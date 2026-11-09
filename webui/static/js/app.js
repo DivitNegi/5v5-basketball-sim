@@ -1238,6 +1238,70 @@ function cardFromSnapshot(snap, teamName, playerName) {
     archetype: "", badges: [], shots: { rim:[0,0], mid:[0,0], three:[0,0], post:[0,0] }, defended: { rim:[0,0], mid:[0,0], three:[0,0], post:[0,0] } };
 }
 
+// ---- Player card visuals: radar, shot-diet donut, personal shot map, quarter sparkline, count-up tiles, hot/cold badge, hover tilt
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+function pcRadar(p, color) {
+  const mins = Math.max(p.min || 0, 1), per = (v) => (v / mins) * 36;   // everything per 36 so a short stint is not an empty shape
+  const axes = [["SCR", clamp01(per(p.pts) / 32)], ["REB", clamp01(per(p.reb) / 12)], ["PLY", clamp01(per(p.ast) / 9)], ["DEF", clamp01(per(p.stl + p.blk) / 4)],
+    ["EFF", p.ts ? clamp01((p.ts - 45) / 25) : 0], ["SHT", p.fga ? clamp01((100 * p.fgm / p.fga - 30) / 30) : 0]];
+  const R = 74, C = 100, pt = (i, f) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / axes.length; return [C + R * f * Math.cos(a), C + R * f * Math.sin(a)]; };
+  const ring = (f) => axes.map((_, i) => pt(i, f).map((v) => v.toFixed(1)).join(",")).join(" ");
+  const shape = axes.map(([, v], i) => pt(i, Math.max(v, 0.04)).map((x) => x.toFixed(1)).join(",")).join(" ");
+  const svg = svgEl("svg", { viewBox: "0 0 200 200", class: "pc-radar" });
+  svg.innerHTML = [0.33, 0.66, 1].map((f) => `<polygon points="${ring(f)}" class="rg"/>`).join("")
+    + axes.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${C}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="rg"/>`; }).join("")
+    + `<polygon points="${shape}" class="rs" style="--c:${color}"/>`
+    + axes.map(([l], i) => { const [x, y] = pt(i, 1.2); return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" class="rl" text-anchor="middle" dominant-baseline="middle">${l}</text>`; }).join("");
+  return svg;
+}
+function pcDonut(z) {
+  const parts = [["Rim", z.rim, "var(--green)"], ["Mid", z.mid, "var(--accent)"], ["3PT", z.three, "#60a5fa"], ["Post", z.post, "#c084fc"]].map(([l, v, c]) => [l, ((v && v[1]) || 0), c]);
+  const total = parts.reduce((a, b) => a + b[1], 0), r = 42, circ = 2 * Math.PI * r;
+  const svg = svgEl("svg", { viewBox: "0 0 120 120", class: "pc-donut" });
+  let off = 0, html = `<circle cx="60" cy="60" r="${r}" class="dn-bg"/>`;
+  if (total) for (const [, n, c] of parts) { if (!n) continue; const len = (n / total) * circ; html += `<circle cx="60" cy="60" r="${r}" class="dn-seg" stroke="${c}" stroke-dasharray="${len.toFixed(1)} ${(circ - len).toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 60 60)"/>`; off += len; }
+  html += `<text x="60" y="58" text-anchor="middle" class="dn-n">${total}</text><text x="60" y="73" text-anchor="middle" class="dn-l">shots</text>`;
+  svg.innerHTML = html;
+  const legend = h("div", { class: "dn-legend" }, parts.map(([l, n, c]) => h("span", {}, h("i", { style: { background: c } }), `${l} ${total ? Math.round((100 * n) / total) : 0}%`)));
+  return h("div", { class: "pc-donut-wrap" }, svg, legend);
+}
+function pcShotMap(name, team, quarter) {
+  const mine = S.shots.filter((e) => e.player === name && (quarter === "all" || (quarter === "OT" ? e.period >= 5 : e.period === Number(quarter))));
+  const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 40}`, class: "court-svg shot-map pc-map" });
+  svg.innerHTML = courtLines();
+  const g = svgEl("g", { class: "dots" }); svg.append(g);
+  for (const ev of mine) {
+    const [x, y] = shotSpot(ev, teamSide(ev.team));
+    const d = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}` });
+    if (ev.made) d.append(svgEl("circle", { r: 8, class: "ring" })); else d.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
+    g.append(d);
+  }
+  const made = mine.filter((e) => e.made).length;
+  return h("div", {}, svg, h("div", { class: "muted", style: { fontSize: "12px", marginTop: "4px" } }, `${made}/${mine.length} on the map`));
+}
+function pcSpark(byQ, color) {
+  if (!byQ?.length) return null;
+  const W = 220, H = 56, max = Math.max(4, ...byQ.map((q) => q.pts)), step = byQ.length > 1 ? (W - 20) / (byQ.length - 1) : 0;
+  const pts = byQ.map((q, i) => [10 + i * step, H - 10 - (q.pts / max) * (H - 24)]);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "pc-spark" });
+  svg.innerHTML = `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`
+    + pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"/><text x="${x}" y="${y - 7}" text-anchor="middle" class="sp-v">${byQ[i].pts}</text>`).join("");
+  return h("div", {}, svg, h("div", { class: "sp-lbl" }, byQ.map((q) => h("span", {}, q.period > 4 ? "OT" : `Q${q.period}`))));
+}
+function countUp(el, to, fmt = (v) => String(v)) {
+  const key = el.dataset.k, prev = Number(S.pcPrev?.[key]);
+  if (reduceMotion() || !Number.isFinite(to) || !Number.isFinite(prev) || prev === to) { el.textContent = fmt(to); return; }
+  const t0 = performance.now(), dur = 600;
+  const step = (now) => { const f = clamp01((now - t0) / dur); el.textContent = fmt(prev + (to - prev) * (1 - Math.pow(1 - f, 3))); if (f < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function pcTilt(card) {
+  if (reduceMotion()) return;
+  card.addEventListener("pointermove", (e) => { const r = card.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5; card.style.transform = `perspective(900px) rotateX(${(-y * 3).toFixed(2)}deg) rotateY(${(x * 4).toFixed(2)}deg)`; });
+  card.addEventListener("pointerleave", () => { card.style.transform = ""; });
+}
+
 async function loadPlayerCard() {
   const list = await api.get("/api/game/players");
   const pick = $("#pcardPick");
@@ -1266,7 +1330,9 @@ async function loadPlayerCard() {
   const p = d.player;
   const face = h("div", { class: "pcard-face", style: { "--c": d.team.color } }, p.name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
   withImage(face, `/media/headshot?name=${encodeURIComponent(p.name)}`);
-  const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v));
+  const numTiles = [];   // plain numbers count up from their previous value on the next refresh
+  const tile = (k, v) => { const vEl = h("div", { class: "v", "data-k": k }, v); if (typeof v === "number") numTiles.push([vEl, v]); return h("div", { class: "tile" }, h("div", { class: "k" }, k), vEl); };
+  const form = GV.pc.game === "live" && GV.pc.quarter === "all" ? shotForm(p.name) : "";
   const zoneBox = (title, z) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
     h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))));
   const qmatch = (pb) => GV.pc.quarter === "all" || String(periodIndex(pb.period) + 1) === GV.pc.quarter || (GV.pc.quarter === "OT" && periodIndex(pb.period) >= 4);
@@ -1276,16 +1342,29 @@ async function loadPlayerCard() {
   const qNote = GV.pc.quarter !== "all" && pastGame ? h("div", { class: "muted", style: { margin: "6px 0" } }, "Quarter splits are only kept for the game being played; this earlier game shows its full-game line.") : null;
   const plays = S.goodPlays.filter((pb) => pb.game === chosenGame && pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
   $("#pcardBody").replaceChildren(
-    h("div", { class: "pcard-head" }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null),
+    h("div", { class: "pcard-head", style: { "--c": d.team.color } }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null,
+      form ? h("span", { class: `form ${form}`, style: { fontSize: "18px" } }, form === "hot" ? "🔥" : "🧊") : null),
       h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.listed}${d.archetype ? ` · ${d.archetype}` : ""} · ${p.on ? "on the floor" : "bench"}`),
       h("div", { class: "badges" }, cleanBadges(d.badges).map((b) => h("span", { class: "badge" }, b)))),
       h("div", { class: "pcard-ovr" }, h("div", { class: "n" }, `${p.pts}`), h("small", {}, `${qLabel} · pts · ${p.reb} reb · ${p.ast} ast`))),
-    qNote,
+    qNote || [],
     h("div", { class: "stat-tiles" }, tile("MIN", p.min.toFixed(1)), tile("PTS", p.pts), tile("REB", p.reb), tile("AST", p.ast), tile("STL", p.stl), tile("BLK", p.blk), tile("TO", p.tov), tile("PF", p.pf),
       tile("+/-", p.pm > 0 ? `+${p.pm}` : p.pm), tile("FG", `${p.fgm}/${p.fga}`), tile("3PT", `${p.tpm}/${p.tpa}`), tile("FT", `${p.ftm}/${p.fta}`), tile("FG%", pct1(p.fgm, p.fga)), tile("TS%", p.ts ?? "–")),
+    h("div", { class: "pc-viz" },
+      h("div", { class: "pc-panel" }, h("h4", {}, "Impact"), pcRadar(p, d.team.color)),
+      h("div", { class: "pc-panel" }, h("h4", {}, `Shot diet · ${qLabel}`), pcDonut(d.shots)),
+      h("div", { class: "pc-panel" }, h("h4", {}, "Points by quarter"), pcSpark(d.by_quarter, d.team.color) || h("div", { class: "muted" }, "–"))),
+    GV.pc.game === "live" ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${qLabel}`), pcShotMap(p.name, d.team, GV.pc.quarter)) : [],
     h("div", { class: "conf-grid" }, zoneBox(d.scope === "quarter" ? `Shot diet · ${qLabel}` : "Shot diet", d.shots), zoneBox(d.scope === "quarter" ? "Shots defended · full game" : "Shots defended", d.defended)),
     h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Positive plays · ${p.name}`),
     h("div", { class: "pc-plays" }, plays.length ? plays.map((pb) => h("div", { class: "ev score" }, h("div", { class: "rail", style: { background: "var(--line-strong)" } }, ""), h("div", {}, h("span", { class: "sc" }, `${pb.period} ${pb.clock} · ${pb.score}`), pb.text))) : h("div", { class: "muted" }, "No plays logged yet for this selection.")));
+  pcAfterRender(numTiles);
+}
+function pcAfterRender(numTiles) {
+  const cur = {};
+  for (const [el, v] of numTiles) { countUp(el, v); cur[el.dataset.k] = v; }
+  S.pcPrev = cur;
+  const head = $("#pcardBody .pcard-head"); if (head) pcTilt(head);
 }
 function zoneClass(key, made, att) {
   if (!att) return "none";
