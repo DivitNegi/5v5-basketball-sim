@@ -638,6 +638,7 @@ def roster_payload(runner, team_name):
     team = factory()
     import sim_engine
     try:
+        sim_engine.apply_star_clutchness(team)   # the same clutch fill-in a game applies, so the card matches what the player plays with
         sim_engine.assign_player_badges(team)
     except Exception:
         pass
