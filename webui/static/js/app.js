@@ -1954,12 +1954,36 @@ function courtLines() {
 const NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs = {}) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
 const teamSide = (name) => (S.identities?.[1]?.name === name ? 1 : 0);
+// ---- heat map: gaussian density of shot locations drawn to a small canvas and stretched over the court (smooth, inferno colours)
+const INFERNO = [[0, 0, 4], [31, 12, 72], [85, 15, 109], [136, 34, 106], [186, 54, 85], [227, 89, 51], [249, 140, 10], [249, 201, 50], [252, 255, 164]];
+function infernoAt(t) {
+  const f = clamp01(t) * (INFERNO.length - 1), i = Math.min(INFERNO.length - 2, Math.floor(f)), u = f - i;
+  return INFERNO[i].map((c, k) => Math.round(c + (INFERNO[i + 1][k] - c) * u));
+}
+function heatImage(list) {
+  const { X0, Y0, CW, CH } = SC_GEO, CELL = 5, GW = Math.round(CW / CELL), GH = Math.round(CH / CELL), sig = 28 / CELL, rad = Math.ceil(sig * 3);
+  const grid = new Float32Array(GW * GH);
+  for (const ev of list) {
+    const [x, y] = shotSpot(ev, teamSide(ev.team)), cx = (x - X0) / CELL, cy = (y - Y0) / CELL;
+    for (let gy = Math.max(0, Math.floor(cy - rad)); gy <= Math.min(GH - 1, Math.ceil(cy + rad)); gy++)
+      for (let gx = Math.max(0, Math.floor(cx - rad)); gx <= Math.min(GW - 1, Math.ceil(cx + rad)); gx++) grid[gy * GW + gx] += Math.exp(-((gx - cx) ** 2 + (gy - cy) ** 2) / (2 * sig * sig));
+  }
+  let max = 0; for (const v of grid) if (v > max) max = v;
+  const cv = document.createElement("canvas"); cv.width = GW; cv.height = GH;
+  const ctx = cv.getContext("2d"), img = ctx.createImageData(GW, GH);
+  for (let i = 0; i < grid.length; i++) {
+    const t = max ? Math.sqrt(grid[i] / max) : 0, [r, g, b] = infernoAt(t), o = i * 4;
+    img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = Math.round(255 * clamp01(t * 2.2) * 0.92);   // empty floor stays see-through
+  }
+  ctx.putImageData(img, 0, 0);
+  return svgEl("image", { href: cv.toDataURL(), x: X0, y: Y0, width: CW, height: CH, preserveAspectRatio: "none", class: "heat-img" });
+}
 function mountShotChart(host, { big = false } = {}) {
   host = typeof host === "string" ? $(host) : host; if (!host) return;
   const st = { team: "all", player: "all", quarter: "all", result: "all", heat: false, drawn: 0, playersSig: "" };
   const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 40}`, class: "court-svg shot-map" });
   svg.innerHTML = courtLines();
-  const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }); svg.append(heat, dots);
+  const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }); svg.append(dots); svg.insertBefore(heat, svg.firstChild.nextSibling ? svg.children[1] : null);
   const names = svgEl("g", { class: "court-names" }); svg.append(names);
   const sel = (key, opts) => h("select", { onchange: (e) => { st[key] = e.target.value; redraw(); } }, opts.map(([v, t]) => h("option", { value: v, selected: v === st[key] }, t)));
   const bar = h("div", { class: "filters sc-bar" });
@@ -1992,11 +2016,8 @@ function mountShotChart(host, { big = false } = {}) {
   function redraw() {
     dots.replaceChildren(); heat.replaceChildren();
     const list = S.shots.filter(passes);
-    if (st.heat) {   // density view: 40 px bins coloured by shooting percentage, stronger where there are more shots
-      const bins = new Map();
-      for (const ev of list) { const [x, y] = shotSpot(ev, teamSide(ev.team)); const k = `${Math.floor(x / 40)},${Math.floor(y / 40)}`; const b = bins.get(k) || [0, 0]; b[0]++; if (ev.made) b[1]++; bins.set(k, b); }
-      for (const [k, [n, m]] of bins) { const [cx, cy] = k.split(",").map(Number); heat.append(svgEl("rect", { x: cx * 40, y: cy * 40, width: 40, height: 40, rx: 6, fill: `hsl(${Math.round(120 * m / n)} 70% 45%)`, opacity: Math.min(0.8, 0.22 + n * 0.1) })); }
-    } else for (const ev of list.slice(-420)) dot(ev, false);
+    if (st.heat) heat.append(heatImage(list));   // smooth shot-frequency map: hottest where the most shots are taken
+    else for (const ev of list.slice(-420)) dot(ev, false);
     updateStats(list); st.drawn = S.shots.length;
     known.clear(); S.shots.forEach((e) => known.add(e.player));
   }
