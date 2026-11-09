@@ -50,6 +50,9 @@ def rating_summary(p) -> Dict:
     }
 
 
+FF_LINE_PAUSE = 0.006   # seconds per play-by-play line while a "sim to" jump is running
+
+
 class WebOutputProxy(GuiOutputProxy):
     """The Tk app's output proxy, minus its 1 ms pause per write while a "sim to" jump is fast-forwarding."""
     def write(self, text):
@@ -65,6 +68,9 @@ class WebOutputProxy(GuiOutputProxy):
                 self._maybe_series_record(clean)
                 if self._should_show_in_play_log(clean):
                     self.output_queue.put(line + "\n")
+                    # a tiny pause per play, so the page receives and draws every play and score instead of one lump at the end:
+                    # a little slower than Sim Series, and it follows the speed buttons (higher speed = shorter pause)
+                    time.sleep(FF_LINE_PAUSE * max(0.05, min(2.0, float(getattr(sim_engine, "SIM_SLEEP_SCALE", 1.0) or 1.0))))
             return
         super().write(text)
 
