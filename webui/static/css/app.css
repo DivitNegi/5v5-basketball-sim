@@ -784,5 +784,5 @@ tr.clickable { cursor: pointer; }
 
 /* stat tiles: long values (578/1061) shrink to fit instead of spilling out of the box */
 .stat-tiles .tile { min-width: 0; overflow: hidden; }
-.stat-tiles .tile .v { font-size: 20px; white-space: nowrap; }
-.stat-tiles .tile .v.frac { font-size: 13px; letter-spacing: -0.02em; }
+.stat-tiles .tile .v { font-size: 13px; white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }   /* a value that is too wide for its box scrolls sideways */
+.stat-tiles .tile .v.frac { font-size: 13px; }   /* every tile value is the same size */
