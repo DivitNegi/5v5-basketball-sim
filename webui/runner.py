@@ -332,9 +332,18 @@ class SimRunner:
         return None
 
     # ------------------------------------------------------------------ run
+    def _on_shot_hook(self, kind: str):
+        # "attempt" opens a shot, "make" turns it into a made one; the next line that is shown is that shot's result line
+        self._shot_state = "make" if kind == "make" else "miss"
+
     def _on_pbp(self, text: str):
         line = text.rstrip("\n")
-        self.hub.publish({"type": "pbp", "text": line}, keep=True)
+        event = {"type": "pbp", "text": line}
+        state = getattr(self, "_shot_state", None)
+        if state and line.strip():
+            event["shot"] = state
+            self._shot_state = None
+        self.hub.publish(event, keep=True)
 
     def _on_section(self, sections):
         if isinstance(sections, dict):
@@ -397,6 +406,8 @@ class SimRunner:
         sys.stdout = proxy
         builtins.input = lambda prompt="": ""
         sim_engine.GUI_SCOREBOARD_QUEUE = self._engine_queue
+        self._shot_state = None
+        sim_engine.SHOT_RESULT_HOOK = self._on_shot_hook
         sim_engine.GUI_SERIES_UPDATE_QUEUE = _Sink(self._on_section)
         sim_engine.GUI_FANTASY_PICKER = self._web_fantasy_picker
         sim_engine.GUI_POSITION_PICKER = self._web_position_picker
@@ -500,6 +511,7 @@ class SimRunner:
             except Exception:
                 self.sections = {}
             sys.stdout, builtins.input = original_stdout, original_input
+            sim_engine.SHOT_RESULT_HOOK = None
             sim_engine.GUI_SCOREBOARD_QUEUE = original_engine_queue
             sim_engine.GUI_SERIES_UPDATE_QUEUE = original_series_queue
             sim_engine.GUI_FANTASY_PICKER = original_fantasy_picker

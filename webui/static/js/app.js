@@ -282,6 +282,7 @@ function classifyLines(lines) {
 function newBlock() {
   feed.block = h("div", { class: "ev pending" }, h("div", { class: "rail" }), h("div", { class: "body" }));
   feed.lines = [];
+  feed.miss = false;
 }
 
 // "X will guard Y" opening-matchup lines are left out of the play-by-play
@@ -315,7 +316,7 @@ function nameRegex() {
   }
   return rawState.re;
 }
-function rawLine(line) {
+function rawLine(line, shot) {
   const root = $("#rawlog");
   root.querySelector(".empty")?.remove();
   if (!root.dataset.watch) {   // follow the newest line until the user scrolls up; following resumes when they scroll back to the bottom
@@ -354,7 +355,9 @@ function rawLine(line) {
     const re = nameRegex();
     if (re) html = html.replace(re, '<b class="nm">$1</b>');
     el.innerHTML = html;
-    if (/steal|stolen|turnover|loses the|travel/i.test(t)) el.classList.add("tov");
+    if (shot === "make") el.classList.add("made");          // the engine says how the shot ended: no guessing from the wording
+    else if (shot === "miss") el.classList.add("miss");
+    else if (/steal|stolen|turnover|loses the|travel/i.test(t)) el.classList.add("tov");
     else if (/foul/i.test(t)) el.classList.add("foul");
     else if (/\b(misses|missed|no good|rims? out|off the (iron|rim|glass|backboard)|front rim|back rim|bricks?|clanks?|blocked|swats?|won.t drop|spins (off|out)|comes? off long|falls short)\b/i.test(t)) el.classList.add("miss");
   }
@@ -364,13 +367,13 @@ function rawLine(line) {
   if (root._stick) root._wantPin = true;   // the batch scrolls once, after all its lines are in
 }
 
-function addFeedLine(line) {
+function addFeedLine(line, shot) {
   const root = $("#feed");
   const empty = $(".empty", root);
   if (empty) empty.remove();
   if (GUARD_RE.test(line)) return;
   if (!line.trim() && !$("#rawlog").lastChild?.textContent) return;
-  rawLine(line);
+  rawLine(line, shot);
   if (!line.trim()) return;
   const m = line.match(SCORE_RE);
   if (m) { closeBlock(m); return; }
@@ -384,6 +387,7 @@ function addFeedLine(line) {
   }
   if (!feed.block) newBlock();
   feed.lines.push(line);
+  if (shot === "miss") feed.miss = true;
 }
 
 function closeBlock(m) {
@@ -396,7 +400,7 @@ function closeBlock(m) {
   const block = feed.block;
   const scored = delta[0] > 0 ? 0 : delta[1] > 0 ? 1 : -1;
   const pts = scored >= 0 ? delta[scored] : 0;
-  const kind = scored >= 0 ? (pts >= 3 ? "three" : "score") : classifyLines(feed.lines);
+  const kind = scored >= 0 ? (pts >= 3 ? "three" : "score") : (feed.miss ? "miss" : classifyLines(feed.lines));
   const isDunk = scored >= 0 && /dunk|slam|jam|throws it down|hammers/i.test(feed.lines.join(" "));
   block.className = `ev ${kind} ${isDunk ? "dunk" : ""}`;
   block.dataset.kind = scored >= 0 ? "score" : (kind || "other");
@@ -612,7 +616,7 @@ function drainEvents() {
   let sawScore = false, lastLive = null;
   while (evQueue.length && performance.now() - t0 < 12) {
     const msg = evQueue.shift();
-    if (msg.type === "pbp") addFeedLine(msg.text);
+    if (msg.type === "pbp") addFeedLine(msg.text, msg.shot);
     else if (msg.type === "score") { applyScore(msg, false); sawScore = true; }
     else if (msg.type === "live") lastLive = msg;
     else handleEvent(msg);

@@ -12134,8 +12134,15 @@ def current_sim_period_key():
     return None
 
 
+# Set by a front end that wants to know, for each result line it is about to receive, whether the shot went in or missed:
+# the hook is called with "attempt" for every field-goal attempt and again with "make" if it scored, just before the narration prints.
+SHOT_RESULT_HOOK = None
+
+
 def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Player = None,
                      defender: Player = None, quality_mult: float | None = None):
+    if SHOT_RESULT_HOOK is not None:
+        SHOT_RESULT_HOOK("attempt")
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 
@@ -12183,6 +12190,8 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
 
 
 def record_shot_make(team: Team, shot_type: str, context: str = "", player: Player = None, defender: Player = None):
+    if SHOT_RESULT_HOOK is not None:
+        SHOT_RESULT_HOOK("make")
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 
