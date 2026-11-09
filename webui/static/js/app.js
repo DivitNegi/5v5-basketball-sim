@@ -90,7 +90,7 @@ const S = {
   score: [0, 0], flow: [], series: null,
   active: false, paused: false, speed: 1,
   feedFilter: "raw", boxTeam: 0, boxSort: null,
-  gameNo: 1, gameSnapshots: new Map(), goodPlays: [], lastScoreClock: null,
+  gameNo: 1, gameSnapshots: new Map(), gameShots: new Map(), goodPlays: [], lastScoreClock: null,
 };
 
 function cleanBadges(values) {
@@ -596,6 +596,7 @@ function applyScore(msg, paint = true) {
   const startsFresh = /^1st$/i.test(msg.period || "") && /^(12|10):00$/.test(msg.clock || "") && Number(msg.score_a) === 0 && Number(msg.score_b) === 0;
   if (startsFresh && S.lastScoreClock === "0:00" && S.live) {
     S.gameSnapshots.set(S.gameNo, structuredClone(S.live));
+    S.gameShots.set(S.gameNo, S.shots); S.shots = []; redrawShotCharts();   // the finished game's shots are kept for its player cards
     S.gameNo += 1;
   }
   $("#sbPeriod").textContent = (msg.period || "").toUpperCase();
@@ -638,7 +639,7 @@ function resetGame(msg) {
     return;
   }
   S.shots = []; redrawShotCharts();
-  S.plays = []; S.goodPlays = []; S.gameNo = 1; S.gameSnapshots = new Map(); S.lastScoreClock = null;
+  S.plays = []; S.goodPlays = []; S.gameNo = 1; S.gameSnapshots = new Map(); S.gameShots = new Map(); S.lastScoreClock = null;
   S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()];
   S.identities = msg.teams || [null, null];
   (msg.teams || []).forEach((t, i) => {     // keep the setup bar on the teams actually playing
@@ -1227,14 +1228,19 @@ async function loadQuarters() {
 }
 
 // ---- player card
-function cardFromSnapshot(snap, teamName, playerName) {
+const zoneOfShot = (z) => (z === "dunk" || z === "rim" ? "rim" : z === "three" ? "three" : z === "post" ? "post" : "mid");
+function cardFromSnapshot(snap, teamName, playerName, shots = [], quarter = "all") {
   const team = snap?.teams?.find((t) => t.name === teamName);
   const opp = snap?.teams?.find((t) => t.name !== teamName);
   const p = team?.box?.find((row) => row.name === playerName);
   if (!team || !p) return null;
+  const inQ = (e) => quarter === "all" || (quarter === "OT" ? e.period >= 5 : e.period === Number(quarter));
+  const mine = shots.filter((e) => e.player === playerName && inQ(e));
   const tsd = 2 * (p.fga + .44 * p.fta);
   return { team, opp, score: [team.score, opp?.score || 0], player: { ...p, ts: tsd ? +(100 * p.pts / tsd).toFixed(1) : null },
-    archetype: "", badges: [], shots: { rim:[0,0], mid:[0,0], three:[0,0], post:[0,0] }, defended: { rim:[0,0], mid:[0,0], three:[0,0], post:[0,0] } };
+    archetype: "", badges: [], past: true,
+    shots: mine.reduce((z, e) => { const k = zoneOfShot(e.zone); z[k][1]++; if (e.made) z[k][0]++; return z; }, { rim: [0, 0], mid: [0, 0], three: [0, 0], post: [0, 0] }),
+    by_quarter: Object.entries(shots.filter((e) => e.player === playerName).reduce((q, e) => { if (e.made) q[e.period] = (q[e.period] || 0) + (e.zone === "three" ? 3 : 2); else q[e.period] = q[e.period] || 0; return q; }, {})).map(([k, v]) => ({ period: Number(k), pts: v })).sort((a, b) => a.period - b.period), defended: null };
 }
 
 // ---- Player card visuals: radar, shot-diet donut, personal shot map, quarter sparkline, count-up tiles, hot/cold badge, hover tilt
@@ -1265,9 +1271,10 @@ function pcDonut(z) {
   const legend = h("div", { class: "dn-legend" }, parts.map(([l, n, c]) => h("span", {}, h("i", { style: { background: c } }), `${l} ${total ? Math.round((100 * n) / total) : 0}%`)));
   return h("div", { class: "pc-donut-wrap" }, svg, legend);
 }
-function pcShotMap(name, team, quarter) {
-  const mine = S.shots.filter((e) => e.player === name && (quarter === "all" || (quarter === "OT" ? e.period >= 5 : e.period === Number(quarter))));
-  const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 40}`, class: "court-svg shot-map pc-map" });
+function pcShotMap(name, teamName, quarter, shots) {
+  const mine = shots.filter((e) => e.player === name && (quarter === "all" || (quarter === "OT" ? e.period >= 5 : e.period === Number(quarter))));
+  const side = mine.length ? teamSide(mine[0].team) : teamSide(teamName);   // he shoots at one basket: show just that half of the floor
+  const svg = svgEl("svg", { viewBox: `${side ? 470 : 20} 52 510 536`, class: "court-svg shot-map pc-map" });
   svg.innerHTML = courtLines();
   const g = svgEl("g", { class: "dots" }); svg.append(g);
   for (const ev of mine) {
@@ -1277,7 +1284,7 @@ function pcShotMap(name, team, quarter) {
     g.append(d);
   }
   const made = mine.filter((e) => e.made).length;
-  return h("div", {}, svg, h("div", { class: "muted", style: { fontSize: "12px", marginTop: "4px" } }, `${made}/${mine.length} on the map`));
+  return h("div", { class: "pc-map-wrap" }, svg, h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${mine.length}`), " FG"), h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss")));
 }
 function pcSpark(byQ, color) {
   if (!byQ?.length) return null;
@@ -1288,7 +1295,7 @@ function pcSpark(byQ, color) {
     + pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"/><text x="${x}" y="${y - 7}" text-anchor="middle" class="sp-v">${byQ[i].pts}</text>`).join("");
   return h("div", {}, svg, h("div", { class: "sp-lbl" }, byQ.map((q) => h("span", {}, q.period > 4 ? "OT" : `Q${q.period}`))));
 }
-function countUp(el, to, fmt = (v) => String(v)) {
+function countUp(el, to, fmt = (v) => String(Math.round(v))) {
   const key = el.dataset.k, prev = Number(S.pcPrev?.[key]);
   if (reduceMotion() || !Number.isFinite(to) || !Number.isFinite(prev) || prev === to) { el.textContent = fmt(to); return; }
   const t0 = performance.now(), dur = 600;
@@ -1311,7 +1318,7 @@ async function loadPlayerCard() {
   // earlier games are offered only if this player actually played in one of them (his team was in it and he got on the floor)
   const playedGames = [...S.gameSnapshots.keys()].sort((a, b) => b - a).filter((n) => {
     const row = S.gameSnapshots.get(n)?.teams?.find((t) => t.name === GV.pc.team)?.box?.find((r) => r.name === GV.pc.name);
-    return !!row && ((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
+    return !!row;   // every earlier game his team was in; one he sat out is marked DNP
   });
   if (GV.pc.game !== "live" && !playedGames.includes(Number(GV.pc.game))) GV.pc.game = "live";
   pick.replaceChildren(
@@ -1319,11 +1326,12 @@ async function loadPlayerCard() {
     h("select", { onchange: (e) => { GV.pc.name = e.target.value; loadPlayerCard(); } }, roster.map((n) => h("option", { value: n, selected: n === GV.pc.name }, n))),
     h("select", { onchange: (e) => { GV.pc.game = e.target.value; loadPlayerCard(); } },
       h("option", { value: "live", selected: GV.pc.game === "live" }, `Live / Game ${S.gameNo}`),
-      playedGames.map((n) => h("option", { value: String(n), selected: GV.pc.game === String(n) }, `Game ${n}`))),
+      playedGames.map((n) => { const snap = S.gameSnapshots.get(n), mine = snap.teams.find((t) => t.name === GV.pc.team), opp = snap.teams.find((t) => t.name !== GV.pc.team), row = mine.box.find((r) => r.name === GV.pc.name), dnp = !((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
+        return h("option", { value: String(n), selected: GV.pc.game === String(n) }, `Game ${n} · vs ${opp?.short || "?"} · ${mine.score}-${opp?.score ?? 0}${dnp ? " · DNP" : ""}`); })),
     h("div", { class: "seg small" }, ["all", "1", "2", "3", "4", "OT"].map((q) => h("button", { class: GV.pc.quarter === q ? "on" : "", onclick: () => { GV.pc.quarter = q; loadPlayerCard(); } }, q === "all" ? "All plays" : q === "OT" ? "OT" : `Q${q}`))));
   const d = GV.pc.game === "live"
     ? await api.get(`/api/game/card?team=${encodeURIComponent(GV.pc.team)}&name=${encodeURIComponent(GV.pc.name)}&quarter=${GV.pc.quarter}`)
-    : cardFromSnapshot(S.gameSnapshots.get(Number(GV.pc.game)), GV.pc.team, GV.pc.name);
+    : cardFromSnapshot(S.gameSnapshots.get(Number(GV.pc.game)), GV.pc.team, GV.pc.name, S.gameShots.get(Number(GV.pc.game)) || [], GV.pc.quarter);
   if (!d) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, "That player was not in this game.")); return; }
   if (d.error) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, d.error)); return; }
   const p = d.player;
@@ -1338,23 +1346,25 @@ async function loadPlayerCard() {
   const chosenGame = GV.pc.game === "live" ? S.gameNo : Number(GV.pc.game);
   const qLabel = GV.pc.quarter === "all" ? "game" : GV.pc.quarter === "OT" ? "overtime" : `Q${GV.pc.quarter}`;
   const pastGame = GV.pc.game !== "live";
-  const qNote = GV.pc.quarter !== "all" && pastGame ? h("div", { class: "muted", style: { margin: "6px 0" } }, "Quarter splits are only kept for the game being played; this earlier game shows its full-game line.") : null;
+  const gameLabel = pastGame ? `Game ${GV.pc.game}` : `Game ${S.gameNo}`;
+  const qNote = GV.pc.quarter !== "all" && pastGame ? h("div", { class: "muted", style: { margin: "6px 0" } }, "The stat tiles show this earlier game's full line; the shot map, shot diet and points chart follow the quarter.") : null;
   const plays = S.goodPlays.filter((pb) => pb.game === chosenGame && pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
   $("#pcardBody").replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": d.team.color } }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null,
       form ? h("span", { class: `form ${form}`, style: { fontSize: "18px" } }, form === "hot" ? "🔥" : "🧊") : null),
       h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.listed}${d.archetype ? ` · ${d.archetype}` : ""} · ${p.on ? "on the floor" : "bench"}`),
       h("div", { class: "badges" }, cleanBadges(d.badges).map((b) => h("span", { class: "badge" }, b)))),
-      h("div", { class: "pcard-ovr" }, h("div", { class: "n" }, `${p.pts}`), h("small", {}, `${qLabel} · pts · ${p.reb} reb · ${p.ast} ast`))),
+      h("div", { class: "pcard-ovr" }, h("div", { class: "scope" }, qLabel), h("div", { class: "n" }, `${p.pts}`), h("div", { class: "unit" }, "PTS"),
+        h("div", { class: "line2" }, h("span", {}, h("b", {}, p.reb), " REB"), h("span", {}, h("b", {}, p.ast), " AST"), h("span", {}, h("b", {}, p.stl), " STL"), h("span", {}, h("b", {}, p.blk), " BLK")))),
     qNote || [],
     h("div", { class: "stat-tiles" }, tile("MIN", p.min.toFixed(1)), tile("PTS", p.pts), tile("REB", p.reb), tile("AST", p.ast), tile("STL", p.stl), tile("BLK", p.blk), tile("TO", p.tov), tile("PF", p.pf),
-      tile("+/-", p.pm > 0 ? `+${p.pm}` : p.pm), tile("FG", `${p.fgm}/${p.fga}`), tile("3PT", `${p.tpm}/${p.tpa}`), tile("FT", `${p.ftm}/${p.fta}`), tile("FG%", pct1(p.fgm, p.fga)), tile("TS%", p.ts ?? "–")),
+      tile("+/-", p.pm > 0 ? `+${p.pm}` : String(p.pm)), tile("FG", `${p.fgm}/${p.fga}`), tile("3PT", `${p.tpm}/${p.tpa}`), tile("FT", `${p.ftm}/${p.fta}`), tile("FG%", pct1(p.fgm, p.fga)), tile("TS%", p.ts ?? "–")),
     h("div", { class: "pc-viz" },
       h("div", { class: "pc-panel" }, h("h4", {}, "Impact"), pcRadar(p, d.team.color)),
       h("div", { class: "pc-panel" }, h("h4", {}, `Shot diet · ${qLabel}`), pcDonut(d.shots)),
-      h("div", { class: "pc-panel" }, h("h4", {}, "Points by quarter"), pcSpark(d.by_quarter, d.team.color) || h("div", { class: "muted" }, "–"))),
-    GV.pc.game === "live" ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${qLabel}`), pcShotMap(p.name, d.team, GV.pc.quarter)) : [],
-    h("div", { class: "conf-grid" }, zoneBox(d.scope === "quarter" ? `Shot diet · ${qLabel}` : "Shot diet", d.shots), zoneBox(d.scope === "quarter" ? "Shots defended · full game" : "Shots defended", d.defended)),
+      h("div", { class: "pc-panel" }, h("h4", {}, pastGame ? "Field-goal points by quarter" : "Points by quarter"), pcSpark(d.by_quarter, d.team.color) || h("div", { class: "muted" }, "–"))),
+    h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${gameLabel} · ${qLabel}`), pcShotMap(p.name, GV.pc.team, GV.pc.quarter, GV.pc.game === "live" ? S.shots : (S.gameShots.get(Number(GV.pc.game)) || []))),
+    h("div", { class: "conf-grid" }, zoneBox(d.scope === "quarter" ? `Shot diet · ${qLabel}` : "Shot diet", d.shots), d.defended ? zoneBox(d.scope === "quarter" ? "Shots defended · full game" : "Shots defended", d.defended) : null),
     h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Positive plays · ${p.name}`),
     h("div", { class: "pc-plays" }, plays.length ? plays.map((pb) => h("div", { class: "ev score" }, h("div", { class: "rail", style: { background: "var(--line-strong)" } }, ""), h("div", {}, h("span", { class: "sc" }, `${pb.period} ${pb.clock} · ${pb.score}`), pb.text))) : h("div", { class: "muted" }, "No plays logged yet for this selection.")));
   pcAfterRender(numTiles);
