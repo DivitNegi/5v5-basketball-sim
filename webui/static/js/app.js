@@ -361,7 +361,7 @@ function rawLine(line) {
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
   if (!root._stick && el.className !== "pbp-sys") { root._behind = (root._behind || 0) + 1; syncLatestButton(); }
-  if (root._stick) pinBottom(root);
+  if (root._stick) root._wantPin = true;   // the batch scrolls once, after all its lines are in
 }
 
 function addFeedLine(line) {
@@ -513,7 +513,7 @@ function applyLive(snap) {
   if ($("#view-box").classList.contains("active")) renderBox();
 }
 
-function applyScore(msg) {
+function applyScore(msg, paint = true) {
   const startsFresh = /^1st$/i.test(msg.period || "") && /^(12|10):00$/.test(msg.clock || "") && Number(msg.score_a) === 0 && Number(msg.score_b) === 0;
   if (startsFresh && S.lastScoreClock === "0:00" && S.live) {
     S.gameSnapshots.set(S.gameNo, structuredClone(S.live));
@@ -524,11 +524,14 @@ function applyScore(msg) {
   const lastFlow = S.flow[S.flow.length - 1];
   if (!lastFlow || flowElapsed(msg.period, msg.clock) >= flowElapsed(lastFlow[0], lastFlow[1])) S.flow.push([msg.period, msg.clock, Number(msg.score_a) - Number(msg.score_b)]);
   const newScore = [Number(msg.score_a), Number(msg.score_b)];
-  const changed = [newScore[0] !== S.score[0], newScore[1] !== S.score[1]];
+  const before = S.score.slice();
   S.score = newScore;
-  renderScoreboard();
-  changed.forEach((c, i) => c && bumpScore(i));
   S.lastScoreClock = msg.clock || null;
+  if (paint) paintScore(before);
+}
+function paintScore(before) {
+  renderScoreboard();
+  [0, 1].forEach((i) => { if (S.score[i] !== before[i]) bumpScore(i); });
   renderFlow("#flowMini", 170);
   if ($("#view-flow").classList.contains("active")) renderFlow("#flowBig", 420);
 }
@@ -587,13 +590,42 @@ function connect() {
     if (st.flow?.length) { S.flow = st.flow; renderFlow("#flowMini", 170); }
   };
   es.onerror = () => { conn.className = "conn bad"; conn.lastElementChild.textContent = "Reconnecting…"; };
-  es.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
+  es.onmessage = (e) => { evQueue.push(JSON.parse(e.data)); scheduleDrain(); };
+}
+
+// Events are queued and applied in short batches (about 12 ms each): thousands of plays and score updates arrive in a few seconds
+// during a "sim to" jump, and drawing every one separately froze the page. The scoreboard is drawn once per batch with the latest score,
+// like Tk's polling, while every play still lands in the log and every score still lands in the game-flow data.
+const evQueue = [];
+let drainScheduled = false;
+function scheduleDrain() {
+  if (drainScheduled) return;
+  drainScheduled = true;
+  let ran = false;
+  const run = () => { if (ran) return; ran = true; drainScheduled = false; drainEvents(); };
+  requestAnimationFrame(run);
+  setTimeout(run, 100);   // a hidden tab does not run animation frames
+}
+function drainEvents() {
+  const t0 = performance.now();
+  const before = S.score.slice();
+  let sawScore = false, lastLive = null;
+  while (evQueue.length && performance.now() - t0 < 12) {
+    const msg = evQueue.shift();
+    if (msg.type === "pbp") addFeedLine(msg.text);
+    else if (msg.type === "score") { applyScore(msg, false); sawScore = true; }
+    else if (msg.type === "live") lastLive = msg;
+    else handleEvent(msg);
+  }
+  if (sawScore) paintScore(before);
+  if (lastLive) { applyLive(lastLive.data); scheduleGameViews(); scheduleStats(); }
+  const log = $("#rawlog");
+  if (log._wantPin) { log._wantPin = false; if (log._stick) pinBottom(log); }
+  if (evQueue.length) scheduleDrain();
+}
+function handleEvent(msg) {
     switch (msg.type) {
       case "reset": resetGame(msg); break;
-      case "pbp": addFeedLine(msg.text); break;
-      case "score": applyScore(msg); break;
-      case "live": applyLive(msg.data); scheduleGameViews(); scheduleStats(); break;
       case "status": applyStatus(msg); break;
       case "series":
         if (msg.series_status?.startsWith("SERIES FINAL")) $("#sbSeries").textContent = `${S.seriesText || "Series"} · Final`;
@@ -606,7 +638,6 @@ function connect() {
       case "bracket": scheduleBracket(); break;
       case "finished": scheduleStats(); scheduleSeasonRefresh(); break;
     }
-  };
 }
 
 // ───────────────────────── season ─────────────────────────
