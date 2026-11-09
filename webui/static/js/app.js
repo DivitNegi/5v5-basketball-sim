@@ -1414,24 +1414,120 @@ function renderCoach(d) {
   $("#coachMatch").replaceChildren(rows.length ? h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Opposing player"), h("th", {}, "Primary defender"), h("th", {}, "Coverage"))), h("tbody", {}, rows)) : h("div", { class: "empty" }, "Matchups appear once the game starts."));
 }
 
-async function loadLineup() {
+// ───────────────────────── Lineups: the Tk Coach tab's sliders ─────────────────────────
+// Drag a player up or down to set the rotation (slots 1-5 start at PG, SG, SF, PF, C; 6 is the sixth man...). Each minutes slider moves only
+// its own player and the team has 240 minutes in all: once they are handed out a slider cannot go higher, so slide someone else down first.
+// Usage sliders set how much of the offense a player carries (CUSTOM); Auto gives it back to the game. Changes save by themselves.
+const LU = { order: [], minutes: {}, usage: {}, custom: {}, roster: {}, sig: "", team: "", lineup: null, timer: null, note: "", drag: null, busy: false };
+const LU_SLOTS = ["1  PG", "2  SG", "3  SF", "4  PF", "5  C", "6th man", "7th", "8th", "9th", "10th", "11th", "12th", "13th", "14th", "15th"];
+const LU_POS = ["PG", "SG", "SF", "PF", "C"];
+const luTotal = () => Object.values(LU.minutes).reduce((x, y) => x + y, 0);
+// split `total` minutes over the players in proportion to `weights`, each between low and high, as whole numbers that add up exactly
+function luSpread(total, weights, low = 0, high = 44) {
+  const names = Object.keys(weights); if (!names.length) return {};
+  total = Math.max(low * names.length, Math.min(high * names.length, Math.round(total)));
+  const share = Object.fromEntries(names.map((n) => [n, Math.max(weights[n], 0)]));
+  if (Object.values(share).reduce((x, y) => x + y, 0) <= 0) names.forEach((n) => { share[n] = 1; });
+  const fixed = {}; let free = [...names], alloc = {};
+  for (let k = 0; k < names.length + 2; k++) {
+    const remaining = total - Object.values(fixed).reduce((x, y) => x + y, 0), ws = free.reduce((x, n) => x + share[n], 0);
+    alloc = Object.fromEntries(free.map((n) => [n, ws > 0 ? remaining * share[n] / ws : remaining / free.length]));
+    const over = free.filter((n) => alloc[n] > high), under = free.filter((n) => alloc[n] < low);
+    if (!over.length && !under.length) break;
+    over.forEach((n) => { fixed[n] = high; }); under.forEach((n) => { fixed[n] = low; });
+    free = free.filter((n) => !(n in fixed)); if (!free.length) break;
+  }
+  const values = { ...fixed, ...Object.fromEntries(free.filter((n) => n in alloc).map((n) => [n, alloc[n]])) };
+  const floors = Object.fromEntries(names.map((n) => [n, Math.floor(values[n])]));
+  let left = total - Object.values(floors).reduce((x, y) => x + y, 0);
+  for (const n of [...names].sort((x, y) => (values[y] - floors[y]) - (values[x] - floors[x]))) { if (left <= 0) break; if (floors[n] < high) { floors[n]++; left--; } }
+  return floors;
+}
+async function loadLineup(force = false) {
   const d = await api.get("/api/fantasy"), root = $("#lineupBody");
   if (!d.active) { root.replaceChildren(h("div", { class: "empty" }, d.message)); return; }
-  const rows = d.userRoster.map((p, i) => h("tr", { "data-name": p.name },
-    h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))),
-    h("td", {}, p.ovr), h("td", {}, h("input", { type: "checkbox", class: "lu-start", checked: p.starter })),
-    h("td", {}, h("select", { class: "lu-pos" }, ["PG","SG","SF","PF","C"].map((x) => h("option", { value:x, selected:x===p.pos }, x)))),
-    h("td", {}, h("input", { class: "lineup-input lu-min", type:"number", min:"0", max:"48", value:p.minutes ?? 0 })),
-    h("td", {}, h("input", { class: "lineup-input lu-use", type:"number", min:"0.05", max:"0.5", step:"0.01", value:(p.usage ?? .2).toFixed(2) })),
-    h("td", {}, i + 1)));
-  root.replaceChildren(h("table", { class:"stats lineup-table" }, h("thead", {}, h("tr", {}, ["Player","OVR","Start","Pos","Minutes","Usage","Rotation"].map((x,i) => h("th", { class:i===0?"l":"" }, x)))), h("tbody", {}, rows)));
+  const names = d.userRoster.map((p) => p.name), sig = [...names].sort().join("|");
+  LU.roster = Object.fromEntries(d.userRoster.map((p) => [p.name, p])); LU.team = d.userTeam; LU.lineup = d.lineup;
+  names.forEach((n) => { LU.usage[n] = Math.round(((d.usage?.[n]?.usage) ?? 0.2) * 100); LU.custom[n] = !!d.usage?.[n]?.custom; });
+  if (force || sig !== LU.sig || !LU.order.length) {   // rebuild when the roster changed (a trade) or on Reload; otherwise leave the user's edits alone
+    LU.sig = sig;
+    const saved = (d.lineup.rotation || []).filter((n) => names.includes(n));
+    if (saved.length === names.length) LU.order = saved;
+    else {
+      const slotOf = Object.fromEntries(LU_POS.map((x, i) => [x, i]));
+      const starters = [...d.lineup.starters].sort((x, y) => (slotOf[d.lineup.positions[x]] ?? 2) - (slotOf[d.lineup.positions[y]] ?? 2));
+      LU.order = [...starters, ...names.filter((n) => !starters.includes(n)).sort((x, y) => (d.lineup.minutes[y] || 0) - (d.lineup.minutes[x] || 0))];
+    }
+    LU.minutes = luSpread(240, Object.fromEntries(names.map((n) => [n, d.lineup.minutes[n] || 0])));
+  }
+  renderLineup();
 }
-async function saveLineup(reset=false) {
-  if (reset) { await api.post("/api/fantasy/lineup", { reset:true }); await loadLineup(); return; }
-  const rows = $$("#lineupBody tbody tr"), starters=[], positions={}, minutes={}, usage={}, rotation=[];
-  rows.forEach((tr) => { const n=tr.dataset.name; rotation.push(n); if ($(".lu-start",tr).checked) starters.push(n); positions[n]=$(".lu-pos",tr).value; minutes[n]=Number($(".lu-min",tr).value); usage[n]=Number($(".lu-use",tr).value); });
-  if (starters.length !== 5) throw new Error("Choose exactly five starters.");
-  await api.post("/api/fantasy/lineup", { starters, positions, minutes, usage, rotation }); toast("Lineup saved.", "ok"); await loadLineup();
+function luUpdateTotal() {
+  const el = $("#luTotal"); if (!el) return;
+  const total = luTotal(), left = 240 - total;
+  el.textContent = `Minutes: ${total} / 240     ${left === 0 ? "all handed out" : `${left} left to hand out (slide someone down to free more)`}`;
+  el.style.color = total === 240 ? "#4ade80" : "#f87171";
+}
+function luScheduleApply() { clearTimeout(LU.timer); LU.timer = setTimeout(luApply, 700); }   // saved a moment after the last change
+async function luApply() {
+  if (!LU.order.length) return;
+  const positions = {}; LU.order.forEach((n, i) => { positions[n] = i < 5 ? LU_POS[i] : LU.roster[n].pos; });
+  const short = 240 - luTotal();
+  try {
+    const r = await api.post("/api/fantasy/lineup", { starters: LU.order.slice(0, 5), positions, minutes: short === 0 ? LU.minutes : {}, rotation: LU.order });
+    LU.note = (r.effective_order != null ? `Saved. It applies from game ${r.effective_order + 1} on (games already played or handed out keep the old lineup).` : "Saved. It applies to your next games.")
+      + (short === 0 ? "" : `  Minutes are not saved yet: ${short} still to hand out so they add up to 240.`);
+  } catch (e) { LU.note = e.message || "Could not apply that."; }
+  const el = $("#luNote"); if (el) el.textContent = LU.note;
+  const nx = $("#luNext"); if (nx) { try { const d = await api.get("/api/fantasy"); nx.textContent = "Your next game starts: " + d.lineup.starters.map((n) => `${d.lineup.positions[n] || ""} ${n}`).join(", "); } catch (_) {} }
+}
+async function luUsage(name, value) {   // a number (percent) sets it by hand, null gives it back to the game
+  const positions = {}; LU.order.forEach((n, i) => { positions[n] = i < 5 ? LU_POS[i] : LU.roster[n].pos; });
+  try {
+    await api.post("/api/fantasy/lineup", { starters: LU.order.slice(0, 5), positions, minutes: 240 - luTotal() === 0 ? LU.minutes : {}, rotation: LU.order, usage: { [name]: value == null ? null : value / 100 } });
+    LU.note = value == null ? `${name}'s usage is back to automatic.` : `${name}'s usage is set to ${value}%; the others share what is left.`;
+  } catch (e) { LU.note = e.message || "Could not set that."; }
+  await loadLineup(); const el = $("#luNote"); if (el) el.textContent = LU.note;
+}
+function renderLineup() {
+  const root = $("#lineupBody");
+  const slider = (min, max, val, oninput, onchange) => h("input", { type: "range", min, max, step: 1, value: val, class: "lu-slider", oninput, onchange });
+  const rows = LU.order.map((n, i) => {
+    const p = LU.roster[n], starter = i < 5;
+    const label = h("b", { class: "lu-min" }, String(LU.minutes[n]));
+    const range = slider(0, 44, LU.minutes[n], (e) => {
+      const others = luTotal() - LU.minutes[n], room = Math.max(0, 240 - others), v = Math.max(0, Math.min(44, room, Number(e.target.value)));
+      if (v !== Number(e.target.value)) e.target.value = v;
+      LU.minutes[n] = v; label.textContent = String(v); luUpdateTotal();
+    }, luScheduleApply);
+    return h("div", { class: `lu-row ${starter ? "starter" : ""} ${i === 5 ? "after-five" : ""}`, draggable: "true", "data-name": n,
+      ondragstart: (e) => { LU.drag = n; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", n); e.currentTarget.classList.add("dragging"); },
+      ondragend: (e) => { e.currentTarget.classList.remove("dragging"); LU.drag = null; },
+      ondragover: (e) => { e.preventDefault(); e.currentTarget.classList.add("over"); }, ondragleave: (e) => e.currentTarget.classList.remove("over"),
+      ondrop: (e) => { e.preventDefault(); const from = LU.drag; if (!from || from === n) return; const rest = LU.order.filter((x) => x !== from); rest.splice(LU.order.indexOf(n), 0, from); LU.order = rest; renderLineup(); luScheduleApply(); } },
+      h("span", { class: "lu-slot" }, LU_SLOTS[i] || `${i + 1}th`), h("span", { class: "lu-grip" }, "☰"), faceEl(n), h("span", { class: "lu-nm" }, n), h("span", { class: "muted lu-pos" }, p.pos),
+      h("b", { class: "lu-ovr", style: { color: ratingColor(p.ovr || 0) } }, p.ovr), range, label);
+  });
+  const usageRows = LU.order.map((n) => {
+    const pct = h("b", { class: "lu-min" }, `${LU.usage[n]}%`);
+    const status = h("span", { class: `lu-status ${LU.custom[n] ? "custom" : ""}` }, LU.custom[n] ? "CUSTOM" : "AUTO");
+    const range = slider(4, 50, LU.usage[n], (e) => { LU.usage[n] = Number(e.target.value); pct.textContent = `${LU.usage[n]}%`; }, (e) => luUsage(n, Number(e.target.value)));
+    return h("div", { class: "lu-row usage" }, h("span", { class: "lu-nm wide" }, n), status, range, pct, h("button", { class: "btn small", onclick: () => luUsage(n, null) }, "Auto"));
+  });
+  root.replaceChildren(
+    h("h3", { class: "lu-h" }, `Coach: ${LU.team}`),
+    h("p", { class: "muted" }, "Drag a player up or down to set your rotation.  Slots 1-5 start the game at PG, SG, SF, PF and C; 6 is your sixth man, 7 the next off the bench.  Each slider sets one player's minutes and moves only that player.  The team has 240 minutes: once they are all handed out a slider can't go higher, so slide someone else down first.  Changes save by themselves and apply from the next game day (minutes save once all 240 are handed out)."),
+    h("div", { class: "lu-list" }, rows),
+    h("div", { class: "lu-foot" }, h("b", { id: "luTotal" }), h("span", { id: "luNote", class: "lu-note" }, LU.note)),
+    h("div", { id: "luNext", class: "muted", style: { margin: "6px 0 18px" } }, LU.lineup ? "Your next game starts: " + LU.lineup.starters.map((n) => `${LU.lineup.positions[n] || ""} ${n}`).join(", ") : ""),
+    h("h3", { class: "lu-h" }, "Shot usage"),
+    h("p", { class: "muted" }, "How much of the offense each player carries. The game sets it from his ratings and the players around him: add a star and everyone else's usage drops, play a thin roster and your scorers' rises. Slide a player to set his usage yourself (CUSTOM); press Auto to give it back. A player you trade starts fresh on his new team. Shot tendencies are not changed."),
+    h("div", { class: "lu-list" }, usageRows));
+  luUpdateTotal();
+}
+async function saveLineup(reset = false) {
+  if (reset) { await api.post("/api/fantasy/lineup", { reset: true }); LU.note = "Back to the automatic starters, positions and minutes."; await loadLineup(true); const el = $("#luNote"); if (el) el.textContent = LU.note; return; }
+  clearTimeout(LU.timer); await luApply();
 }
 
 // ratings shown beside every player in the draft and trade screens (the Tk draft board's columns)
@@ -1836,6 +1932,7 @@ async function boot() {
   $("#simPlayoffs").addEventListener("click", () => api.post("/api/control", { action: "simPlayoffs" }).catch((e) => toast(e.message, "err")));
   $("#simSeries").addEventListener("click", () => api.post("/api/control", { action: "simSeries" }).catch((e) => toast(e.message, "err")));
   $$('[data-coach]').forEach((b)=>b.addEventListener('click',async()=>{try{await api.post('/api/coach',{action:b.dataset.coach,team:CO.team});await loadCoach();}catch(e){toast(e.message,'err');}}));
+  $("#lineupReload")?.addEventListener("click", () => loadLineup(true).catch((e) => toast(e.message, "err")));
   $("#lineupSave").addEventListener("click",()=>saveLineup(false).catch((e)=>toast(e.message,"err")));
   $("#lineupReset").addEventListener("click",()=>saveLineup(true).catch((e)=>toast(e.message,"err")));
   $$('[data-fantasy]').forEach((b)=>b.addEventListener('click',()=>startSpecial(b.dataset.fantasy==='2027'?'Fantasy draft: 2027 players (season + playoffs)':b.dataset.fantasy==='all'?'Fantasy draft: all-time (season + playoffs)':'Fantasy draft playoffs')));
