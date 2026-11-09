@@ -1250,6 +1250,16 @@ function cardFromSnapshot(snap, teamName, playerName, shots = [], quarter = "all
     by_quarter: Object.entries(shots.filter((e) => e.player === playerName).reduce((q, e) => { if (e.made) q[e.period] = (q[e.period] || 0) + (e.zone === "three" ? 3 : 2); else q[e.period] = q[e.period] || 0; return q; }, {})).map(([k, v]) => ({ period: Number(k), pts: v })).sort((a, b) => a.period - b.period), defended: null };
 }
 
+// team colours that are very dark (navy, black) vanish on the dark charts: use the brighter of the two team colours, lightened if still dim
+function chartColor(id) {
+  const parse = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec((c || "").trim()); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
+  const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  const cands = [id?.color, id?.color2].map(parse).filter(Boolean);
+  if (!cands.length) return "#e03a3e";
+  let best = cands.reduce((a, b) => (lum(b) > lum(a) ? b : a));
+  for (let k = 0; k < 8 && lum(best) < 0.42; k++) best = best.map((c) => Math.round(c + (255 - c) * 0.18));
+  return `rgb(${best.join(",")})`;
+}
 // ---- Player card visuals: radar, shot-diet donut, personal shot map, quarter sparkline, count-up tiles, hot/cold badge, hover tilt
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -1367,9 +1377,9 @@ async function loadPlayerCard() {
     h("div", { class: "stat-tiles" }, tile("MIN", p.min.toFixed(1)), tile("PTS", p.pts), tile("REB", p.reb), tile("AST", p.ast), tile("STL", p.stl), tile("BLK", p.blk), tile("TO", p.tov), tile("PF", p.pf),
       tile("+/-", p.pm > 0 ? `+${p.pm}` : String(p.pm)), tile("FG", `${p.fgm}/${p.fga}`), tile("3PT", `${p.tpm}/${p.tpa}`), tile("FT", `${p.ftm}/${p.fta}`), tile("FG%", pct1(p.fgm, p.fga)), tile("TS%", p.ts ?? "–")),
     h("div", { class: "pc-viz" },
-      h("div", { class: "pc-panel" }, h("h4", {}, "Impact"), pcRadar(p, d.team.color)),
+      h("div", { class: "pc-panel" }, h("h4", {}, "Impact"), pcRadar(p, chartColor(d.team))),
       h("div", { class: "pc-panel" }, h("h4", {}, `Shot diet · ${qLabel}`), pcDonut(d.shots)),
-      h("div", { class: "pc-panel" }, h("h4", {}, pastGame ? "Field-goal points by quarter" : "Points by quarter"), pcSpark(d.by_quarter, d.team.color) || h("div", { class: "muted" }, "–"))),
+      h("div", { class: "pc-panel" }, h("h4", {}, pastGame ? "Field-goal points by quarter" : "Points by quarter"), pcSpark(d.by_quarter, chartColor(d.team)) || h("div", { class: "muted" }, "–"))),
     h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${gameLabel} · ${qLabel}`), pcShotMap(p.name, GV.pc.team, GV.pc.quarter, GV.pc.game === "live" ? S.shots : (S.gameShots.get(Number(GV.pc.game)) || []))),
     h("div", { class: "conf-grid" }, zoneBox(d.scope === "quarter" ? `Shot diet · ${qLabel}` : "Shot diet", d.shots), d.defended ? zoneBox(d.scope === "quarter" ? "Shots defended · full game" : "Shots defended", d.defended) : null),
     h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Positive plays · ${p.name}`),
@@ -1902,7 +1912,7 @@ async function openStatsPlayer(team, name, source) {
   let d;
   try { d = await api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`); } catch { d = { error: "Could not load that player." }; }
   if (d.error) { body.replaceChildren(h("div", { class: "empty" }, d.error)); return; }
-  const id = identOf(team), color = id.color || "#e03a3e";
+  const id = identOf(team), color = chartColor(id);
   let mode = "pg";
   const tiles = h("div", {});
   const pct1v = (m, a) => (a ? (100 * m / a).toFixed(1) : "–");
