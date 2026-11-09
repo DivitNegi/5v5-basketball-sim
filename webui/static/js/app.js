@@ -888,7 +888,8 @@ function renderScheduleTab() {
       h("b", {}, b.teams.map((t) => `${t.short} ${t.score}`).join("  –  ")), h("span", { class: "muted" }, `(team game ${b.game})`),
       b.order != null ? h("button", { class: "btn", onclick: () => startSpecial("Replay season game", { order: b.order }) }, "Replay this game") : null), fullBox(b));
   }
-  const teams = (S.meta?.teams || []).map((t) => t.name).filter((n) => (SE.data?.standings || []).some((r) => r.team === n));
+  // the teams come from the season's own standings, so a fantasy draft's teams (which are not in the built-in team list) work too
+  const teams = [...new Set((SE.data?.standings || []).map((r) => r.team))].sort((a, b) => shortTeam(a).localeCompare(shortTeam(b)));
   const sel = h("select", { onchange: (e) => { SE.team = e.target.value; loadSchedule(); } }, h("option", { value: "" }, "Pick a team"), teams.map((n) => h("option", { value: n, selected: n === SE.team }, shortTeam(n))));
   const g = SE.sched || [];
   const w = g.filter((x) => x.win).length;
