@@ -1158,12 +1158,18 @@ async function loadPlayerCard() {
   if (!GV.pc.team || !list.some((t) => t.team === GV.pc.team)) GV.pc.team = list[0].team;
   const roster = list.find((t) => t.team === GV.pc.team).players;
   if (!roster.includes(GV.pc.name)) GV.pc.name = roster[0];
+  // earlier games are offered only if this player actually played in one of them (his team was in it and he got on the floor)
+  const playedGames = [...S.gameSnapshots.keys()].sort((a, b) => b - a).filter((n) => {
+    const row = S.gameSnapshots.get(n)?.teams?.find((t) => t.name === GV.pc.team)?.box?.find((r) => r.name === GV.pc.name);
+    return !!row && ((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
+  });
+  if (GV.pc.game !== "live" && !playedGames.includes(Number(GV.pc.game))) GV.pc.game = "live";
   pick.replaceChildren(
     h("select", { onchange: (e) => { GV.pc.team = e.target.value; GV.pc.name = null; loadPlayerCard(); } }, list.map((t) => h("option", { value: t.team, selected: t.team === GV.pc.team }, t.short))),
     h("select", { onchange: (e) => { GV.pc.name = e.target.value; loadPlayerCard(); } }, roster.map((n) => h("option", { value: n, selected: n === GV.pc.name }, n))),
     h("select", { onchange: (e) => { GV.pc.game = e.target.value; loadPlayerCard(); } },
       h("option", { value: "live", selected: GV.pc.game === "live" }, `Live / Game ${S.gameNo}`),
-      [...S.gameSnapshots.keys()].sort((a,b) => b-a).map((n) => h("option", { value: String(n), selected: GV.pc.game === String(n) }, `Game ${n}`))),
+      playedGames.map((n) => h("option", { value: String(n), selected: GV.pc.game === String(n) }, `Game ${n}`))),
     h("div", { class: "seg small" }, ["all", "1", "2", "3", "4", "OT"].map((q) => h("button", { class: GV.pc.quarter === q ? "on" : "", onclick: () => { GV.pc.quarter = q; loadPlayerCard(); } }, q === "all" ? "All plays" : q === "OT" ? "OT" : `Q${q}`))));
   const d = GV.pc.game === "live"
     ? await api.get(`/api/game/card?team=${encodeURIComponent(GV.pc.team)}&name=${encodeURIComponent(GV.pc.name)}&quarter=${GV.pc.quarter}`)
