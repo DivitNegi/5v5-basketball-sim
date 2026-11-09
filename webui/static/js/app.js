@@ -1250,16 +1250,9 @@ function cardFromSnapshot(snap, teamName, playerName, shots = [], quarter = "all
     by_quarter: Object.entries(shots.filter((e) => e.player === playerName).reduce((q, e) => { if (e.made) q[e.period] = (q[e.period] || 0) + (e.zone === "three" ? 3 : 2); else q[e.period] = q[e.period] || 0; return q; }, {})).map(([k, v]) => ({ period: Number(k), pts: v })).sort((a, b) => a.period - b.period), defended: null };
 }
 
-// team colours that are very dark (navy, black) vanish on the dark charts: use the brighter of the two team colours, lightened if still dim
-function chartColor(id) {
-  const parse = (c) => { const m = /^#?([0-9a-f]{6})$/i.exec((c || "").trim()); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
-  const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  const cands = [id?.color, id?.color2].map(parse).filter(Boolean);
-  if (!cands.length) return "#e03a3e";
-  let best = cands.reduce((a, b) => (lum(b) > lum(a) ? b : a));
-  for (let k = 0; k < 8 && lum(best) < 0.42; k++) best = best.map((c) => Math.round(c + (255 - c) * 0.18));
-  return `rgb(${best.join(",")})`;
-}
+// one chart colour for every team and every chart (radars, sparklines), so they always match and always show on the dark panels
+const CHART_COLOR = "#f5a524";
+const chartColor = () => CHART_COLOR;
 // ---- Player card visuals: radar, shot-diet donut, personal shot map, quarter sparkline, count-up tiles, hot/cold badge, hover tilt
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
