@@ -18,6 +18,7 @@ from .runner import rating_summary, SimRunner
 from .live import team_identity
 from . import live
 from .stats import payload as stats_payload
+from .shots import payload as shots_payload
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(ROOT, "static")
@@ -935,6 +936,8 @@ def build_app():
                 return self._json(runner.meta())
             if path == "/api/state":
                 return self._json(runner.state())
+            if path == "/api/shots":
+                return self._json(shots_payload(runner, {k: v[0] for k, v in params.items()}))
             if path == "/api/stats":
                 return self._json(stats_payload(runner,
                     (params.get("source") or ["Live"])[0],

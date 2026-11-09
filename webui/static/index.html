@@ -25,6 +25,7 @@
         <div class="nav-section">League &amp; coaching</div>
         <button class="nav-item" data-view="season"><span class="nav-icon">☰</span>Season</button>
         <button class="nav-item" data-view="bracket"><span class="nav-icon">⛓</span>Playoffs</button>
+        <button class="nav-item" data-view="shottab"><span class="nav-icon">◎</span>Shots</button>
         <button class="nav-item" data-view="stats"><span class="nav-icon">◎</span>Stats</button>
         <button class="nav-item" data-view="cards"><span class="nav-icon">▣</span>Teams &amp; players</button>
         <button class="nav-item" data-view="coach"><span class="nav-icon">✎</span>Coach</button>
@@ -125,6 +126,14 @@
               <div class="flow small" id="flowMini"></div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-shottab">
+        <div class="panel">
+          <div class="panel-head"><h2>Shots</h2><span class="muted">Shot diet, defense diet and who guarded whom (the Tk Shots tab)</span></div>
+          <div class="filters" id="shotFilters"></div>
+          <div id="shotTable"><div class="empty">Shot data appears once games are played.</div></div>
         </div>
       </section>
 

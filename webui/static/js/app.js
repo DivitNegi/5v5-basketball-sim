@@ -1554,6 +1554,35 @@ function renderStats() {
   renderStatsInto($("#statsBody"), statsData);
 }
 
+// ---- Shots tab (Tk): shot diet / defense diet / matchup defense
+const SH = { mode: "Shot Diet", game: "All Games", quarter: "All Quarters", team: "All Teams", defender: "All Defenders", guarded: "All Guarded", rank: "Team order", rankStat: "Made", minAtt: "", minDef: "", source: "Season", data: null };
+async function loadShots2() {
+  const q = new URLSearchParams({ mode: SH.mode, game: SH.game, quarter: SH.quarter, team: SH.team, defender: SH.defender, guarded: SH.guarded, rank: SH.rank, rankStat: SH.rankStat, minAtt: SH.minAtt, minDef: SH.minDef, source: SH.source });
+  SH.data = await api.get(`/api/shots?${q}`);
+  if (SH.data.source) SH.source = SH.data.source;
+  renderShots2();
+}
+function renderShots2() {
+  const d = SH.data; if (!d) return;
+  const sel = (label, key, opts, show = true) => !show ? null : h("label", { class: "fsel" }, h("span", { class: "muted" }, label),
+    h("select", { onchange: (e) => { SH[key] = e.target.value; loadShots2(); } }, opts.map((o) => h("option", { value: o.v ?? o, selected: (o.v ?? o) === SH[key] }, o.t ?? o))));
+  const rankable = SH.mode !== "Matchup Defense";
+  $("#shotFilters").replaceChildren(
+    sel("Type", "mode", d.modes), sel("Game", "game", d.games), SH.mode === "Shot Diet" ? sel("Quarter", "quarter", ["All Quarters", "Q1", "Q2", "Q3", "Q4", "OT"]) : null,
+    sel("Team", "team", [{ v: "All Teams", t: "All Teams" }, ...d.teams.map((t) => ({ v: t, t }))]),
+    SH.mode === "Matchup Defense" ? sel("Defender", "defender", [{ v: "All Defenders", t: "All Defenders" }, ...d.defenders.map((t) => ({ v: t, t }))]) : null,
+    SH.mode === "Matchup Defense" ? sel("Guarded", "guarded", [{ v: "All Guarded", t: "All Guarded" }, ...d.guarded.map((t) => ({ v: t, t }))]) : null,
+    rankable ? sel("Rank by", "rank", ["Team order", ...d.rankKeys]) : null, rankable ? sel("", "rankStat", ["Made", "Attempted", "Percentage"]) : null,
+    rankable ? h("label", { class: "fsel" }, h("span", { class: "muted" }, SH.mode === "Defense Diet" ? "Min defended (blank = auto)" : "Min att (blank = NBA min)"),
+      h("input", { value: SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"], style: { width: "70px" }, onchange: (e) => { SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"] = e.target.value; loadShots2(); } })) : null,
+    sel("Show", "source", d.sources));
+  if (!d.rows.length) { $("#shotTable").replaceChildren(h("div", { class: "empty" }, d.note || "Shot data appears once games are played.")); return; }
+  const prev = $("#shotTable .table-wrap"), left = prev?.scrollLeft || 0, top = prev?.scrollTop || 0;
+  const wrap = h("div", { class: "table-wrap tall" }, h("table", { class: "stats avg" }, h("thead", {}, h("tr", {}, d.columns.map((c, i) => h("th", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, c)))),
+    h("tbody", {}, d.rows.map((r) => h("tr", { class: r.kind === "team" ? "team-row" : "" }, r.cells.map((c, i) => h("td", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, i === 0 ? (identOf(c).short ? `${identOf(c).year || ""} ${identOf(c).short}`.trim() : c) : c)))))));
+  $("#shotTable").replaceChildren(wrap); wrap.scrollLeft = left; wrap.scrollTop = top;
+}
+
 // ───────────────────────── trade offers (the season pauses until you answer) ─────────────────────────
 function showTradePrompt(pr) {
   document.getElementById("tradeModal")?.remove();
@@ -1690,6 +1719,7 @@ async function boot() {
     if (b.dataset.view === "box") renderBox();
     if (b.dataset.view === "flow") renderFlow("#flowBig", 420);
     if (b.dataset.view === "season") refreshSeason();
+    if (b.dataset.view === "shottab") loadShots2().catch((e) => toast(e.message, "err"));
     if (b.dataset.view === "stats") loadStats().catch(e=>toast(e.message,"err"));
     if (b.dataset.view === "bracket") refreshBracket();
     if (b.dataset.view === "cards" && !CD.data) loadRoster(S.teamA);
