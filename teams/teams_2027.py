@@ -2254,7 +2254,7 @@ def make_thunder_2027() -> Team:
         Player('Shai G-Alexander', 'PG',
                0.36, 0.34, 0.34, 0.50, 0.20, 0.98,
                0.880, 0.999, 0.999, 0.750, 0.880,
-               0.32, 0.80, 0.980,
+               0.32, 0.70, 0.980,
                0.850, 0.620, 0.340, 0.650, 0.990, 0.467,
                0.860, 0.690,
                clutchness=0.600, secondary_positions=('SG',), height=78, speed=0.880, iso_tendency = .99,

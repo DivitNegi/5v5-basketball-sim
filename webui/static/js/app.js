@@ -659,6 +659,7 @@ async function refreshSeason() {
       if (SE.tab === "players") { const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source }); AV.data = await api.get(`/api/season/avg?${q}`); }
       if (SE.tab === "advanced") SE.advStats = await api.get("/api/stats?kind=advanced&source=Season&team=All+teams&quarter=All");
       if (SE.tab === "teams") SE.teams = (await api.get("/api/season/teams")).teams;
+      if (SE.tab === "shots") { SH.source = SH.source || "Season"; await loadShots2(); }
       if (SE.tab === "recap") RC.data = await api.get(`/api/season/recap?team=${encodeURIComponent(RC.team)}`);
       if (SE.tab === "highs" && !HV.box) SE.highs = await api.get(`/api/season/highs?${new URLSearchParams({ view: HV.view, stat: HV.stat, team: HV.team })}`);
       if (SE.tab === "schedule" && SE.team) SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
@@ -919,8 +920,14 @@ function renderRecapTab() {
     h("div", { class: "recap" }, d.lines.map(([tag, text]) => h("div", { class: `rc-line ${tag}` }, text || "\u00a0"))));
 }
 
+function renderShotsTab() {
+  const box = h("div", { class: "sh-scope" }, h("div", { class: "filters sh-filters" }), h("div", { class: "sh-table" }, h("div", { class: "empty" }, "Loading shots…")));
+  if (SH.data) queueMicrotask(renderShots2); else loadShots2().catch((e) => toast(e.message, "err"));
+  return box;
+}
+
 function renderSeasonBody() {
-  const view = { standings: renderStandings, races: renderRaces, players: renderPlayers, advanced: renderAdvancedTab, teams: renderTeamsTab, schedule: renderScheduleTab, highs: renderHighsTab, recap: renderRecapTab }[SE.tab]();
+  const view = { standings: renderStandings, races: renderRaces, players: renderPlayers, advanced: renderAdvancedTab, teams: renderTeamsTab, schedule: renderScheduleTab, highs: renderHighsTab, recap: renderRecapTab, shots: renderShotsTab }[SE.tab]();
   $("#seasonBody").replaceChildren(view);
 }
 
@@ -1564,10 +1571,14 @@ async function loadShots2() {
 }
 function renderShots2() {
   const d = SH.data; if (!d) return;
+  for (const scope of $$(".sh-scope")) paintShots(scope, d);
+}
+function paintShots(scope, d) {
+  const filtersEl = scope.querySelector(".sh-filters"), tableEl = scope.querySelector(".sh-table");
   const sel = (label, key, opts, show = true) => !show ? null : h("label", { class: "fsel" }, h("span", { class: "muted" }, label),
     h("select", { onchange: (e) => { SH[key] = e.target.value; loadShots2(); } }, opts.map((o) => h("option", { value: o.v ?? o, selected: (o.v ?? o) === SH[key] }, o.t ?? o))));
   const rankable = SH.mode !== "Matchup Defense";
-  $("#shotFilters").replaceChildren(
+  filtersEl.replaceChildren(
     sel("Type", "mode", d.modes), sel("Game", "game", d.games), SH.mode === "Shot Diet" ? sel("Quarter", "quarter", ["All Quarters", "Q1", "Q2", "Q3", "Q4", "OT"]) : null,
     sel("Team", "team", [{ v: "All Teams", t: "All Teams" }, ...d.teams.map((t) => ({ v: t, t }))]),
     SH.mode === "Matchup Defense" ? sel("Defender", "defender", [{ v: "All Defenders", t: "All Defenders" }, ...d.defenders.map((t) => ({ v: t, t }))]) : null,
@@ -1576,11 +1587,11 @@ function renderShots2() {
     rankable ? h("label", { class: "fsel" }, h("span", { class: "muted" }, SH.mode === "Defense Diet" ? "Min defended (blank = auto)" : "Min att (blank = NBA min)"),
       h("input", { value: SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"], style: { width: "70px" }, onchange: (e) => { SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"] = e.target.value; loadShots2(); } })) : null,
     sel("Show", "source", d.sources));
-  if (!d.rows.length) { $("#shotTable").replaceChildren(h("div", { class: "empty" }, d.note || "Shot data appears once games are played.")); return; }
-  const prev = $("#shotTable .table-wrap"), left = prev?.scrollLeft || 0, top = prev?.scrollTop || 0;
+  if (!d.rows.length) { tableEl.replaceChildren(h("div", { class: "empty" }, d.note || "Shot data appears once games are played.")); return; }
+  const prev = tableEl.querySelector(".table-wrap"), left = prev?.scrollLeft || 0, top = prev?.scrollTop || 0;
   const wrap = h("div", { class: "table-wrap tall" }, h("table", { class: "stats avg" }, h("thead", {}, h("tr", {}, d.columns.map((c, i) => h("th", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, c)))),
     h("tbody", {}, d.rows.map((r) => h("tr", { class: r.kind === "team" ? "team-row" : "" }, r.cells.map((c, i) => h("td", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, i === 0 ? (identOf(c).short ? `${identOf(c).year || ""} ${identOf(c).short}`.trim() : c) : c)))))));
-  $("#shotTable").replaceChildren(wrap); wrap.scrollLeft = left; wrap.scrollTop = top;
+  tableEl.replaceChildren(wrap); wrap.scrollLeft = left; wrap.scrollTop = top;
 }
 
 // ───────────────────────── trade offers (the season pauses until you answer) ─────────────────────────
