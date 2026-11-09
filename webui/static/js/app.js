@@ -659,6 +659,7 @@ async function refreshSeason() {
       if (SE.tab === "players") { const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source }); AV.data = await api.get(`/api/season/avg?${q}`); }
       if (SE.tab === "advanced") SE.advStats = await api.get("/api/stats?kind=advanced&source=Season&team=All+teams&quarter=All");
       if (SE.tab === "teams") SE.teams = (await api.get("/api/season/teams")).teams;
+      if (SE.tab === "recap") RC.data = await api.get(`/api/season/recap?team=${encodeURIComponent(RC.team)}`);
       if (SE.tab === "highs" && !HV.box) SE.highs = await api.get(`/api/season/highs?${new URLSearchParams({ view: HV.view, stat: HV.stat, team: HV.team })}`);
       if (SE.tab === "schedule" && SE.team) SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
       renderSeasonBody();
@@ -903,8 +904,23 @@ function renderHighsTab() {
     h("td", { class: "pts" }, r.pts), h("td", {}, r.reb), h("td", {}, r.ast), h("td", {}, r.stl), h("td", {}, r.blk), h("td", {}, r.tov), h("td", {}, r.pf), h("td", {}, r.fg), h("td", {}, r.tp), h("td", {}, r.ft), h("td", {}, r.pm > 0 ? `+${r.pm}` : r.pm)));
   return h("div", {}, filters, h("div", { class: "table-wrap tall" }, h("table", { class: "stats avg" }, h("thead", {}, h("tr", {}, cols.map((c, i) => h("th", { class: i < 4 ? "l" : "" }, c)))), h("tbody", {}, rows))));
 }
+const RC = { team: "", data: null };
+async function loadRecap() {
+  RC.data = await api.get(`/api/season/recap?team=${encodeURIComponent(RC.team)}`);
+  RC.team = RC.data.team || RC.team;
+  renderSeasonBody();
+}
+function renderRecapTab() {
+  const d = RC.data;
+  if (!d) { loadRecap(); return h("div", { class: "empty" }, "Loading recap…"); }
+  if (!d.lines.length) return h("div", { class: "empty" }, "Team season recaps appear after a regular season has been simulated.");
+  const sel = h("select", { onchange: (e) => { RC.team = e.target.value; loadRecap(); } }, d.teams.map((t) => h("option", { value: t.name, selected: t.name === d.team }, `${t.year} ${t.short}`)));
+  return h("div", {}, h("div", { class: "filters" }, h("label", { class: "fsel" }, h("span", { class: "muted" }, "Team"), sel)),
+    h("div", { class: "recap" }, d.lines.map(([tag, text]) => h("div", { class: `rc-line ${tag}` }, text || "\u00a0"))));
+}
+
 function renderSeasonBody() {
-  const view = { standings: renderStandings, races: renderRaces, players: renderPlayers, advanced: renderAdvancedTab, teams: renderTeamsTab, schedule: renderScheduleTab, highs: renderHighsTab }[SE.tab]();
+  const view = { standings: renderStandings, races: renderRaces, players: renderPlayers, advanced: renderAdvancedTab, teams: renderTeamsTab, schedule: renderScheduleTab, highs: renderHighsTab, recap: renderRecapTab }[SE.tab]();
   $("#seasonBody").replaceChildren(view);
 }
 

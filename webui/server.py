@@ -800,6 +800,85 @@ def strength_payload(runner):
     return {"teams": [{"name": n, "strength": round(v, 2), "franchise": ("okc" if "supersonics" in n.lower() else team_identity(n)["logo"])} for n, v in ranked]}
 
 
+def recap_payload(runner, team=""):
+    """Tk's Recap tab for one team: record, splits, streaks, stretches, extremes and best individual games."""
+    sec = runner.sections or {}
+    games = sec.get("_season_games") or []
+    standings = sec.get("_season_standings") or []
+    names = [r["team"] for r in standings] or sorted({g["home"] for g in games} | {g["away"] for g in games})
+    out = {"teams": [{"name": n, "short": team_identity(n)["short"], "year": team_identity(n)["year"]} for n in sorted(names)], "team": team, "lines": []}
+    if not games or not names:
+        return out
+    if team not in names:
+        team = names[0]
+        out["team"] = team
+    short = lambda n: team_identity(n)["short"] if n else ""
+    mine = sorted([g for g in games if team in (g.get("home"), g.get("away"))], key=lambda g: g.get("order", 0))
+    if not mine:
+        out["lines"] = [["head", short(team)], ["", "No games recorded yet."]]
+        return out
+    results = []
+    for g in mine:
+        home = g["home"] == team
+        pf, pa = (g["home_score"], g["away_score"]) if home else (g["away_score"], g["home_score"])
+        results.append({"n": len(results) + 1, "home": home, "pf": pf, "pa": pa, "opp": g["away"] if home else g["home"], "win": pf > pa, "margin": pf - pa})
+    wins = sum(1 for r in results if r["win"])
+    losses = len(results) - wins
+
+    def streak(flag):
+        best, cur, start, rng = 0, 0, 0, (0, 0)
+        for r in results:
+            if r["win"] == flag:
+                if cur == 0:
+                    start = r["n"]
+                cur += 1
+                if cur > best:
+                    best, rng = cur, (start, r["n"])
+            else:
+                cur = 0
+        return best, rng
+
+    def stretch(size, best=True):
+        if len(results) < size:
+            return None
+        scores = [(sum(1 for r in results[i:i + size] if r["win"]), i) for i in range(len(results) - size + 1)]
+        w, i = (max if best else min)(scores, key=lambda it: it[0])
+        return w, size - w, results[i]["n"], results[i + size - 1]["n"]
+
+    ws, wr = streak(True)
+    ls, lr = streak(False)
+    b10, w10 = stretch(10, True), stretch(10, False)
+    hw = sum(1 for r in results if r["home"] and r["win"]); hl = sum(1 for r in results if r["home"] and not r["win"])
+    rw = sum(1 for r in results if not r["home"] and r["win"]); rl = sum(1 for r in results if not r["home"] and not r["win"])
+    close = [r for r in results if abs(r["margin"]) <= 5]; blow = [r for r in results if abs(r["margin"]) >= 15]
+    bw, bl = max(results, key=lambda r: r["margin"]), min(results, key=lambda r: r["margin"])
+    apf, apa = sum(r["pf"] for r in results) / len(results), sum(r["pa"] for r in results) / len(results)
+    last10 = results[-10:]
+    lines = [["head", f"{short(team)}   {wins}-{losses}  ({wins / max(1, len(results)):.3f})"],
+             ["", f"Scoring {apf:.1f} - {apa:.1f}  (avg margin {apf - apa:+.1f})   |   Last 10: {sum(1 for r in last10 if r['win'])}-{sum(1 for r in last10 if not r['win'])}"],
+             ["", ""], ["label", "Splits"],
+             ["", f"Home {hw}-{hl}    Road {rw}-{rl}    Close games (5 or less) {sum(1 for r in close if r['win'])}-{sum(1 for r in close if not r['win'])}    Blowouts (15+) {sum(1 for r in blow if r['win'])}-{sum(1 for r in blow if not r['win'])}"],
+             ["", ""], ["label", "Streaks and stretches"],
+             ["", f"Longest win streak: {ws} (games {wr[0]}-{wr[1]})"], ["", f"Longest losing streak: {ls} (games {lr[0]}-{lr[1]})"]]
+    if b10:
+        lines.append(["", f"Best 10-game stretch: {b10[0]}-{b10[1]} (games {b10[2]}-{b10[3]})"])
+    if w10:
+        lines.append(["", f"Worst 10-game stretch: {w10[0]}-{w10[1]} (games {w10[2]}-{w10[3]})"])
+    lines += [["", ""], ["label", "Extremes"],
+              ["", f"Biggest win: +{bw['margin']} {'vs' if bw['home'] else 'at'} {short(bw['opp'])}, {bw['pf']}-{bw['pa']} (game {bw['n']})"],
+              ["", f"Worst loss: {bl['margin']} {'vs' if bl['home'] else 'at'} {short(bl['opp'])}, {bl['pf']}-{bl['pa']} (game {bl['n']})"]]
+    rows, fields = sec.get("_season_game_log") or [], sec.get("_season_game_log_fields") or []
+    if rows and fields:
+        ix = {n: i for i, n in enumerate(fields)}
+        trows = [r for r in rows if r[ix["team"]] == team] if "team" in ix else []
+        if trows and "pts" in ix and "player" in ix:
+            lines += [["", ""], ["label", "Best individual games"]]
+            for r in sorted(trows, key=lambda r: -r[ix["pts"]])[:3]:
+                lines.append(["", f"{r[ix['player']]}: {r[ix['pts']]} PTS, {r[ix['reb']] if 'reb' in ix else 0} REB, {r[ix['ast']] if 'ast' in ix else 0} AST vs {short(r[ix['opp']]) if 'opp' in ix else ''}"])
+    out["lines"] = lines
+    return out
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -889,6 +968,8 @@ def build_app():
                 return self._json(advanced_payload(runner))
             if path == "/api/teams/strength":
                 return self._json(strength_payload(runner))
+            if path == "/api/season/recap":
+                return self._json(recap_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/season/box":
                 return self._json(game_box_payload(runner, (params.get("gid") or [""])[0]))
             if path == "/api/season/highs":

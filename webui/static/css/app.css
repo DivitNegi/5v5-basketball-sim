@@ -631,3 +631,7 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .rawlog .pbp-line.miss { color: #fda4af; background: rgba(244, 63, 94, .09); }
 .rawlog .pbp-line.miss::before { background: var(--red); }
 .rawlog .pbp-line.miss .nm { color: #fecdd3; }
+
+.recap { margin-top: 8px; padding: 16px 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(2, 6, 15, .35); line-height: 1.65; }
+.rc-line.head { font-size: 22px; font-weight: 800; color: var(--accent-2); margin-bottom: 4px; }
+.rc-line.label { margin-top: 4px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 800; color: var(--accent-2); }
