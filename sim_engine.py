@@ -22221,6 +22221,10 @@ def fantasy_ovr(player: Player) -> int:
     return min(99, fantasy_ovr_uncapped(player))
 
 
+CLUTCH_OVR_PIVOT = 62.0      # about the league-average clutch rating: a player at this value is neutral in the overall
+CLUTCH_OVR_WEIGHT = 0.35     # how much of a clutch rating's distance from the pivot reaches the overall (it used to be 1.0)
+
+
 def fantasy_ovr_uncapped(player: Player) -> int:
     """The formula's own value, which can pass 99 (a few players are 100 or 101). Only the Ratings tab shows this."""
     tpt = player.three_rating * 100
@@ -22228,7 +22232,10 @@ def fantasy_ovr_uncapped(player: Player) -> int:
     lpt = player.rim_rating * 100
     pdef = player.perimeter_def * 100
     idef = player.interior_def * 100
-    cpt = player.clutchness * 100
+    # Clutch barely moves the overall: its distance from CLUTCH_OVR_PIVOT counts for only CLUTCH_OVR_WEIGHT of what it used to, so a
+    # 0.50 vs a 0.95 is worth about a point. The thresholds below (cpt_raw >= 88 ...) still read the real rating.
+    cpt_raw = player.clutchness * 100
+    cpt = CLUTCH_OVR_PIVOT + (cpt_raw - CLUTCH_OVR_PIVOT) * CLUTCH_OVR_WEIGHT
     pl = player.playmaking * 100
     dk = player.dunk_rating * 100
     bl = fantasy_block_rating(player)
@@ -22286,7 +22293,7 @@ def fantasy_ovr_uncapped(player: Player) -> int:
         )
         scoring_peak = max(tpt, mpt, lpt)
         scoring_average = (tpt + mpt + lpt) / 3
-        if scoring_peak >= 94 and cpt >= 88:
+        if scoring_peak >= 94 and cpt_raw >= 88:
             raw += 3
         elif scoring_peak >= 90:
             raw += 1
@@ -22294,7 +22301,7 @@ def fantasy_ovr_uncapped(player: Player) -> int:
             raw += 2
         elif pdef >= 75 and scoring_peak >= 90:
             raw += 1
-        if scoring_average >= 92 and pdef >= 82 and cpt >= 86:
+        if scoring_average >= 92 and pdef >= 82 and cpt_raw >= 86:
             raw += 2
         elif scoring_average >= 88 and pdef >= 76:
             raw += 1
@@ -22388,7 +22395,7 @@ def fantasy_ovr_uncapped(player: Player) -> int:
             raw += 3
         elif paint_creation_average >= 84:
             raw += 2
-        if cpt >= 80 and scoring_peak >= 84:
+        if cpt_raw >= 80 and scoring_peak >= 84:
             raw += 1
     else:
         raw = (
@@ -22405,9 +22412,9 @@ def fantasy_ovr_uncapped(player: Player) -> int:
 
         if tpt >= 98 and handle >= 92 and mpt >= 90:
             raw += 4
-        elif tpt >= 97 and handle >= 90 and cpt >= 85:
+        elif tpt >= 97 and handle >= 90 and cpt_raw >= 85:
             raw += 1.5
-        elif tpt >= 94 and handle >= 84 and (pl >= 72 or cpt >= 82):
+        elif tpt >= 94 and handle >= 84 and (pl >= 72 or cpt_raw >= 82):
             raw += 0.75
 
         creator_guard_average = (tpt + mpt + lpt + pl + handle + cpt) / 6
@@ -22447,7 +22454,7 @@ def fantasy_ovr_uncapped(player: Player) -> int:
                 0.22 * tpt + 0.17 * mpt + 0.15 * lpt + 0.15 * pdef +
                 0.11 * handle + 0.08 * cpt + 0.07 * pl + 0.05 * speed
             )
-            if pdef >= 86 and creator_scoring_peak >= 97 and cpt >= 88:
+            if pdef >= 86 and creator_scoring_peak >= 97 and cpt_raw >= 88:
                 two_way_score += 3
             raw = max(raw, two_way_score)
         if pl >= 96 and handle >= 88:
