@@ -9233,11 +9233,12 @@ def _initialize_minute_targets_core(team: Team):
         target_ranges = {
             "Aday Mara": (20, 26),
             "Bennett Stirtz": (8, 14),
-            "Shai G-Alexander": (34, 38), "Cason Wallace": (18, 24),
-            "Jalen Williams": (28, 33), "Chet Holmgren": (28, 33),
-            "Isaiah Hartenstein": (20, 26), "Jared McCain": (18, 24),
-            "Alex Caruso": (18, 24), "Ajay Mitchell": (14, 20),
+            "Shai G-Alexander": (34, 38), "Cason Wallace": (24, 30),
+            "Chet Holmgren": (28, 33),
+            "Isaiah Hartenstein": (20, 26), "Jared McCain": (22, 28),
+            "Alex Caruso": (22, 28), "Ajay Mitchell": (20, 26),
             "Jaylin Williams": (14, 20), "Kenrich Williams": (10, 16),
+            "Brooks Barnhizer": (14, 20),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
