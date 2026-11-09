@@ -96,7 +96,7 @@ const S = {
 function cleanBadges(values) {
   const seen = new Set();
   return (values || []).map((value) => String(value).replace(/_/g, " ").trim().toLowerCase()
-    .replace(/\s+(bronze|silver|gold|hall of fame|hof)$/i, "").trim())
+    .replace(/\s+(bronze|silver|gold|plat|platinum|hall of fame|hof)$/i, "").trim())
     .filter((value) => value && !seen.has(value) && seen.add(value))
     .map((value) => value.charAt(0).toUpperCase() + value.slice(1));
 }
