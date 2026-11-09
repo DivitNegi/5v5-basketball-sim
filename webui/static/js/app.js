@@ -3,6 +3,51 @@
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+// Screens redraw their whole contents on every update (a new play, a sort click, an expanded row). A redrawn element starts at scroll
+// 0, so every scrolled table and the page itself jumped back to the top. Replacing the contents of any element that has an id now
+// remembers the scroll of the container, of everything scrolled inside it (found again by its position), and of the page.
+const KEEP_SCROLL_SKIP = new Set(["rawlog", "feed"]);
+function scrollSnapshot(root) {
+  const out = [];
+  const visit = (el, path) => {
+    if (el.scrollTop > 0 || el.scrollLeft > 0) out.push([path.slice(), el.scrollTop, el.scrollLeft]);
+    let i = 0;
+    for (const child of el.children) { path.push(i++); visit(child, path); path.pop(); }
+  };
+  visit(root, []);
+  return out;
+}
+function scrollRestore(root, snap) {
+  for (const [path, top, left] of snap) {
+    let el = root;
+    for (const i of path) { el = el?.children?.[i]; if (!el) break; }
+    if (el) { el.scrollTop = top; el.scrollLeft = left; }
+  }
+}
+const nativeReplaceChildren = Element.prototype.replaceChildren;
+Element.prototype.replaceChildren = function (...nodes) {
+  if (!this.id || KEEP_SCROLL_SKIP.has(this.id)) return nativeReplaceChildren.apply(this, nodes);
+  const snap = scrollSnapshot(this), x = window.scrollX, y = window.scrollY;
+  const rootTop = this.scrollTop, rootLeft = this.scrollLeft;
+  nativeReplaceChildren.apply(this, nodes);
+  this.scrollTop = rootTop; this.scrollLeft = rootLeft;
+  scrollRestore(this, snap.filter((s) => s[0].length));
+  if (window.scrollY !== y || window.scrollX !== x) window.scrollTo(x, y);
+};
+const nativeReplaceWith = Element.prototype.replaceWith;
+Element.prototype.replaceWith = function (...nodes) {
+  const next = nodes.length === 1 && nodes[0] instanceof Element ? nodes[0] : null;
+  if (!this.id || !next) return nativeReplaceWith.apply(this, nodes);
+  const snap = scrollSnapshot(this), x = window.scrollX, y = window.scrollY;
+  nativeReplaceWith.apply(this, nodes);
+  for (const [path, top, left] of snap) {
+    let el = next;
+    for (const i of path) { el = el?.children?.[i]; if (!el) break; }
+    if (el) { el.scrollTop = top; el.scrollLeft = left; }
+  }
+  if (window.scrollY !== y || window.scrollX !== x) window.scrollTo(x, y);
+};
+
 function h(tag, attrs = {}, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
