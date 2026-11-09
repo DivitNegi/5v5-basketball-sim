@@ -5257,6 +5257,7 @@ def lineup_can_five_out(team: Team) -> bool:
 # A player's usual clutch rating, used when a team entry leaves his clutchness unset (0.50). It is the median of the values his other
 # season entries and the per-team flavour dict below give him; a team entry that sets its own value, or an entry in star_clutch,
 # still wins. Edit a number here to change that player everywhere his own entry is silent.
+CLUTCH_FALLBACK_MIN_OVR = 85   # only players this good (overall, at the default clutch) get the fallback below
 PLAYER_CLUTCH_DEFAULTS = {
     'Shai Gilgeous-Alexander': 0.90,   # the same player as 'Shai G-Alexander' in the 2027 files
     'A.J. Green': 0.56, 'AJ Dybantsa': 0.60, 'Aaron Gordon': 0.70, 'Aaron McKie': 0.78, 'Aaron Nesmith': 0.59,
@@ -5696,8 +5697,8 @@ def apply_star_clutchness(*teams: Team):
             # dict instead of being silently clobbered by it.
             if p.name in ratings and p.clutchness == 0.50:
                 p.clutchness = ratings[p.name]
-            elif p.clutchness == 0.50 and p.name in PLAYER_CLUTCH_DEFAULTS:
-                p.clutchness = PLAYER_CLUTCH_DEFAULTS[p.name]   # silent entry: fall back to his usual clutch
+            elif p.clutchness == 0.50 and p.name in PLAYER_CLUTCH_DEFAULTS and fantasy_ovr_uncapped(p) >= CLUTCH_FALLBACK_MIN_OVR:
+                p.clutchness = PLAYER_CLUTCH_DEFAULTS[p.name]   # a star whose entry is silent: fall back to his usual clutch (role players keep 0.50)
 
 
 def position_group(pos: str) -> str:
