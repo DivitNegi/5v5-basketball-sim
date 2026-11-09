@@ -236,16 +236,47 @@ function playerCell(p, slot) {
     h("span", { class: "pname" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null, p.pf >= 5 ? h("span", { class: "tag foul" }, `${p.pf} PF`) : null)));
 }
 
+// ---- On the floor: form badges, foul pips, energy, ball handler, scoring floaters and sub animations
+S.recentScores = {}; S.enteredAt = {}; S.leaving = [];
+// hot after 3 straight makes (or 3 of the last 4 with the last two in); cold after 0-for-4. Read from the shot log, newest first.
+function shotForm(name) {
+  const last = [];
+  for (let i = S.shots.length - 1; i >= 0 && last.length < 4; i--) if (S.shots[i].player === name) last.push(S.shots[i].made);
+  if (last.length >= 3 && last[0] && last[1] && last[2]) return "hot";
+  if (last.length === 4 && last[0] && last[1] && last.filter(Boolean).length >= 3) return "hot";
+  if (last.length === 4 && !last.some(Boolean)) return "cold";
+  return "";
+}
+function courtPlayerCell(p, slot) {
+  const form = shotForm(p.name), now = performance.now();
+  const energy = p.energy == null ? null : Math.max(0, Math.min(100 - (p.stint || 0) * 6, ((p.energy - 85) / 15) * 100));
+  const rec = S.recentScores[p.name], age = rec ? now - rec.at : 1e9;
+  const pips = h("span", { class: "pips", title: `${p.pf} personal fouls` }, [0, 1, 2, 3, 4].map((i) => h("i", { class: i < p.pf ? (p.pf >= 5 ? "red" : p.pf >= 3 ? "yel" : "on") : "" })));
+  return h("td", { class: "l" }, h("div", { class: "pcell" }, slot ? h("span", { class: "slot" }, slot) : null, faceEl(p.name),
+    h("div", { class: "pstack" },
+      h("span", { class: "pname" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null,
+        form ? h("span", { class: `form ${form}`, title: form === "hot" ? "Hot: making his shots" : "Cold: has missed his last four" }, form === "hot" ? "🔥" : "🧊") : null,
+        age < 1500 ? h("span", { class: "floater2", style: { animationDelay: `-${Math.round(age)}ms` } }, `+${rec.pts}`) : null),
+      h("div", { class: "pmeta" }, pips, energy == null ? null : h("span", { class: "energy", title: `Energy ${p.energy}% · ${p.stint} min this stint` }, h("i", { style: { width: `${Math.max(6, energy)}%`, background: energy >= 70 ? "var(--green)" : energy >= 35 ? "var(--accent)" : "var(--red)" } }))))));
+}
+
 function renderCourt() {
   const root = $("#court");
   if (!S.live) { root.replaceChildren(h("div", { class: "empty" }, "The ten players on the floor show here during a game.")); return; }
   const blocks = S.live.teams.map((t, i) => {
     const prev = S.prevOnCourt[i];
     const now = new Set(t.court.map((p) => p.name));
+    const nowMs = performance.now();
+    if (prev.size) {   // a substitution: the player coming in is flagged for ~1.2 s, the one going out is kept as a fading ghost row
+      for (const p of t.court) if (!prev.has(p.name)) S.enteredAt[p.name] = nowMs;
+      for (const n of prev) if (!now.has(n)) S.leaving.push({ name: n, side: i, at: nowMs });
+    }
+    S.leaving = S.leaving.filter((g) => nowMs - g.at < 1300);
     const rows = t.court.map((p) => {
-      const tr = h("tr", { class: prev.size && !prev.has(p.name) ? "entered" : "" }, playerCell(p, p.pos), ...STAT_COLS.map(([k]) => h("td", { class: k === "pts" ? "pts" : "" }, cell(p, k))));
-      return tr;
+      const sinceIn = nowMs - (S.enteredAt[p.name] ?? -1e9), isIn = sinceIn < 1300, onBall = t.ball === p.name;
+      return h("tr", { class: `${isIn ? "entered" : ""} ${onBall ? "on-ball" : ""}`, style: isIn ? { "--delay": `-${Math.round(sinceIn)}ms` } : null }, courtPlayerCell(p, p.pos), ...STAT_COLS.map(([k]) => h("td", { class: k === "pts" ? "pts" : k === "pm" ? (p.pm > 0 ? "pm-pos" : p.pm < 0 ? "pm-neg" : "") : "" }, cell(p, k))));
     });
+    for (const g of S.leaving.filter((x) => x.side === i)) rows.push(h("tr", { class: "leaving", style: { "--delay": `-${Math.round(nowMs - g.at)}ms` } }, h("td", { class: "l", colspan: STAT_COLS.length + 1 }, `↓ ${g.name} checks out`)));
     S.prevOnCourt[i] = now;
     const tot = t.totals;
     return h("div", { class: "court-team", style: { "--c": t.color } },
@@ -1912,6 +1943,7 @@ function mountShotChart(host, { big = false } = {}) {
 }
 function addShot(ev, animate) {
   S.shots.push(ev); if (S.shots.length > 3000) S.shots.shift();
+  if (ev.made && animate) S.recentScores[ev.player] = { pts: ev.zone === "three" ? 3 : 2, at: performance.now() };
   const calm = animate && !matchMedia("(prefers-reduced-motion: reduce)").matches;
   for (const c of SHOT_CHARTS) c.add(ev, calm);
 }

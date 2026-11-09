@@ -73,6 +73,13 @@ def _pct(made: int, att: int) -> Optional[float]:
     return round(100.0 * made / att, 1) if att else None
 
 
+def _energy(player):
+    try:
+        return round(100 * sim_engine.fatigue_factor(player))   # 100 = fresh; the floor is about 85
+    except Exception:
+        return None
+
+
 def player_line(player, slot: Optional[str] = None, on_court: bool = False) -> Dict:
     return {
         "name": player.name,
@@ -88,6 +95,7 @@ def player_line(player, slot: Optional[str] = None, on_court: bool = False) -> D
         "out": bool(getattr(player, "fouled_out", False)),
         "rookie": bool(getattr(player, "rookie", False)),
         "starter": bool(getattr(player, "started_game", False)),
+        "energy": _energy(player), "stint": round(getattr(player, "current_stint", 0) / 60.0, 1),
     }
 
 
@@ -115,7 +123,7 @@ def team_block(team) -> Dict:
     court = [player_line(p, slot, True) for slot, p in slots]
     box = [player_line(p, None, id(p) in on_ids) for p in team.roster]
     block = team_identity(team.name)
-    block.update({"score": team.score, "court": court, "box": box, "totals": team_totals(team)})
+    block.update({"score": team.score, "court": court, "box": box, "totals": team_totals(team), "ball": getattr(team, "ball_handler_name", None)})
     return block
 
 

@@ -703,3 +703,25 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .sc-legend { display: flex; gap: 14px; }
 .sc-legend .make { color: var(--green); } .sc-legend .miss { color: var(--red); }
 @media (prefers-reduced-motion: reduce) { .shot.fresh, .shot .pulse, .shot .floater { animation: none; } }
+
+/* on the floor */
+.pstack { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pmeta { display: flex; align-items: center; gap: 8px; }
+.pips { display: inline-flex; gap: 3px; }
+.pips i { width: 7px; height: 7px; border-radius: 50%; background: rgba(148, 163, 184, .22); }
+.pips i.on { background: #94a3b8; } .pips i.yel { background: var(--accent); } .pips i.red { background: var(--red); }
+.energy { display: inline-block; width: 54px; height: 4px; border-radius: 99px; background: rgba(148, 163, 184, .16); overflow: hidden; }
+.energy i { display: block; height: 100%; border-radius: 99px; transition: width .5s ease, background .5s ease; }
+.form { margin-left: 6px; font-size: 13px; }
+.form.hot { filter: drop-shadow(0 0 5px rgba(249, 115, 22, .8)); animation: flicker 1.3s ease-in-out infinite; }
+.floater2 { margin-left: 8px; color: #86efac; font-weight: 800; display: inline-block; animation: floaterUp 1.5s ease-out forwards; }
+@keyframes floaterUp { 0% { transform: translateY(2px) scale(.7); opacity: 0; } 15% { transform: translateY(-2px) scale(1.15); opacity: 1; } 100% { transform: translateY(-14px) scale(1); opacity: 0; } }
+@keyframes flicker { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+tr.on-ball td:first-child { box-shadow: inset 3px 0 0 var(--accent); background: linear-gradient(90deg, rgba(245, 165, 36, .16), transparent 70%); }
+tr.entered { animation: subFlash 1.3s ease-out both; animation-delay: var(--delay, 0s); }
+tr.entered .pcell { animation: subSlide .45s cubic-bezier(.2, .9, .3, 1) both; animation-delay: var(--delay, 0s); }
+tr.leaving td { color: var(--muted); font-size: 12px; padding-top: 4px; padding-bottom: 4px; animation: subOut 1.3s ease-in both; animation-delay: var(--delay, 0s); }
+@keyframes subFlash { 0% { background: color-mix(in srgb, var(--c) 45%, transparent); } 100% { background: transparent; } }
+@keyframes subSlide { 0% { transform: translateX(-26px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes subOut { 0% { opacity: .9; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .form.hot, .floater2, tr.entered, tr.entered .pcell, tr.leaving td { animation: none; } }

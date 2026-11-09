@@ -19188,6 +19188,7 @@ def simulate_possession(off: Team, dff: Team,
         handler = secondary_handler
         ball_owner = handler
     off.current_play_initiator = handler
+    off.ball_handler_name = handler.name   # the live view glows the player who runs this possession
     shooter = choose_shooter(off)
     if closing_star_mode and closing_star is not None:
         shooter = closing_star
