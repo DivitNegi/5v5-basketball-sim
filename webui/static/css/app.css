@@ -750,3 +750,5 @@ tr.leaving td { color: var(--muted); font-size: 12px; padding-top: 4px; padding-
 .sp-lbl { display: flex; justify-content: space-between; padding: 0 4px; font-size: 11px; color: var(--muted); }
 .pc-map { max-height: 380px; }
 @media (prefers-reduced-motion: reduce) { .pc-radar .rs, .pc-donut .dn-seg { animation: none; } .pcard-head { transition: none; } }
+/* the 22px team-name style was leaking into every cell of the floor tables */
+.court-team .court-scroll { font-size: 14px; font-weight: 400; }

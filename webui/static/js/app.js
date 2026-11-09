@@ -435,7 +435,6 @@ function rawLine(line, shot) {
     else if (shot === "miss") el.classList.add("miss");
     else if (/steal|stolen|turnover|loses the|travel/i.test(t)) el.classList.add("tov");
     else if (/foul/i.test(t)) el.classList.add("foul");
-    else if (/\b(misses|missed|no good|rims? out|off the (iron|rim|glass|backboard)|front rim|back rim|bricks?|clanks?|blocked|swats?|won.t drop|spins (off|out)|comes? off long|falls short)\b/i.test(t)) el.classList.add("miss");
   }
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
@@ -1930,7 +1929,10 @@ function shotSpot(ev, side) {
   else if (z === "post") [x, y] = polar(45, 105, 1.0);
   else if (z === "three") {
     if (rnd() < 0.2) { x = 45 + rnd() * 120; y = rnd() < 0.5 ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
-    else { for (let k = 0; k < 10; k++) { [x, y] = polar(248, 330, 1.25); if (y > Y0 + 14 && y < Y0 + CH - 14) break; } }
+    else {   // just behind the line: most threes are 24-26 ft out, a few are 27-30 ft pull-ups
+      const far = rnd() < 0.08, rMin = 242, rMax = far ? 300 : 268;
+      for (let k = 0; k < 10; k++) { [x, y] = polar(rMin, rMax, 1.2); if (y > Y0 + 18 && y < Y0 + CH - 18) break; }
+    }
   } else { for (let k = 0; k < 10; k++) { [x, y] = polar(75, 225, 1.4); if (Math.abs(y - HY) <= 205) break; } }   // mid-range, post fade and anything else: inside the arc
   return side ? [1000 - x, y] : [x, y];
 }
