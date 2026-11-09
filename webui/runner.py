@@ -72,10 +72,14 @@ class WebOutputProxy(GuiOutputProxy):
                     # a little slower than Sim Series, and it follows the speed buttons (higher speed = shorter pause)
                     # (the engine turns time.sleep into a no-op while fast-forwarding, so use the real one; and a Windows sleep is ~15 ms
                     #  at best, so the small per-line pauses are added up and slept in one go)
-                    self._pace_debt = getattr(self, "_pace_debt", 0.0) + FF_LINE_PAUSE * max(0.05, min(2.0, float(getattr(sim_engine, "SIM_SLEEP_SCALE", 1.0) or 1.0)))
-                    if self._pace_debt >= 0.016:
-                        sim_engine._REAL_SLEEP(self._pace_debt)
-                        self._pace_debt = 0.0
+                    # paced by the clock, not by counting sleeps: a Windows sleep can run long or short depending on the timer resolution,
+                    # so each line is given a time slot and the sleep only covers what is still owed (an overshoot is simply caught up)
+                    now = time.perf_counter()
+                    slot = FF_LINE_PAUSE * max(0.05, min(2.0, float(getattr(sim_engine, "SIM_SLEEP_SCALE", 1.0) or 1.0)))
+                    due = max(getattr(self, "_pace_due", now), now - 0.05) + slot
+                    self._pace_due = due
+                    if due - now > 0.010:
+                        sim_engine._REAL_SLEEP(due - now)
             return
         if sim_engine.SIM_STICKY_FAST == "series":   # Sim All Playoffs stays fully quiet, as before
             self._write_quick(text)

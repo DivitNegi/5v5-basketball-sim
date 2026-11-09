@@ -2317,7 +2317,7 @@ def make_thunder_2027() -> Team:
                0.770, 0.430,
                clutchness=0.600, secondary_positions=('SG',), height=76, speed=0.830,
                shot_iq=0.800, archetype='sharpshooting guard', stamina=0.82),
-        Player('Jaylin Williams', 'C',
+        Player('Jaylin Williams', 'PF',   # a 6'10" stretch/playmaking big who plays beside a center, not as the team's one C
                0.34, 0.22, 0.12, 0.22, 0.24, 0.20,
                0.820, 0.850, 0.830, 0.750, 0.790,
                0.12, 0.687, 0.590,

@@ -330,8 +330,22 @@ def controlled_sleep(seconds: float):
     while SIM_PAUSED:
         _REAL_SLEEP(0.05)
     if not SIM_CONTROL_ENABLED or not sys.stdin.isatty():
-        _REAL_SLEEP(seconds)
-        return
+        # sleep in short slices, so a "sim to" jump (or Pause) pressed in the middle of a long sleep takes effect at once instead of
+        # after the whole sleep: that wait was why a jump was sometimes slow to start
+        end = time.perf_counter() + seconds
+        while True:
+            if SIM_FAST_FORWARD:
+                return
+            if SIM_PAUSED:
+                paused_at = time.perf_counter()
+                while SIM_PAUSED:
+                    _REAL_SLEEP(0.05)
+                end += time.perf_counter() - paused_at
+                continue
+            remaining = end - time.perf_counter()
+            if remaining <= 0:
+                return
+            _REAL_SLEEP(min(0.04, remaining))
 
     remaining = seconds
     while remaining > 0:
@@ -4514,8 +4528,8 @@ def _balance_lineup_positions_impl(team: Team):
     current = current[:5]
 
     def _prefer_under_target(candidates):
-        if team.name != "2026 Los Angeles Lakers":
-            return candidates
+        # a player who is behind his minutes target is picked before one who is already past it (used to be the 2026 Lakers only,
+        # which left a low-rated big like Aday Mara with a 20-minute target and 5 minutes: the best-rated big always won)
         under = [p for p in candidates if p.minutes / 60 < target_minutes(p, team)]
         return under or candidates
 
@@ -4593,10 +4607,17 @@ def _balance_lineup_positions_impl(team: Team):
 
     # Centers play center only (unless PF is listed for them): two of them never share the floor. The one who is not the team's best
     # sits for the best forward on the bench.
+    def _keep_score(p: Player) -> float:
+        # Who stays when two bigs share the floor: the better player, but a big who is far behind his minutes target gets the spot over
+        # one who has already had his (otherwise the lower-rated backup center was pushed out of every lineup he entered and never
+        # got near his minutes).
+        owed = max(-8.0, min(12.0, target_minutes(p, team) - p.minutes / 60.0)) if hasattr(p, "target_minutes") else 0.0
+        return overall_rating(p) + 0.025 * owed
+
     plain = [p for p in current if is_plain_center(p)]
     while len(plain) >= 2:
-        keep = max(plain, key=overall_rating)
-        sit = min((p for p in plain if p is not keep), key=lambda p: (overall_rating(p), -p.minutes))
+        keep = max(plain, key=_keep_score)
+        sit = min((p for p in plain if p is not keep), key=lambda p: (_keep_score(p), -p.minutes))
         replacements = [p for p in bench_pool if not is_plain_center(p) and not identity_contains(current, p)]
         if not replacements:
             break
@@ -4613,8 +4634,8 @@ def _balance_lineup_positions_impl(team: Team):
 
     bigs = [p for p in current if _center_type(p)]
     while len(bigs) >= 2:
-        keep = max(bigs, key=overall_rating)
-        sit = min((p for p in bigs if p is not keep), key=lambda p: (overall_rating(p), -p.minutes))
+        keep = max(bigs, key=_keep_score)
+        sit = min((p for p in bigs if p is not keep), key=lambda p: (_keep_score(p), -p.minutes))
         replacements = [p for p in bench_pool if not _center_type(p) and not identity_contains(current, p)]
         if not replacements:
             break
@@ -10640,6 +10661,13 @@ def should_prioritize_first_stint(player: Player, team: Team, period: int, perio
     return getattr(team, "garbage_time_locked", False)
 
 
+def owed_minutes_score(player: Player, team: Team) -> float:
+    """Rating plus a push for minutes still owed to his target (capped), used to choose which under-target bench player checks in:
+    by rating alone the lowest-rated reserves (a rookie big with a 20-minute target) never got their minutes."""
+    owed = max(-8.0, min(12.0, target_minutes(player, team) - player.minutes / 60.0))
+    return overall_rating(player) + 0.025 * owed
+
+
 def best_bench_replacement_for(team: Team, out_player: Player, excluded: set[Player] = None):
     excluded = excluded or set()
     current_period = getattr(team, "current_period", 0)
@@ -10673,7 +10701,7 @@ def best_bench_replacement_for(team: Team, out_player: Player, excluded: set[Pla
         return max(priority_same_pos, key=lambda p: (target_minutes(p, team) - p.minutes / 60, overall_rating(p)))
     same_pos_under_target = [p for p in same_pos if p.minutes / 60 < target_minutes(p, team)]
     if same_pos_under_target:
-        return max(same_pos_under_target, key=overall_rating)
+        return max(same_pos_under_target, key=lambda p: owed_minutes_score(p, team))
     if same_pos:
         return max(same_pos, key=overall_rating)
 
@@ -10688,7 +10716,7 @@ def best_bench_replacement_for(team: Team, out_player: Player, excluded: set[Pla
         return max(priority_available, key=lambda p: (target_minutes(p, team) - p.minutes / 60, overall_rating(p)))
     available_under_target = [p for p in available if p.minutes / 60 < target_minutes(p, team)]
     if available_under_target:
-        return max(available_under_target, key=overall_rating)
+        return max(available_under_target, key=lambda p: owed_minutes_score(p, team))
 
     return max(available, key=overall_rating)
 
