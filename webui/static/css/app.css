@@ -618,3 +618,16 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .rawlog .sb-dash { flex: none; }
 
 .rawlog .pbp-score { height: 30px; }
+
+/* shots are coloured by result only: every make is green and every miss is red (no gold threes, no violet dunks, no grey misses) */
+.ev.score .rail, .ev.three .rail, .ev.dunk .rail { background: var(--green); }
+.ev.miss .rail { background: var(--red); }
+.ev.miss { color: #fda4af; }
+.ev.score, .ev.three, .ev.dunk { color: #86efac; }
+.ev.score .result.made, .ev.three .result.made { color: #86efac; }
+.rawlog .pbp-line.made { color: #86efac; background: rgba(34, 197, 94, .10); }
+.rawlog .pbp-line.made::before { background: var(--green); }
+.rawlog .pbp-line.made .nm { color: #bbf7d0; }
+.rawlog .pbp-line.miss { color: #fda4af; background: rgba(244, 63, 94, .09); }
+.rawlog .pbp-line.miss::before { background: var(--red); }
+.rawlog .pbp-line.miss .nm { color: #fecdd3; }

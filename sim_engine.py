@@ -24677,8 +24677,11 @@ def build_season_sections(entries: List[Dict],
                 minute_factor * 1.8
                 + stocks_pg * 4.2
                 + dreb_pg * 0.28
-                + quality_defended_pg * 0.55
-                + star_defended_pg * 0.55
+                # How many shots a player is the primary defender on says as much about his position as his defence (a rim protector
+                # defends far fewer matchup shots than a perimeter defender but changes more of them), so volume counts for less than
+                # stocks, rebounds, opponent shooting and defensive impact.
+                + quality_defended_pg * 0.30
+                + star_defended_pg * 0.30
                 + efficiency_bonus
                 + skill_bonus
                 + adv[23] * 0.85

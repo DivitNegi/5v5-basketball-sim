@@ -339,7 +339,7 @@ function rawLine(line) {
     const idA = S.identities?.find((x) => x && x.name === na), idB = S.identities?.find((x) => x && x.name === nb);
     const now = [Number(sa), Number(sb)];
     const scored = now[0] > rawState.last[0] ? 0 : now[1] > rawState.last[1] ? 1 : -1;
-    if (scored >= 0) root.lastElementChild?.classList.add("made");
+    if (scored >= 0 && root.lastElementChild) { root.lastElementChild.classList.remove("miss", "tov", "foul"); root.lastElementChild.classList.add("made"); }   // the play that scored is a make, whatever else its words say
     rawState.last = now;
     const side = (id, name, sc, hot) => h("span", { class: `sb-side ${hot ? "hot" : ""}`, style: { "--c": id?.color || "#64748b" } }, h("span", { class: "sb-name" }, id?.short || name.replace(/^\d{4} /, "")), h("b", {}, sc));
     el = h("div", { class: "pbp-score" }, h("span", { class: "pbp-clock" }, `${period} · ${clock}`), side(idA, na, sa, scored === 0), h("span", { class: "sb-dash" }, "–"), side(idB, nb, sb, scored === 1));
@@ -356,7 +356,7 @@ function rawLine(line) {
     el.innerHTML = html;
     if (/steal|stolen|turnover|loses the|travel/i.test(t)) el.classList.add("tov");
     else if (/foul/i.test(t)) el.classList.add("foul");
-    else if (/\b(misses|missed|no good|rims out|off the iron|blocked|swats?)\b/i.test(t)) el.classList.add("miss");
+    else if (/\b(misses|missed|no good|rims? out|off the (iron|rim|glass|backboard)|front rim|back rim|bricks?|clanks?|blocked|swats?|won.t drop|spins (off|out)|comes? off long|falls short)\b/i.test(t)) el.classList.add("miss");
   }
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
