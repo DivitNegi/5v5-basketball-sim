@@ -50,7 +50,7 @@ def rating_summary(p) -> Dict:
     }
 
 
-FF_LINE_PAUSE = 0.003   # seconds per play-by-play line while a "sim to" jump is running
+FF_LINE_PAUSE = 0.0015   # seconds per play-by-play line while a "sim to" jump is running
 
 
 class WebOutputProxy(GuiOutputProxy):
@@ -70,7 +70,12 @@ class WebOutputProxy(GuiOutputProxy):
                     self.output_queue.put(line + "\n")
                     # a tiny pause per play, so the page receives and draws every play and score instead of one lump at the end:
                     # a little slower than Sim Series, and it follows the speed buttons (higher speed = shorter pause)
-                    time.sleep(FF_LINE_PAUSE * max(0.05, min(2.0, float(getattr(sim_engine, "SIM_SLEEP_SCALE", 1.0) or 1.0))))
+                    # (the engine turns time.sleep into a no-op while fast-forwarding, so use the real one; and a Windows sleep is ~15 ms
+                    #  at best, so the small per-line pauses are added up and slept in one go)
+                    self._pace_debt = getattr(self, "_pace_debt", 0.0) + FF_LINE_PAUSE * max(0.05, min(2.0, float(getattr(sim_engine, "SIM_SLEEP_SCALE", 1.0) or 1.0)))
+                    if self._pace_debt >= 0.016:
+                        sim_engine._REAL_SLEEP(self._pace_debt)
+                        self._pace_debt = 0.0
             return
         if sim_engine.SIM_STICKY_FAST == "series":   # Sim All Playoffs stays fully quiet, as before
             self._write_quick(text)
@@ -95,7 +100,7 @@ class WebOutputProxy(GuiOutputProxy):
             self._last_quick_score = now
             self.scoreboard_queue.put({"period": period, "clock": clock, "team_a": team_a, "score_a": score_a, "team_b": team_b, "score_b": score_b})
         if now - self._last_yield > 0.12:   # hand the interpreter to the web thread now and then, like the Tk proxy does
-            time.sleep(0.03)
+            sim_engine._REAL_SLEEP(0.03)
             self._last_yield = time.perf_counter()
 
 
@@ -518,6 +523,8 @@ class SimRunner:
     def _push_live(self, force: bool = False):   # force: called on an event (score, substitution), not by the timer
         if self.mode in SEASON_LIKE:
             return   # a regular season is simulated quietly: its games (and the All-Star game) are not a live game to show
+        if force and sim_engine.SIM_FAST_FORWARD:
+            return   # a jump is running: the 0.25 s timer refreshes the live view, so ~200 forced full snapshots a game would only clog the stream
         try:
             snap = live_snapshot()
         except Exception:

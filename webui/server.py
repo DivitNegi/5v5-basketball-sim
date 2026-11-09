@@ -947,12 +947,21 @@ def build_app():
             self.send_header("Connection", "keep-alive")
             self.end_headers()
             try:
+                try:   # small events must go out immediately: Nagle + delayed ACKs held them back and released them in lumps
+                    self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                except OSError:
+                    pass
                 self.wfile.write(b"retry: 1500\n\n")
                 self.wfile.flush()
                 while True:
                     try:
-                        event = client.get(timeout=15)
-                        payload = "data: " + json.dumps(event, default=str) + "\n\n"
+                        batch = [client.get(timeout=15)]
+                        while len(batch) < 200:   # whatever else is already waiting goes out in the same write
+                            try:
+                                batch.append(client.get_nowait())
+                            except queue.Empty:
+                                break
+                        payload = "".join("data: " + json.dumps(event, default=str) + "\n\n" for event in batch)
                     except queue.Empty:
                         payload = ": keep-alive\n\n"
                     self.wfile.write(payload.encode("utf-8"))
