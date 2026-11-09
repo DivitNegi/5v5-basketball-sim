@@ -790,3 +790,5 @@ tr.clickable { cursor: pointer; }
 .wl { display: inline-block; width: 22px; text-align: center; border-radius: 6px; font-size: 11px; font-weight: 800; padding: 2px 0; }
 .wl.w { background: rgba(74, 222, 128, .16); color: var(--green); } .wl.l { background: rgba(244, 63, 94, .16); color: #fda4af; }
 @media (max-width: 760px) { .pc-viz[style*="1.4fr"] { grid-template-columns: 1fr !important; } }
+
+.zone.elite { background: rgba(168, 85, 247, .2); border-color: rgba(192, 132, 252, .6); box-shadow: 0 0 14px -4px rgba(168, 85, 247, .6); }

@@ -1389,6 +1389,8 @@ function pcAfterRender(numTiles) {
 function zoneClass(key, made, att) {
   if (!att) return "none";
   const pct = 100 * made / att;
+  const elite = { rim: 65, mid: 55, three: 42, post: 55 }[key];   // purple: elite tier
+  if (elite != null && pct > elite) return "elite";
   if (key === "three") return pct > 36 ? "good" : "ok";   // threes: green above 36% (40%+ included), yellow below
   const [hi, lo] = key === "rim" ? [50, 40] : key === "mid" ? [40, 30] : key === "post" ? [48, 38] : [42, 33];
   return pct > hi ? "good" : pct >= lo ? "ok" : "bad";
