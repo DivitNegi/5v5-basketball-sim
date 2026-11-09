@@ -2253,7 +2253,7 @@ def make_thunder_2027() -> Team:
     players = [
         # Cason Wallace is injured and Chet Holmgren is out of the 2027 depth chart: Jaylin Williams starts at PF beside Hartenstein.
         Player('Shai G-Alexander', 'PG',
-               0.36, 0.34, 0.34, 0.50, 0.20, 0.98,
+               0.36, 0.34, 0.34, 0.50, 0.20, 0.85,
                0.880, 0.999, 0.999, 0.750, 0.880,
                0.32, 0.70, 0.980,
                0.850, 0.620, 0.340, 0.650, 0.990, 0.467,
@@ -2313,7 +2313,7 @@ def make_thunder_2027() -> Team:
                0.470, 0.660, 0.723, 0.750, 0.560,
                0.15, 0.637, 0.430,
                0.410, 0.860, 0.620, 0.730, 0.520, 0.600,
-               0.440, 0.730,
+               0.440, 0.920,
                clutchness=0.400, secondary_positions=('PF',), height=87, speed=0.460,
                shot_iq=0.650, stamina=0.83),
         # Jalen Williams is injured for 2027: Brooks Barnhizer, a defence-first wing, takes his roster spot (limited NBA sample, so
