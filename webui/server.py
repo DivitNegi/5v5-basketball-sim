@@ -880,6 +880,47 @@ def recap_payload(runner, team=""):
     return out
 
 
+def _trade_row(p, team_name, runner, blocked=()):
+    """One player on the trade screen: ratings, form, and his season line so far (the Tk trade window's player card)."""
+    row = rating_summary(p)
+    try:
+        row["form"] = int(sim_engine.fantasy_player_form(p))
+    except Exception:
+        row["form"] = 0
+    row["shift"] = {k: round(v * 100) for k, v in (getattr(p, "form_shift", None) or {}).items() if abs(v) >= 0.005}
+    row["blocked"] = p.name in blocked
+    row["r2"] = {"STL": round(float(getattr(p, "steal", 0) or 0) * 100), "BLK": round(float(getattr(p, "block", 0) or 0) * 100), "CLUTCH": round(float(getattr(p, "clutchness", 0) or 0) * 100)}
+    totals = (runner.sections or {}).get("_season_player_totals") or {}
+    entry = (totals.get(team_name) or {}).get(p.name) or next((t[p.name] for t in totals.values() if p.name in t), None)
+    if entry and entry.get("games", 0) > 0:
+        g = entry["games"]
+        den = 2.0 * (entry.get("fga", 0) + 0.44 * entry.get("fta", 0))
+        row["season"] = {"gp": g, "mpg": entry.get("minutes", 0) / 60.0 / g, "pts": entry.get("pts", 0) / g, "reb": entry.get("reb", 0) / g, "ast": entry.get("ast", 0) / g,
+                         "stl": entry.get("stl", 0) / g, "blk": entry.get("blk", 0) / g, "tov": entry.get("tov", 0) / g,
+                         "fg": 100.0 * entry.get("fgm", 0) / max(1, entry.get("fga", 0)), "tp": 100.0 * entry.get("tpm", 0) / max(1, entry.get("tpa", 0)),
+                         "ft": 100.0 * entry.get("ftm", 0) / max(1, entry.get("fta", 0)), "ts": 100.0 * entry.get("pts", 0) / den if den else 0.0}
+    else:
+        row["season"] = None
+    return row
+
+
+def trade_state_payload(runner, partner=""):
+    if not sim_engine.fantasy_trade_available():
+        return {"active": False, "message": "Trades are only available in the fantasy season modes, after the draft."}
+    state = sim_engine.FANTASY_TRADE_STATE
+    user = state["user_team"]
+    ai = sorted(n for n in state["factories"] if n != user)
+    if partner not in ai:
+        partner = ai[0] if ai else ""
+    blocked = state.get("block", set())
+    mine = sorted(sim_engine.fantasy_trade_roster(user), key=sim_engine.fantasy_ovr, reverse=True)
+    theirs = sorted(sim_engine.fantasy_trade_roster(partner), key=sim_engine.fantasy_ovr, reverse=True) if partner else []
+    return {"active": True, "userTeam": user, "teams": ai, "partner": partner, "block": sorted(blocked),
+            "mine": [_trade_row(p, user, runner, blocked) for p in mine], "theirs": [_trade_row(p, partner, runner) for p in theirs],
+            "deadline": state.get("deadline_game"), "deadlinePassed": bool(state.get("deadline_passed")),
+            "log": [{"user_gives": t.get("user_gives", []), "ai_team": t.get("ai_team", ""), "ai_gives": t.get("ai_gives", [])} for t in state.get("log", [])]}
+
+
 def build_app():
     hub = EventHub()
     runner = SimRunner(hub)
@@ -973,6 +1014,8 @@ def build_app():
                 return self._json(strength_payload(runner))
             if path == "/api/season/recap":
                 return self._json(recap_payload(runner, (params.get("team") or [""])[0]))
+            if path == "/api/trade/state":
+                return self._json(trade_state_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/season/box":
                 return self._json(game_box_payload(runner, (params.get("gid") or [""])[0]))
             if path == "/api/season/highs":
@@ -1085,10 +1128,21 @@ def build_app():
                 action = data.get("action")
                 if not sim_engine.fantasy_trade_available():
                     return self._json({"ok": False, "error": "No fantasy league is active."}, 400)
+                if action == "propose":
+                    team, give, get = data.get("team", ""), list(data.get("userGives", [])), list(data.get("aiGives", []))
+                    outcome = sim_engine.evaluate_fantasy_trade(team, give, get, allow_counter=bool(data.get("allowCounter", True)))
+                    out = {"ok": True, "decision": outcome["decision"], "headline": outcome.get("headline", ""), "reasons": list(outcome.get("reasons", [])),
+                           "counter": outcome.get("counter"), "done": False}
+                    if outcome["decision"] == "accept":
+                        res = sim_engine.fantasy_trade_submit(team, give, get)
+                        out["done"] = bool(res.get("ok"))
+                        out["error"] = res.get("error")
+                        out["effective_order"] = res.get("effective_order")
+                    return self._json(out)
                 if action == "find":
-                    return self._json({"ok": True, "offers": sim_engine.fantasy_trade_find_offers(data.get("userGives", []))})
+                    return self._json({"ok": True, "offers": sim_engine.fantasy_trade_find_offers(data.get("userGives", []), limit=24)})
                 if action == "ask":
-                    return self._json({"ok": True, "offers": sim_engine.fantasy_trade_find_asks(data.get("team", ""), data.get("aiGives", []))})
+                    return self._json({"ok": True, "offers": sim_engine.fantasy_trade_find_asks(data.get("team", ""), data.get("aiGives", []), limit=24)})
                 if action == "submit":
                     result = sim_engine.fantasy_trade_submit(data.get("team", ""), data.get("userGives", []), data.get("aiGives", []))
                     return self._json(result, 200 if result.get("ok") else 400)

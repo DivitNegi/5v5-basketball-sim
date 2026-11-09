@@ -1492,38 +1492,120 @@ async function loadDraft() {
 }
 async function chooseDraft(value) { try { await api.post("/api/draft", { value }); setTimeout(loadDraft, 250); } catch (e) { toast(e.message, "err"); } }
 
+// ───────────────────────── trades: the Tk trade window ─────────────────────────
+// Click players on either side to pick them (click again to un-pick, as many as you like), press Propose, and the AI answers: it accepts a
+// deal that helps its rotation, explains a refusal, and sometimes counters. Plus the trade block and the two Trade Finder searches.
+const TR = { team: "", data: null, give: new Set(), get: new Set(), counter: null, resp: null, card: [null, null] };
 async function loadTrades() {
-  const d = await api.get("/api/fantasy"), root = $("#tradeBody");
+  const d = await api.get(`/api/trade/state?team=${encodeURIComponent(TR.team)}`);
+  const root = $("#tradeBody");
   if (!d.active) { root.replaceChildren(h("div", { class: "empty" }, d.message)); return; }
-  window.__tradeTeams = d.teams.filter((x) => x !== d.userTeam);
-  const sel = h("select", { id: "tradeTeam", onchange: loadTradeOpponent }, window.__tradeTeams.map((x) => h("option", { value: x }, x)));
-  const give = new Set();
-  const tick = (set) => (p) => h("label", { class: "trade-pick" }, h("input", { type: "checkbox", value: p.name, checked: set.has(p.name), onchange: (e) => (e.target.checked ? set.add(p.name) : set.delete(p.name)) }), "Trade");
-  window.__tradeGive = give; window.__tradeGet = new Set();
-  root.replaceChildren(h("p", {}, h("b", {}, d.userTeam), ` · deadline ${d.deadlinePassed ? "passed" : `game ${d.deadline}`}`),
-    h("div", { class: "trade-layout" }, h("div", {}, h("h3", {}, "Your players"), playerTable(d.userRoster, { id: "tradeMineTbl", extra: [["MIN", (p) => (p.minutes ?? ""), "minutes"]], action: tick(give) })),
-      h("div", {}, h("div", { class: "filters" }, h("h3", { style: { margin: 0 } }, "Trade with"), sel), h("div", { id: "tradeTheirs" }))),
-    h("div", { class: "action-row" }, h("button", { class: "btn primary", onclick: findTrades }, "Find offers")), h("div", { id: "tradeOffers" }),
-    h("div", { class: "trade-layout" }, lineupPanel(d.userRoster, "Your current lineup")));
-  const pre = window.__tradePreset; window.__tradePreset = null;
+  const pre = window.__tradePreset;
+  if (pre && pre.team !== d.partner && d.teams.includes(pre.team)) { TR.team = pre.team; window.__tradePreset = pre; return loadTrades(); }
+  window.__tradePreset = null;
+  if (TR.team !== d.partner) { TR.team = d.partner; TR.give.clear(); TR.get.clear(); TR.counter = null; TR.card = [null, null]; }
+  TR.data = d;
+  const have = (list, set) => { for (const n of [...set]) if (!list.some((p) => p.name === n)) set.delete(n); };
+  have(d.mine, TR.give); have(d.theirs, TR.get);
   if (pre) {
-    sel.value = pre.team; (pre.give || []).forEach((n) => give.add(n)); window.__tradeGet = new Set(pre.get || []);
-    root.prepend(h("div", { class: "lineup-panel" }, h("h3", {}, "Negotiating"), h("div", {}, `${pre.team} offered ${(pre.get || []).join(", ")} for ${(pre.give || []).join(", ")}. Change it, press Find offers, then Resume the season (Pause button) when you are done.`)));
-    $("#tradeMineTbl")?.replaceWith(playerTable(d.userRoster, { id: "tradeMineTbl", extra: [["MIN", (p) => (p.minutes ?? ""), "minutes"]], action: tick(give) }));
+    TR.give = new Set(pre.give.filter((n) => d.mine.some((p) => p.name === n))); TR.get = new Set(pre.get.filter((n) => d.theirs.some((p) => p.name === n)));
+    TR.resp = { tag: "counter", headline: `${pre.team} offered this deal.`, lines: ["Edit the players on either side and press Propose to see their answer."] };
+  } else if (!TR.resp) TR.resp = { tag: "counter", headline: "Pick players on both sides.", lines: ["The AI accepts a deal that helps its rotation, explains a refusal, and sometimes counters a close one."] };
+  renderTrades();
+}
+function trPlayerCard(p) {
+  if (!p) return h("div", { class: "muted" }, "Click a player to see his ratings and season stats.");
+  const r = p.r, f1 = (v) => v.toFixed(1);
+  const form = p.form ? `  (${p.form > 0 ? "+" : ""}${p.form} this season)` : "";
+  const shift = Object.entries(p.shift || {}).map(([k, v]) => `${k.replace("_rating", "")} ${v > 0 ? "+" : ""}${v}`).join("  ");
+  const s = p.season;
+  return h("div", { class: "tr-card" }, h("div", { class: "tr-card-h" }, `${p.name}  |  ${p.pos}  |  OVR ${p.ovr}${form}${p.ht ? `  |  ${fmtHt(p.ht)}` : ""}`),
+    h("div", {}, `Shooting: 3PT ${r["3PT"]}  Mid ${r["MID"]}  Rim ${r["RIM"]}  Dunk ${r["DUNK"]}  FT ${r["FT"]}      Playmaking ${r["PLAY"]}  Handle ${r["HANDLE"]}`),
+    shift ? h("div", { class: "muted" }, `Form this season: ${shift}`) : null,
+    h("div", {}, `Defense: Perimeter ${r["PERIM D"]}  Interior ${r["INT D"]}  Steal ${p.r2.STL}  Block ${p.r2.BLK}      Rebounding: Off ${r["OREB"]}  Def ${r["DREB"]}      Clutch ${p.r2.CLUTCH}`),
+    h("div", { class: "muted" }, s ? `Season: ${s.gp} GP  ${f1(s.mpg)} MPG  ${f1(s.pts)} PTS  ${f1(s.reb)} REB  ${f1(s.ast)} AST  ${f1(s.stl)} STL  ${f1(s.blk)} BLK  ${f1(s.tov)} TOV   FG ${f1(s.fg)}%  3P ${f1(s.tp)}%  FT ${f1(s.ft)}%  TS ${f1(s.ts)}%` : "Season: no games played yet."));
+}
+function renderTrades() {
+  const d = TR.data, root = $("#tradeBody");
+  const toggle = (set, side, name) => { set.has(name) ? set.delete(name) : set.add(name); TR.card[side] = name; TR.counter = TR.counter && null; renderTrades(); };
+  const list = (rows, set, side) => h("div", { class: "tr-list" }, rows.map((p) => h("div", { class: `tr-row ${set.has(p.name) ? "sel" : ""}`, onclick: () => toggle(set, side, p.name) },
+    h("span", { class: "pos" }, p.pos), faceEl(p.name), h("span", { class: "tr-name" }, p.name), p.blocked ? h("span", { class: "tr-block" }, "BLOCK") : null, h("b", { style: { color: ratingColor(p.ovr || 0) } }, p.ovr))));
+  const cardOf = (rows, side) => trPlayerCard(rows.find((p) => p.name === TR.card[side]));
+  const sel = h("select", { onchange: (e) => { TR.team = e.target.value; TR.resp = { tag: "counter", headline: "Pick players on both sides.", lines: [] }; loadTrades(); } }, d.teams.map((t) => h("option", { value: t, selected: t === d.partner }, t)));
+  const give = [...TR.give], get = [...TR.get];
+  const resp = TR.resp;
+  const deadline = d.deadlinePassed ? "The trade deadline has passed: no more trades this season." : d.deadline ? `Trade deadline: game ${d.deadline} of the season.` : "";
+  root.replaceChildren(
+    h("div", { class: "tr-top" }, h("label", { class: "fsel" }, h("span", { class: "muted" }, "Trade with"), sel),
+      h("button", { class: "btn", onclick: () => trFinder("shop") }, "Find offers for my players"), h("button", { class: "btn", onclick: () => trFinder("ask") }, "What would it take?"), h("button", { class: "btn", onclick: trBlock }, "Trade block"),
+      h("span", { class: "muted" }, "Click players to pick them (click again to un-pick); pick as many as you like on either side, then press Propose. " + deadline)),
+    h("div", { class: "tr-cols" }, h("div", {}, h("h3", {}, `${d.userTeam} (you)`), list(d.mine, TR.give, 0), cardOf(d.mine, 0)),
+      h("div", {}, h("h3", {}, d.partner), list(d.theirs, TR.get, 1), cardOf(d.theirs, 1))),
+    h("div", { class: "muted tr-sum" }, `You send (${give.length}): ${give.join(", ") || "-"}      You get (${get.length}): ${get.join(", ") || "-"}`),
+    h("div", { class: `tr-resp ${resp.tag}` }, h("div", { class: "head" }, resp.headline), (resp.lines || []).map((l) => h("div", { class: "line" }, `- ${l}`))),
+    h("div", { class: "tr-actions" }, h("button", { class: "btn primary", onclick: () => trPropose(null) }, "Propose trade"),
+      TR.counter ? h("button", { class: "btn", onclick: () => trPropose(TR.counter) }, "Accept counter-offer") : null,
+      d.log.length ? h("span", { class: "muted" }, "Trades so far: " + d.log.map((t) => `${t.user_gives.join(", ")} to ${t.ai_team} for ${t.ai_gives.join(", ")}`).join("; ")) : null));
+}
+async function trPropose(counter) {
+  const give = counter ? counter.user_gives : [...TR.give], get = counter ? counter.ai_gives : [...TR.get];
+  if (!give.length && !get.length) { TR.resp = { tag: "counter", headline: "Pick players on both sides.", lines: ["Choose who you send and who you want, then press Propose."] }; renderTrades(); return; }
+  let r;
+  try { r = await api.post("/api/fantasy/trade", { action: "propose", team: TR.team, userGives: give, aiGives: get, allowCounter: !counter }); }
+  catch (e) { TR.resp = { tag: "reject", headline: "The trade could not be completed.", lines: [e.message] }; renderTrades(); return; }
+  TR.counter = null;
+  if (r.decision === "accept") {
+    if (!r.done) { TR.resp = { tag: "reject", headline: "The trade could not be completed.", lines: [r.error || "Unknown error. If the season is running, pause it first."] }; renderTrades(); return; }
+    TR.give.clear(); TR.get.clear(); TR.card = [null, null];
+    TR.resp = { tag: "accept", headline: counter ? "Deal. We accept." : r.headline, lines: [...(counter ? [] : r.reasons), `Trade completed: you send ${give.join(", ")} and receive ${get.join(", ")}.`] };
+    toast(r.effective_order != null ? `Trade done. Your new roster plays from game ${r.effective_order + 1} on.` : "Trade done.", "ok");
+    await loadTrades(); return;
   }
-  await loadTradeOpponent();
+  if (r.decision === "counter") { TR.counter = r.counter; TR.resp = { tag: "counter", headline: r.headline, lines: r.reasons }; }
+  else TR.resp = { tag: "reject", headline: counter ? "That counter is no longer available." : r.headline, lines: r.reasons };
+  renderTrades();
 }
-async function loadTradeOpponent() {
-  const el = $("#tradeTeam"); if (!el) return;
-  const d = await api.get(`/api/fantasy/roster?team=${encodeURIComponent(el.value)}`);
-  $("#tradeTheirs").replaceChildren(playerTable(d.players, { id: "tradeTheirsTbl" }));
+async function trBlock() {
+  const names = [...TR.give];
+  if (!names.length) { TR.resp = { tag: "counter", headline: "Trade block", lines: ["Select your players on the left, then press Trade block to protect them (or to take them off the block)."] }; renderTrades(); return; }
+  const r = await api.post("/api/fantasy/trade", { action: "block", players: names });
+  TR.resp = { tag: "counter", headline: "Trade block updated.", lines: ["On the block: " + (r.block.length ? r.block.sort().join(", ") : "nobody."), "Players on the block are protected: the finder never asks for them and the AI teams never ask for them in an offer or counter-offer."] };
+  await loadTrades();
 }
-async function findTrades() {
-  const userGives = [...(window.__tradeGive || [])];
-  if (!userGives.length) { toast("Choose at least one of your players."); return; }
-  const d = await api.post("/api/fantasy/trade", { action: "find", userGives });
-  $("#tradeOffers").replaceChildren(...(d.offers.length ? d.offers.map((o) => h("div", { class: "replay-row" }, h("b", {}, o.ai_team), h("span", {}, `${o.user_gives.join(", ")} ⇄ ${o.ai_gives.join(", ")}`),
-    h("button", { class: "btn", onclick: async () => { await api.post("/api/fantasy/trade", { action: "submit", team: o.ai_team, userGives: o.user_gives, aiGives: o.ai_gives }); loadTrades(); } }, "Accept"))) : [h("div", { class: "empty" }, "No acceptable offers found.")]));
+async function trFinder(mode) {
+  const names = mode === "shop" ? [...TR.give] : [...TR.get];
+  if (!names.length) { TR.resp = { tag: "counter", headline: "Trade Finder", lines: [mode === "shop" ? "Select the player (or players) on your side that you want to shop, then press Find offers." : "Select the player (or players) you want from the other team (right side), then press What would it take?"] }; renderTrades(); return; }
+  const r = await api.post("/api/fantasy/trade", mode === "shop" ? { action: "find", userGives: names } : { action: "ask", team: TR.team, aiGives: names });
+  const heading = mode === "shop" ? `What teams would give for: ${names.join(", ")}` : `What it would take to get ${names.join(", ")} from ${TR.team}`;
+  const empty = mode === "shop" ? "No team would make an offer you would want for them right now." : "They would not make that deal for any package of your players that works for the roster limits." + (TR.data.block.length ? " (Players on your trade block are never asked for: take some off the block to see more.)" : "");
+  let sort = "Best for my team", picked = 0;
+  const sorters = { "Best for my team": (o) => -o.gain, "Best fit": (o) => [-o.fit_score, -o.gain], "Best player": (o) => [-o.best_ovr, -o.gain] };
+  const cmp = (x, y) => { const a = [].concat(sorters[sort](x)), b = [].concat(sorters[sort](y)); for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };
+  const close = () => document.getElementById("finderModal")?.remove();
+  const draw = () => {
+    close();
+    const offers = [...r.offers].sort(cmp);
+    const chosen = offers[picked] || offers[0];
+    const take = async (negotiate) => {
+      if (!chosen) return;
+      close();
+      if (negotiate) { window.__tradePreset = { team: chosen.ai_team, give: chosen.user_gives, get: chosen.ai_gives }; TR.team = chosen.ai_team; await loadTrades(); return; }
+      TR.team = chosen.ai_team; await loadTrades();
+      const res = await api.post("/api/fantasy/trade", { action: "propose", team: chosen.ai_team, userGives: chosen.user_gives, aiGives: chosen.ai_gives, allowCounter: false });
+      if (res.decision !== "accept" || !res.done) { TR.resp = { tag: "reject", headline: "That offer is no longer available (the rosters have changed).", lines: res.reasons || [res.error].filter(Boolean) }; renderTrades(); return; }
+      TR.resp = { tag: "accept", headline: "Deal. We accept.", lines: [`Trade completed: you send ${chosen.user_gives.join(", ")} and receive ${chosen.ai_gives.join(", ")}.`] };
+      toast("Trade done.", "ok"); await loadTrades();
+    };
+    document.body.append(h("div", { id: "finderModal", class: "tm-backdrop", onclick: (e) => { if (e.target.id === "finderModal") close(); } }, h("div", { class: "tm-box wide" },
+      h("h2", {}, "Trade Finder"), h("p", { class: "muted" }, heading),
+      h("div", { class: "filters" }, h("label", { class: "fsel" }, h("span", { class: "muted" }, "Sort by"), h("select", { onchange: (e) => { sort = e.target.value; picked = 0; draw(); } }, Object.keys(sorters).map((k) => h("option", { value: k, selected: k === sort }, k))))),
+      h("p", { class: "muted", style: { fontSize: "12px" } }, "Every deal here is one that team would accept. Rotation = change to your top-ten value; fit = what the deal adds (+) or costs (-) your lineup."),
+      offers.length ? h("div", { class: "table-wrap", style: { maxHeight: "340px" } }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, ["Team", mode === "shop" ? "You would get" : "You would send", "Rotation", "Fit"].map((x, i) => h("th", { class: i < 2 || i === 3 ? "l" : "" }, x)))),
+        h("tbody", {}, offers.map((o, i) => h("tr", { class: `pl-row ${i === picked ? "open" : ""}`, onclick: () => { picked = i; draw(); }, ondblclick: () => { picked = i; take(false); } },
+          h("td", { class: "l" }, o.ai_team), h("td", { class: "l" }, o.detail.join(", ")), h("td", {}, `${o.user_change * 100 >= 0 ? "+" : ""}${(o.user_change * 100).toFixed(1)}%`), h("td", { class: "l" }, o.fit || "-")))))) : h("div", { class: "empty" }, empty),
+      h("div", { class: "tm-actions" }, offers.length ? h("button", { class: "btn primary", onclick: () => take(false) }, "Make this trade") : null, offers.length ? h("button", { class: "btn", onclick: () => take(true) }, "Negotiate") : null, h("button", { class: "btn", onclick: close }, "Close")))));
+  };
+  draw();
 }
 
 const customSelected=new Set();

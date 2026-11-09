@@ -635,3 +635,26 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .recap { margin-top: 8px; padding: 16px 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(2, 6, 15, .35); line-height: 1.65; }
 .rc-line.head { font-size: 22px; font-weight: 800; color: var(--accent-2); margin-bottom: 4px; }
 .rc-line.label { margin-top: 4px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 800; color: var(--accent-2); }
+
+/* trade window (Tk) */
+.tr-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.tr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.tr-cols h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-2); }
+.tr-list { border: 1px solid var(--line); border-radius: 12px; max-height: 360px; overflow-y: auto; background: rgba(2, 6, 15, .35); }
+.tr-row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; border-bottom: 1px solid var(--line); user-select: none; }
+.tr-row:last-child { border-bottom: 0; }
+.tr-row:hover { background: rgba(148, 163, 184, .08); }
+.tr-row.sel { background: rgba(245, 165, 36, .16); box-shadow: inset 3px 0 0 var(--accent); }
+.tr-row .pos { width: 26px; text-align: center; color: var(--muted); font-size: 11px; font-weight: 800; }
+.tr-row .tr-name { flex: 1; font-weight: 700; }
+.tr-block { font-size: 10px; letter-spacing: .1em; font-weight: 800; color: var(--accent-2); border: 1px solid rgba(245, 165, 36, .5); border-radius: 6px; padding: 1px 6px; }
+.tr-card { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(2, 6, 15, .35); font-size: 12.5px; line-height: 1.55; min-height: 90px; }
+.tr-card-h { font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.tr-sum { margin: 12px 2px 8px; }
+.tr-resp { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(2, 6, 15, .45); min-height: 70px; }
+.tr-resp .head { font-weight: 800; font-size: 15px; margin-bottom: 4px; }
+.tr-resp.accept .head { color: #4ade80; } .tr-resp.reject .head { color: #f87171; } .tr-resp.counter .head { color: var(--accent-2); }
+.tr-resp .line { color: var(--text-2); font-size: 13px; }
+.tr-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.tm-box.wide { width: min(980px, 100%); }
+@media (max-width: 900px) { .tr-cols { grid-template-columns: 1fr; } }
