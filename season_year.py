@@ -65,6 +65,7 @@ def run_year_season(year: int, section_queue=None, progress_queue=None) -> Dict:
     for home_key, away_key, order, seed, _year in games:
         sim_engine.season_replay_register_game(order, name_of_key[home_key], name_of_key[away_key], seed)
     entry_by_name = {entry["name"]: entry for entry in entries}
+    fixtures = [(order + 1, name_of_key[home_key], name_of_key[away_key]) for home_key, away_key, order, _seed, _y in games]   # the whole schedule, so the schedule tab can list upcoming games
     player_totals, team_totals = {}, {}
     game_log = SeasonGameLog()
     total_games = len(games)
@@ -75,7 +76,7 @@ def run_year_season(year: int, section_queue=None, progress_queue=None) -> Dict:
 
     def snap():
         sim_engine.season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, None, total_games,
-                                         positional=info["positional"])
+                                         positional=info["positional"], fixtures=fixtures)
 
     live_tick = sim_engine.make_season_live_updater(snap)
 
@@ -149,7 +150,7 @@ def run_year_season(year: int, section_queue=None, progress_queue=None) -> Dict:
     sim_engine.SEASON_POSITIONAL_AWARDS = info["positional"]
     try:
         sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,
-                                         game_extras=game_log.extras, game_meta=game_log.games)
+                                         game_extras=game_log.extras, game_meta=game_log.games, fixtures=fixtures)
     finally:
         sim_engine.SEASON_POSITIONAL_AWARDS = False
     if section_queue is not None:

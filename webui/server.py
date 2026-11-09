@@ -405,18 +405,38 @@ def advanced_payload(runner):
 
 def schedule_payload(runner, team):
     sec = runner.sections or {}
-    rows = []
+    # each team's top scorer in every played game, from the season game log
+    fields, log = sec.get("_season_game_log_fields") or [], sec.get("_season_game_log") or []
+    idx = {f: i for i, f in enumerate(fields)}
+    top = {}
+    if all(k in idx for k in ("gid", "team", "player", "pts")):
+        for r in log:
+            key = (r[idx["gid"]], r[idx["team"]])
+            if key not in top or r[idx["pts"]] > top[key][1]:
+                top[key] = (r[idx["player"]], r[idx["pts"]])
+    rows, played_orders = [], set()
     for g in sec.get("_season_games") or []:
+        played_orders.add(g.get("order"))
         if team and team not in (g.get("home"), g.get("away")):
             continue
         home = g.get("home") == team if team else True
         hs, as_ = g.get("home_score"), g.get("away_score")
         if team:
             mine, theirs = (hs, as_) if home else (as_, hs)
-            rows.append({"n": len(rows) + 1, "gid": g.get("gid"), "home": home, "opp": g["away"] if home else g["home"], "mine": mine, "theirs": theirs, "win": mine is not None and mine > theirs})
+            leader = top.get((g.get("gid"), team))
+            rows.append({"n": len(rows) + 1, "gid": g.get("gid"), "home": home, "opp": g["away"] if home else g["home"], "mine": mine, "theirs": theirs,
+                         "win": mine is not None and mine > theirs, "top": {"player": leader[0], "pts": leader[1]} if leader else None})
         else:
             rows.append({"n": g.get("order"), "gid": g.get("gid"), "home": g["home"], "away": g["away"], "hs": hs, "as": as_})
-    return {"games": rows}
+    upcoming = []
+    if team:
+        for fx in sec.get("_season_fixtures") or []:
+            number, home_name, away_name = fx[0], fx[1], fx[2]
+            if number in played_orders or team not in (home_name, away_name):
+                continue
+            upcoming.append({"game": number, "home": home_name == team, "opp": away_name if home_name == team else home_name})
+    return {"games": rows, "upcoming": upcoming}
+
 
 
 TEAM_METRICS = [   # (label, value(per-game totals), lower_is_better)
@@ -472,7 +492,7 @@ def team_card_payload(runner, team):
     games = schedule_payload(runner, team)["games"]
     played = [x for x in games if x.get("mine") is not None]
     return {"team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
-            "recent": list(reversed(played[-8:])), "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"])}
+            "recent": list(reversed(played[-8:])), "upcoming": schedule_payload(runner, team)["upcoming"][:5], "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"])}
 
 
 HIGHS_STATS = {"PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk", "3PM": "tpm", "3PA": "tpa",
@@ -589,10 +609,9 @@ def game_box_payload(runner, gid):
 
 RATING_FIELDS = [
     ("Scoring", [("three_rating", "3PT"), ("mid_rating", "Mid-range"), ("rim_rating", "Finishing"), ("dunk_rating", "Dunking"), ("ft_rating", "Free throw")]),
-    ("Playmaking", [("playmaking", "Playmaking"), ("ball_handle", "Ball handle"), ("usage", "Usage")]),
+    ("Playmaking", [("playmaking", "Playmaking"), ("ball_handle", "Ball handle")]),
     ("Defense", [("perimeter_def", "Perimeter D"), ("interior_def", "Interior D"), ("steal", "Steals"), ("block", "Blocks")]),
     ("Rebounding & more", [("oreb", "Off. rebound"), ("dreb", "Def. rebound"), ("foul_draw", "Draws fouls"), ("clutchness", "Clutch")]),
-    ("Tendencies", [("three_tendency", "Threes"), ("mid_tendency", "Mid-range"), ("drive_tendency", "Drives"), ("post_tendency", "Post"), ("dunk_tendency", "Dunks"), ("shot_tendency", "Shot-taking")]),
 ]
 
 

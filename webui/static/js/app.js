@@ -935,13 +935,16 @@ function renderScheduleTab() {
   const sel = h("select", { onchange: (e) => { SE.team = e.target.value; loadSchedule(); } }, h("option", { value: "" }, "Pick a team"), teams.map((n) => h("option", { value: n, selected: n === SE.team }, shortTeam(n))));
   const g = SE.sched || [];
   const w = g.filter((x) => x.win).length;
-  const list = SE.team ? simpleTable(h("tr", {}, ...["#", "", "Opponent", "Result", "Score"].map((x, i) => h("th", { class: i === 2 ? "l" : "" }, x))),
-    g.map((x) => h("tr", { class: x.mine != null && x.gid != null ? "pl-row" : "", onclick: () => { if (x.mine != null && x.gid != null) openScheduleBox(x.gid); } }, h("td", {}, x.n), h("td", {}, x.home ? "vs" : "@"), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(x.opp)), shortTeam(x.opp))), h("td", { class: x.win ? "pm-pos" : "pm-neg" }, x.mine == null ? "–" : x.win ? "W" : "L"), h("td", {}, x.mine == null ? "" : `${x.mine}-${x.theirs}`)))) : h("div", { class: "empty" }, "Choose a team to see its schedule and results.");
-  return h("div", {}, h("div", { class: "filters" }, sel, SE.team ? h("span", { class: "muted" }, `${w}-${g.length - w} so far · click a game for its box score`) : null), list);
+  const played = g.map((x) => h("tr", { class: x.mine != null && x.gid != null ? "pl-row" : "", onclick: () => { if (x.mine != null && x.gid != null) openScheduleBox(x.gid); } }, h("td", {}, x.n), h("td", {}, x.home ? "vs" : "@"), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(x.opp)), shortTeam(x.opp))), h("td", { class: x.win ? "pm-pos" : "pm-neg" }, x.mine == null ? "–" : x.win ? "W" : "L"), h("td", {}, x.mine == null ? "" : `${x.mine}-${x.theirs}`),
+    h("td", { class: "l top-scorer" }, x.top ? h("div", { class: "pcell" }, faceEl(x.top.player), h("span", {}, x.top.player, h("b", { class: "muted" }, ` ${x.top.pts} pts`))) : "")));
+  const up = (SE.upcoming || []).map((x, i) => h("tr", { class: `upcoming ${i === 0 ? "next" : ""}` }, h("td", {}, g.length + i + 1), h("td", {}, x.home ? "vs" : "@"), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(x.opp)), shortTeam(x.opp))), h("td", { class: "muted" }, i === 0 ? "NEXT" : "–"), h("td", {}, ""), h("td", {}, "")));
+  const list = SE.team ? simpleTable(h("tr", {}, ...["#", "", "Opponent", "Result", "Score", "Top scorer"].map((x, i) => h("th", { class: i === 2 || i === 5 ? "l" : "" }, x))), [...played, ...(up.length ? [h("tr", { class: "sep" }, h("td", { class: "l", colspan: 6 }, `Upcoming · ${up.length} game${up.length === 1 ? "" : "s"} left`))] : []), ...up]) : h("div", { class: "empty" }, "Choose a team to see its schedule and results.");
+  return h("div", {}, h("div", { class: "filters" }, sel, SE.team ? h("span", { class: "muted" }, `${w}-${g.length - w} so far · click a game for its box score${up.length ? ` · ${up.length} to go` : ""}`) : null), list);
 }
 async function loadSchedule() {
   if (!SE.team) { renderSeasonBody(); return; }
-  SE.sched = (await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`)).games;
+  const sd = await api.get(`/api/season/schedule?team=${encodeURIComponent(SE.team)}`);
+  SE.sched = sd.games; SE.upcoming = sd.upcoming || [];
   renderSeasonBody();
 }
 const HV = { view: "Season highs (every stat)", stat: "PTS", team: "All Teams", box: null };
@@ -1910,14 +1913,15 @@ async function openTeamCard(team) {
     const rows = d.recent.map((x) => h("tr", { class: "clickable", title: "Click for the box score", onclick: () => showBox(x.gid) },
       h("td", { class: "l" }, h("span", { class: `wl ${x.win ? "w" : "l"}` }, x.win ? "W" : "L")), h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", {}, `${x.mine}-${x.theirs}`)));
     body.replaceChildren(
-      h("div", { class: "pcard-head", style: { "--c": id.color || "#64748b" } }, logoEl(id), h("div", {}, h("div", { class: "pcard-name" }, `${id.year ? id.year + " " : ""}${id.short || team}`),
+      h("div", { class: "pcard-head", style: { "--c": id.color || "#64748b" } }, logoEl(id, "xl"), h("div", {}, h("div", { class: "pcard-name" }, `${id.year ? id.year + " " : ""}${id.short || team}`),
         h("div", { class: "pcard-sub" }, `${st ? `${st.wins}-${st.losses}` : `${d.wins}-${d.losses}`}${st?.conference ? ` · ${st.conference}` : ""} · ${d.games} games`)),
         h("div", { style: { marginLeft: "auto" } }, h("button", { class: "btn", onclick: goSchedule }, "View schedule ›"))),
       h("div", { class: "stat-tiles" }, tile("PPG", fmt(pg.pts)), tile("OPP PPG", fmt(pg.opp_pts)), tile("RPG", fmt(pg.reb)), tile("APG", fmt(pg.ast)), tile("SPG", fmt(pg.stl)), tile("BPG", fmt(pg.blk)), tile("TOV", fmt(pg.tov)),
         tile("FG%", fmt(pg.fgp)), tile("3P%", fmt(pg.tpp)), tile("FT%", fmt(pg.ftp))),
       h("div", { class: "pc-viz", style: { gridTemplateColumns: "1.4fr 1fr", marginTop: "12px" } },
         h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the other ${d.pool - 1} teams. Defense and turnovers are flipped so higher is always better.`), percentileRadar(d.ranks, chartColor())),
-        h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"))));
+        h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
+          d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)));
   };
   render();
 }

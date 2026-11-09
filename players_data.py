@@ -751,13 +751,14 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         _replay_engine.season_replay_register_game(_order, _name_of_key[_home], _name_of_key[_away], _seed)
     player_totals, team_totals = {}, {}
     game_log = SeasonGameLog()
+    fixtures = [(_o + 1, _name_of_key[_h], _name_of_key[_a]) for _h, _a, _o, _sd in games]   # games known up front, so the schedule tab can list upcoming ones
     print("\n=== 2027 SEASON (82 games per team, NBA schedule) ===")
     print(f"Quiet-simming {total_games} games. No play-by-play during the regular season.")
     if progress_queue is not None:
         progress_queue.put({"season_progress": True, "completed": 0, "total": total_games})
     def snap():
         import sim_engine as _snap_engine
-        _snap_engine.season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, None, total_games)
+        _snap_engine.season_pause_snapshot(section_queue, entries, player_totals, team_totals, game_log, None, total_games, fixtures=fixtures)
 
     import sim_engine as _live_engine
     live_tick = _live_engine.make_season_live_updater(snap)
@@ -916,7 +917,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = None
     sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,
-                                     game_extras=game_log.extras, game_meta=game_log.games)
+                                     game_extras=game_log.extras, game_meta=game_log.games, fixtures=fixtures)
     if cup.get("summary"):
         summary = cup["summary"]
         champion, runner_up = _name_of_key[summary["champion"]], _name_of_key[summary["runner_up"]]
