@@ -845,3 +845,6 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .zhot { background: #0b1325; }
 .pc-zlegend.zl3 { gap: 18px; } .pc-zlegend.zl3 span { display: inline-flex; align-items: center; gap: 6px; }
 .pc-zlegend.zl3 b { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(255,255,255,.7); }
+
+.zl-pct { font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, monospace; font-weight: 700; letter-spacing: 0; stroke-width: 3px; }
+.zl-delta { fill: rgba(255,255,255,.92); font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, monospace; font-weight: 600; letter-spacing: .02em; paint-order: stroke; stroke: rgba(4,10,22,.7); stroke-width: 2.6px; stroke-linejoin: round; }

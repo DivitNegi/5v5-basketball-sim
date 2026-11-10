@@ -2080,12 +2080,19 @@ function seasonShotChart(name, zones, avg, vs, split) {
     out.push(zone(`${lane} ${ra}`, "paint", null, "Paint"), zone(ra, "ra", null, "Restricted area", false));
     const frame = svgEl("rect", { x: 0, y: 0, width: 500, height: 470, fill: "none", stroke: "#fff", "stroke-width": 4 });
     const ft = svgEl("path", { d: "M190 190 A60 60 0 0 0 310 190", fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-opacity": ".5", "stroke-dasharray": "5 6" });
-    const label = (x, y, key, size) => {
-      const { a, pct } = info(key), t = svgEl("text", { x, y, "font-size": size, "text-anchor": "middle", "dominant-baseline": "central", class: "zl-pct" });
-      t.textContent = a ? `${pct.toFixed(0)}%` : "–"; return t;
+    // readout: the FG% in a small tabular face, then a tiny ▲ / ▼ with how far he is above or below the average (the league's, or his position group's if that is picked)
+    const label = (x, y, key, size, withDiff = true) => {
+      const { a, pct, diff } = info(key), g = svgEl("g", { "text-anchor": "middle", class: "zl-g" });
+      const t = svgEl("text", { x, y: withDiff && diff != null ? y - size * 0.32 : y, "font-size": size, "dominant-baseline": "central", class: "zl-pct" });
+      t.textContent = a ? `${pct.toFixed(0)}%` : "–"; g.append(t);
+      if (withDiff && diff != null && a) {
+        const d = svgEl("text", { x, y: y + size * 0.62, "font-size": Math.max(8.5, size * 0.58), "dominant-baseline": "central", class: "zl-delta" });
+        d.textContent = `${diff >= 0 ? "▲ +" : "▼ −"}${Math.abs(diff).toFixed(1)}%`; g.append(d);
+      }
+      return g;
     };
-    const labels = [label(250, 62, "ra", 19), label(250, 138, "paint", 21), label(250, 238, "elbow", 22), label(250, 325, "top3", 24)];
-    for (const s of S) labels.push(label(250 + s * 110, 183, "mid_wing", 22), label(250 + s * 133, 76, "baseline", 21), label(250 + s * 190, 238, "wing3", 22), label(250 + s * 235, 78, "corner3", 11));
+    const labels = [label(250, 66, "ra", 14), label(250, 138, "paint", 15), label(250, 238, "elbow", 16), label(250, 325, "top3", 17)];
+    for (const s of S) labels.push(label(250 + s * 110, 183, "mid_wing", 16), label(250 + s * 133, 78, "baseline", 15), label(250 + s * 190, 238, "wing3", 16), label(250 + s * 235, 78, "corner3", 9, false));
     zsvg.append(...out, ft, frame, ...labels);
   };
   const paint = () => {
@@ -2113,7 +2120,7 @@ function seasonShotChart(name, zones, avg, vs, split) {
   const tabs = h("div", { class: "seg small pc-tabs" }, [["shots", "Shots"], ["heat", "Heat map"], ["zones", `Zones vs ${vs}`]].map(([k, l]) => h("button", { class: state.view === k ? "on" : "", onclick: (e) => {
     state.view = k; tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint();
   } }, l)));
-  const legend = h("div", { class: "pc-zlegend zl3", style: { display: "none" } }, h("span", {}, h("b", { style: { background: COLD } }), "cold"), h("span", {}, h("b", { style: { background: AVG } }), `about ${vs} average`), h("span", {}, h("b", { style: { background: HOT } }), "hot"));
+  const legend = h("div", { class: "pc-zlegend zl3", style: { display: "none" } }, h("span", {}, h("b", { style: { background: COLD } }), "cold"), h("span", {}, h("b", { style: { background: AVG } }), `about ${vs === "league" ? "league" : "position"} average`), h("span", {}, h("b", { style: { background: HOT } }), "hot"));
   paint();
   return h("div", { class: "pc-map-wrap" }, tabs, svg, zsvg, legend,
     h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG", h("span", { class: "muted" }, ` · ${total ? (100 * made / total).toFixed(1) : "–"}%`)), h("span", { class: "lg make" }, "● make"), h("span", { class: "lg miss" }, "✕ miss")),
