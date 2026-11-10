@@ -173,22 +173,27 @@ def player_detail(runner, source, team, name):
             return None
     my_adv = adv_row(team, mine)
     adv_pool = [r for r in (adv_row(tn, s) for tn, _, s in qualified) if r]
-    adv_ranks = []
-    for key, label, lower in ADV_PICK:
-        val = my_adv.get(key) if my_adv else None
-        if val is None or not adv_pool:
-            adv_ranks.append({"key": key, "label": label, "value": None, "pct": None}); continue
-        pop = [r[key] for r in adv_pool if r.get(key) is not None]
-        below = sum(1 for v in pop if v < val - 1e-9)
-        equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
-        pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
-        if pct is not None and lower:
-            pct = 100 - pct
-        adv_ranks.append({"key": key, "label": label, "value": round(val, 3 if key == "WS/48" else 1), "pct": pct})
+    ADV_PICK2 = [("TS%", "True Shooting %", False), ("FTr", "Free Throw Rate", False), ("3PAr", "3-pt Attempt Rate", False), ("ORB%", "Off. Rebound %", False), ("DRB%", "Def. Rebound %", False),
+                 ("OWS", "Off. Win Shares", False), ("DWS", "Def. Win Shares", False), ("WS", "Win Shares", False), ("OFF", "Offense rating", False), ("DEF", "Defense rating", False), ("IMPACT", "Impact", False)]
+    def rank_adv(picks):
+        out = []
+        for key, label, lower in picks:
+            val = my_adv.get(key) if my_adv else None
+            if val is None or not adv_pool:
+                out.append({"key": key, "label": label, "value": None, "pct": None}); continue
+            pop = [r[key] for r in adv_pool if r.get(key) is not None]
+            below = sum(1 for v in pop if v < val - 1e-9)
+            equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
+            pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
+            if pct is not None and lower:
+                pct = 100 - pct
+            out.append({"key": key, "label": label, "value": round(val, 3 if key in ("WS/48", "TS%", "FTr", "3PAr") and abs(val) < 2 else 1), "pct": pct})
+        return out
+    adv_ranks, adv_ranks2 = rank_adv(ADV_PICK), rank_adv(ADV_PICK2)
     keys = ("minutes", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus")
     totals = {k: (round(st[k] / 60, 1) if k == "minutes" else round(st[k], 1) if k == "plus_minus" else int(st[k])) for k in keys}
     per_game = {k: round(st[k] / g / (60 if k == "minutes" else 1), 1) for k in keys}
     diet = st.get("shot_diet") or {}
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
-    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_ranks": adv_ranks,
+    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_ranks": adv_ranks, "adv_ranks2": adv_ranks2,
             "pool": len(qualified), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")}}
