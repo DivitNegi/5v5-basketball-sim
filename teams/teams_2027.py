@@ -2754,7 +2754,7 @@ def make_spurs_2027() -> Team:
                clutchness=0.600, secondary_positions=('SF',), height=80, speed=0.750,
                shot_iq=0.600, archetype='scoring forward', stamina=0.68),
         Player('Victor Wembanyama', 'C',
-               0.35, 0.30, 0.18, 0.20, 0.36, 0.90,
+               0.35, 0.05, 0.60, 0.20, 0.36, 0.90,
                0.850, 0.90, 0.980, 0.980, 0.830,
                0.34, 0.560, 0.760,
                0.750, 0.990, 0.930, 0.980, 0.970, 0.667,
