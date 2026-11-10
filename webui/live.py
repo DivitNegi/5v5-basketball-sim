@@ -160,12 +160,19 @@ def zones(diet: Optional[Dict]) -> Dict:
     return {k: _zone(diet, k) for k in ("rim", "paint", "mid", "three", "post", "dunk")}
 
 
+_LAST_TEAMS = (None, None)   # the last live pair, kept while a quiet sim (sim series / sim to Final) has the engine busy
+
+
 def _teams():
+    global _LAST_TEAMS
     if getattr(sim_engine, "SILENT_SIM_DEPTH", 0) > 0:
-        return (None, None)
+        return _LAST_TEAMS   # keeps the player card and shot chart on the game being watched instead of blanking
     ctx = sim_engine.SIM_CONTEXT
     a, b = ctx.get("teamA"), ctx.get("teamB")
-    return (a, b) if a is not None and b is not None else (None, None)
+    if a is not None and b is not None:
+        _LAST_TEAMS = (a, b)
+        return (a, b)
+    return _LAST_TEAMS if _LAST_TEAMS[0] is not None and ctx.get("period") else (None, None)
 
 
 def shots_payload() -> Dict:
