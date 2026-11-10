@@ -2256,15 +2256,15 @@ function paintShots(scope, d) {
   const sel = (label, key, opts, show = true) => !show ? null : h("label", { class: "fsel" }, h("span", { class: "muted" }, label),
     h("select", { onchange: (e) => { SH[key] = e.target.value; loadShots2(); } }, opts.map((o) => h("option", { value: o.v ?? o, selected: (o.v ?? o) === SH[key] }, o.t ?? o))));
   const rankable = SH.mode !== "Matchup Defense";
-  filtersEl.replaceChildren(
+  filtersEl.replaceChildren(...[
     sel("Type", "mode", d.modes), sel("Game", "game", d.games), SH.mode === "Shot Diet" ? sel("Quarter", "quarter", ["All Quarters", "Q1", "Q2", "Q3", "Q4", "OT"]) : null,
     sel("Team", "team", [{ v: "All Teams", t: "All Teams" }, ...d.teams.map((t) => ({ v: t, t }))]),
     SH.mode === "Matchup Defense" ? sel("Defender", "defender", [{ v: "All Defenders", t: "All Defenders" }, ...d.defenders.map((t) => ({ v: t, t }))]) : null,
     SH.mode === "Matchup Defense" ? sel("Guarded", "guarded", [{ v: "All Guarded", t: "All Guarded" }, ...d.guarded.map((t) => ({ v: t, t }))]) : null,
-    rankable ? sel("Rank by", "rank", ["Team order", ...d.rankKeys]) : null, rankable ? sel("", "rankStat", ["Made", "Attempted", "Percentage"]) : null,
+    rankable ? sel("Rank by", "rank", ["Team order", ...d.rankKeys]) : null, rankable ? sel("Rank on", "rankStat", ["Made", "Attempted", "Percentage"]) : null,
     rankable ? h("label", { class: "fsel" }, h("span", { class: "muted" }, SH.mode === "Defense Diet" ? "Min defended (blank = auto)" : "Min att (blank = NBA min)"),
-      h("input", { value: SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"], style: { width: "70px" }, onchange: (e) => { SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"] = e.target.value; loadShots2(); } })) : null,
-    sel("Show", "source", d.sources));
+      h("input", { value: SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"], style: { width: "110px" }, placeholder: "auto", onchange: (e) => { SH[SH.mode === "Defense Diet" ? "minDef" : "minAtt"] = e.target.value; loadShots2(); } })) : null,
+    sel("Show", "source", d.sources)].filter(Boolean));   // replaceChildren would print a null as the word "null"
   if (!d.rows.length) { tableEl.replaceChildren(h("div", { class: "empty" }, d.note || "Shot data appears once games are played.")); return; }
   const prev = tableEl.querySelector(".table-wrap"), left = prev?.scrollLeft || 0, top = prev?.scrollTop || 0;
   const wrap = h("div", { class: "table-wrap tall" }, h("table", { class: "stats avg" }, h("thead", {}, h("tr", {}, d.columns.map((c, i) => h("th", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, c)))),
