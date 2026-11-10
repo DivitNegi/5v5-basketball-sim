@@ -2341,10 +2341,10 @@ async function boot() {
   // the year seasons live on the Modes screen as buttons now, so the dropdown stays short
   const YEAR_SEASON = /^(\d{4}) season/;
   for (const m of S.meta.modes) { if (YEAR_SEASON.test(m.name) || m.name === "Custom 16-team playoffs") continue; modeSel.append(h("option", { value: m.name, disabled: !m.ready }, m.ready ? m.name : `${m.name} (Tk app for now)`)); }
-  $("#seasonPresets").replaceChildren(...S.meta.modes.filter((m) => YEAR_SEASON.test(m.name) && m.ready).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
-    const year = m.name.match(YEAR_SEASON)[1];
-    return h("button", { class: "btn primary", onclick: () => startSpecial(m.name) }, `${year} season`);
-  }));
+  // one dropdown of every full-season year, with a Run button
+  const yearModes = S.meta.modes.filter((m) => YEAR_SEASON.test(m.name) && m.ready).sort((x, y) => x.name.localeCompare(y.name));
+  const yearSel = h("select", { id: "seasonYearPick", "aria-label": "Season year" }, yearModes.map((m, i) => h("option", { value: m.name, selected: i === yearModes.length - 1 }, `${m.name.match(YEAR_SEASON)[1]} season`)));
+  $("#seasonPresets").replaceChildren(yearSel, h("button", { class: "btn primary", onclick: () => startSpecial(yearSel.value) }, "Run season"));
   const pickTeams = async (kind) => {
     const d = await api.get("/api/teams/strength");
     let chosen;
@@ -2416,7 +2416,6 @@ async function boot() {
   $("#lineupReset").addEventListener("click",()=>saveLineup(true).catch((e)=>toast(e.message,"err")));
   $$('[data-fantasy]').forEach((b)=>b.addEventListener('click',()=>startSpecial(b.dataset.fantasy==='2027'?'Fantasy draft: 2027 players (season + playoffs)':b.dataset.fantasy==='all'?'Fantasy draft: all-time (season + playoffs)':'Fantasy draft playoffs')));
   $("#tradeRefresh").addEventListener("click",loadTrades);
-  $("#select2027").addEventListener("click",()=>{customSelected.clear();S.meta.teams.filter((t)=>t.year==='2027').slice(0,30).forEach((t)=>customSelected.add(t.name));renderCustomTeams();});
   $("#clearCustom").addEventListener("click",()=>{customSelected.clear();renderCustomTeams();});
   $("#customSeason").addEventListener("click",()=>startSpecial("Custom season (82 games)",{teams:[...customSelected]}));
   $("#olympics").addEventListener("click",()=>startSpecial("Olympic tournament"));
