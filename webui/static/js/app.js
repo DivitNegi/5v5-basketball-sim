@@ -2040,56 +2040,60 @@ function seasonShotChart(name, zones, avg, vs, split) {
   const under = svgEl("g"), heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }), zoneG = svgEl("g", { class: "zonemap" });
   svg.children[1].after(under); under.append(zoneG, heat); svg.append(dots);
   const side0 = () => 0;
-  const diffColor = (d) => {   // below the average: red; level: slate; above: green
-    const t = Math.max(-1, Math.min(1, d / 12)), mix = (a, b, u) => a.map((c, i) => Math.round(c + (b[i] - c) * u)), base = [100, 116, 139];
-    const c = t >= 0 ? mix(base, [34, 197, 94], t) : mix(base, [239, 68, 68], -t);
-    return `rgb(${c.join(",")})`;
-  };
-  // Twelve zones like an NBA hotspot chart: restricted area, paint, elbow, two mid wings, two baselines, two corner threes, two wing threes, top of the key.
-  // Each is shaded by his FG% against the league (or his position group) and labelled with just the percentage; hover for the exact numbers.
-  const fineInfo = (key) => {
-    const [m, a] = split?.fine?.[key] || [0, 0], av = split?.fineAvg?.[key], pct = a ? 100 * m / a : null;
-    return { m, a, pct, diff: pct != null && av?.pct != null ? pct - av.pct : null };
+  // Twelve zones like an NBA hotspot chart, drawn with the basket at the top: restricted area, paint, elbow, two mid wings, two baselines, two corner threes,
+  // two wing threes and the top of the key. A zone's FG% is counted from the X's and O's drawn in the Shots view; red = hot, grey = about average, blue = cold
+  // against the league (or his position group). Hover a zone for the exact numbers.
+  const HOT = "#d92d27", AVG = "#8c8676", COLD = "#2f45e0", NONE = "#2a3347";
+  const zsvg = svgEl("svg", { viewBox: "-8 -8 516 486", class: "court-svg pc-map pro zhot", style: "display:none" });
+  const zoneStats = () => {
+    const st = { ra: [0, 0], paint: [0, 0], elbow: [0, 0], mid_wing: [0, 0], baseline: [0, 0], corner3: [0, 0], wing3: [0, 0], top3: [0, 0] };
+    for (const ev of events) {
+      const [x, y] = shotSpot(ev, 0, true), key = shotZoneOf(ev, x, y);
+      if (!key) continue;
+      st[key][1]++; if (ev.made) st[key][0]++;
+    }
+    return st;
   };
   const paintZones = () => {
-    const H = [82.5, 320], pt = (R, a) => `${(H[0] + R * Math.cos(a)).toFixed(1)} ${(H[1] + R * Math.sin(a)).toFixed(1)}`;
-    const wedge = (a0, a1) => `M${H[0]} ${H[1]} L${pt(700, a0)} A700 700 0 0 ${a1 > a0 ? 1 : 0} ${pt(700, a1)} Z`;
-    const inner = "M30 100 H172 A237.5 237.5 0 0 1 172 540 H30 Z", lane = "M30 240 H220 V400 H30 Z", circle = "M42.5 320 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0";
-    const defs = svgEl("defs");
-    defs.innerHTML = `<clipPath id="${uid}m"><path clip-rule="evenodd" d="${inner} ${lane}"/></clipPath><clipPath id="${uid}t"><path clip-rule="evenodd" d="M30 70 H500 V570 H30 Z ${inner}"/></clipPath>`;
-    const shape = (d, key, clip, title) => {
-      const { m, a, diff } = fineInfo(key), tip = svgEl("title");
-      tip.textContent = `${title}: ${a ? `${m} of ${a} (${(100 * m / a).toFixed(1)}%)` : "no shots"}${diff == null ? "" : `, ${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} vs ${vs}`}`;
-      const el = svgEl("path", { d, "fill-rule": "evenodd", fill: !a || diff == null ? "rgba(100,116,139,.14)" : diffColor(diff), "fill-opacity": !a || diff == null ? 1 : ".62", stroke: "#0b1220", "stroke-width": 2.2, ...(clip ? { "clip-path": `url(#${uid}${clip})` } : {}) });
+    const st = zoneStats(), fa = split?.fineAvg || {};
+    const info = (key) => {
+      const [m, a] = st[key], pct = a ? 100 * m / a : null, av = fa[key]?.pct;
+      return { m, a, pct, diff: pct != null && av != null ? pct - av : null };
+    };
+    const pt = (R, a) => `${(250 + R * Math.sin(a)).toFixed(1)} ${(52.5 + R * Math.cos(a)).toFixed(1)}`;
+    const wedge = (a0, a1) => `M250 52.5 L${pt(700, a0)} A700 700 0 ${Math.abs(a1 - a0) > Math.PI ? 1 : 0} ${a1 > a0 ? 0 : 1} ${pt(700, a1)} Z`;
+    const inner = "M30 0 V142.1 A237.5 237.5 0 0 0 470 142.1 V0 Z", lane = "M170 0 H330 V190 H170 Z", ra = "M210 52.5 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0 Z";
+    zsvg.innerHTML = `<defs><clipPath id="${uid}m"><path clip-rule="evenodd" d="${inner} ${lane}"/></clipPath><clipPath id="${uid}t"><path clip-rule="evenodd" d="M0 0 H500 V470 H0 Z ${inner}"/></clipPath></defs>`;
+    const zone = (d, key, clip, title, evenodd = true) => {
+      const { m, a, pct, diff } = info(key), tip = svgEl("title");
+      tip.textContent = `${title}: ${a ? `${m} of ${a} (${pct.toFixed(1)}%)` : "no shots"}${diff == null ? "" : `, ${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} vs ${vs}`}`;
+      const fill = !a ? NONE : diff == null ? AVG : diff >= 3.5 ? HOT : diff <= -3.5 ? COLD : AVG;
+      const el = svgEl("path", { d, fill, "fill-rule": evenodd ? "evenodd" : "nonzero", stroke: "#fff", "stroke-width": 3, "stroke-linejoin": "round", ...(clip ? { "clip-path": `url(#${uid}${clip})` } : {}) });
       el.append(tip); return el;
     };
-    const label = (x, y, key, size = 21) => {
-      const { a, pct } = fineInfo(key);
-      const t = svgEl("text", { x, y, "font-size": size, "text-anchor": "middle", "dominant-baseline": "central", class: "zl-pct" });
-      t.textContent = a && pct != null ? `${pct.toFixed(0)}%` : "–"; return t;
+    const S = [-1, 1], out = [];
+    out.push(zone(wedge(-0.4, 0.4), "top3", "t", "Top of the key three"));
+    for (const s of S) out.push(zone(wedge(s * 0.4, s * 1.18), "wing3", "t", "Wing three"));
+    out.push(zone("M0 0 H30 V142.1 L0 154.5 Z", "corner3", null, "Corner three"), zone("M500 0 H470 V142.1 L500 154.5 Z", "corner3", null, "Corner three"));
+    out.push(zone(wedge(-0.4, 0.4), "elbow", "m", "Elbow / free-throw line"));
+    for (const s of S) out.push(zone(wedge(s * 0.4, s * 0.98), "mid_wing", "m", "Mid-range wing"), zone(wedge(s * 0.98, s * 3.1), "baseline", "m", "Baseline jumper"));
+    out.push(zone(`${lane} ${ra}`, "paint", null, "Paint"), zone(ra, "ra", null, "Restricted area", false));
+    const frame = svgEl("rect", { x: 0, y: 0, width: 500, height: 470, fill: "none", stroke: "#fff", "stroke-width": 4 });
+    const ft = svgEl("path", { d: "M190 190 A60 60 0 0 0 310 190", fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-opacity": ".5", "stroke-dasharray": "5 6" });
+    const label = (x, y, key, size) => {
+      const { a, pct } = info(key), t = svgEl("text", { x, y, "font-size": size, "text-anchor": "middle", "dominant-baseline": "central", class: "zl-pct" });
+      t.textContent = a ? `${pct.toFixed(0)}%` : "–"; return t;
     };
-    const S = [-1, 1], out = [defs];
-    // threes
-    out.push(shape(wedge(-0.4, 0.4), "top3", "t", "Top of the key three"));
-    for (const s of S) out.push(shape(wedge(s * 0.4, s * 1.18), "wing3", "t", "Wing three"));
-    out.push(shape("M30 70 H172 V100 H30 Z", "corner3", null, "Corner three"), shape("M30 540 H172 V570 H30 Z", "corner3", null, "Corner three"));
-    // midrange
-    out.push(shape(wedge(-0.4, 0.4), "elbow", "m", "Elbow / free-throw line"));
-    for (const s of S) out.push(shape(wedge(s * 0.4, s * 0.98), "mid_wing", "m", "Mid-range wing"), shape(wedge(s * 0.98, s * 3.1), "baseline", "m", "Baseline jumper"));
-    // paint and restricted area
-    out.push(shape(`${lane} ${circle}`, "paint", null, "Paint"), shape(`${circle} Z`, "ra", null, "Restricted area"));
-    // labels (percentages only)
-    out.push(label(410, 320, "top3", 26));
-    for (const s of S) out.push(label(280, 320 + s * 205, "wing3", 22), label(198, 320 + s * 97, "mid_wing"), label(122, 320 + s * 128, "baseline", 19));
-    out.push(label(100, 85, "corner3", 16), label(100, 555, "corner3", 16), label(272, 320, "elbow"), label(172, 322, "paint", 19), label(82.5, 322, "ra", 18));
-    zoneG.replaceChildren(...out);
+    const labels = [label(250, 62, "ra", 19), label(250, 138, "paint", 21), label(250, 238, "elbow", 22), label(250, 325, "top3", 24)];
+    for (const s of S) labels.push(label(250 + s * 110, 183, "mid_wing", 22), label(250 + s * 133, 76, "baseline", 21), label(250 + s * 190, 238, "wing3", 22), label(250 + s * 235, 78, "corner3", 11));
+    zsvg.append(...out, ft, frame, ...labels);
   };
   const paint = () => {
     dots.replaceChildren(); heat.replaceChildren(); zoneG.replaceChildren();
-    legend.style.visibility = state.view === "zones" ? "visible" : "hidden";
-    svg.querySelectorAll(".hoop, .decor").forEach((el) => { el.style.display = state.view === "zones" ? "none" : ""; });   // the zone labels sit where the hoop and the free-throw arc are
+    legend.style.display = state.view === "zones" ? "flex" : "none";
+    svg.style.display = state.view === "zones" ? "none" : ""; zsvg.style.display = state.view === "zones" ? "" : "none";
     if (state.view === "heat") { heat.append(heatImage(events, side0)); return; }
-    if (state.view === "zones") { paintZones(); return; }
+    if (state.view === "zones") { zsvg.replaceChildren(); paintZones(); return; }
     // every shot gets its own small mark (a 500-shot midrange is 500 marks): a ring for a make, an X for a miss; misses go down first so makes sit on top.
     // The glow is one soft filter per group, not one per mark.
     const missG = svgEl("g", { class: "g-miss" }), makeG = svgEl("g", { class: "g-make" });
@@ -2109,9 +2113,9 @@ function seasonShotChart(name, zones, avg, vs, split) {
   const tabs = h("div", { class: "seg small pc-tabs" }, [["shots", "Shots"], ["heat", "Heat map"], ["zones", `Zones vs ${vs}`]].map(([k, l]) => h("button", { class: state.view === k ? "on" : "", onclick: (e) => {
     state.view = k; tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint();
   } }, l)));
-  const legend = h("div", { class: "pc-zlegend", style: { visibility: "hidden" } }, h("span", {}, "below"), h("i", {}), h("span", {}, `${vs} average`), h("i", { class: "up" }), h("span", {}, "above"));
+  const legend = h("div", { class: "pc-zlegend zl3", style: { display: "none" } }, h("span", {}, h("b", { style: { background: COLD } }), "cold"), h("span", {}, h("b", { style: { background: AVG } }), `about ${vs} average`), h("span", {}, h("b", { style: { background: HOT } }), "hot"));
   paint();
-  return h("div", { class: "pc-map-wrap" }, tabs, svg, legend,
+  return h("div", { class: "pc-map-wrap" }, tabs, svg, zsvg, legend,
     h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG", h("span", { class: "muted" }, ` · ${total ? (100 * made / total).toFixed(1) : "–"}%`)), h("span", { class: "lg make" }, "● make"), h("span", { class: "lg miss" }, "✕ miss")),
     h("div", { class: "muted", style: { fontSize: "12px", textAlign: "center", marginTop: "4px" } }, "Built from his zone totals: each shot sits somewhere inside its zone"));
 }
@@ -2269,12 +2273,26 @@ function shotSpot(ev, side, spread = false) {
       for (let k = 0; k < 10; k++) { [x, y] = polar(rMin, rMax, 1.2); if (y > Y0 + 18 && y < Y0 + CH - 18) break; }
     }
   } else if (z === "mid") {
-    const r0 = ev.loc === "base" ? 0 : ev.loc === "elbow" ? 0.4 : ev.loc === "wing" ? 0.9 : rnd(), side = rnd() < 0.5 ? -1 : 1;
-    if (r0 < 0.30) { x = 34 + rnd() * 105; y = HY + side * (88 + rnd() * 122); }                      // baseline / short-corner jumper beside the lane
-    else if (r0 < 0.50) { x = 195 + rnd() * 70; y = HY + side * (8 + rnd() * 100); }                  // elbow / free-throw line
-    else { for (let k = 0; k < 10; k++) { [x, y] = polar(110, 225, 1.3); if (Math.abs(y - HY) <= 205) break; } }   // wings and the middle
+    const side = rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
+    if (want === "base") { x = 34 + rnd() * 105; y = HY + side * (92 + rnd() * 118); }                                   // baseline jumper: beside the lane, level with the block
+    else if (want === "elbow") { const a = (rnd() * 2 - 1) * 0.36, r = 150 + rnd() * 72; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); }   // free-throw line / elbow
+    else { for (let k = 0; k < 14; k++) { const a = side * (0.46 + rnd() * 0.46), r = 100 + rnd() * 125; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (!(x <= 220 && Math.abs(y - HY) <= 80) && Math.abs(y - HY) <= 205) break; } }   // wing, outside the lane
   } else { for (let k = 0; k < 10; k++) { [x, y] = polar(75, 225, 1.4); if (Math.abs(y - HY) <= 205) break; } }   // anything else: inside the arc
   return side ? [1000 - x, y] : [x, y];
+}
+// which of the twelve hotspot zones a placed shot is in (read off its drawn position, so the zone map always agrees with the X's and O's)
+function shotZoneOf(ev, x, y) {
+  const z = ev.zone;
+  if (z === "rim" || z === "dunk") return "ra";
+  if (z === "post") return "paint";
+  const dx = x - SC_GEO.HX, dy = y - SC_GEO.CY, ang = Math.atan2(Math.abs(dy), dx);
+  if (z === "mid") return ang < 0.4 ? "elbow" : ang < 0.98 ? "mid_wing" : "baseline";
+  if (z === "three") {
+    if (ev.loc === "deep") return null;   // logo range sits off the map
+    if (x <= 172 && Math.abs(dy) > 220) return "corner3";
+    return ang < 0.4 ? "top3" : "wing3";
+  }
+  return null;
 }
 function courtLines() {
   const { W, X0, Y0, CW, CH, CY, HX } = SC_GEO;

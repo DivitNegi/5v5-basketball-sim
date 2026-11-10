@@ -99,6 +99,8 @@ class GuiOutputProxy:
             if not quick:
                 self._maybe_scoreboard(clean)
             self._maybe_series_record(clean)
+            if clean and not quick:
+                sim_engine.note_pbp_line(clean)   # lets the next shot be recorded from the spot this line named
             if not quick and self._should_show_in_play_log(clean):
                 self.output_queue.put(line + "\n")
 

@@ -2045,6 +2045,45 @@ def shot_family(shot_type: str) -> str:
 
 
 CURRENT_THREE_LOC = None   # where the three being recorded/commentated was taken from ("corner" | "above_break" | "deep")
+CURRENT_THREE_SUB = None   # "wing3" / "top3" for an above-the-break three
+CURRENT_MID_LOC = None     # "mid_base" | "mid_elbow" | "mid_wing"
+PBP_RECENT: "collections.deque" = None   # the last few play-by-play lines: (id, text)
+PBP_LINE_ID = 0
+PBP_LAST_USED_ID = 0
+
+
+def note_pbp_line(line: str):
+    """Called with every play-by-play line a live game prints. Lets the shot that follows be recorded from the spot the text just named."""
+    global PBP_RECENT, PBP_LINE_ID
+    import collections
+    if PBP_RECENT is None:
+        PBP_RECENT = collections.deque(maxlen=8)
+    PBP_LINE_ID += 1
+    PBP_RECENT.append((PBP_LINE_ID, str(line)))
+
+
+_MID_HINTS = (("elbow", "mid_elbow"), ("free throw line", "mid_elbow"), ("free-throw line", "mid_elbow"), ("nail", "mid_elbow"), ("baseline", "mid_base"), ("wing", "mid_wing"))
+_THREE_HINTS = (("logo", "deep"), ("top of the key", "top"), ("wing", "wing"), ("corner", "corner"))
+
+
+def pbp_location_hint(player, kind: str):
+    """The spot named by this player's most recent unused play-by-play line, or None. `kind` is "mid" or "three"."""
+    import re as _re
+    global PBP_LAST_USED_ID
+    if player is None or not PBP_RECENT:
+        return None
+    hints = _MID_HINTS if kind == "mid" else _THREE_HINTS
+    for lid, text in reversed(PBP_RECENT):
+        if lid <= PBP_LAST_USED_ID:
+            break
+        if getattr(player, "name", "") not in text:
+            continue
+        low = _re.sub(r"turn(?:s|ed|ing)? the corner", "", text.lower())
+        for word, value in hints:
+            if word in low:
+                PBP_LAST_USED_ID = lid
+                return value
+    return None
 CORNER_THREE_MAKE_BONUS = 0.014     # the corner three is the shortest: a small efficiency edge...
 ABOVE_BREAK_THREE_PENALTY = 0.006   # ...paid for by a small cost above the break, so the league average stays put
 
@@ -2105,8 +2144,40 @@ CORNER_THREE_MISS_LINES = [
 ]
 
 
+SPOT_MAKE_LINES = {
+    "mid_base": ["{shooter} hits the baseline jumper over {defender}.", "{shooter} turns and drops in the baseline fadeaway.", "{shooter} floats along the baseline and the jumper falls."],
+    "mid_elbow": ["{shooter} knocks down the elbow jumper over {defender}.", "{shooter} catches it at the elbow, rises, and hits it.", "{shooter} pulls up at the free-throw line and it is good."],
+    "mid_wing": ["{shooter} hits the wing jumper over {defender}.", "{shooter} steps into the pull-up from the wing and it drops.", "{shooter} rises from the short wing and cashes it."],
+    "wing3": ["{shooter} lifts from the wing and drills the three.", "{shooter} catches on the wing and buries it.", "{shooter} rises from the wing over {defender} and it is good."],
+    "top3": ["{shooter} steps into the three from the top of the key and hits it.", "{shooter} pulls up from the top of the arc and it drops.", "{shooter} fires from the top of the key and it is good."],
+}
+SPOT_MISS_LINES = {
+    "mid_base": ["{shooter} fades along the baseline and the jumper is off.", "{shooter} takes the baseline jumper over {defender} and it rims out."],
+    "mid_elbow": ["{shooter} pulls up at the elbow and it rims out.", "{shooter} takes the elbow jumper over {defender} and it is short."],
+    "mid_wing": ["{shooter} pulls up from the wing and it clangs off the iron.", "{shooter} takes the wing jumper over {defender} and it will not fall."],
+    "wing3": ["{shooter} fires from the wing and it rattles out.", "{shooter} takes the wing three over {defender} and it is long."],
+    "top3": ["{shooter} lets it go from the top of the key and it is off the mark.", "{shooter} takes the three from the top of the arc and it bounces away."],
+}
+
+
+def _spot_line(table, shot_type, shooter, defender):
+    """A line naming the real spot of the shot, about half the time (otherwise the usual lines)."""
+    global CURRENT_MID_LOC, CURRENT_THREE_SUB
+    key = CURRENT_MID_LOC if shot_type == "mid" else CURRENT_THREE_SUB if shot_type == "three" else None
+    if key and key in table and random.random() < 0.5:
+        if shot_type == "mid":
+            CURRENT_MID_LOC = None
+        else:
+            CURRENT_THREE_SUB = None
+        return random.choice(table[key]).format(shooter=shooter, defender=defender)
+    return None
+
+
 def commentator_make(shooter: str, defender: str, shot_type: str, defense_line: str) -> str:
     global CURRENT_THREE_LOC
+    spot = _spot_line(SPOT_MAKE_LINES, shot_type, shooter, defender) if CURRENT_THREE_LOC != "corner" or shot_type != "three" else None
+    if spot:
+        return spot
     if shot_type == "three" and CURRENT_THREE_LOC == "corner" and random.random() < 0.5:
         CURRENT_THREE_LOC = None
         return random.choice(CORNER_THREE_MAKE_LINES).format(shooter=shooter, defender=defender)
@@ -2119,6 +2190,9 @@ def commentator_make(shooter: str, defender: str, shot_type: str, defense_line: 
 
 def commentator_miss(shooter: str, defender: str, shot_type: str, defense_line: str) -> str:
     global CURRENT_THREE_LOC
+    spot = _spot_line(SPOT_MISS_LINES, shot_type, shooter, defender) if CURRENT_THREE_LOC != "corner" or shot_type != "three" else None
+    if spot:
+        return spot
     if shot_type == "three" and CURRENT_THREE_LOC == "corner" and random.random() < 0.5:
         CURRENT_THREE_LOC = None
         return random.choice(CORNER_THREE_MISS_LINES).format(shooter=shooter, defender=defender)
@@ -12387,15 +12461,24 @@ def tag_three_location(player, context: str, consume: bool) -> str:
     """Add the three's location (corner / above_break / deep) to the context string. The attempt takes the location chosen for this shot;
     the make reuses it."""
     global CURRENT_THREE_LOC
+    global CURRENT_THREE_SUB
     if consume:
         loc = getattr(player, "_three_loc", None) if player is not None else None
         if "heave" in str(context or ""):
             loc = "deep"
         if loc is None:
             loc = three_location(player)
+        forced_sub = None
+        hint = pbp_location_hint(player, "three")   # the build-up line named the spot: the shot comes from there
+        if hint in ("corner", "deep"):
+            loc = hint
+        elif hint in ("wing", "top"):
+            loc, forced_sub = "above_break", hint + "3"
         CURRENT_THREE_LOC = loc
+        CURRENT_THREE_SUB = None
         if loc == "above_break":   # above the break is the wing or the top of the key
-            loc = "above_break|" + ("top3" if random.random() < 0.42 else "wing3")
+            CURRENT_THREE_SUB = forced_sub or ("top3" if random.random() < 0.42 else "wing3")
+            loc = "above_break|" + CURRENT_THREE_SUB
         if player is not None:
             player._three_loc = None
             player._three_loc_used = loc
@@ -12410,12 +12493,17 @@ def tag_three_location(player, context: str, consume: bool) -> str:
 def tag_mid_location(player, context: str, consume: bool) -> str:
     """Add where a midrange jumper was taken (mid_base = baseline, mid_elbow = free-throw line / elbow, mid_wing = the wings). Bigs and low-handle players
     take more from the baseline and elbows, guards more from the wings."""
+    global CURRENT_MID_LOC
     if consume:
         bh = getattr(player, "ball_handle", 0.7) if player is not None else 0.7
         base_w = 0.14 + 0.20 * max(0.0, min(1.0, (0.80 - bh) / 0.50))
         elbow_w = 0.30
         r = random.random()
         loc = "mid_base" if r < base_w else "mid_elbow" if r < base_w + elbow_w else "mid_wing"
+        hint = pbp_location_hint(player, "mid")   # the build-up line named the spot: the shot comes from there
+        if hint:
+            loc = hint
+        CURRENT_MID_LOC = loc
         if player is not None:
             player._mid_loc_used = loc
     else:
