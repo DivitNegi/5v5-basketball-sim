@@ -2069,28 +2069,17 @@ function seasonShotChart(name, zones, avg, vs) {
     svg.querySelectorAll(".hoop, .decor").forEach((el) => { el.style.display = state.view === "zones" ? "none" : ""; });   // the zone labels sit where the hoop and the free-throw arc are
     if (state.view === "heat") { heat.append(heatImage(events, side0)); return; }
     if (state.view === "zones") { paintZones(); return; }
-    // dots never sit on top of each other: pick a fair sample of each zone (made and missed in their real proportion), then place every dot where
-    // it clears the ones already down. A busy zone shows fewer dots than shots; the heat and zone views carry the real volume.
-    const budget = Math.min(total, 300), placed = [], cell = 11, grid = new Map(), key = (x, y) => `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
-    const clear = (x, y, d) => { for (let gx = -1; gx <= 1; gx++) for (let gy = -1; gy <= 1; gy++) for (const q of grid.get(`${Math.floor(x / cell) + gx},${Math.floor(y / cell) + gy}`) || []) if ((q[0] - x) ** 2 + (q[1] - y) ** 2 < d * d) return false; return true; };
-    const picks = [];
-    for (const [zk] of PC_ZONES) {
-      const zl = events.filter((e) => e.zone === zk), k = Math.min(zl.length, Math.max(zl.length ? 1 : 0, Math.round(zl.length * budget / Math.max(1, total))));
-      for (let i = 0; i < k; i++) picks.push(zl[Math.min(zl.length - 1, Math.floor((i + 0.5) * zl.length / k))]);
+    // the original look: a ring for every make and an X for every miss, every shot drawn (up to 450 so a huge season stays readable); misses go down first
+    const step = Math.max(1, Math.ceil(total / 450)), misses = [], makes = [];
+    for (let i = 0; i < events.length; i += step) (events[i].made ? makes : misses).push(events[i]);
+    for (const ev of misses) {
+      const [x, y] = shotSpot(ev, 0);
+      dots.append(svgEl("path", { d: `M${(x - 6).toFixed(1)} ${(y - 6).toFixed(1)} l12 12 m0 -12 l-12 12`, class: "sd-miss" }));
     }
-    const spot = (ev) => {
-      let best = null;
-      for (let t = 0; t < 40; t++) {
-        const [x, y] = shotSpot({ ...ev, n: ev.n + t * 7919 }, 0, true);
-        if (clear(x, y, 10.5)) { best = [x, y]; break; }
-        if (!best) best = [x, y];
-      }
-      const ok = clear(best[0], best[1], 10.5);
-      if (ok) { placed.push(best); const kk = key(best[0], best[1]); (grid.get(kk) || grid.set(kk, []).get(kk)).push(best); }
-      return ok ? best : null;   // no room left in that zone: skip the dot rather than stack it
-    };
-    for (const ev of picks.filter((e) => !e.made)) { const s = spot(ev); if (s) dots.append(svgEl("path", { d: `M${(s[0] - 3.6).toFixed(1)} ${(s[1] - 3.6).toFixed(1)} l7.2 7.2 m0 -7.2 l-7.2 7.2`, class: "sd-miss" })); }
-    for (const ev of picks.filter((e) => e.made)) { const s = spot(ev); if (s) dots.append(svgEl("circle", { cx: s[0].toFixed(1), cy: s[1].toFixed(1), r: 4.4, class: "sd-make" })); }
+    for (const ev of makes) {
+      const [x, y] = shotSpot(ev, 0);
+      dots.append(svgEl("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: 8, class: "sd-make" }));
+    }
   };
   const made = events.filter((e) => e.made).length;
   const tabs = h("div", { class: "seg small pc-tabs" }, [["shots", "Shots"], ["heat", "Heat map"], ["zones", `Zones vs ${vs}`]].map(([k, l]) => h("button", { class: state.view === k ? "on" : "", onclick: (e) => {

@@ -821,8 +821,8 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 
 /* professional shot chart */
 .pc-map.pro { background: #0b1325; border: 1px solid rgba(148,163,184,.18); border-radius: 14px; box-shadow: inset 0 0 40px rgba(0,0,0,.35); }
-.sd-make { fill: rgba(74, 222, 128, .88); stroke: #052e16; stroke-width: 1; filter: drop-shadow(0 0 3px rgba(74,222,128,.55)); }
-.sd-miss { fill: none; stroke: #f87171; stroke-opacity: .62; stroke-width: 1.7; stroke-linecap: round; }
+.sd-make { fill: rgba(34, 197, 94, .16); stroke: #4ade80; stroke-width: 2.6; filter: drop-shadow(0 0 3px #4ade80) drop-shadow(0 0 9px rgba(74, 222, 128, .75)); }
+.sd-miss { fill: none; stroke: #fb7185; stroke-opacity: .95; stroke-width: 2.4; stroke-linecap: round; filter: drop-shadow(0 0 3px #fb7185) drop-shadow(0 0 9px rgba(251, 113, 133, .7)); }
 .pc-tabs { display: flex; justify-content: center; margin: 0 auto 10px; width: fit-content; }
 .zl-main { fill: #fff; paint-order: stroke; stroke: rgba(4,10,22,.85); stroke-width: 4px; stroke-linejoin: round; }
 .zl-diff { fill: #e2e8f0; paint-order: stroke; stroke: rgba(4,10,22,.85); stroke-width: 3.5px; stroke-linejoin: round; }
