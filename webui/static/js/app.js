@@ -1497,10 +1497,16 @@ function renderCompare2() {
   });
   $("#compBody").replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "stats cmp-table" },
     h("thead", {}, h("tr", {}, h("th", {}, "Stat"), h("th", {}, GV.comp.a[1]), h("th", {}, GV.comp.b[1]))), h("tbody", {}, body))),
-    // each player's shot chart side by side (built from his zone totals), same heat-map switch as the player card
-    h("div", { class: "pc-viz cmp-maps", style: { marginTop: "14px" } }, [[GV.comp.a, sa], [GV.comp.b, sb]].map(([c, s]) => {
-      const any = s.shots && Object.values(s.shots).some((z) => z[1] > 0);
-      return h("div", { class: "pc-panel" }, h("h4", {}, `${c[1]} · shot chart`), any ? seasonShotChart(c[1], s.shots) : h("div", { class: "muted" }, "No shots yet."));
+    // under each player: the league radar, shot diet, zones and shot chart (same panels as the player pop-up)
+    h("div", { class: "pc-viz cmp-maps", style: { marginTop: "14px", alignItems: "start" } }, ["a", "b"].map((side) => {
+      const [team, name] = GV.comp[side], col = h("div", {}, h("div", { class: "muted" }, "Loading…"));
+      const src = d.source === "season" ? "Season" : d.source === "series" ? "Series" : "Live";
+      api.get(`/api/stats/player?source=${src}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`).then((det) => {
+        if (GV.comp[side][1] !== name) return;
+        if (det.error) { col.replaceChildren(h("div", { class: "muted" }, det.error)); return; }
+        col.replaceChildren(h("h3", { class: "cmp-name", style: { margin: "0 0 -6px" } }, name), ...playerInsights(det, chartColor(identOf(team))).filter(Boolean));
+      }).catch(() => col.replaceChildren(h("div", { class: "muted" }, "Could not load.")));
+      return col;
     })));
 }
 
@@ -1987,6 +1993,18 @@ function seasonShotChart(name, zones) {
     h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG"), h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss")),
     h("div", { class: "muted", style: { fontSize: "12px", textAlign: "center", marginTop: "4px" } }, "Built from his zone totals: each shot sits somewhere inside its zone"));
 }
+// the radar vs the league, shot diet, zone cards and shot chart for one player (pop-up and Compare share it)
+function playerInsights(d, color) {
+  const zoneRow = h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
+  const hasZones = Object.values(d.shots).some((z) => z[1] > 0);
+  return [
+    h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, "Compared to the league"),
+      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} players with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
+      percentileRadar(d.ranks, color)),
+    hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(d.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null,
+    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots)) : null,
+  ];
+}
 async function openStatsPlayer(team, name, source) {
   document.querySelector(".pp-back")?.remove();
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
@@ -2016,16 +2034,10 @@ async function openStatsPlayer(team, name, source) {
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
   const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
   paint();
-  const zoneRow = h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
-  const hasZones = Object.values(d.shots).some((z) => z[1] > 0);
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`)), h("div", { style: { marginLeft: "auto" } }, seg)),
     tiles,
-    h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, "Compared to the league"),
-      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} players with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
-      percentileRadar(d.ranks, color)),
-    hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(d.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null,
-    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots)) : null);
+    ...playerInsights(d, color));
 }
 
 function renderStatsInto(root, data, opts = {}) {
