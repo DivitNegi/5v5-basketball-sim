@@ -24427,7 +24427,7 @@ def fantasy_season_strength(team: Team) -> float:
     star_power = sum(fantasy_ovr(p) for p in starters[:2]) / max(1, len(starters[:2]))
     starter_power = sum(fantasy_ovr(p) for p in starters) / max(1, len(starters))
     depth_power = sum(fantasy_ovr(p) for p in top8) / max(1, len(top8))
-    shooting = sum(p.three_rating * p.three_tendency for p in starters) / max(1, len(starters))
+    shooting = sum(p.three_rating for p in starters) / max(1, len(starters))   # ratings only: how well the starters can shoot, not how often they choose to
     inside = sum((p.rim_rating + p.dunk_rating) * 0.5 for p in starters) / max(1, len(starters))
     defense = sum(0.52 * p.perimeter_def + 0.48 * p.interior_def for p in starters) / max(1, len(starters))
     creation = sum(0.55 * p.playmaking + 0.45 * p.ball_handle for p in starters) / max(1, len(starters))
