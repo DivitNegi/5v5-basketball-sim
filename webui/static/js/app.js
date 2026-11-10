@@ -2093,7 +2093,8 @@ function seasonShotChart(name, zones, avg, vs, split) {
     };
     const labels = [label(250, 66, "ra", 14), label(250, 138, "paint", 15), label(250, 238, "elbow", 16), label(250, 325, "top3", 17)];
     for (const s of S) labels.push(label(250 + s * 110, 183, "mid_wing", 16), label(250 + s * 133, 78, "baseline", 15), label(250 + s * 190, 238, "wing3", 16), label(250 + s * 235, 78, "corner3", 9, false));
-    zsvg.append(...out, ft, frame, ...labels);
+    const arc = svgEl("path", { d: "M30 0 V142.1 A237.5 237.5 0 0 0 470 142.1 V0", fill: "none", stroke: "#fff", "stroke-width": 3, "stroke-linejoin": "round" });   // the three-point line, the same white and weight as every other line
+    zsvg.append(...out, ft, arc, frame, ...labels);
   };
   const paint = () => {
     dots.replaceChildren(); heat.replaceChildren(); zoneG.replaceChildren();

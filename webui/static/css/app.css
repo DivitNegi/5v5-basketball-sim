@@ -848,3 +848,6 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 
 .zl-pct { font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, monospace; font-weight: 700; letter-spacing: 0; stroke-width: 3px; }
 .zl-delta { fill: rgba(255,255,255,.92); font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, monospace; font-weight: 600; letter-spacing: .02em; paint-order: stroke; stroke: rgba(4,10,22,.7); stroke-width: 2.6px; stroke-linejoin: round; }
+
+/* zone map text uses the page's own font */
+.zl-pct, .zl-delta { font-family: inherit; font-variant-numeric: tabular-nums; }
