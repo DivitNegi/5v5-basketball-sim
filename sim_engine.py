@@ -22224,6 +22224,7 @@ def fantasy_ovr(player: Player) -> int:
     return min(99, fantasy_ovr_uncapped(player))
 
 
+SLASHER_CREATOR_OFFSET = 4.0   # lifts the defensive playmaking slasher's score onto the overall scale (see the path in fantasy_ovr_uncapped)
 CLUTCH_OVR_PIVOT = 62.0      # about the league-average clutch rating: a player at this value is neutral in the overall
 CLUTCH_OVR_WEIGHT = 0.35     # how much of a clutch rating's distance from the pivot reaches the overall (it used to be 1.0)
 
@@ -22447,6 +22448,15 @@ def fantasy_ovr_uncapped(player: Player) -> int:
             if tpt < 60 and mpt < 82:
                 floor_general_score -= 1.5
             raw = max(raw, floor_general_score)
+        # Defensive playmaking slasher (Simmons, Rondo types): an elite passer who finishes at the rim and defends at an elite level but
+        # has no jump shot. The shooting-heavy guard formula marks him far below what he is worth, so he is scored on what he does
+        # instead. It can only replace the score when it comes out higher.
+        if player.position == "PG" and pl >= 90 and lpt >= 88 and pdef >= 82 and tpt < 60 and mpt < 82:
+            slasher_score = (
+                0.27 * pl + 0.18 * lpt + 0.16 * pdef + 0.09 * handle + 0.07 * dk + 0.07 * speed +
+                0.04 * stl + 0.04 * cpt + SLASHER_CREATOR_OFFSET
+            )
+            raw = max(raw, slasher_score)
         # Two-way scorer: a guard who scores at a high level and defends
         # at a high level shouldn't be dragged down just because his
         # playmaking number is modest. This can only replace the score
