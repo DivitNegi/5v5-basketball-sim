@@ -679,6 +679,8 @@ function resetGame(msg) {
   $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
   $("#simPlayoffs").classList.toggle("hidden", msg.mode !== "2027 play-in & playoffs");
   if (msg.mode === "2027 play-in & playoffs") { $('#nav .nav-item[data-view="bracket"]').click(); BR.selected = null; return; }
+  // season-style runs that still show live games (custom season, fantasy season + playoffs): open the Season tab too
+  if (!isSeasonMode(msg.mode) && /^(Custom season|Fantasy draft: )/.test(msg.mode || "")) { $('#nav .nav-item[data-view="season"]').click(); refreshSeason(); }
   if (isSeasonMode(msg.mode)) {
     $('#nav .nav-item[data-view="season"]').click();
     refreshSeason();
