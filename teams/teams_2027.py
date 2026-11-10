@@ -1875,14 +1875,14 @@ def make_clippers_2027() -> Team:
 
 def make_grizzlies_2027() -> Team:
     players = [
-        Player('Scotty Pippen Jr.', 'PG',
-               0.34, 0.24, 0.30, 0.02, 0.10, 0.24,
-               0.750, 0.790, 0.810, 0.650, 0.780,
-               0.12, 0.840, 0.860,
-               0.930, 0.620, 0.470, 0.390, 0.500, 0.467,
-               0.620, 0.310,
-               clutchness=0.500, secondary_positions=('SG',), height=73, speed=0.820,
-               shot_iq=0.700, archetype='scoring guard', stamina=0.77),
+        Player('Ty Jerome', 'PG',
+               0.46, 0.24, 0.22, 0.02, 0.06, 0.86,
+               0.880, 0.850, 0.950, 0.450, 0.880,
+               0.36, 0.70, 0.860,
+               0.760, 0.420, 0.420, 0.500, 0.770, 0.467,
+               0.560, 0.320,
+               clutchness=0.650, secondary_positions=('SG',), height=77, speed=0.690,
+               shot_iq=0.850, archetype='sharpshooting guard', stamina=0.72),
         Player('Cedric Coward', 'SG',
                0.38, 0.20, 0.24, 0.04, 0.20, 0.24,
                0.780, 0.690, 0.920, 0.800, 0.850,
@@ -1915,14 +1915,14 @@ def make_grizzlies_2027() -> Team:
                0.370, 0.790,
                clutchness=0.450, height=88, speed=0.460,
                shot_iq=0.700, archetype='back-to-basket big', stamina=0.62),
-        Player('Ty Jerome', 'PG',
-               0.46, 0.24, 0.22, 0.02, 0.06, 0.86,
-               0.880, 0.850, 0.950, 0.450, 0.880,
-               0.36, 0.70, 0.860,
-               0.760, 0.420, 0.420, 0.500, 0.770, 0.467,
-               0.560, 0.320,
-               clutchness=0.650, secondary_positions=('SG',), height=77, speed=0.690,
-               shot_iq=0.850, archetype='sharpshooting guard', stamina=0.72),
+        Player('Scotty Pippen Jr.', 'PG',
+               0.34, 0.24, 0.30, 0.02, 0.10, 0.24,
+               0.750, 0.790, 0.810, 0.650, 0.780,
+               0.12, 0.840, 0.860,
+               0.930, 0.620, 0.470, 0.390, 0.500, 0.467,
+               0.620, 0.310,
+               clutchness=0.500, secondary_positions=('SG',), height=73, speed=0.820,
+               shot_iq=0.700, archetype='scoring guard', stamina=0.77),
         Player('Cam Spencer', 'SG',
                0.52, 0.18, 0.14, 0.02, 0.08, 0.22,
                0.840, 0.860, 0.970, 0.550, 0.940,
@@ -1963,6 +1963,7 @@ def make_grizzlies_2027() -> Team:
                0.640, 0.660,
                clutchness=0.400, secondary_positions=('PF',), height=80, speed=0.689,
                shot_iq=0.600, stamina=0.79),
+    
     ]
     t = Team('2027 Memphis Grizzlies', players)
     t.init_lineup()
@@ -2251,7 +2252,7 @@ def make_knicks_2027() -> Team:
 
 def make_thunder_2027() -> Team:
     players = [
-        # Cason Wallace is injured for 2027; Chet Holmgren is back for the season (first big off the bench here, Jaylin Williams starts at PF).
+        # Cason Wallace is injured for 2027; Chet Holmgren is back for the season and starts at PF over Jaylin Williams.
         Player('Shai G-Alexander', 'PG',
                0.36, 0.34, 0.34, 0.50, 0.20, 0.85,
                0.880, 0.999, 0.999, 0.750, 0.880,
@@ -2276,22 +2277,6 @@ def make_thunder_2027() -> Team:
                0.990, 0.510,
                clutchness=0.500, secondary_positions=('PG',), height=77, speed=0.820,
                shot_iq=0.700, archetype='lockdown', badges=('lockdown_gold',), stamina=0.72),
-        Player('Jaylin Williams', 'PF',   # a 6'10" stretch/playmaking big who plays beside a center, not as the team's one C
-               0.34, 0.22, 0.12, 0.22, 0.24, 0.20,
-               0.820, 0.850, 0.830, 0.750, 0.790,
-               0.12, 0.687, 0.590,
-               0.400, 0.720, 0.390, 0.870, 0.670, 0.600,
-               0.540, 0.680,
-               clutchness=0.600, height=81, speed=0.500,
-               shot_iq=0.800, archetype='playmaking big', stamina=0.78),
-        Player('Isaiah Hartenstein', 'C',
-               0.08, 0.16, 0.18, 0.28, 0.36, 0.16,
-               0.550, 0.790, 0.960, 0.800, 0.590,
-               0.12, 0.600, 0.560,
-               0.630, 0.710, 0.950, 0.880, 0.720, 0.600,
-               0.410, 0.8950,
-               clutchness=0.350, height=84, speed=0.620,
-               shot_iq=0.650, archetype='playmaking big', stamina=0.70),
         Player('Chet Holmgren', 'PF',
                0.40, 0.28, 0.16, 0.20, 0.32, 0.26,
                0.790, 0.870, 0.920, 0.750, 0.800,
@@ -2300,6 +2285,22 @@ def make_thunder_2027() -> Team:
                0.750, 0.950,
                clutchness=0.500, height=85, speed=0.750,
                shot_iq=0.700, archetype='stretch shot-blocker', badges=('chasedown',), stamina=0.80),
+        Player('Isaiah Hartenstein', 'C',
+               0.08, 0.16, 0.18, 0.28, 0.36, 0.16,
+               0.550, 0.790, 0.960, 0.800, 0.590,
+               0.12, 0.600, 0.560,
+               0.630, 0.710, 0.950, 0.880, 0.720, 0.600,
+               0.410, 0.8950,
+               clutchness=0.350, height=84, speed=0.620,
+               shot_iq=0.650, archetype='playmaking big', stamina=0.70),
+        Player('Jaylin Williams', 'PF',   # a 6'10" stretch/playmaking big who plays beside a center, not as the team's one C
+               0.34, 0.22, 0.12, 0.22, 0.24, 0.20,
+               0.820, 0.850, 0.830, 0.750, 0.790,
+               0.12, 0.687, 0.590,
+               0.400, 0.720, 0.390, 0.870, 0.670, 0.600,
+               0.540, 0.680,
+               clutchness=0.600, height=81, speed=0.500,
+               shot_iq=0.800, archetype='playmaking big', stamina=0.78),
         Player('Jared McCain', 'PG',
                0.48, 0.20, 0.18, 0.02, 0.10, 0.24,
                0.840, 0.770, 0.830, 0.700, 0.870,
@@ -2342,6 +2343,7 @@ def make_thunder_2027() -> Team:
                0.600, 0.340,
                clutchness=0.400, secondary_positions=('SG',), height=76, speed=0.700,
                shot_iq=0.500, stamina=0.79),
+    
     
     ]
     t = Team('2027 Oklahoma City Thunder', players)

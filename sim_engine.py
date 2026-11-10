@@ -9351,9 +9351,9 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 Memphis Grizzlies":
         target_ranges = {
             "Karim Lopez": (10, 16),
-            "Scotty Pippen Jr.": (18, 24), "Cedric Coward": (18, 24),
+            "Scotty Pippen Jr.": (14, 20), "Cedric Coward": (18, 24),
             "Jerami Grant": (22, 28), "Cameron Boozer": (28, 33),
-            "Zach Edey": (22, 28), "Ty Jerome": (18, 24),
+            "Zach Edey": (22, 28), "Ty Jerome": (24, 30),
             "Cam Spencer": (14, 20), "Jaylen Wells": (14, 20),
             "GG Jackson": (14, 20), "Isaiah Stewart": (12, 18),
         }
@@ -9406,8 +9406,8 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 Oklahoma City Thunder":
         target_ranges = {
             "Shai G-Alexander": (34, 37), "Ajay Mitchell": (26, 32), "Alex Caruso": (24, 30),
-            "Jaylin Williams": (18, 24), "Isaiah Hartenstein": (22, 27),
-            "Chet Holmgren": (26, 31), "Jared McCain": (16, 22), "Kenrich Williams": (8, 14), "Aday Mara": (10, 16),
+            "Chet Holmgren": (28, 33), "Isaiah Hartenstein": (22, 27),
+            "Jaylin Williams": (14, 20), "Jared McCain": (16, 22), "Kenrich Williams": (8, 14), "Aday Mara": (10, 16),
             "Brooks Barnhizer": (8, 14), "Bennett Stirtz": (6, 12),
         }
         for p in team.roster:
