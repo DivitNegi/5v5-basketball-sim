@@ -290,6 +290,10 @@ function renderCourt() {
   const keep = $$("#court .court-scroll").map((el) => el.scrollLeft);   // a re-render must not snap the scroll back
   root.replaceChildren(...blocks);
   $$("#court .court-scroll").forEach((el, i) => { el.scrollLeft = keep[i] || 0; });
+  // "checks out" ghost rows fade to invisible after ~1.3 s but stay in the table until the next render, which may never come (paused, jump to Final):
+  // schedule one more render so they are removed instead of leaving blank rows
+  clearTimeout(S.leavingTimer);
+  if (S.leaving.length) S.leavingTimer = setTimeout(() => { S.leaving = S.leaving.filter((g) => performance.now() - g.at < 1300); if (S.live) renderCourt(); }, 1400);
 }
 
 // ───────────────────────── team compare ─────────────────────────
