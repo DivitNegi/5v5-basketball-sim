@@ -866,20 +866,24 @@ _STRENGTH_CACHE = {}
 
 
 def strength_payload(runner):
-    """Every team ranked by the same strength number the season sim uses (cached: it only changes with the team files)."""
+    """Every team ranked the way Tk's "strongest" pick ranks them: team strength plus star power (star power counts a little more), each standardised
+    across all the teams. Cached: it only changes with the team files."""
     if not _STRENGTH_CACHE:
-        for name, factory in runner.factories.items():
-            if "Olympic" in name or "USA " in name[:9]:
-                continue
-            try:
-                team = factory()
-                team.init_lineup()
-                sim_engine.build_best_lineup_by_overall(team)
-                _STRENGTH_CACHE[name] = sim_engine.fantasy_season_strength(team)
-            except Exception:
-                continue
+        candidates = {n: f for n, f in runner.factories.items()
+                      if "Olympic" not in n and "USA " not in n[:9] and "Dream Team" not in n and "Redeem Team" not in n}
+        try:
+            _STRENGTH_CACHE.update(sim_engine.strongest_team_scores(candidates))
+        except Exception:
+            for name, factory in candidates.items():   # fall back to team strength alone if the combined score cannot be built
+                try:
+                    team = factory()
+                    team.init_lineup()
+                    sim_engine.build_best_lineup_by_overall(team)
+                    _STRENGTH_CACHE[name] = sim_engine.fantasy_season_strength(team)
+                except Exception:
+                    continue
     ranked = sorted(_STRENGTH_CACHE.items(), key=lambda kv: kv[1], reverse=True)
-    return {"teams": [{"name": n, "strength": round(v, 2), "franchise": ("okc" if "supersonics" in n.lower() else team_identity(n)["logo"])} for n, v in ranked]}
+    return {"teams": [{"name": n, "strength": round(v, 3), "franchise": ("okc" if "supersonics" in n.lower() else team_identity(n)["logo"])} for n, v in ranked]}
 
 
 def recap_payload(runner, team=""):
