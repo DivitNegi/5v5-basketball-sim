@@ -15433,6 +15433,8 @@ HOT_GAME_SEASON_FGA_BONUS = 10.0
 
 def has_shot_volume_left(player: Player) -> bool:
     bonus = HOT_GAME_SEASON_FGA_BONUS if (SEASON_STAR_MINUTES_CAP and player.pts >= 30) else 0.0
+    if getattr(player, "hot_start", False):
+        bonus += HOT_START_FGA_BONUS
     if player.shot_tendency >= 0.48 or player.usage >= 0.32:
         return player.fga <= shot_volume_soft_cap(player) + 3.0 + bonus
     return player.fga <= shot_volume_soft_cap(player) + 1.0 + bonus
@@ -17285,6 +17287,19 @@ def choose_ball_movement_receiver(team: Team, passer: Player, avoid: Tuple[Playe
         for p in players
     ]
     return random.choices(players, weights=weights, k=1)[0]
+
+
+HOT_START_REROUTE = 0.20   # how often a possession that was going to someone else is swung to the star who started hot
+
+
+def maybe_reroute_hot_start(team: Team, shooter: Player) -> Player:
+    """Teammates look for the star who started hot: some of the shots that were going elsewhere go to him instead."""
+    if getattr(shooter, "hot_start", False):
+        return shooter
+    hot = [p for p in team.on_floor if p is not shooter and getattr(p, "hot_start", False) and not p.fouled_out and has_shot_volume_left(p)]
+    if not hot or random.random() >= HOT_START_REROUTE:
+        return shooter
+    return max(hot, key=lambda p: p.pts)
 
 
 def maybe_reroute_spurs_role_shot(team: Team, shooter: Player) -> Player:
@@ -20341,6 +20356,8 @@ def simulate_possession(off: Team, dff: Team,
                 return off, random.randint(2, 5)
 
     rerouted_shooter = maybe_reroute_spurs_role_shot(off, shooter)
+    if rerouted_shooter is shooter:
+        rerouted_shooter = maybe_reroute_hot_start(off, shooter)
     if rerouted_shooter is not shooter:
         announce_ball_transfer(ball_owner, rerouted_shooter, "reroute")
         last_passer = ball_owner if ball_owner is not rerouted_shooter else last_passer
