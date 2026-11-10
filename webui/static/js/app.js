@@ -1949,6 +1949,39 @@ function percentileRadar(ranks, color) {
   svg.innerHTML = html;
   return svg;
 }
+// a player's whole-season shot chart for the pop-up: his zone totals (made/attempted) become that many dots placed inside each zone
+function seasonShotChart(name, zones) {
+  const events = [];
+  let n = 0;
+  for (const [zone, key] of [["rim", "rim"], ["mid", "mid"], ["three", "three"], ["post", "post"]]) {
+    const [made, att] = zones[key] || [0, 0];
+    for (let i = 0; i < att; i++) events.push({ player: name, zone, made: i < made, n: n++, team: "" });
+  }
+  const total = events.length, state = { heat: false };
+  const svg = svgEl("svg", { viewBox: "20 52 510 536", class: "court-svg shot-map pc-map" });
+  svg.innerHTML = courtLines();
+  const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" });
+  svg.insertBefore(heat, svg.children[1]); svg.append(dots);
+  const side0 = () => 0;
+  const paint = () => {
+    dots.replaceChildren(); heat.replaceChildren();
+    if (state.heat) { heat.append(heatImage(events, side0)); return; }
+    // many dots hide each other: draw at most 450, spread evenly over the zones and the makes/misses
+    const step = Math.max(1, Math.ceil(total / 450));
+    for (let i = 0; i < events.length; i += step) {
+      const ev = events[i], [x, y] = shotSpot(ev, 0);
+      const g = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}` });
+      if (ev.made) g.append(svgEl("circle", { r: 8, class: "ring" })); else g.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
+      dots.append(g);
+    }
+  };
+  paint();
+  const made = events.filter((e) => e.made).length;
+  const box = h("input", { type: "checkbox", onchange: (e) => { state.heat = e.target.checked; paint(); } });
+  return h("div", { class: "pc-map-wrap" }, h("label", { class: "chk", style: { display: "flex", gap: "8px", alignItems: "center", margin: "0 0 8px" } }, box, " Heat map"), svg,
+    h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG"), h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss")),
+    h("div", { class: "muted", style: { fontSize: "12px", textAlign: "center", marginTop: "4px" } }, "Built from his zone totals: each shot sits somewhere inside its zone"));
+}
 async function openStatsPlayer(team, name, source) {
   document.querySelector(".pp-back")?.remove();
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
@@ -1986,7 +2019,8 @@ async function openStatsPlayer(team, name, source) {
     h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, "Compared to the league"),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} players with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
       percentileRadar(d.ranks, color)),
-    hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(d.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null);
+    hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(d.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null,
+    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots)) : null);
 }
 
 function renderStatsInto(root, data, opts = {}) {
@@ -2093,11 +2127,11 @@ function infernoAt(t) {
   const f = clamp01(t) * (INFERNO.length - 1), i = Math.min(INFERNO.length - 2, Math.floor(f)), u = f - i;
   return INFERNO[i].map((c, k) => Math.round(c + (INFERNO[i + 1][k] - c) * u));
 }
-function heatImage(list) {
+function heatImage(list, sideOf = (ev) => teamSide(ev.team)) {
   const { X0, Y0, CW, CH } = SC_GEO, CELL = 5, GW = Math.round(CW / CELL), GH = Math.round(CH / CELL), sig = 28 / CELL, rad = Math.ceil(sig * 3);
   const grid = new Float32Array(GW * GH);
   for (const ev of list) {
-    const [x, y] = shotSpot(ev, teamSide(ev.team)), cx = (x - X0) / CELL, cy = (y - Y0) / CELL;
+    const [x, y] = shotSpot(ev, sideOf(ev)), cx = (x - X0) / CELL, cy = (y - Y0) / CELL;
     for (let gy = Math.max(0, Math.floor(cy - rad)); gy <= Math.min(GH - 1, Math.ceil(cy + rad)); gy++)
       for (let gx = Math.max(0, Math.floor(cx - rad)); gx <= Math.min(GW - 1, Math.ceil(cx + rad)); gx++) grid[gy * GW + gx] += Math.exp(-((gx - cx) ** 2 + (gy - cy) ** 2) / (2 * sig * sig));
   }
