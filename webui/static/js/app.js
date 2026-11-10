@@ -106,7 +106,11 @@ function cleanBadges(values) {
 const imageState = new Map();   // url -> "ok" | "missing" | Promise
 function withImage(el, url, cls = "") {
   const state = imageState.get(url);
-  const attach = () => { el.textContent = ""; el.append(h("img", { src: url, alt: "", class: cls })); };
+  const attach = () => { el.textContent = ""; const img = h("img", { src: url, alt: "", class: cls });
+    // NBA headshots are wide (body included) and are zoomed in the CSS; a square, face-only photo (other sources) must not be zoomed
+    const mark = () => img.classList.toggle("sq", img.naturalHeight > 0 && img.naturalWidth / img.naturalHeight < 1.2);
+    if (img.complete) mark(); else img.addEventListener("load", mark);
+    el.append(img); };
   if (state === "ok") { attach(); return; }
   if (state === "missing") return;
   if (!state) {

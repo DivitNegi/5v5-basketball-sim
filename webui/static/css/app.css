@@ -806,3 +806,6 @@ tr.upcoming td { color: var(--muted); }
 tr.upcoming.next td { color: var(--text, #e5e7eb); font-weight: 700; }
 td.top-scorer .pcell { min-width: 0; gap: 8px; }
 td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26px; }
+
+/* square face-only photos fill the frame without the extra zoom the wide NBA headshots get */
+.face img.sq, .pcard-face img.sq { width: 100%; height: 100%; margin-top: 0; object-fit: cover; object-position: center 20%; }
