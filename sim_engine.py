@@ -2066,12 +2066,21 @@ _MID_HINTS = (("elbow", "mid_elbow"), ("free throw line", "mid_elbow"), ("free-t
 _THREE_HINTS = (("logo", "deep"), ("top of the key", "top"), ("wing", "wing"), ("corner", "corner"))
 
 
+def shot_side(player) -> str:
+    """Left or right side of the floor for a wing / baseline / corner shot. Each player leans a little toward one side (a fixed 40-60% split
+    worked out from his name), so his two sides get different volumes over a season."""
+    name = str(getattr(player, "name", "") or "")
+    p_left = 0.40 + (sum(ord(c) for c in name) % 21) * 0.01
+    return "L" if random.random() < p_left else "R"
+
+
 def pbp_location_hint(player, kind: str):
-    """The spot named by this player's most recent unused play-by-play line, or None. `kind` is "mid" or "three"."""
+    """The (spot, side) named by this player's most recent unused play-by-play line, or (None, None). `kind` is "mid" or "three"; side is "L" / "R" when the
+    line says left or right."""
     import re as _re
     global PBP_LAST_USED_ID
     if player is None or not PBP_RECENT:
-        return None
+        return None, None
     hints = _MID_HINTS if kind == "mid" else _THREE_HINTS
     for lid, text in reversed(PBP_RECENT):
         if lid <= PBP_LAST_USED_ID:
@@ -2082,8 +2091,9 @@ def pbp_location_hint(player, kind: str):
         for word, value in hints:
             if word in low:
                 PBP_LAST_USED_ID = lid
-                return value
-    return None
+                side = "L" if _re.search(r"\bleft\b", low) else "R" if _re.search(r"\bright\b", low) else None
+                return value, side
+    return None, None
 CORNER_THREE_MAKE_BONUS = 0.014     # the corner three is the shortest: a small efficiency edge...
 ABOVE_BREAK_THREE_PENALTY = 0.006   # ...paid for by a small cost above the break, so the league average stays put
 
@@ -6453,12 +6463,15 @@ def add_to_shot_diet(diet: Dict[str, int], shot_type: str, context: str = "", ma
     if shot_type in ("three", "mid"):
         tokens = (("corner", "corner3"), ("above_break", "atb3"), ("deep", "deep3"), ("wing3", "wing3"), ("top3", "top3")) if shot_type == "three" \
             else (("mid_base", "mid_base"), ("mid_elbow", "mid_elbow"), ("mid_wing", "mid_wing"))
+        side_token = "L" if "side_L" in contexts else "R" if "side_R" in contexts else None
         for token, key in tokens:
             if token in contexts:
-                if made:   # an attempt is counted when it is taken, the make when it goes in
-                    diet[f"{key}_made"] = diet.get(f"{key}_made", 0) + 1
-                else:
-                    diet[key] = diet.get(key, 0) + 1
+                keys = [key] + ([f"{key}_{side_token}"] if side_token and key in ("corner3", "wing3", "mid_base", "mid_wing") else [])
+                for k2 in keys:
+                    if made:   # an attempt is counted when it is taken, the make when it goes in
+                        diet[f"{k2}_made"] = diet.get(f"{k2}_made", 0) + 1
+                    else:
+                        diet[k2] = diet.get(k2, 0) + 1
     if made:
         diet[f"{shot_type}_made"] = diet.get(f"{shot_type}_made", 0) + 1
 
@@ -12469,7 +12482,7 @@ def tag_three_location(player, context: str, consume: bool) -> str:
         if loc is None:
             loc = three_location(player)
         forced_sub = None
-        hint = pbp_location_hint(player, "three")   # the build-up line named the spot: the shot comes from there
+        hint, hint_side = pbp_location_hint(player, "three")   # the build-up line named the spot: the shot comes from there
         if hint in ("corner", "deep"):
             loc = hint
         elif hint in ("wing", "top"):
@@ -12479,6 +12492,8 @@ def tag_three_location(player, context: str, consume: bool) -> str:
         if loc == "above_break":   # above the break is the wing or the top of the key
             CURRENT_THREE_SUB = forced_sub or ("top3" if random.random() < 0.42 else "wing3")
             loc = "above_break|" + CURRENT_THREE_SUB
+        if CURRENT_THREE_LOC == "corner" or CURRENT_THREE_SUB == "wing3":   # these spots exist on both sides of the floor
+            loc += "|side_" + (hint_side or shot_side(player))
         if player is not None:
             player._three_loc = None
             player._three_loc_used = loc
@@ -12500,10 +12515,12 @@ def tag_mid_location(player, context: str, consume: bool) -> str:
         elbow_w = 0.30
         r = random.random()
         loc = "mid_base" if r < base_w else "mid_elbow" if r < base_w + elbow_w else "mid_wing"
-        hint = pbp_location_hint(player, "mid")   # the build-up line named the spot: the shot comes from there
+        hint, hint_side = pbp_location_hint(player, "mid")   # the build-up line named the spot: the shot comes from there
         if hint:
             loc = hint
         CURRENT_MID_LOC = loc
+        if loc in ("mid_base", "mid_wing"):
+            loc += "|side_" + (hint_side or shot_side(player))
         if player is not None:
             player._mid_loc_used = loc
     else:

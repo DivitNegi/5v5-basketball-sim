@@ -2025,14 +2025,18 @@ function seasonShotChart(name, zones, avg, vs, split) {
     const [made, att] = zones[key] || [0, 0];
     for (let i = 0; i < att; i++) events.push({ player: name, zone: key, made: i < made, n: n++, team: "" });
   }
-  if (split) {   // give his shots their real locations: so many corner / wing / top / deep threes and baseline / elbow / wing jumpers, the rest unspecified
+  if (split) {   // give his shots their real locations and sides: so many left / right corner and wing threes, baseline / wing jumpers on each side, elbow, top, deep
     const tag = (zone, parts) => {
       const list = events.filter((e) => e.zone === zone), made = list.filter((e) => e.made), miss = list.filter((e) => !e.made);
-      for (const [loc, [m, a]] of parts) { made.splice(0, m).forEach((e) => { e.loc = loc; }); miss.splice(0, Math.max(0, a - m)).forEach((e) => { e.loc = loc; }); }
+      for (const [loc, side, [m, a]] of parts) {
+        made.splice(0, m).forEach((e) => { e.loc = loc; if (side) e.side = side; });
+        miss.splice(0, Math.max(0, a - m)).forEach((e) => { e.loc = loc; if (side) e.side = side; });
+      }
     };
-    const t = split.three || {}, m2 = split.mid || {};
-    tag("three", [["corner", t.corner || [0, 0]], ["deep", t.deep || [0, 0]], ["wing", t.wing || [0, 0]], ["top", t.top || [0, 0]]]);
-    tag("mid", [["base", m2.base || [0, 0]], ["elbow", m2.elbow || [0, 0]], ["wing", m2.wing || [0, 0]]]);
+    const t = split.three || {}, m2 = split.mid || {}, z = [0, 0];
+    const sided = (o, name, loc) => (o[`${name}_L`] || o[`${name}_R`]) ? [[loc, "L", o[`${name}_L`] || z], [loc, "R", o[`${name}_R`] || z]] : [[loc, null, o[name] || z]];
+    tag("three", [...sided(t, "corner", "corner"), ["deep", null, t.deep || z], ...sided(t, "wing", "wing"), ["top", null, t.top || z]]);
+    tag("mid", [...sided(m2, "base", "base"), ["elbow", null, m2.elbow || z], ...sided(m2, "wing", "wing")]);
   }
   const total = events.length, state = { view: "shots" };
   const svg = svgEl("svg", { viewBox: "20 60 490 520", class: "court-svg pc-map pro" });
@@ -2046,7 +2050,8 @@ function seasonShotChart(name, zones, avg, vs, split) {
   const HOT = "#d92d27", AVG = "#8c8676", COLD = "#2f45e0", NONE = "#2a3347";
   const zsvg = svgEl("svg", { viewBox: "-8 -8 516 486", class: "court-svg pc-map pro zhot", style: "display:none" });
   const zoneStats = () => {
-    const st = { ra: [0, 0], paint: [0, 0], elbow: [0, 0], mid_wing: [0, 0], baseline: [0, 0], corner3: [0, 0], wing3: [0, 0], top3: [0, 0] };
+    const st = { ra: [0, 0], paint: [0, 0], elbow: [0, 0], top3: [0, 0] };
+    for (const k of ["mid_wing", "baseline", "corner3", "wing3"]) { st[`${k}_L`] = [0, 0]; st[`${k}_R`] = [0, 0]; }
     for (const ev of events) {
       const [x, y] = shotSpot(ev, 0, true), key = shotZoneOf(ev, x, y);
       if (!key) continue;
@@ -2057,7 +2062,7 @@ function seasonShotChart(name, zones, avg, vs, split) {
   const paintZones = () => {
     const st = zoneStats(), fa = split?.fineAvg || {};
     const info = (key) => {
-      const [m, a] = st[key], pct = a ? 100 * m / a : null, av = fa[key]?.pct;
+      const [m, a] = st[key], pct = a ? 100 * m / a : null, av = fa[key.replace(/_[LR]$/, "")]?.pct;   // each side is its own count; the benchmark is the league / position average for that spot
       return { m, a, pct, diff: pct != null && av != null ? pct - av : null };
     };
     const pt = (R, a) => `${(250 + R * Math.sin(a)).toFixed(1)} ${(52.5 + R * Math.cos(a)).toFixed(1)}`;
@@ -2071,18 +2076,22 @@ function seasonShotChart(name, zones, avg, vs, split) {
       const el = svgEl("path", { d, fill, "fill-rule": evenodd ? "evenodd" : "nonzero", stroke: "#fff", "stroke-width": 3, "stroke-linejoin": "round", ...(clip ? { "clip-path": `url(#${uid}${clip})` } : {}) });
       el.append(tip); return el;
     };
-    const S = [-1, 1], out = [];
+    const S = [-1, 1], sd = (s) => (s < 0 ? "L" : "R"), out = [];
     out.push(zone(wedge(-0.4, 0.4), "top3", "t", "Top of the key three"));
-    for (const s of S) out.push(zone(wedge(s * 0.4, s * 1.18), "wing3", "t", "Wing three"));
-    out.push(zone("M0 0 H30 V142.1 L0 154.5 Z", "corner3", null, "Corner three"), zone("M500 0 H470 V142.1 L500 154.5 Z", "corner3", null, "Corner three"));
+    for (const s of S) out.push(zone(wedge(s * 0.4, s * 1.18), `wing3_${sd(s)}`, "t", "Wing three"));
+    out.push(zone("M0 0 H30 V142.1 L0 154.5 Z", "corner3_L", null, "Left corner three"), zone("M500 0 H470 V142.1 L500 154.5 Z", "corner3_R", null, "Right corner three"));
     out.push(zone(wedge(-0.4, 0.4), "elbow", "m", "Elbow / free-throw line"));
-    for (const s of S) out.push(zone(wedge(s * 0.4, s * 0.98), "mid_wing", "m", "Mid-range wing"), zone(wedge(s * 0.98, s * 3.1), "baseline", "m", "Baseline jumper"));
+    for (const s of S) out.push(zone(wedge(s * 0.4, s * 0.98), `mid_wing_${sd(s)}`, "m", "Mid-range wing"), zone(wedge(s * 0.98, s * 3.1), `baseline_${sd(s)}`, "m", "Baseline jumper"));
     out.push(zone(`${lane} ${ra}`, "paint", null, "Paint"), zone(ra, "ra", null, "Restricted area", false));
     const frame = svgEl("rect", { x: 0, y: 0, width: 500, height: 470, fill: "none", stroke: "#fff", "stroke-width": 4 });
     const ft = svgEl("path", { d: "M190 190 A60 60 0 0 0 310 190", fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-opacity": ".5", "stroke-dasharray": "5 6" });
     // readout: the FG% in a small tabular face, then a tiny ▲ / ▼ with how far he is above or below the average (the league's, or his position group's if that is picked)
-    const label = (x, y, key, size, withDiff = true) => {
+    const label = (x, y, key, size, withDiff = true, rotate = false) => {
       const { a, pct, diff } = info(key), g = svgEl("g", { "text-anchor": "middle", class: "zl-g" });
+      if (rotate) {   // a thin corner strip: the whole readout on one line, turned to run along it
+        const t = svgEl("text", { x, y, "font-size": size, "dominant-baseline": "central", class: "zl-pct", transform: `rotate(-90 ${x} ${y})` });
+        t.textContent = a ? `${pct.toFixed(0)}%${diff != null ? `  ${diff >= 0 ? "▲ +" : "▼ −"}${Math.abs(diff).toFixed(1)}%` : ""}` : "–"; g.append(t); return g;
+      }
       const t = svgEl("text", { x, y: withDiff && diff != null ? y - size * 0.32 : y, "font-size": size, "dominant-baseline": "central", class: "zl-pct" });
       t.textContent = a ? `${pct.toFixed(0)}%` : "–"; g.append(t);
       if (withDiff && diff != null && a) {
@@ -2092,7 +2101,7 @@ function seasonShotChart(name, zones, avg, vs, split) {
       return g;
     };
     const labels = [label(250, 66, "ra", 14), label(250, 138, "paint", 15), label(250, 238, "elbow", 16), label(250, 325, "top3", 17)];
-    for (const s of S) labels.push(label(250 + s * 110, 183, "mid_wing", 16), label(250 + s * 133, 78, "baseline", 15), label(250 + s * 190, 238, "wing3", 16), label(250 + s * 235, 78, "corner3", 9, false));
+    for (const s of S) labels.push(label(250 + s * 110, 183, `mid_wing_${sd(s)}`, 16), label(250 + s * 133, 78, `baseline_${sd(s)}`, 15), label(250 + s * 190, 238, `wing3_${sd(s)}`, 16), label(250 + s * 235, 72, `corner3_${sd(s)}`, 10, true, true));
     const arc = svgEl("path", { d: "M30 0 V142.1 A237.5 237.5 0 0 0 470 142.1 V0", fill: "none", stroke: "#fff", "stroke-width": 3, "stroke-linejoin": "round" });   // the three-point line, the same white and weight as every other line
     zsvg.append(...out, ft, arc, frame, ...labels);
   };
@@ -2270,18 +2279,18 @@ function shotSpot(ev, side, spread = false) {
     if (ev.loc === "deep") { for (let k = 0; k < 10; k++) { [x, y] = polar(280, 405, 0.85); if (y > Y0 + 12 && y < Y0 + CH - 12) break; } }   // logo range: well past the arc, out toward half court
     else if (ev.loc === "wing" || ev.loc === "top") {   // above the break: the wings, or the top of the key
       for (let k = 0; k < 10; k++) {
-        const sgn = rnd() < 0.5 ? -1 : 1, ang = ev.loc === "top" ? (rnd() * 2 - 1) * 0.4 : sgn * (0.44 + rnd() * 0.7), r = 242 + rnd() * 27;
+        const sgn = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, ang = ev.loc === "top" ? (rnd() * 2 - 1) * 0.4 : sgn * (0.44 + rnd() * 0.7), r = 242 + rnd() * 27;
         x = HX + r * Math.cos(ang); y = HY + r * Math.sin(ang);
         if (y > Y0 + 18 && y < Y0 + CH - 18) break;
       }
     }
-    else if (ev.loc === "corner" || (!ev.loc && rnd() < 0.2)) { x = 45 + rnd() * 120; y = rnd() < 0.5 ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
+    else if (ev.loc === "corner" || (!ev.loc && rnd() < 0.2)) { x = 45 + rnd() * 120; y = (ev.side === "L" ? true : ev.side === "R" ? false : rnd() < 0.5) ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
     else {   // just behind the line: most threes are 24-26 ft out, a few are 27-30 ft pull-ups (a known above-the-break three never comes from the far end)
       const far = !ev.loc && rnd() < 0.08, rMin = 242, rMax = far ? 300 : 268;
       for (let k = 0; k < 10; k++) { [x, y] = polar(rMin, rMax, 1.2); if (y > Y0 + 18 && y < Y0 + CH - 18) break; }
     }
   } else if (z === "mid") {
-    const side = rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
+    const side = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
     if (want === "base") { x = 34 + rnd() * 105; y = HY + side * (92 + rnd() * 118); }                                   // baseline jumper: beside the lane, level with the block
     else if (want === "elbow") { const a = (rnd() * 2 - 1) * 0.36, r = 150 + rnd() * 72; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); }   // free-throw line / elbow
     else { for (let k = 0; k < 14; k++) { const a = side * (0.46 + rnd() * 0.46), r = 100 + rnd() * 125; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (!(x <= 220 && Math.abs(y - HY) <= 80) && Math.abs(y - HY) <= 205) break; } }   // wing, outside the lane
@@ -2293,12 +2302,12 @@ function shotZoneOf(ev, x, y) {
   const z = ev.zone;
   if (z === "rim" || z === "dunk") return "ra";
   if (z === "post") return "paint";
-  const dx = x - SC_GEO.HX, dy = y - SC_GEO.CY, ang = Math.atan2(Math.abs(dy), dx);
-  if (z === "mid") return ang < 0.4 ? "elbow" : ang < 0.98 ? "mid_wing" : "baseline";
+  const dx = x - SC_GEO.HX, dy = y - SC_GEO.CY, ang = Math.atan2(Math.abs(dy), dx), side = ev.side || (dy > 0 ? "R" : "L");   // L = left of the basket as the zone map is drawn
+  if (z === "mid") return ang < 0.4 ? "elbow" : ang < 0.98 ? `mid_wing_${side}` : `baseline_${side}`;
   if (z === "three") {
     if (ev.loc === "deep") return null;   // logo range sits off the map
-    if (x <= 172 && Math.abs(dy) > 220) return "corner3";
-    return ang < 0.4 ? "top3" : "wing3";
+    if (x <= 172 && Math.abs(dy) > 220) return `corner3_${side}`;
+    return ang < 0.4 ? "top3" : `wing3_${side}`;
   }
   return null;
 }
