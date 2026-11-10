@@ -824,9 +824,12 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .sd-make { fill: rgba(34, 197, 94, .16); stroke: #4ade80; stroke-width: 2.6; filter: drop-shadow(0 0 3px #4ade80) drop-shadow(0 0 9px rgba(74, 222, 128, .75)); }
 .sd-miss { fill: none; stroke: #fb7185; stroke-opacity: .95; stroke-width: 2.4; stroke-linecap: round; filter: drop-shadow(0 0 3px #fb7185) drop-shadow(0 0 9px rgba(251, 113, 133, .7)); }
 .pc-tabs { display: flex; justify-content: center; margin: 0 auto 10px; width: fit-content; }
-.zl-main { fill: #fff; paint-order: stroke; stroke: rgba(4,10,22,.85); stroke-width: 4px; stroke-linejoin: round; }
-.zl-diff { fill: #e2e8f0; paint-order: stroke; stroke: rgba(4,10,22,.85); stroke-width: 3.5px; stroke-linejoin: round; }
-.zl-att { fill: #cbd5e1; opacity: .85; paint-order: stroke; stroke: rgba(4,10,22,.85); stroke-width: 3px; }
+.zl-name { fill: #a9bde3; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; paint-order: stroke; stroke: rgba(4,10,22,.8); stroke-width: 3px; }
+.zl-main { fill: #fff; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: rgba(4,10,22,.85); stroke-width: 4px; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(255,255,255,.35)); }
+.zl-pill.up { fill: rgba(34,197,94,.26); stroke: rgba(74,222,128,.75); stroke-width: 1.2; filter: drop-shadow(0 0 5px rgba(74,222,128,.55)); }
+.zl-pill.down { fill: rgba(244,63,94,.26); stroke: rgba(251,113,133,.75); stroke-width: 1.2; filter: drop-shadow(0 0 5px rgba(251,113,133,.5)); }
+.zl-diff { font-weight: 800; letter-spacing: .02em; font-variant-numeric: tabular-nums; } .zl-diff.up { fill: #86efac; } .zl-diff.down { fill: #fda4af; }
+.zl-att { fill: #b6c4de; opacity: .9; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: 10px; paint-order: stroke; stroke: rgba(4,10,22,.8); stroke-width: 3px; }
 .pc-zlegend { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .pc-zlegend i { display: block; width: 70px; height: 8px; border-radius: 99px; background: linear-gradient(90deg, #ef4444, #64748b); }
 .pc-zlegend i.up { background: linear-gradient(90deg, #64748b, #22c55e); }
@@ -835,4 +838,3 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .ins-float { position: sticky; top: 8px; z-index: 8; display: flex; align-items: center; gap: 10px; width: fit-content; margin: 14px 0 0 auto; padding: 6px 8px 6px 12px;
   background: color-mix(in srgb, var(--panel-solid, #111827) 88%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line-strong, #334155); border-radius: 999px; box-shadow: 0 10px 30px -8px rgba(0,0,0,.6); }
 
-.zl-diff.up { fill: #4ade80; } .zl-diff.down { fill: #f87171; }

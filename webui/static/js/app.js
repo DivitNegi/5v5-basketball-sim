@@ -2051,17 +2051,24 @@ function seasonShotChart(name, zones, avg, vs) {
       shape(`${inner} M30 240 H220 V400 H30 Z`, "mid", true),
       shape(`M30 240 H220 V400 H30 Z ${circle}`, "post", true),
       shape(`${circle} Z`, "rim", false));
+    // zone readout: a small spaced-out caps name, the FG% big, a green/red pill with the +/- vs the average, then made of attempted
+    const NAMES = { rim: "RIM", mid: "MID", three: "3 PT", post: "POST" };
     const label = (x, y, key, big, small) => {
       const { m, a, pct, diff } = zoneInfo(key);
       const g = svgEl("g", { class: "zone-label", transform: `translate(${x} ${y})`, "text-anchor": "middle" });
-      const t1 = svgEl("text", { y: 0, "font-size": big ? 28 : 21, "font-weight": 800, class: "zl-main" }); t1.textContent = pct == null ? "–" : `${pct.toFixed(0)}%`;
-      const t2 = svgEl("text", { y: big ? 23 : 17, "font-size": big ? 17 : 13, "font-weight": 800, class: `zl-diff ${diff == null ? "" : diff >= 0 ? "up" : "down"}` });
-      t2.textContent = diff == null ? "" : `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)}`;
-      g.append(t1, t2);
-      if (!small) { const t3 = svgEl("text", { y: big ? 40 : 31, "font-size": 11, class: "zl-att" }); t3.textContent = `${m}/${a}`; g.append(t3); }
+      const nm = svgEl("text", { y: big ? -34 : -28, "font-size": big ? 12 : 10.5, class: "zl-name" }); nm.textContent = NAMES[key];
+      const t1 = svgEl("text", { y: 0, "font-size": big ? 32 : small ? 23 : 25, class: "zl-main" }); t1.textContent = pct == null ? "–" : `${pct.toFixed(0)}%`;
+      g.append(nm, t1);
+      if (diff != null) {
+        const txt = `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)}`, w = 22 + txt.length * 8.5, h2 = big ? 22 : 19, py = big ? 9 : 7;
+        const pill = svgEl("rect", { x: -w / 2, y: py, width: w, height: h2, rx: h2 / 2, class: `zl-pill ${diff >= 0 ? "up" : "down"}` });
+        const t2 = svgEl("text", { y: py + h2 / 2 + 4.5, "font-size": big ? 14 : 12.5, class: `zl-diff ${diff >= 0 ? "up" : "down"}` }); t2.textContent = txt;
+        g.append(pill, t2);
+      }
+      if (!small) { const t3 = svgEl("text", { y: big ? 52 : 46, "font-size": 11, class: "zl-att" }); t3.textContent = `${m} of ${a}`; g.append(t3); }
       return g;
     };
-    zoneG.append(label(410, 300, "three", true), label(205, 178, "mid", false), label(172, 300, "post", false), label(82.5, 322, "rim", false, true));
+    zoneG.append(label(410, 300, "three", true), label(205, 178, "mid", false), label(172, 304, "post", false), label(82.5, 326, "rim", false, true));
   };
   const paint = () => {
     dots.replaceChildren(); heat.replaceChildren(); zoneG.replaceChildren();
