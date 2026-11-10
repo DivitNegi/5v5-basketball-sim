@@ -2037,7 +2037,7 @@ function insightsBox(first, color, fetchGroup) {
   const box = h("div", {}); let grp = first.group || "all";
   const mine = first.position;   // "guards" | "forwards" | "centers" ("" when his position is unknown)
   const paint = (det) => {
-    const options = [["all", "Everyone"], ...(mine ? [[mine, `All ${mine}`]] : [])];   // only his own position group is offered: a guard vs all guards (PG and SG), a forward vs all forwards (SF and PF)
+    const options = [["all", "Everyone"], ...(mine ? [[mine, "Relative to position"]] : [])];   // only his own position group is offered: a guard vs all guards (PG and SG), a forward vs all forwards (SF and PF)
     const seg = h("div", { class: "seg small" }, options.map(([k, l]) => h("button", { class: grp === k ? "on" : "", onclick: async () => {
       grp = k; box.style.opacity = ".55";
       try { paint(await fetchGroup(k)); } catch { /* keep the current graphs */ } finally { box.style.opacity = ""; }
