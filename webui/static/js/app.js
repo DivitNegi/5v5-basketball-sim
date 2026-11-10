@@ -1496,7 +1496,12 @@ function renderCompare2() {
     return h("tr", {}, h("td", {}, label), h("td", { class: better === 0 ? "better" : "" }, f(va)), h("td", { class: better === 1 ? "better" : "" }, f(vb)));
   });
   $("#compBody").replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "stats cmp-table" },
-    h("thead", {}, h("tr", {}, h("th", {}, "Stat"), h("th", {}, GV.comp.a[1]), h("th", {}, GV.comp.b[1]))), h("tbody", {}, body))));
+    h("thead", {}, h("tr", {}, h("th", {}, "Stat"), h("th", {}, GV.comp.a[1]), h("th", {}, GV.comp.b[1]))), h("tbody", {}, body))),
+    // each player's shot chart side by side (built from his zone totals), same heat-map switch as the player card
+    h("div", { class: "pc-viz cmp-maps", style: { marginTop: "14px" } }, [[GV.comp.a, sa], [GV.comp.b, sb]].map(([c, s]) => {
+      const any = s.shots && Object.values(s.shots).some((z) => z[1] > 0);
+      return h("div", { class: "pc-panel" }, h("h4", {}, `${c[1]} · shot chart`), any ? seasonShotChart(c[1], s.shots) : h("div", { class: "muted" }, "No shots yet."));
+    })));
 }
 
 // ───────────────────────── Tk-equivalent coach and mode tools ─────────────────────────

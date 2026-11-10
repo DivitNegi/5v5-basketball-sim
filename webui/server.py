@@ -646,6 +646,12 @@ def roster_payload(runner, team_name):
     return {"team": ident, "players": players}
 
 
+def _zones_of(diet):
+    diet = diet or {}
+    z = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
+    return {"rim": [a + b for a, b in zip(z("rim"), z("dunk"))], "mid": z("mid"), "three": z("three"), "post": z("post")}
+
+
 def compare_payload(runner):
     sec = runner.sections or {}
     totals = sec.get("_season_player_totals") or sec.get("_series_totals") or {}
@@ -653,7 +659,7 @@ def compare_payload(runner):
     out = {}
     for team, players in totals.items():
         ident = team_identity(team)
-        out[team] = {"short": ident["short"], "logo": ident["logo"], "players": {n: {k: st.get(k, 0) for k in keys} for n, st in players.items() if st.get("games", 0)}}
+        out[team] = {"short": ident["short"], "logo": ident["logo"], "players": {n: {**{k: st.get(k, 0) for k in keys}, "shots": _zones_of(st.get("shot_diet"))} for n, st in players.items() if st.get("games", 0)}}
     if out:
         return {"teams": out, "source": "season" if sec.get("_season_player_totals") else "series"}
     # no season/series yet: compare using the game being played
@@ -668,7 +674,7 @@ def compare_payload(runner):
                     continue
                 players[p.name] = {"games": 1, "minutes": p.minutes, "pts": p.pts, "reb": p.reb, "ast": p.ast, "stl": getattr(p, "stl", 0),
                                    "blk": getattr(p, "blk_stat", 0), "tov": p.tov, "fgm": p.fgm, "fga": p.fga, "tpm": p.tpm, "tpa": p.tpa,
-                                   "ftm": p.ftm, "fta": p.fta, "plus_minus": getattr(p, "plus_minus", 0)}
+                                   "ftm": p.ftm, "fta": p.fta, "plus_minus": getattr(p, "plus_minus", 0), "shots": _zones_of(getattr(p, "shot_diet", None))}
             out[team.name] = {"short": ident["short"], "logo": ident["logo"], "players": players}
     return {"teams": out, "source": "game"}
 
