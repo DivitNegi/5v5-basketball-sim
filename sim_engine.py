@@ -13985,7 +13985,43 @@ def _team_and_opponent_for(player: Player) -> Tuple[Team | None, Team | None]:
     return None, None
 
 
+HOT_START_USAGE = 0.26          # a star for this purpose: his usage or his shot tendency is already high
+HOT_START_SHOT_TENDENCY = 0.50
+HOT_START_TOUCH_BOOST = 1.30    # how much more often a star who started hot is the one shooting
+HOT_START_FGA_BONUS = 4.0       # and how many more shots he may take before his usual volume limit pulls him back
+
+
+def is_hot_start_star(player: Player) -> bool:
+    return player.usage >= HOT_START_USAGE or player.shot_tendency >= HOT_START_SHOT_TENDENCY
+
+
+def update_hot_start(player: Player):
+    """A star who makes 3 of his first 3-4 shots (or 4 of his first 5) has started hot: his team keeps going to him. It lasts while he keeps
+    making at least half his shots; once he cools below that it is over for the game."""
+    fga, fgm = player.fga, player.fgm
+    if fga <= 1:
+        player.hot_start = False
+        player.hot_start_done = False
+    if getattr(player, "hot_start_done", False) or not is_hot_start_star(player):
+        return
+    if getattr(player, "hot_start", False):
+        if fga and fgm / fga < 0.50:
+            player.hot_start = False
+            player.hot_start_done = True
+        return
+    if (fga in (3, 4) and fgm >= 3) or (fga == 5 and fgm >= 4):
+        player.hot_start = True
+        print(random.choice([
+            f"{player.name} has it going early, and his teammates keep looking for him.",
+            f"{player.name} is off to a hot start. They are going to keep feeding him.",
+            f"{player.name} cannot miss to open this one, and the offense is running through him.",
+        ]))
+    elif fga >= 5:
+        player.hot_start_done = True
+
+
 def update_shot_rhythm(player: Player, made: bool, shot_type: str | None = None):
+    update_hot_start(player)
     bump_player_heat(player, shot_type, made)
     contesting_defender = getattr(player, "last_defender", None)
     if contesting_defender is not None:
@@ -15233,6 +15269,9 @@ def shooter_weight(player: Player) -> float:
         role_volume *= max(0.62, 1.0 - (player.fga - 13) * 0.06)
 
     soft_cap = shot_volume_soft_cap(player)
+    if getattr(player, "hot_start", False):   # a star who started hot gets the ball more and is readier to shoot it
+        role_volume *= HOT_START_TOUCH_BOOST
+        soft_cap += HOT_START_FGA_BONUS
     if SEASON_STAR_MINUTES_CAP and player.pts >= 30:
         soft_cap += HOT_GAME_SEASON_FGA_BONUS  # regular season: a hot night may run past the usual volume cap
     explicit_target = getattr(player, "target_fga_soft_cap", None)
