@@ -202,6 +202,8 @@ class SimRunner:
         if not keep:
             self.sections = {}
             self.season = {"progress": None, "races": None, "standings": None, "ready": False}
+            self.bracket = {}
+            self.post = {"standings": None, "factories": None, "year": None}
         self._live_signature = None
         self.hub.clear_backlog()
         self.hub.publish({"type": "reset", "mode": mode, "teams": [team_identity(team_a), team_identity(team_b)] if needs_teams else [None, None]})

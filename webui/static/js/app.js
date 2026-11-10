@@ -641,7 +641,39 @@ function applyStatus(s) {
   setStatus(s.text || (S.active ? "Running" : "Ready"), live);
 }
 
+// Everything a finished season/game leaves behind: the live game (score, plays, box, shot chart, snapshots), the playoff bracket and series,
+// compare / player-card picks, every Stats and Shots table, and the season views' cached data. A new season starts from a clean slate.
+function clearAllResults(msg, keepSeason = false) {
+  S.shots = []; redrawShotCharts();
+  S.plays = []; S.goodPlays = []; S.gameNo = 1; S.gameSnapshots = new Map(); S.gameShots = new Map(); S.finishedLive = null; S.snappedLive = null; S.lastScoreClock = null; S.lastScorePeriod = null;
+  S.live = null; S.flow = []; S.score = [0, 0]; S.prevOnCourt = [new Set(), new Set()]; S.leaving = []; S.recentScores = {};
+  S.identities = msg?.teams || [null, null];
+  feed.block = null; feed.lines = []; feed.last = [0, 0];
+  $("#feed").replaceChildren(h("div", { class: "empty" }, "Nothing yet."));
+  $("#rawlog").replaceChildren(h("div", { class: "empty" }, "Nothing yet.")); $("#rawlog")._stick = true; $("#rawlog")._behind = 0; syncLatestButton();
+  rawState.last = [0, 0];
+  $("#sbSeries").textContent = ""; $("#sbPeriod").textContent = "1ST"; $("#sbClock").textContent = S.rules === "FIBA" ? "10:00" : "12:00";
+  BR.data = null; BR.selected = null; BR.game = null; BR.avg = null; BR.pi = null;
+  GV.pc = { team: null, name: null, quarter: "all", game: "live" };
+  if (keepSeason) {   // the playoffs follow the season just played: its stats stay, only the live game and bracket start over
+    document.querySelector(".pp-back")?.remove();
+    renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
+    $("#pcardBody")?.replaceChildren(h("div", { class: "empty" }, "Start a game, then pick a player."));
+    return;
+  }
+  GV.comp = { a: [null, null], b: [null, null], data: null };
+  for (const k of Object.keys(STX)) delete STX[k];
+  SH.data = null; SH.game = "All Games"; SH.team = "All Teams"; SH.defender = "All Defenders"; SH.guarded = "All Guarded"; SH.rank = "Team order";
+  AV.data = null; AV.team = "All Teams"; AV.quarter = "All"; AV.rank = "Team order"; AV.sort = null; AV.filter = "";
+  SE.data = null; SE.players = null; SE.advStats = null; SE.highs = null; SE.sbox = null; SE.sched = null; SE.upcoming = []; SE.team = null; SE.tsort = null; SE.teams = null;
+  document.querySelector(".pp-back")?.remove();
+  renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
+  $("#pcardBody")?.replaceChildren(h("div", { class: "empty" }, "Start a game, then pick a player."));
+  $("#compBody")?.replaceChildren(h("div", { class: "empty" }, "Pick two players once games have been played."));
+}
+
 function resetGame(msg) {
+  if (msg.mode !== "Replay season game") clearAllResults(msg, msg.mode === "2027 play-in & playoffs");   // a replay must leave the finished season as it was
   const quietSeason = isSeasonMode(msg.mode) && msg.mode !== "2027 play-in & playoffs";
   $("#scoreboard").classList.toggle("hidden", quietSeason);
   $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
@@ -649,7 +681,7 @@ function resetGame(msg) {
   if (msg.mode === "2027 play-in & playoffs") { $('#nav .nav-item[data-view="bracket"]').click(); BR.selected = null; return; }
   if (isSeasonMode(msg.mode)) {
     $('#nav .nav-item[data-view="season"]').click();
-    SE.data = null; SE.players = null; refreshSeason();
+    refreshSeason();
     return;
   }
   S.shots = []; redrawShotCharts();
