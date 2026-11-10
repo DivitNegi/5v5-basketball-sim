@@ -2044,6 +2044,39 @@ def shot_family(shot_type: str) -> str:
     return "paint"
 
 
+CURRENT_THREE_LOC = None   # where the three being recorded/commentated was taken from ("corner" | "above_break" | "deep")
+CORNER_THREE_MAKE_BONUS = 0.014     # the corner three is the shortest: a small efficiency edge...
+ABOVE_BREAK_THREE_PENALTY = 0.006   # ...paid for by a small cost above the break, so the league average stays put
+
+
+def three_location(shooter) -> str:
+    """Where this player's next three comes from.
+
+    Deep (logo range) when his Limitless Range badge fires. Otherwise spot-up players (catch-and-shoot badge or a shooter / 3-and-D / stretch
+    archetype, low handle, low usage) take most of their threes from the corner, and on-ball creators (high handle, usage, isolation) take
+    theirs above the break: spot-up shooters sit around 50-60% corners, a pull-up creator near 15-18%, an average player ~22%."""
+    if shooter is None:
+        return "above_break"
+    if getattr(shooter, "limitless_range_attempt", False):
+        return "deep"
+    badges = tuple(getattr(shooter, "badges", ()) or ())
+    archetype = str(getattr(shooter, "archetype", "") or "").lower()
+    spot = 0.0
+    if any(str(b).startswith("catch_shoot") for b in badges):
+        spot += 0.45
+    if any(k in archetype for k in ("shooter", "3-and-d", "stretch", "spot", "sharpshoot")):
+        spot += 0.30
+    spot += 0.30 * max(0.0, min(1.0, (0.78 - getattr(shooter, "ball_handle", 0.7)) / 0.40))
+    spot -= 0.30 * max(0.0, min(1.0, (getattr(shooter, "iso_tendency", 0.0) - 0.30) / 0.40))
+    if getattr(shooter, "usage", 0.0) >= 0.28:
+        spot -= 0.20
+    if any(str(b).startswith(("shot_creator", "limitless")) for b in badges):
+        spot -= 0.15
+    spot = max(0.0, min(1.0, spot))
+    corner_p = 0.18 + 0.46 * spot
+    return "corner" if random.random() < corner_p else "above_break"
+
+
 def shot_diet_type(shot_type: str) -> str:
     return "post" if shot_type == "post_fade" else shot_type
 
@@ -2056,7 +2089,27 @@ def is_paint_shot(shot_type: str) -> bool:
     return shot_type in ("rim", "dunk", "post", "post_fade")
 
 
+CORNER_THREE_MAKE_LINES = [
+    "{shooter} is wide open in the corner and buries the three.",
+    "{shooter} lifts from the corner and cashes it in over {defender}.",
+    "{shooter} catches it in the corner and drills the three.",
+    "The kick-out finds {shooter} in the corner and it is good from deep.",
+    "{shooter} sets his feet in the corner and does not miss.",
+]
+CORNER_THREE_MISS_LINES = [
+    "{shooter} fires from the corner and it rattles out.",
+    "{shooter} takes the corner three over {defender} and it is long.",
+    "The kick-out finds {shooter} in the corner, but the three will not fall.",
+    "{shooter} lets it go from the corner and it clangs off the iron.",
+    "{shooter} has the corner look and it is short.",
+]
+
+
 def commentator_make(shooter: str, defender: str, shot_type: str, defense_line: str) -> str:
+    global CURRENT_THREE_LOC
+    if shot_type == "three" and CURRENT_THREE_LOC == "corner" and random.random() < 0.5:
+        CURRENT_THREE_LOC = None
+        return random.choice(CORNER_THREE_MAKE_LINES).format(shooter=shooter, defender=defender)
     return random.choice(broadcast_make_lines[shot_family(shot_type)]).format(
         shooter=shooter,
         defender=defender,
@@ -2065,6 +2118,10 @@ def commentator_make(shooter: str, defender: str, shot_type: str, defense_line: 
 
 
 def commentator_miss(shooter: str, defender: str, shot_type: str, defense_line: str) -> str:
+    global CURRENT_THREE_LOC
+    if shot_type == "three" and CURRENT_THREE_LOC == "corner" and random.random() < 0.5:
+        CURRENT_THREE_LOC = None
+        return random.choice(CORNER_THREE_MISS_LINES).format(shooter=shooter, defender=defender)
     return random.choice(broadcast_miss_lines[shot_family(shot_type)]).format(
         shooter=shooter,
         defender=defender,
@@ -6319,6 +6376,15 @@ def add_shot_quality_to_diet(diet: Dict[str, int], quality_mult: float | None):
 def add_to_shot_diet(diet: Dict[str, int], shot_type: str, context: str = "", made: bool = False):
     shot_type = shot_diet_type(shot_type)
     contexts = set(str(context or "").split("|")) - {""}
+    if shot_type in ("three", "mid"):
+        tokens = (("corner", "corner3"), ("above_break", "atb3"), ("deep", "deep3"), ("wing3", "wing3"), ("top3", "top3")) if shot_type == "three" \
+            else (("mid_base", "mid_base"), ("mid_elbow", "mid_elbow"), ("mid_wing", "mid_wing"))
+        for token, key in tokens:
+            if token in contexts:
+                if made:   # an attempt is counted when it is taken, the make when it goes in
+                    diet[f"{key}_made"] = diet.get(f"{key}_made", 0) + 1
+                else:
+                    diet[key] = diet.get(key, 0) + 1
     if made:
         diet[f"{shot_type}_made"] = diet.get(f"{shot_type}_made", 0) + 1
 
@@ -12317,8 +12383,55 @@ def current_sim_period_key():
 SHOT_RESULT_HOOK = None
 
 
+def tag_three_location(player, context: str, consume: bool) -> str:
+    """Add the three's location (corner / above_break / deep) to the context string. The attempt takes the location chosen for this shot;
+    the make reuses it."""
+    global CURRENT_THREE_LOC
+    if consume:
+        loc = getattr(player, "_three_loc", None) if player is not None else None
+        if "heave" in str(context or ""):
+            loc = "deep"
+        if loc is None:
+            loc = three_location(player)
+        CURRENT_THREE_LOC = loc
+        if loc == "above_break":   # above the break is the wing or the top of the key
+            loc = "above_break|" + ("top3" if random.random() < 0.42 else "wing3")
+        if player is not None:
+            player._three_loc = None
+            player._three_loc_used = loc
+    else:
+        loc = getattr(player, "_three_loc_used", None) if player is not None else None
+        if loc is None:
+            return context
+        player._three_loc_used = None
+    return f"{context}|{loc}" if context else loc
+
+
+def tag_mid_location(player, context: str, consume: bool) -> str:
+    """Add where a midrange jumper was taken (mid_base = baseline, mid_elbow = free-throw line / elbow, mid_wing = the wings). Bigs and low-handle players
+    take more from the baseline and elbows, guards more from the wings."""
+    if consume:
+        bh = getattr(player, "ball_handle", 0.7) if player is not None else 0.7
+        base_w = 0.14 + 0.20 * max(0.0, min(1.0, (0.80 - bh) / 0.50))
+        elbow_w = 0.30
+        r = random.random()
+        loc = "mid_base" if r < base_w else "mid_elbow" if r < base_w + elbow_w else "mid_wing"
+        if player is not None:
+            player._mid_loc_used = loc
+    else:
+        loc = getattr(player, "_mid_loc_used", None) if player is not None else None
+        if loc is None:
+            return context
+        player._mid_loc_used = None
+    return f"{context}|{loc}" if context else loc
+
+
 def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Player = None,
                      defender: Player = None, quality_mult: float | None = None):
+    if shot_type == "three":
+        context = tag_three_location(player, context, True)
+    elif shot_type == "mid":
+        context = tag_mid_location(player, context, True)
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("attempt", team=team, player=player, shot_type=shot_type, context=context)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
@@ -12368,6 +12481,10 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
 
 
 def record_shot_make(team: Team, shot_type: str, context: str = "", player: Player = None, defender: Player = None):
+    if shot_type == "three":
+        context = tag_three_location(player, context, False)
+    elif shot_type == "mid":
+        context = tag_mid_location(player, context, False)
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("make", team=team, player=player, shot_type=shot_type, context=context)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
@@ -12985,6 +13102,14 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
             p *= 1.0 - max(0.0, soft_defense_rating(effective_perimeter_def(defender)) - 0.55) * 0.08
         elif is_paint_shot(shot_type):
             p *= 1.0 - max(0.0, soft_defense_rating(effective_interior_def(defender)) - 0.55) * 0.18
+
+    if shot_type == "three":
+        loc = three_location(shooter)
+        shooter._three_loc = loc
+        if loc == "corner":
+            p += CORNER_THREE_MAKE_BONUS
+        elif loc == "above_break":
+            p -= ABOVE_BREAK_THREE_PENALTY
 
     if shot_type == "three" and getattr(shooter, "limitless_range_attempt", False):
         p *= limitless_range_make_bonus(shooter)

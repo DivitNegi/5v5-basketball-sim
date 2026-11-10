@@ -364,7 +364,11 @@ class SimRunner:
                 self._pending_shot = None
                 return
             ctx = sim_engine.SIM_CONTEXT
-            self._pending_shot = {"team": team.name, "player": player.name, "zone": str(info.get("shot_type") or "mid"), "period": ctx.get("period"), "clock": ctx.get("period_time")}
+            tokens = set(str(info.get("context") or "").split("|"))
+            loc = ("corner" if "corner" in tokens else "deep" if "deep" in tokens else "top" if "top3" in tokens else "wing" if "wing3" in tokens
+                   else "above_break" if "above_break" in tokens else "base" if "mid_base" in tokens else "elbow" if "mid_elbow" in tokens
+                   else "wing" if "mid_wing" in tokens else None)
+            self._pending_shot = {"team": team.name, "player": player.name, "zone": str(info.get("shot_type") or "mid"), "loc": loc, "period": ctx.get("period"), "clock": ctx.get("period_time")}
         elif kind == "make":
             self._flush_shot(True)
         elif kind == "miss":

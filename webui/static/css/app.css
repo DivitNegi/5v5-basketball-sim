@@ -839,3 +839,5 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .ins-float { position: sticky; top: 8px; z-index: 8; display: flex; align-items: center; gap: 10px; width: fit-content; margin: 14px 0 0 auto; padding: 6px 8px 6px 12px;
   background: color-mix(in srgb, var(--panel-solid, #111827) 88%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--line-strong, #334155); border-radius: 999px; box-shadow: 0 10px 30px -8px rgba(0,0,0,.6); }
 
+
+.zl-pct { fill: #fff; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: rgba(4,10,22,.8); stroke-width: 3.5px; stroke-linejoin: round; }

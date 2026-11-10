@@ -2017,12 +2017,22 @@ function proCourt() {
     <g class="hoop"><line x1="70" y1="290" x2="70" y2="350" stroke="#e8edf6" stroke-width="3.5" stroke-linecap="round"/><circle cx="82.5" cy="320" r="7.5" stroke="#f5a524" stroke-width="3" fill="none"/></g>`;
 }
 const PC_ZONES = [["rim", "Rim"], ["mid", "Midrange"], ["three", "3-pt"], ["post", "Post"]];
-function seasonShotChart(name, zones, avg, vs) {
+function seasonShotChart(name, zones, avg, vs, split) {
+  const uid = `pc${Math.random().toString(36).slice(2, 8)}`;
   const events = [];
   let n = 0;
   for (const [key] of PC_ZONES) {
     const [made, att] = zones[key] || [0, 0];
     for (let i = 0; i < att; i++) events.push({ player: name, zone: key, made: i < made, n: n++, team: "" });
+  }
+  if (split) {   // give his shots their real locations: so many corner / wing / top / deep threes and baseline / elbow / wing jumpers, the rest unspecified
+    const tag = (zone, parts) => {
+      const list = events.filter((e) => e.zone === zone), made = list.filter((e) => e.made), miss = list.filter((e) => !e.made);
+      for (const [loc, [m, a]] of parts) { made.splice(0, m).forEach((e) => { e.loc = loc; }); miss.splice(0, Math.max(0, a - m)).forEach((e) => { e.loc = loc; }); }
+    };
+    const t = split.three || {}, m2 = split.mid || {};
+    tag("three", [["corner", t.corner || [0, 0]], ["deep", t.deep || [0, 0]], ["wing", t.wing || [0, 0]], ["top", t.top || [0, 0]]]);
+    tag("mid", [["base", m2.base || [0, 0]], ["elbow", m2.elbow || [0, 0]], ["wing", m2.wing || [0, 0]]]);
   }
   const total = events.length, state = { view: "shots" };
   const svg = svgEl("svg", { viewBox: "20 60 490 520", class: "court-svg pc-map pro" });
@@ -2035,40 +2045,44 @@ function seasonShotChart(name, zones, avg, vs) {
     const c = t >= 0 ? mix(base, [34, 197, 94], t) : mix(base, [239, 68, 68], -t);
     return `rgb(${c.join(",")})`;
   };
-  const zoneInfo = (key) => {
-    const [m, a] = zones[key] || [0, 0], av = avg?.[key], pct = a ? 100 * m / a : null;
+  // Twelve zones like an NBA hotspot chart: restricted area, paint, elbow, two mid wings, two baselines, two corner threes, two wing threes, top of the key.
+  // Each is shaded by his FG% against the league (or his position group) and labelled with just the percentage; hover for the exact numbers.
+  const fineInfo = (key) => {
+    const [m, a] = split?.fine?.[key] || [0, 0], av = split?.fineAvg?.[key], pct = a ? 100 * m / a : null;
     return { m, a, pct, diff: pct != null && av?.pct != null ? pct - av.pct : null };
   };
   const paintZones = () => {
-    const shape = (d, key, evenodd) => {
-      const { diff } = zoneInfo(key);
-      return svgEl("path", { d, "fill-rule": evenodd ? "evenodd" : "nonzero", fill: diff == null ? "rgba(100,116,139,.12)" : diffColor(diff), "fill-opacity": diff == null ? 1 : ".55", stroke: "#0b1220", "stroke-width": 2 });
+    const H = [82.5, 320], pt = (R, a) => `${(H[0] + R * Math.cos(a)).toFixed(1)} ${(H[1] + R * Math.sin(a)).toFixed(1)}`;
+    const wedge = (a0, a1) => `M${H[0]} ${H[1]} L${pt(700, a0)} A700 700 0 0 ${a1 > a0 ? 1 : 0} ${pt(700, a1)} Z`;
+    const inner = "M30 100 H172 A237.5 237.5 0 0 1 172 540 H30 Z", lane = "M30 240 H220 V400 H30 Z", circle = "M42.5 320 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0";
+    const defs = svgEl("defs");
+    defs.innerHTML = `<clipPath id="${uid}m"><path clip-rule="evenodd" d="${inner} ${lane}"/></clipPath><clipPath id="${uid}t"><path clip-rule="evenodd" d="M30 70 H500 V570 H30 Z ${inner}"/></clipPath>`;
+    const shape = (d, key, clip, title) => {
+      const { m, a, diff } = fineInfo(key), tip = svgEl("title");
+      tip.textContent = `${title}: ${a ? `${m} of ${a} (${(100 * m / a).toFixed(1)}%)` : "no shots"}${diff == null ? "" : `, ${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} vs ${vs}`}`;
+      const el = svgEl("path", { d, "fill-rule": "evenodd", fill: !a || diff == null ? "rgba(100,116,139,.14)" : diffColor(diff), "fill-opacity": !a || diff == null ? 1 : ".62", stroke: "#0b1220", "stroke-width": 2.2, ...(clip ? { "clip-path": `url(#${uid}${clip})` } : {}) });
+      el.append(tip); return el;
     };
-    const circle = "M42.5 320 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0";
-    const inner = "M30 100 H172 A237.5 237.5 0 0 1 172 540 H30 Z";
-    zoneG.replaceChildren(
-      shape(`M30 70 H500 V570 H30 Z ${inner}`, "three", true),
-      shape(`${inner} M30 240 H220 V400 H30 Z`, "mid", true),
-      shape(`M30 240 H220 V400 H30 Z ${circle}`, "post", true),
-      shape(`${circle} Z`, "rim", false));
-    // zone readout: a small spaced-out caps name, the FG% big, a green/red pill with the +/- vs the average, then made of attempted
-    const NAMES = { rim: "RIM", mid: "MID", three: "3 PT", post: "POST" };
-    const label = (x, y, key, big, small) => {
-      const { m, a, pct, diff } = zoneInfo(key);
-      const g = svgEl("g", { class: "zone-label", transform: `translate(${x} ${y})`, "text-anchor": "middle" });
-      const nm = svgEl("text", { y: big ? -34 : -28, "font-size": big ? 12 : 10.5, class: "zl-name" }); nm.textContent = NAMES[key];
-      const t1 = svgEl("text", { y: 0, "font-size": big ? 32 : small ? 23 : 25, class: "zl-main" }); t1.textContent = pct == null ? "–" : `${pct.toFixed(0)}%`;
-      g.append(nm, t1);
-      if (diff != null) {
-        const txt = `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)}`, w = 22 + txt.length * 8.5, h2 = big ? 22 : 19, py = big ? 9 : 7;
-        const pill = svgEl("rect", { x: -w / 2, y: py, width: w, height: h2, rx: h2 / 2, class: `zl-pill ${diff >= 0 ? "up" : "down"}` });
-        const t2 = svgEl("text", { y: py + h2 / 2 + 4.5, "font-size": big ? 14 : 12.5, class: `zl-diff ${diff >= 0 ? "up" : "down"}` }); t2.textContent = txt;
-        g.append(pill, t2);
-      }
-      if (!small) { const t3 = svgEl("text", { y: big ? 52 : 46, "font-size": 11, class: "zl-att" }); t3.textContent = `${m} of ${a}`; g.append(t3); }
-      return g;
+    const label = (x, y, key, size = 21) => {
+      const { a, pct } = fineInfo(key);
+      const t = svgEl("text", { x, y, "font-size": size, "text-anchor": "middle", "dominant-baseline": "central", class: "zl-pct" });
+      t.textContent = a && pct != null ? `${pct.toFixed(0)}%` : "–"; return t;
     };
-    zoneG.append(label(410, 300, "three", true), label(205, 178, "mid", false), label(172, 304, "post", false), label(82.5, 326, "rim", false, true));
+    const S = [-1, 1], out = [defs];
+    // threes
+    out.push(shape(wedge(-0.4, 0.4), "top3", "t", "Top of the key three"));
+    for (const s of S) out.push(shape(wedge(s * 0.4, s * 1.18), "wing3", "t", "Wing three"));
+    out.push(shape("M30 70 H172 V100 H30 Z", "corner3", null, "Corner three"), shape("M30 540 H172 V570 H30 Z", "corner3", null, "Corner three"));
+    // midrange
+    out.push(shape(wedge(-0.4, 0.4), "elbow", "m", "Elbow / free-throw line"));
+    for (const s of S) out.push(shape(wedge(s * 0.4, s * 0.98), "mid_wing", "m", "Mid-range wing"), shape(wedge(s * 0.98, s * 3.1), "baseline", "m", "Baseline jumper"));
+    // paint and restricted area
+    out.push(shape(`${lane} ${circle}`, "paint", null, "Paint"), shape(`${circle} Z`, "ra", null, "Restricted area"));
+    // labels (percentages only)
+    out.push(label(410, 320, "top3", 26));
+    for (const s of S) out.push(label(280, 320 + s * 205, "wing3", 22), label(198, 320 + s * 97, "mid_wing"), label(122, 320 + s * 128, "baseline", 19));
+    out.push(label(100, 85, "corner3", 16), label(100, 555, "corner3", 16), label(272, 320, "elbow"), label(172, 322, "paint", 19), label(82.5, 322, "ra", 18));
+    zoneG.replaceChildren(...out);
   };
   const paint = () => {
     dots.replaceChildren(); heat.replaceChildren(); zoneG.replaceChildren();
@@ -2095,7 +2109,7 @@ function seasonShotChart(name, zones, avg, vs) {
   const tabs = h("div", { class: "seg small pc-tabs" }, [["shots", "Shots"], ["heat", "Heat map"], ["zones", `Zones vs ${vs}`]].map(([k, l]) => h("button", { class: state.view === k ? "on" : "", onclick: (e) => {
     state.view = k; tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint();
   } }, l)));
-  const legend = h("div", { class: "pc-zlegend", style: { visibility: "hidden" } }, h("span", {}, "below"), h("i", {}), h("span", {}, `${vs} average (+/− = his FG% minus it)`), h("i", { class: "up" }), h("span", {}, "above"));
+  const legend = h("div", { class: "pc-zlegend", style: { visibility: "hidden" } }, h("span", {}, "below"), h("i", {}), h("span", {}, `${vs} average`), h("i", { class: "up" }), h("span", {}, "above"));
   paint();
   return h("div", { class: "pc-map-wrap" }, tabs, svg, legend,
     h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG", h("span", { class: "muted" }, ` · ${total ? (100 * made / total).toFixed(1) : "–"}%`)), h("span", { class: "lg make" }, "● make"), h("span", { class: "lg miss" }, "✕ miss")),
@@ -2131,7 +2145,7 @@ function playerInsights(d, color) {
     hasZones && d.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot zones · compared to ${cmpLbl}`),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "For the rim, midrange, three and post: how well he shoots it (FG%) and how often he shoots it (shots a game), ranked against the other players. A zone he barely uses shows 0 for FG%."),
       percentileRadar(d.zone_ranks, color)) : null,
-    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group)) : null,
+    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group, { three: d.three_split, mid: d.mid_split, fine: d.fine, fineAvg: d.fine_avg })) : null,
   ];
 }
 async function openStatsPlayer(team, name, source) {
@@ -2241,12 +2255,25 @@ function shotSpot(ev, side, spread = false) {
   else if (z === "rim") [x, y] = spread ? polar(8, 56, 1.45) : polar(10, 40, 1.35);
   else if (z === "post") [x, y] = polar(45, 105, 1.0);
   else if (z === "three") {
-    if (rnd() < 0.2) { x = 45 + rnd() * 120; y = rnd() < 0.5 ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
-    else {   // just behind the line: most threes are 24-26 ft out, a few are 27-30 ft pull-ups
-      const far = rnd() < 0.08, rMin = 242, rMax = far ? 300 : 268;
+    if (ev.loc === "deep") { for (let k = 0; k < 10; k++) { [x, y] = polar(280, 405, 0.85); if (y > Y0 + 12 && y < Y0 + CH - 12) break; } }   // logo range: well past the arc, out toward half court
+    else if (ev.loc === "wing" || ev.loc === "top") {   // above the break: the wings, or the top of the key
+      for (let k = 0; k < 10; k++) {
+        const sgn = rnd() < 0.5 ? -1 : 1, ang = ev.loc === "top" ? (rnd() * 2 - 1) * 0.4 : sgn * (0.44 + rnd() * 0.7), r = 242 + rnd() * 27;
+        x = HX + r * Math.cos(ang); y = HY + r * Math.sin(ang);
+        if (y > Y0 + 18 && y < Y0 + CH - 18) break;
+      }
+    }
+    else if (ev.loc === "corner" || (!ev.loc && rnd() < 0.2)) { x = 45 + rnd() * 120; y = rnd() < 0.5 ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
+    else {   // just behind the line: most threes are 24-26 ft out, a few are 27-30 ft pull-ups (a known above-the-break three never comes from the far end)
+      const far = !ev.loc && rnd() < 0.08, rMin = 242, rMax = far ? 300 : 268;
       for (let k = 0; k < 10; k++) { [x, y] = polar(rMin, rMax, 1.2); if (y > Y0 + 18 && y < Y0 + CH - 18) break; }
     }
-  } else { for (let k = 0; k < 10; k++) { [x, y] = polar(75, 225, 1.4); if (Math.abs(y - HY) <= 205) break; } }   // mid-range, post fade and anything else: inside the arc
+  } else if (z === "mid") {
+    const r0 = ev.loc === "base" ? 0 : ev.loc === "elbow" ? 0.4 : ev.loc === "wing" ? 0.9 : rnd(), side = rnd() < 0.5 ? -1 : 1;
+    if (r0 < 0.30) { x = 34 + rnd() * 105; y = HY + side * (88 + rnd() * 122); }                      // baseline / short-corner jumper beside the lane
+    else if (r0 < 0.50) { x = 195 + rnd() * 70; y = HY + side * (8 + rnd() * 100); }                  // elbow / free-throw line
+    else { for (let k = 0; k < 10; k++) { [x, y] = polar(110, 225, 1.3); if (Math.abs(y - HY) <= 205) break; } }   // wings and the middle
+  } else { for (let k = 0; k < 10; k++) { [x, y] = polar(75, 225, 1.4); if (Math.abs(y - HY) <= 205) break; } }   // anything else: inside the arc
   return side ? [1000 - x, y] : [x, y];
 }
 function courtLines() {

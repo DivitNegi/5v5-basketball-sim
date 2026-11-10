@@ -7,7 +7,7 @@ SOURCES = {
     "Season": ("_season_player_totals", "_season_team_totals"),
     "Playoffs": ("_playoff_player_totals", "_playoff_team_totals"),
 }
-ZONES = [("three", "3P"), ("mid", "MID"), ("rim", "RIM"),
+ZONES = [("three", "3P"), ("corner3", "CORNER 3"), ("wing3", "WING 3"), ("top3", "TOP 3"), ("deep3", "DEEP 3"), ("mid", "MID"), ("mid_base", "BASELINE"), ("mid_elbow", "ELBOW"), ("mid_wing", "WING MID"), ("rim", "RIM"),
          ("post", "POST"), ("dunk", "DUNK"), ("catch_shoot", "C&S"),
          ("iso", "ISO"), ("putback", "PUTBACK"), ("wide_open", "OPEN"), ("contested", "CONTESTED")]
 
@@ -246,6 +246,18 @@ def player_detail(runner, source, team, name, group="all"):
         rim, dunk = z("rim"), z("dunk")
         return {"rim": (rim[0] + dunk[0], rim[1] + dunk[1]), "mid": z("mid"), "three": z("three"), "post": z("post")}
     my_zone, pool_zone = zone_of(mine), [(zone_of(s), max(1, s.get("games", 1) or 1)) for _, _, s in qualified]
+    # the twelve-zone map: restricted area, paint, elbow, mid wings, baseline, corner / wing / top threes (left and right sides share a value)
+    FINE = [("ra", ("rim", "dunk")), ("paint", ("post",)), ("elbow", ("mid_elbow",)), ("mid_wing", ("mid_wing",)), ("baseline", ("mid_base",)),
+            ("corner3", ("corner3",)), ("wing3", ("wing3",)), ("top3", ("top3",))]
+    def fine_of(stats):
+        diet = stats.get("shot_diet") or {}
+        return {k: (sum(int(diet.get(x + "_made", 0)) for x in keys), sum(int(diet.get(x, 0)) for x in keys)) for k, keys in FINE}
+    fine_me = {k: list(v) for k, v in fine_of(mine).items()}
+    pool_fine = [fine_of(s) for _, _, s in qualified]
+    fine_avg = {}
+    for k, _ in FINE:
+        mm, aa = sum(f[k][0] for f in pool_fine), sum(f[k][1] for f in pool_fine)
+        fine_avg[k] = {"pct": round(100 * mm / aa, 2) if aa else None, "att": aa}
     zone_avg = {}
     for zk in ("rim", "mid", "three", "post"):
         mm, aa = sum(zz[zk][0] for zz, _ in pool_zone), sum(zz[zk][1] for zz, _ in pool_zone)
@@ -276,4 +288,7 @@ def player_detail(runner, source, team, name, group="all"):
     diet = st.get("shot_diet") or {}
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
     return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
-            "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")}}
+            "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")},
+            "three_split": {"corner": zone("corner3"), "above_break": zone("atb3"), "deep": zone("deep3"), "wing": zone("wing3"), "top": zone("top3")},
+            "mid_split": {"base": zone("mid_base"), "elbow": zone("mid_elbow"), "wing": zone("mid_wing")},
+            "fine": fine_me, "fine_avg": fine_avg}
