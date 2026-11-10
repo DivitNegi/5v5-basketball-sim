@@ -1542,7 +1542,7 @@ function renderCompare2() {
       api.get(`/api/stats/player?source=${src}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`).then((det) => {
         if (GV.comp[side][1] !== name) return;
         if (det.error) { col.replaceChildren(h("div", { class: "muted" }, det.error)); return; }
-        col.replaceChildren(h("h3", { class: "cmp-name", style: { margin: "0 0 -6px" } }, name), ...playerInsights(det, chartColor(identOf(team))).filter(Boolean));
+        col.replaceChildren(h("h3", { class: "cmp-name", style: { margin: "0 0 -6px" } }, name), insightsBox(det, chartColor(identOf(team)), (g) => api.get(`/api/stats/player?source=${src}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
       }).catch(() => col.replaceChildren(h("div", { class: "muted" }, "Could not load.")));
       return col;
     })));
@@ -2032,12 +2032,25 @@ function seasonShotChart(name, zones) {
     h("div", { class: "muted", style: { fontSize: "12px", textAlign: "center", marginTop: "4px" } }, "Built from his zone totals: each shot sits somewhere inside its zone"));
 }
 // the radar vs the league, shot diet, zone cards and shot chart for one player (pop-up and Compare share it)
+// the panels plus a "compare to" switch: everyone, or only guards / forwards / centers (every radar re-ranks him against that group)
+function insightsBox(first, color, fetchGroup) {
+  const box = h("div", {}); let grp = first.group || "all";
+  const paint = (det) => {
+    const seg = h("div", { class: "seg small" }, [["all", "Everyone"], ["guards", "Guards"], ["forwards", "Forwards"], ["centers", "Centers"]].map(([k, l]) => h("button", { class: grp === k ? "on" : "", onclick: async () => {
+      grp = k; box.style.opacity = ".55";
+      try { paint(await fetchGroup(k)); } catch { /* keep the current graphs */ } finally { box.style.opacity = ""; }
+    } }, l)));
+    box.replaceChildren(h("div", { class: "filters", style: { marginTop: "14px", alignItems: "center" } }, h("span", { class: "muted" }, "Compare to"), seg, det.position ? h("span", { class: "muted" }, `he plays ${det.position === "guards" ? "guard" : det.position === "forwards" ? "forward" : "center"}`) : null), ...playerInsights(det, color).filter(Boolean));
+  };
+  paint(first);
+  return box;
+}
 function playerInsights(d, color) {
   const zoneRow = h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
   const hasZones = Object.values(d.shots).some((z) => z[1] > 0);
   return [
     h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, "Compared to the league"),
-      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} players with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
+      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} ${d.group && d.group !== "all" ? d.group : "players"} with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
       percentileRadar(d.ranks, color)),
     // the advanced stats, one radar per theme (impact / scoring & efficiency / defense, rebounding & playmaking)
     ...(d.adv_groups || []).filter((g) => g.ranks.some((r) => r.pct != null)).map((g) => h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `${g.title} · compared to the league`),
@@ -2081,7 +2094,7 @@ async function openStatsPlayer(team, name, source) {
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`)), h("div", { style: { marginLeft: "auto" } }, seg)),
     tiles,
-    ...playerInsights(d, color));
+    insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
 }
 
 function renderStatsInto(root, data, opts = {}) {

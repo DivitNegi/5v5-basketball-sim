@@ -123,7 +123,25 @@ def _metrics(st):
     return out
 
 
-def player_detail(runner, source, team, name):
+_POS_CACHE = {}   # team name -> {player name: position}, built from the team factories
+
+
+def _positions(runner, team_name):
+    if team_name not in _POS_CACHE:
+        pos = {}
+        try:
+            for p in runner.factories[team_name]().roster:
+                pos[p.name] = p.position
+        except Exception:
+            pass
+        _POS_CACHE[team_name] = pos
+    return _POS_CACHE[team_name]
+
+
+POSITION_GROUPS = {"PG": "guards", "SG": "guards", "G": "guards", "SF": "forwards", "PF": "forwards", "F": "forwards", "C": "centers"}
+
+
+def player_detail(runner, source, team, name, group="all"):
     sec = runner.sections or {}
     data = datasets(sec)
     if source not in data:
@@ -136,6 +154,8 @@ def player_detail(runner, source, team, name):
     max_gp = max((s["games"] for _, _, s in pool), default=1)
     min_gp = max(1, round(0.2 * max_gp)) if max_gp > 1 else 1
     qualified = [(tn, pn, s) for tn, pn, s in pool if s["games"] >= min_gp]
+    if group in ("guards", "forwards", "centers"):   # rank him only against his own position group
+        qualified = [(tn, pn, s) for tn, pn, s in qualified if POSITION_GROUPS.get(_positions(runner, tn).get(pn)) == group]
     st = defaultdict(float, mine)
     g = max(1, st["games"])
     metrics = _metrics(st)
@@ -230,4 +250,4 @@ def player_detail(runner, source, team, name):
     diet = st.get("shot_diet") or {}
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
     return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks,
-            "pool": len(qualified), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")}}
+            "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")}}

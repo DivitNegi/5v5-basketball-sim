@@ -1067,7 +1067,7 @@ def build_app():
                     (params.get("team") or ["All teams"])[0],
                     (params.get("quarter") or ["All"])[0]))
             if path == "/api/stats/player":
-                return self._json(stats_player_detail(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
+                return self._json(stats_player_detail(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0], (params.get("group") or ["all"])[0]))
             if path == "/api/coach":
                 return self._json(coach_payload())
             if path == "/api/fantasy":
