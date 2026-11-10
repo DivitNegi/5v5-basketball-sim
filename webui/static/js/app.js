@@ -2035,12 +2035,14 @@ function seasonShotChart(name, zones) {
 // the panels plus a "compare to" switch: everyone, or only guards / forwards / centers (every radar re-ranks him against that group)
 function insightsBox(first, color, fetchGroup) {
   const box = h("div", {}); let grp = first.group || "all";
+  const mine = first.position;   // "guards" | "forwards" | "centers" ("" when his position is unknown)
   const paint = (det) => {
-    const seg = h("div", { class: "seg small" }, [["all", "Everyone"], ["guards", "Guards"], ["forwards", "Forwards"], ["centers", "Centers"]].map(([k, l]) => h("button", { class: grp === k ? "on" : "", onclick: async () => {
+    const options = [["all", "Everyone"], ...(mine ? [[mine, `All ${mine}`]] : [])];   // only his own position group is offered: a guard vs all guards (PG and SG), a forward vs all forwards (SF and PF)
+    const seg = h("div", { class: "seg small" }, options.map(([k, l]) => h("button", { class: grp === k ? "on" : "", onclick: async () => {
       grp = k; box.style.opacity = ".55";
       try { paint(await fetchGroup(k)); } catch { /* keep the current graphs */ } finally { box.style.opacity = ""; }
     } }, l)));
-    box.replaceChildren(h("div", { class: "filters", style: { marginTop: "14px", alignItems: "center" } }, h("span", { class: "muted" }, "Compare to"), seg, det.position ? h("span", { class: "muted" }, `he plays ${det.position === "guards" ? "guard" : det.position === "forwards" ? "forward" : "center"}`) : null), ...playerInsights(det, color).filter(Boolean));
+    box.replaceChildren(h("div", { class: "filters", style: { marginTop: "14px", alignItems: "center" } }, h("span", { class: "muted" }, "Compare to"), seg), ...playerInsights(det, color).filter(Boolean));
   };
   paint(first);
   return box;
