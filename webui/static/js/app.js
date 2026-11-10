@@ -2010,10 +2010,10 @@ function proCourt() {
     <path d="M500 70 H40 Q30 70 30 80 V560 Q30 570 40 570 H500" ${lc}/>
     <path d="M30 100 H172 A237.5 237.5 0 0 1 172 540 H30" ${lc}/>
     <rect x="30" y="240" width="190" height="160" ${lc}/>
-    <path d="M220 260 A60 60 0 0 1 220 380" ${lc}/><path d="M220 260 A60 60 0 0 0 220 380" ${lc} stroke-dasharray="5 7" stroke-opacity=".4"/>
+    <path d="M220 260 A60 60 0 0 1 220 380" ${lc}/><path class="decor" d="M220 260 A60 60 0 0 0 220 380" ${lc} stroke-dasharray="5 7" stroke-opacity=".4"/>
     <path d="M82.5 280 A40 40 0 0 1 82.5 360" ${lc}/>
     <path d="M500 70 V570" ${lc} stroke-dasharray="3 8" stroke-opacity=".35"/>
-    ${[260, 276, 292].map((x) => `<path d="M${x} 232 v8 M${x} 400 v8" ${lc} stroke-opacity=".4"/>`).join("")}
+    ${[260, 276, 292].map((x) => `<path class="decor" d="M${x} 232 v8 M${x} 400 v8" ${lc} stroke-opacity=".4"/>`).join("")}
     <g class="hoop"><line x1="70" y1="290" x2="70" y2="350" stroke="#e8edf6" stroke-width="3.5" stroke-linecap="round"/><circle cx="82.5" cy="320" r="7.5" stroke="#f5a524" stroke-width="3" fill="none"/></g>`;
 }
 const PC_ZONES = [["rim", "Rim"], ["mid", "Midrange"], ["three", "3-pt"], ["post", "Post"]];
@@ -2054,37 +2054,49 @@ function seasonShotChart(name, zones, avg, vs) {
     const label = (x, y, key, big, small) => {
       const { m, a, pct, diff } = zoneInfo(key);
       const g = svgEl("g", { class: "zone-label", transform: `translate(${x} ${y})`, "text-anchor": "middle" });
-      const t1 = svgEl("text", { y: 0, "font-size": big ? 26 : 20, "font-weight": 800, class: "zl-main" }); t1.textContent = pct == null ? "–" : `${pct.toFixed(0)}%`;
-      const t2 = svgEl("text", { y: big ? 20 : 16, "font-size": big ? 13 : small ? 10 : 12, "font-weight": 700, class: "zl-diff" }); t2.textContent = diff == null ? "" : `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}${small ? "" : ` vs ${vs}`}`;
+      const t1 = svgEl("text", { y: 0, "font-size": big ? 28 : 21, "font-weight": 800, class: "zl-main" }); t1.textContent = pct == null ? "–" : `${pct.toFixed(0)}%`;
+      const t2 = svgEl("text", { y: big ? 23 : 17, "font-size": big ? 17 : 13, "font-weight": 800, class: `zl-diff ${diff == null ? "" : diff >= 0 ? "up" : "down"}` });
+      t2.textContent = diff == null ? "" : `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)}`;
       g.append(t1, t2);
-      if (!small) { const t3 = svgEl("text", { y: big ? 36 : 30, "font-size": 11, class: "zl-att" }); t3.textContent = `${m}/${a}`; g.append(t3); }
+      if (!small) { const t3 = svgEl("text", { y: big ? 40 : 31, "font-size": 11, class: "zl-att" }); t3.textContent = `${m}/${a}`; g.append(t3); }
       return g;
     };
-    zoneG.append(label(410, 305, "three", true), label(205, 178, "mid", false), label(170, 312, "post", false), label(82.5, 318, "rim", false, true));
+    zoneG.append(label(410, 300, "three", true), label(205, 178, "mid", false), label(172, 300, "post", false), label(82.5, 322, "rim", false, true));
   };
   const paint = () => {
     dots.replaceChildren(); heat.replaceChildren(); zoneG.replaceChildren();
     legend.style.visibility = state.view === "zones" ? "visible" : "hidden";
-    svg.querySelector(".hoop").style.display = state.view === "zones" ? "none" : "";   // the zone labels sit where the hoop is
+    svg.querySelectorAll(".hoop, .decor").forEach((el) => { el.style.display = state.view === "zones" ? "none" : ""; });   // the zone labels sit where the hoop and the free-throw arc are
     if (state.view === "heat") { heat.append(heatImage(events, side0)); return; }
     if (state.view === "zones") { paintZones(); return; }
-    // many dots hide each other: draw at most 360, spread evenly over the zones; misses first so the makes sit on top
-    const step = Math.max(1, Math.ceil(total / 360)), misses = [], makes = [];
-    for (let i = 0; i < events.length; i += step) (events[i].made ? makes : misses).push(events[i]);
-    for (const ev of misses) {
-      const [x, y] = shotSpot(ev, 0);
-      dots.append(svgEl("path", { d: `M${(x - 3.6).toFixed(1)} ${(y - 3.6).toFixed(1)} l7.2 7.2 m0 -7.2 l-7.2 7.2`, class: "sd-miss" }));
+    // dots never sit on top of each other: pick a fair sample of each zone (made and missed in their real proportion), then place every dot where
+    // it clears the ones already down. A busy zone shows fewer dots than shots; the heat and zone views carry the real volume.
+    const budget = Math.min(total, 300), placed = [], cell = 11, grid = new Map(), key = (x, y) => `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
+    const clear = (x, y, d) => { for (let gx = -1; gx <= 1; gx++) for (let gy = -1; gy <= 1; gy++) for (const q of grid.get(`${Math.floor(x / cell) + gx},${Math.floor(y / cell) + gy}`) || []) if ((q[0] - x) ** 2 + (q[1] - y) ** 2 < d * d) return false; return true; };
+    const picks = [];
+    for (const [zk] of PC_ZONES) {
+      const zl = events.filter((e) => e.zone === zk), k = Math.min(zl.length, Math.max(zl.length ? 1 : 0, Math.round(zl.length * budget / Math.max(1, total))));
+      for (let i = 0; i < k; i++) picks.push(zl[Math.min(zl.length - 1, Math.floor((i + 0.5) * zl.length / k))]);
     }
-    for (const ev of makes) {
-      const [x, y] = shotSpot(ev, 0);
-      dots.append(svgEl("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: 4.6, class: "sd-make" }));
-    }
+    const spot = (ev) => {
+      let best = null;
+      for (let t = 0; t < 40; t++) {
+        const [x, y] = shotSpot({ ...ev, n: ev.n + t * 7919 }, 0, true);
+        if (clear(x, y, 10.5)) { best = [x, y]; break; }
+        if (!best) best = [x, y];
+      }
+      const ok = clear(best[0], best[1], 10.5);
+      if (ok) { placed.push(best); const kk = key(best[0], best[1]); (grid.get(kk) || grid.set(kk, []).get(kk)).push(best); }
+      return ok ? best : null;   // no room left in that zone: skip the dot rather than stack it
+    };
+    for (const ev of picks.filter((e) => !e.made)) { const s = spot(ev); if (s) dots.append(svgEl("path", { d: `M${(s[0] - 3.6).toFixed(1)} ${(s[1] - 3.6).toFixed(1)} l7.2 7.2 m0 -7.2 l-7.2 7.2`, class: "sd-miss" })); }
+    for (const ev of picks.filter((e) => e.made)) { const s = spot(ev); if (s) dots.append(svgEl("circle", { cx: s[0].toFixed(1), cy: s[1].toFixed(1), r: 4.4, class: "sd-make" })); }
   };
   const made = events.filter((e) => e.made).length;
   const tabs = h("div", { class: "seg small pc-tabs" }, [["shots", "Shots"], ["heat", "Heat map"], ["zones", `Zones vs ${vs}`]].map(([k, l]) => h("button", { class: state.view === k ? "on" : "", onclick: (e) => {
     state.view = k; tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint();
   } }, l)));
-  const legend = h("div", { class: "pc-zlegend", style: { visibility: "hidden" } }, h("span", {}, "below"), h("i", {}), h("span", {}, `${vs} average`), h("i", { class: "up" }), h("span", {}, "above"));
+  const legend = h("div", { class: "pc-zlegend", style: { visibility: "hidden" } }, h("span", {}, "below"), h("i", {}), h("span", {}, `${vs} average (+/− = his FG% minus it)`), h("i", { class: "up" }), h("span", {}, "above"));
   paint();
   return h("div", { class: "pc-map-wrap" }, tabs, svg, legend,
     h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG", h("span", { class: "muted" }, ` · ${total ? (100 * made / total).toFixed(1) : "–"}%`)), h("span", { class: "lg make" }, "● make"), h("span", { class: "lg miss" }, "✕ miss")),
@@ -2106,17 +2118,18 @@ function insightsBox(first, color, fetchGroup) {
   return box;
 }
 function playerInsights(d, color) {
+  const cmpLbl = !d.group || d.group === "all" ? "the league" : `other ${d.group}`;
   const zoneRow = h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
   const hasZones = Object.values(d.shots).some((z) => z[1] > 0);
   return [
-    h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, "Compared to the league"),
+    h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, `Compared to ${cmpLbl}`),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} ${d.group && d.group !== "all" ? d.group : "players"} with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
       percentileRadar(d.ranks, color)),
     // the advanced stats, one radar per theme (impact / scoring & efficiency / defense, rebounding & playmaking)
-    ...(d.adv_groups || []).filter((g) => g.ranks.some((r) => r.pct != null)).map((g) => h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `${g.title} · compared to the league`),
+    ...(d.adv_groups || []).filter((g) => g.ranks.some((r) => r.pct != null)).map((g) => h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `${g.title} · compared to ${cmpLbl}`),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, g.desc), percentileRadar(g.ranks, color))),
     hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(d.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null,
-    hasZones && d.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Shot zones · compared to the league"),
+    hasZones && d.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot zones · compared to ${cmpLbl}`),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "For the rim, midrange, three and post: how well he shoots it (FG%) and how often he shoots it (shots a game), ranked against the other players. A zone he barely uses shows 0 for FG%."),
       percentileRadar(d.zone_ranks, color)) : null,
     hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group)) : null,
@@ -2219,14 +2232,14 @@ const SHOT_CHARTS = [];
 const SC_GEO = { W: 1000, H: 600, X0: 30, Y0: 70, CW: 940, CH: 500, CY: 320, HX: 82.5 };
 const hashStr = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; };
 const rng = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-function shotSpot(ev, side) {
+function shotSpot(ev, side, spread = false) {
   const rnd = rng(hashStr(ev.player) ^ Math.imul(ev.n + 1, 2654435761));
   const { HX, CY, Y0, CH } = SC_GEO, HY = CY;
   const polar = (rMin, rMax, aMax) => { const r = rMin + (rMax - rMin) * Math.sqrt(rnd()), a = (rnd() * 2 - 1) * aMax; return [HX + r * Math.cos(a), HY + r * Math.sin(a)]; };
   let x, y;
   const z = ev.zone;
   if (z === "dunk") [x, y] = polar(2, 20, 1.2);
-  else if (z === "rim") [x, y] = polar(10, 40, 1.35);
+  else if (z === "rim") [x, y] = spread ? polar(8, 56, 1.45) : polar(10, 40, 1.35);
   else if (z === "post") [x, y] = polar(45, 105, 1.0);
   else if (z === "three") {
     if (rnd() < 0.2) { x = 45 + rnd() * 120; y = rnd() < 0.5 ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
