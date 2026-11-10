@@ -1919,7 +1919,7 @@ async function openTeamCard(team) {
       h("div", { class: "stat-tiles" }, tile("PPG", fmt(pg.pts)), tile("OPP PPG", fmt(pg.opp_pts)), tile("RPG", fmt(pg.reb)), tile("APG", fmt(pg.ast)), tile("SPG", fmt(pg.stl)), tile("BPG", fmt(pg.blk)), tile("TOV", fmt(pg.tov)),
         tile("FG%", fmt(pg.fgp)), tile("3P%", fmt(pg.tpp)), tile("FT%", fmt(pg.ftp))),
       h("div", { class: "pc-viz", style: { gridTemplateColumns: "1.4fr 1fr", marginTop: "12px" } },
-        h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the other ${d.pool - 1} teams. Defense and turnovers are flipped so higher is always better.`), percentileRadar(d.ranks, chartColor())),
+        h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, ranked among the ${d.pool} teams (1st = best). Defense and turnovers count lower as better, so a longer spoke is always better.`), percentileRadar(d.ranks, chartColor())),
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
           d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)));
   };
@@ -1940,7 +1940,7 @@ function percentileRadar(ranks, color) {
     + `<text x="${C + 6}" y="${CY - R * 0.5 + 14}" class="pr-tick">50%</text><text x="${C + 6}" y="${CY - R + 14}" class="pr-tick">100%</text>`;
   ranks.forEach((r, i) => {
     const [x, y] = pt(i, 1.2), anchor = Math.abs(x - C) < 14 ? "middle" : x < C ? "end" : "start";
-    html += `<text x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="${anchor}" class="pr-lbl">${r.label}</text><text x="${x.toFixed(1)}" y="${(y + 12).toFixed(1)}" text-anchor="${anchor}" class="pr-pct">${r.pct == null ? "n/a" : (r.pct >= 99 ? "(leader)" : `(${ordinal(r.pct)})`)} · ${r.value ?? "–"}</text>`;
+    html += `<text x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="${anchor}" class="pr-lbl">${r.label}</text><text x="${x.toFixed(1)}" y="${(y + 12).toFixed(1)}" text-anchor="${anchor}" class="pr-pct">${r.pct == null ? "n/a" : r.rank ? (r.rank === 1 ? "(best)" : `(${ordinal(r.rank)} of ${r.of})`) : (r.pct >= 99 ? "(leader)" : `(${ordinal(r.pct)})`)} · ${r.value ?? "–"}</text>`;
   });
   svg.innerHTML = html;
   return svg;

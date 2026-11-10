@@ -479,12 +479,11 @@ def team_card_payload(runner, team):
                 v = None
             if v is not None:
                 pop.append(v)
-        below = sum(1 for v in pop if v < val - 1e-9)
-        equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
-        pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
-        if pct is not None and lower:
-            pct = 100 - pct
-        ranks.append({"label": label, "value": round(val, 1), "pct": pct})
+        # the team's place among the teams (1 = best; defense and turnovers count lower as better); the radar spoke runs from last (0) to first (100)
+        better = sum(1 for v in pop if (v < val - 1e-9 if lower else v > val + 1e-9))
+        rank = 1 + better
+        pct = round(100 * (len(pop) - rank) / (len(pop) - 1)) if len(pop) > 1 else 100
+        ranks.append({"label": label, "value": round(val, 1), "pct": pct, "rank": rank, "of": len(pop)})
     per = {k: round(mine.get(k, 0) / g, 1) for k in ("pts", "reb", "ast", "stl", "blk", "tov")}
     per["opp_pts"] = round(mine.get("opp_pts", 0) / max(1, mine.get("opp_games", 0) or g), 1) if mine.get("opp_pts") is not None else None
     pct = lambda m, a: round(100 * mine.get(m, 0) / mine[a], 1) if mine.get(a) else None
