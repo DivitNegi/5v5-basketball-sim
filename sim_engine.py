@@ -13985,14 +13985,24 @@ def _team_and_opponent_for(player: Player) -> Tuple[Team | None, Team | None]:
     return None, None
 
 
-HOT_START_USAGE = 0.26          # a star for this purpose: his usage or his shot tendency is already high
-HOT_START_SHOT_TENDENCY = 0.50
 HOT_START_TOUCH_BOOST = 1.30    # how much more often a star who started hot is the one shooting
 HOT_START_FGA_BONUS = 4.0       # and how many more shots he may take before his usual volume limit pulls him back
 
 
+def team_top_options(team) -> tuple:
+    """The team's first and second option: its two highest-rated players (by overall). Worked out once per team object."""
+    names = getattr(team, "_top_options", None)
+    if names is None:
+        ranked = sorted(team.roster, key=fantasy_ovr_uncapped, reverse=True)
+        names = tuple(p.name for p in ranked[:2])
+        team._top_options = names
+    return names
+
+
 def is_hot_start_star(player: Player) -> bool:
-    return player.usage >= HOT_START_USAGE or player.shot_tendency >= HOT_START_SHOT_TENDENCY
+    """A star here is his team's first or second option, whatever his usage or shot tendency says."""
+    team, _opponent = _team_and_opponent_for(player)
+    return team is not None and player.name in team_top_options(team)
 
 
 def update_hot_start(player: Player):
