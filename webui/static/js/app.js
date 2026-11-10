@@ -818,7 +818,7 @@ function raceCard(title, list) {
   return h("div", { class: "race-card" }, h("h3", {}, title),
     list.map((r, i) => {
       const id = identOf(r.team);
-      return h("div", { class: `race-item ${i === 0 ? "lead" : ""}`, style: { "--c": id.color || "#64748b" } },
+      return h("div", { class: `race-item clickable ${i === 0 ? "lead" : ""}`, title: "Click for full stats", style: { "--c": id.color || "#64748b" }, onclick: () => openStatsPlayer(r.team, r.player, "Season") },
         h("div", { class: "rk" }, r.rank),
         h("div", { class: "rb" }, h("div", { class: "rtop" }, faceEl(r.player), h("div", {}, h("div", { class: "who" }, r.player), h("div", { class: "tm" }, logoEl(id), shortTeam(r.team)))), statChips(r.stats)));
     }));
@@ -842,7 +842,7 @@ function renderRaces() {
       const id = identOf(a.team);
       const nm = cleanName(a.player);
       const isPlayer = !/\bwin\b/i.test(nm);
-      return h("div", { class: "award-item", style: { "--c": id.color || "#64748b" } }, h("div", { class: "rtop" }, isPlayer ? faceEl(nm) : null, h("div", {}, h("div", { class: "p" }, a.player), h("div", { class: "tm" }, logoEl(id), shortTeam(a.team)))), statChips(a.stats));
+      return h("div", { class: `award-item${isPlayer ? " clickable" : ""}`, title: isPlayer ? "Click for full stats" : "", style: { "--c": id.color || "#64748b" }, onclick: isPlayer ? () => openStatsPlayer(a.team, nm, "Season") : null }, h("div", { class: "rtop" }, isPlayer ? faceEl(nm) : null, h("div", {}, h("div", { class: "p" }, a.player), h("div", { class: "tm" }, logoEl(id), shortTeam(a.team)))), statChips(a.stats));
     })));
   return cards.length ? h("div", {}, h("div", { class: "muted", style: { marginBottom: "10px" } }, "Final season awards"), h("div", { class: "award-grid" }, cards)) : h("div", { class: "empty" }, "Awards are given out when the regular season ends.");
 }

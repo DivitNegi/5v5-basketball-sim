@@ -809,3 +809,6 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 
 /* square face-only photos fill the frame without the extra zoom the wide NBA headshots get */
 .face img.sq, .pcard-face img.sq { width: 100%; height: 100%; margin-top: 0; object-fit: cover; object-position: center 20%; }
+
+.race-item.clickable, .award-item.clickable { cursor: pointer; }
+.race-item.clickable:hover, .award-item.clickable:hover { filter: brightness(1.12); }
