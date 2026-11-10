@@ -2076,17 +2076,20 @@ function seasonShotChart(name, zones, avg, vs) {
     svg.querySelectorAll(".hoop, .decor").forEach((el) => { el.style.display = state.view === "zones" ? "none" : ""; });   // the zone labels sit where the hoop and the free-throw arc are
     if (state.view === "heat") { heat.append(heatImage(events, side0)); return; }
     if (state.view === "zones") { paintZones(); return; }
-    // the original look: a ring for every make and an X for every miss, every shot drawn (up to 450 so a huge season stays readable); misses go down first
-    const step = Math.max(1, Math.ceil(total / 450)), misses = [], makes = [];
-    for (let i = 0; i < events.length; i += step) (events[i].made ? makes : misses).push(events[i]);
-    for (const ev of misses) {
-      const [x, y] = shotSpot(ev, 0);
-      dots.append(svgEl("path", { d: `M${(x - 6).toFixed(1)} ${(y - 6).toFixed(1)} l12 12 m0 -12 l-12 12`, class: "sd-miss" }));
+    // every shot gets its own small mark (a 500-shot midrange is 500 marks): a ring for a make, an X for a miss; misses go down first so makes sit on top.
+    // The glow is one soft filter per group, not one per mark.
+    const missG = svgEl("g", { class: "g-miss" }), makeG = svgEl("g", { class: "g-make" });
+    for (const ev of events) {
+      if (ev.made) continue;
+      const [x, y] = shotSpot(ev, 0, true);
+      missG.append(svgEl("path", { d: `M${(x - 2.8).toFixed(1)} ${(y - 2.8).toFixed(1)} l5.6 5.6 m0 -5.6 l-5.6 5.6`, class: "sd-miss" }));
     }
-    for (const ev of makes) {
-      const [x, y] = shotSpot(ev, 0);
-      dots.append(svgEl("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: 8, class: "sd-make" }));
+    for (const ev of events) {
+      if (!ev.made) continue;
+      const [x, y] = shotSpot(ev, 0, true);
+      makeG.append(svgEl("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: 3.3, class: "sd-make" }));
     }
+    dots.append(missG, makeG);
   };
   const made = events.filter((e) => e.made).length;
   const tabs = h("div", { class: "seg small pc-tabs" }, [["shots", "Shots"], ["heat", "Heat map"], ["zones", `Zones vs ${vs}`]].map(([k, l]) => h("button", { class: state.view === k ? "on" : "", onclick: (e) => {
