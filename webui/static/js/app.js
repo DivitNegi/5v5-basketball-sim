@@ -2039,13 +2039,13 @@ function playerInsights(d, color) {
     h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, "Compared to the league"),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, against the ${d.pool} players with at least ${d.min_gp} game${d.min_gp === 1 ? "" : "s"}. The higher the percentile, the better he compares.`),
       percentileRadar(d.ranks, color)),
-    d.adv_ranks?.some((r) => r.pct != null) ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Advanced stats · compared to the league"),
-      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "PER, win shares, box plus-minus, usage and the percentage stats, ranked against the same players. Turnover % is flipped so higher is always better."),
-      percentileRadar(d.adv_ranks, color)) : null,
-    d.adv_ranks2?.some((r) => r.pct != null) ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "More advanced stats · compared to the league"),
-      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "True shooting, free-throw and three-point rates, offensive and defensive rebound %, win shares split into offense and defense, and the offense / defense / impact ratings."),
-      percentileRadar(d.adv_ranks2, color)) : null,
+    // the advanced stats, one radar per theme (impact / scoring & efficiency / defense, rebounding & playmaking)
+    ...(d.adv_groups || []).filter((g) => g.ranks.some((r) => r.pct != null)).map((g) => h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `${g.title} · compared to the league`),
+      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, g.desc), percentileRadar(g.ranks, color))),
     hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(d.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null,
+    hasZones && d.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Shot zones · compared to the league"),
+      h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "For the rim, midrange, three and post: how well he shoots it (FG%) and how often he shoots it (shots a game), ranked against the other players. A zone he barely uses shows 0 for FG%."),
+      percentileRadar(d.zone_ranks, color)) : null,
     hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots)) : null,
   ];
 }

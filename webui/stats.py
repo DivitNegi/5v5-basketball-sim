@@ -160,8 +160,6 @@ def player_detail(runner, source, team, name):
         ranks.append({"key": key, "label": label, "value": round(val, 1), "pct": pct})
     # advanced radar: the same formulas as the Advanced table, ranked against the same qualified players
     ADV_NAMES = ["MPG", "PER", "TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "USG%", "OWS", "DWS", "WS", "WS/48", "OBPM", "DBPM", "BPM", "VORP", "OFF", "DEF", "IMPACT", "+/-", "DOUBLES/G"]
-    ADV_PICK = [("PER", "PER", False), ("WS/48", "Win Shares / 48", False), ("BPM", "Box +/-", False), ("VORP", "VORP", False), ("OBPM", "Off. Box +/-", False), ("DBPM", "Def. Box +/-", False),
-                ("USG%", "Usage %", False), ("AST%", "Assist %", False), ("TRB%", "Rebound %", False), ("STL%", "Steal %", False), ("BLK%", "Block %", False), ("TOV%", "Ball security (TOV%)", True)]
     def adv_row(tn, stats):
         try:
             tt = defaultdict(float, teams_tot.get(tn, {}))
@@ -173,8 +171,17 @@ def player_detail(runner, source, team, name):
             return None
     my_adv = adv_row(team, mine)
     adv_pool = [r for r in (adv_row(tn, s) for tn, _, s in qualified) if r]
-    ADV_PICK2 = [("TS%", "True Shooting %", False), ("FTr", "Free Throw Rate", False), ("3PAr", "3-pt Attempt Rate", False), ("ORB%", "Off. Rebound %", False), ("DRB%", "Def. Rebound %", False),
-                 ("OWS", "Off. Win Shares", False), ("DWS", "Def. Win Shares", False), ("WS", "Win Shares", False), ("OFF", "Offense rating", False), ("DEF", "Defense rating", False), ("IMPACT", "Impact", False)]
+    # the advanced stats, grouped by what they describe; each group is its own radar
+    ADV_GROUPS = [
+        ("Overall impact", "How much he helps his team win: PER, win shares, box plus-minus, VORP and the overall impact rating.",
+         [("PER", "PER", False), ("WS", "Win Shares", False), ("WS/48", "Win Shares / 48", False), ("BPM", "Box +/-", False), ("VORP", "VORP", False), ("IMPACT", "Impact", False)]),
+        ("Scoring & efficiency", "How he scores and how efficiently: shooting efficiency, how often he shoots threes and gets to the line, his usage and his offensive value.",
+         [("TS%", "True Shooting %", False), ("eFG%", "Effective FG %", False), ("FTr", "Free Throw Rate", False), ("3PAr", "3-pt Attempt Rate", False), ("USG%", "Usage %", False),
+          ("OWS", "Off. Win Shares", False), ("OBPM", "Off. Box +/-", False), ("OFF", "Offense rating", False)]),
+        ("Defense, rebounding & playmaking", "What he does without scoring: defensive value, rebounding, steals, blocks, passing and ball security (turnover % is flipped so higher is better).",
+         [("DWS", "Def. Win Shares", False), ("DBPM", "Def. Box +/-", False), ("DEF", "Defense rating", False), ("ORB%", "Off. Rebound %", False), ("DRB%", "Def. Rebound %", False),
+          ("TRB%", "Rebound %", False), ("STL%", "Steal %", False), ("BLK%", "Block %", False), ("AST%", "Assist %", False), ("TOV%", "Ball security (TOV%)", True)]),
+    ]
     def rank_adv(picks):
         out = []
         for key, label, lower in picks:
@@ -187,13 +194,40 @@ def player_detail(runner, source, team, name):
             pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
             if pct is not None and lower:
                 pct = 100 - pct
-            out.append({"key": key, "label": label, "value": round(val, 3 if key in ("WS/48", "TS%", "FTr", "3PAr") and abs(val) < 2 else 1), "pct": pct})
+            out.append({"key": key, "label": label, "value": round(val, 3 if abs(val) < 2 else 1), "pct": pct})
         return out
-    adv_ranks, adv_ranks2 = rank_adv(ADV_PICK), rank_adv(ADV_PICK2)
+    adv_groups = [{"title": t, "desc": d, "ranks": rank_adv(pk)} for t, d, pk in ADV_GROUPS]
+    # shot-zone radar: for each zone, how well he shoots it (FG%) and how much he shoots it (attempts a game), against players who use that zone
+    def zone_of(stats):
+        diet = stats.get("shot_diet") or {}
+        z = lambda k: (int(diet.get(k + "_made", 0)), int(diet.get(k, 0)))
+        rim, dunk = z("rim"), z("dunk")
+        return {"rim": (rim[0] + dunk[0], rim[1] + dunk[1]), "mid": z("mid"), "three": z("three"), "post": z("post")}
+    my_zone, pool_zone = zone_of(mine), [(zone_of(s), max(1, s.get("games", 1) or 1)) for _, _, s in qualified]
+    zone_ranks = []
+    for key, label, floor in (("rim", "Rim", 0.5), ("mid", "Midrange", 0.4), ("three", "3-pt", 0.5), ("post", "Post", 0.2)):
+        made, att = my_zone[key]
+        for kind in ("fgp", "att"):
+            lbl = f"{label} FG%" if kind == "fgp" else f"{label} shots / game"
+            val = (100 * made / att if att else None) if kind == "fgp" else att / g
+            if val is None or (kind == "fgp" and att / g < floor):
+                zone_ranks.append({"key": f"{key}_{kind}", "label": lbl, "value": None if val is None else round(val, 1), "pct": 0 if val is not None else None}); continue
+            pop = []
+            for zz, gg in pool_zone:
+                m2, a2 = zz[key]
+                if kind == "fgp":
+                    if a2 / gg >= floor:
+                        pop.append(100 * m2 / a2)
+                else:
+                    pop.append(a2 / gg)
+            below = sum(1 for v in pop if v < val - 1e-9)
+            equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
+            pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
+            zone_ranks.append({"key": f"{key}_{kind}", "label": lbl, "value": round(val, 1), "pct": pct})
     keys = ("minutes", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus")
     totals = {k: (round(st[k] / 60, 1) if k == "minutes" else round(st[k], 1) if k == "plus_minus" else int(st[k])) for k in keys}
     per_game = {k: round(st[k] / g / (60 if k == "minutes" else 1), 1) for k in keys}
     diet = st.get("shot_diet") or {}
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
-    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_ranks": adv_ranks, "adv_ranks2": adv_ranks2,
+    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks,
             "pool": len(qualified), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")}}
