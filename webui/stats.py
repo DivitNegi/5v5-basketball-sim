@@ -38,6 +38,23 @@ def datasets(sections):
         result["Live"] = (ps, ts)
     return result
 
+def on_off(st, tt, other, team_minutes):
+    """Team net points per 48 minutes with him on the floor, with him off it, and the difference.
+
+    On-court is his plus-minus over his minutes. Off-court is what the rest of the team's net margin was in the minutes he sat
+    (the team's whole season margin minus his on-court margin, over the team minutes he missed)."""
+    mins = (st.get("minutes", 0) or 0) / 60.0
+    pm = st.get("plus_minus", 0) or 0
+    on = 48.0 * pm / mins if mins > 0 else None
+    opp_pts = tt.get("opp_pts")
+    if opp_pts is None:
+        opp_pts = (other or {}).get("pts", 0)
+    net_total = (tt.get("pts", 0) or 0) - (opp_pts or 0)
+    off_min = team_minutes - mins
+    off = 48.0 * (net_total - pm) / off_min if off_min >= 5 else None
+    return on, off, (on - off if on is not None and off is not None else None)
+
+
 def payload(runner, source="Live", kind="averages", team_filter="All teams", quarter="All"):
     sec = runner.sections or {}
     data = datasets(sec)
@@ -67,7 +84,7 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
     if kind in ("shots", "defense", "matchups"):
         result["columns"] = ["Team", "Player"] + (["Opponent"] if kind == "matchups" else []) + [label for _, label in ZONES] + ["TOTAL"]
     elif kind == "advanced":
-        result["columns"] = ["Team", "Player", "MPG", "PER", "TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "USG%", "OWS", "DWS", "WS", "WS/48", "OBPM", "DBPM", "BPM", "VORP", "OFF", "DEF", "IMPACT", "+/-", "DOUBLES/G"]
+        result["columns"] = ["Team", "Player", "MPG", "PER", "TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "USG%", "OWS", "DWS", "WS", "WS/48", "OBPM", "DBPM", "BPM", "VORP", "OFF", "DEF", "IMPACT", "+/-", "DOUBLES/G", "ON/48", "OFF/48", "ON-OFF"]
     else:
         result["columns"] = ["Team", "Player", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "PF", "FG", "FG%", "3PT", "3PT%", "FT", "FT%", "+/-"]
     for tn, pp in players.items():
@@ -94,7 +111,9 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
                 other = next((v for k, v in teams.items() if k != tn), {})
                 opp = defaultdict(float, {k: tt.get("opp_" + k, v) for k, v in other.items()})
                 adv = engine.calc_series_advanced(st, tt, opp)
-                result["rows"].append([tn, pn] + [round(x, 3 if i in (4, 5, 17) else 1) for i, x in enumerate(adv)])
+                team_min = sum((x.get("minutes", 0) or 0) for x in players.get(tn, {}).values()) / 60.0
+                oo = on_off(st, tt, other, team_min)
+                result["rows"].append([tn, pn] + [round(x, 3 if i in (4, 5, 17) else 1) for i, x in enumerate(adv)] + [None if v is None else round(v, 1) for v in oo])
                 result["gp"].append(st["games"])
             else:
                 pct = lambda m, a: round(100*st[m]/st[a], 1) if st[a] else None
@@ -186,7 +205,10 @@ def player_detail(runner, source, team, name, group="all"):
             other = next((v for k, v in teams_tot.items() if k != tn), {})
             opp = defaultdict(float, {k: tt.get("opp_" + k, v) for k, v in other.items()})
             vals = engine.calc_series_advanced(defaultdict(float, stats), tt, opp)
-            return {n: v for n, v in zip(ADV_NAMES, vals)}
+            row = {n: v for n, v in zip(ADV_NAMES, vals)}
+            team_min = sum((x.get("minutes", 0) or 0) for x in players.get(tn, {}).values()) / 60.0
+            row["ON/48"], row["OFF/48"], row["ON-OFF"] = on_off(stats, tt, other, team_min)
+            return row
         except Exception:
             return None
     my_adv = adv_row(team, mine)
@@ -194,7 +216,7 @@ def player_detail(runner, source, team, name, group="all"):
     # the advanced stats, grouped by what they describe; each group is its own radar
     ADV_GROUPS = [
         ("Overall impact", "How much he helps his team win: PER, win shares, box plus-minus, VORP and the overall impact rating.",
-         [("PER", "PER", False), ("WS", "Win Shares", False), ("WS/48", "Win Shares / 48", False), ("BPM", "Box +/-", False), ("VORP", "VORP", False), ("IMPACT", "Impact", False)]),
+         [("PER", "PER", False), ("WS", "Win Shares", False), ("WS/48", "Win Shares / 48", False), ("BPM", "Box +/-", False), ("VORP", "VORP", False), ("IMPACT", "Impact", False), ("ON-OFF", "On/off (net per 48)", False)]),
         ("Scoring & efficiency", "How he scores and how efficiently: shooting efficiency, how often he shoots threes and gets to the line, his usage and his offensive value.",
          [("TS%", "True Shooting %", False), ("eFG%", "Effective FG %", False), ("FTr", "Free Throw Rate", False), ("3PAr", "3-pt Attempt Rate", False), ("USG%", "Usage %", False),
           ("OWS", "Off. Win Shares", False), ("OBPM", "Off. Box +/-", False), ("OFF", "Offense rating", False)]),
@@ -224,6 +246,10 @@ def player_detail(runner, source, team, name, group="all"):
         rim, dunk = z("rim"), z("dunk")
         return {"rim": (rim[0] + dunk[0], rim[1] + dunk[1]), "mid": z("mid"), "three": z("three"), "post": z("post")}
     my_zone, pool_zone = zone_of(mine), [(zone_of(s), max(1, s.get("games", 1) or 1)) for _, _, s in qualified]
+    zone_avg = {}
+    for zk in ("rim", "mid", "three", "post"):
+        mm, aa = sum(zz[zk][0] for zz, _ in pool_zone), sum(zz[zk][1] for zz, _ in pool_zone)
+        zone_avg[zk] = {"pct": round(100 * mm / aa, 2) if aa else None, "made": mm, "att": aa}
     zone_ranks = []
     for key, label, floor in (("rim", "Rim", 0.5), ("mid", "Midrange", 0.4), ("three", "3-pt", 0.5), ("post", "Post", 0.2)):
         made, att = my_zone[key]
@@ -249,5 +275,5 @@ def player_detail(runner, source, team, name, group="all"):
     per_game = {k: round(st[k] / g / (60 if k == "minutes" else 1), 1) for k in keys}
     diet = st.get("shot_diet") or {}
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
-    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks,
+    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
             "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")}}

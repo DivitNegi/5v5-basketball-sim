@@ -1998,40 +1998,98 @@ function percentileRadar(ranks, color) {
   svg.innerHTML = html;
   return svg;
 }
-// a player's whole-season shot chart for the pop-up: his zone totals (made/attempted) become that many dots placed inside each zone
-function seasonShotChart(name, zones) {
+// a player's whole-season shot chart for the pop-up: his zone totals (made/attempted) become that many dots placed inside each zone.
+// Three views on a drawn half court: the shots themselves, a heat map, and a zone map coloured by how his FG% compares with the league
+// (or with his position group when "Relative to position" is on).
+function proCourt() {
+  const lc = 'stroke="#9db0d3" stroke-opacity=".62" stroke-width="2" fill="none" stroke-linecap="round"';
+  return `<defs><linearGradient id="pcFloor" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#16294a"/><stop offset="1" stop-color="#0e1a31"/></linearGradient>
+      <radialGradient id="pcGlow" cx="0.14" cy="0.5" r="0.7"><stop offset="0" stop-color="#2b4a80" stop-opacity=".35"/><stop offset="1" stop-color="#2b4a80" stop-opacity="0"/></radialGradient></defs>
+    <rect x="30" y="70" width="470" height="500" rx="10" fill="url(#pcFloor)"/><rect x="30" y="70" width="470" height="500" rx="10" fill="url(#pcGlow)"/>
+    <rect x="30" y="240" width="190" height="160" fill="#f5a524" fill-opacity=".07"/>
+    <path d="M500 70 H40 Q30 70 30 80 V560 Q30 570 40 570 H500" ${lc}/>
+    <path d="M30 100 H172 A237.5 237.5 0 0 1 172 540 H30" ${lc}/>
+    <rect x="30" y="240" width="190" height="160" ${lc}/>
+    <path d="M220 260 A60 60 0 0 1 220 380" ${lc}/><path d="M220 260 A60 60 0 0 0 220 380" ${lc} stroke-dasharray="5 7" stroke-opacity=".4"/>
+    <path d="M82.5 280 A40 40 0 0 1 82.5 360" ${lc}/>
+    <path d="M500 70 V570" ${lc} stroke-dasharray="3 8" stroke-opacity=".35"/>
+    ${[260, 276, 292].map((x) => `<path d="M${x} 232 v8 M${x} 400 v8" ${lc} stroke-opacity=".4"/>`).join("")}
+    <g class="hoop"><line x1="70" y1="290" x2="70" y2="350" stroke="#e8edf6" stroke-width="3.5" stroke-linecap="round"/><circle cx="82.5" cy="320" r="7.5" stroke="#f5a524" stroke-width="3" fill="none"/></g>`;
+}
+const PC_ZONES = [["rim", "Rim"], ["mid", "Midrange"], ["three", "3-pt"], ["post", "Post"]];
+function seasonShotChart(name, zones, avg, vs) {
   const events = [];
   let n = 0;
-  for (const [zone, key] of [["rim", "rim"], ["mid", "mid"], ["three", "three"], ["post", "post"]]) {
+  for (const [key] of PC_ZONES) {
     const [made, att] = zones[key] || [0, 0];
-    for (let i = 0; i < att; i++) events.push({ player: name, zone, made: i < made, n: n++, team: "" });
+    for (let i = 0; i < att; i++) events.push({ player: name, zone: key, made: i < made, n: n++, team: "" });
   }
-  const total = events.length, state = { heat: false };
-  const svg = svgEl("svg", { viewBox: "20 52 510 536", class: "court-svg shot-map pc-map" });
-  svg.innerHTML = courtLines();
-  const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" });
-  svg.insertBefore(heat, svg.children[1]); svg.append(dots);
+  const total = events.length, state = { view: "shots" };
+  const svg = svgEl("svg", { viewBox: "20 60 490 520", class: "court-svg pc-map pro" });
+  svg.innerHTML = proCourt();
+  const under = svgEl("g"), heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }), zoneG = svgEl("g", { class: "zonemap" });
+  svg.children[1].after(under); under.append(zoneG, heat); svg.append(dots);
   const side0 = () => 0;
+  const diffColor = (d) => {   // below the average: red; level: slate; above: green
+    const t = Math.max(-1, Math.min(1, d / 12)), mix = (a, b, u) => a.map((c, i) => Math.round(c + (b[i] - c) * u)), base = [100, 116, 139];
+    const c = t >= 0 ? mix(base, [34, 197, 94], t) : mix(base, [239, 68, 68], -t);
+    return `rgb(${c.join(",")})`;
+  };
+  const zoneInfo = (key) => {
+    const [m, a] = zones[key] || [0, 0], av = avg?.[key], pct = a ? 100 * m / a : null;
+    return { m, a, pct, diff: pct != null && av?.pct != null ? pct - av.pct : null };
+  };
+  const paintZones = () => {
+    const shape = (d, key, evenodd) => {
+      const { diff } = zoneInfo(key);
+      return svgEl("path", { d, "fill-rule": evenodd ? "evenodd" : "nonzero", fill: diff == null ? "rgba(100,116,139,.12)" : diffColor(diff), "fill-opacity": diff == null ? 1 : ".55", stroke: "#0b1220", "stroke-width": 2 });
+    };
+    const circle = "M42.5 320 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0";
+    const inner = "M30 100 H172 A237.5 237.5 0 0 1 172 540 H30 Z";
+    zoneG.replaceChildren(
+      shape(`M30 70 H500 V570 H30 Z ${inner}`, "three", true),
+      shape(`${inner} M30 240 H220 V400 H30 Z`, "mid", true),
+      shape(`M30 240 H220 V400 H30 Z ${circle}`, "post", true),
+      shape(`${circle} Z`, "rim", false));
+    const label = (x, y, key, big, small) => {
+      const { m, a, pct, diff } = zoneInfo(key);
+      const g = svgEl("g", { class: "zone-label", transform: `translate(${x} ${y})`, "text-anchor": "middle" });
+      const t1 = svgEl("text", { y: 0, "font-size": big ? 26 : 20, "font-weight": 800, class: "zl-main" }); t1.textContent = pct == null ? "–" : `${pct.toFixed(0)}%`;
+      const t2 = svgEl("text", { y: big ? 20 : 16, "font-size": big ? 13 : small ? 10 : 12, "font-weight": 700, class: "zl-diff" }); t2.textContent = diff == null ? "" : `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}${small ? "" : ` vs ${vs}`}`;
+      g.append(t1, t2);
+      if (!small) { const t3 = svgEl("text", { y: big ? 36 : 30, "font-size": 11, class: "zl-att" }); t3.textContent = `${m}/${a}`; g.append(t3); }
+      return g;
+    };
+    zoneG.append(label(410, 305, "three", true), label(205, 178, "mid", false), label(170, 312, "post", false), label(82.5, 318, "rim", false, true));
+  };
   const paint = () => {
-    dots.replaceChildren(); heat.replaceChildren();
-    if (state.heat) { heat.append(heatImage(events, side0)); return; }
-    // many dots hide each other: draw at most 450, spread evenly over the zones and the makes/misses
-    const step = Math.max(1, Math.ceil(total / 450));
-    for (let i = 0; i < events.length; i += step) {
-      const ev = events[i], [x, y] = shotSpot(ev, 0);
-      const g = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}` });
-      if (ev.made) g.append(svgEl("circle", { r: 8, class: "ring" })); else g.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
-      dots.append(g);
+    dots.replaceChildren(); heat.replaceChildren(); zoneG.replaceChildren();
+    legend.style.visibility = state.view === "zones" ? "visible" : "hidden";
+    svg.querySelector(".hoop").style.display = state.view === "zones" ? "none" : "";   // the zone labels sit where the hoop is
+    if (state.view === "heat") { heat.append(heatImage(events, side0)); return; }
+    if (state.view === "zones") { paintZones(); return; }
+    // many dots hide each other: draw at most 360, spread evenly over the zones; misses first so the makes sit on top
+    const step = Math.max(1, Math.ceil(total / 360)), misses = [], makes = [];
+    for (let i = 0; i < events.length; i += step) (events[i].made ? makes : misses).push(events[i]);
+    for (const ev of misses) {
+      const [x, y] = shotSpot(ev, 0);
+      dots.append(svgEl("path", { d: `M${(x - 3.6).toFixed(1)} ${(y - 3.6).toFixed(1)} l7.2 7.2 m0 -7.2 l-7.2 7.2`, class: "sd-miss" }));
+    }
+    for (const ev of makes) {
+      const [x, y] = shotSpot(ev, 0);
+      dots.append(svgEl("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: 4.6, class: "sd-make" }));
     }
   };
-  paint();
   const made = events.filter((e) => e.made).length;
-  const box = h("input", { type: "checkbox", onchange: (e) => { state.heat = e.target.checked; paint(); } });
-  return h("div", { class: "pc-map-wrap" }, h("label", { class: "chk", style: { display: "flex", gap: "8px", alignItems: "center", margin: "0 0 8px" } }, box, " Heat map"), svg,
-    h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG"), h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss")),
+  const tabs = h("div", { class: "seg small pc-tabs" }, [["shots", "Shots"], ["heat", "Heat map"], ["zones", `Zones vs ${vs}`]].map(([k, l]) => h("button", { class: state.view === k ? "on" : "", onclick: (e) => {
+    state.view = k; tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint();
+  } }, l)));
+  const legend = h("div", { class: "pc-zlegend", style: { visibility: "hidden" } }, h("span", {}, "below"), h("i", {}), h("span", {}, `${vs} average`), h("i", { class: "up" }), h("span", {}, "above"));
+  paint();
+  return h("div", { class: "pc-map-wrap" }, tabs, svg, legend,
+    h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG", h("span", { class: "muted" }, ` · ${total ? (100 * made / total).toFixed(1) : "–"}%`)), h("span", { class: "lg make" }, "● make"), h("span", { class: "lg miss" }, "✕ miss")),
     h("div", { class: "muted", style: { fontSize: "12px", textAlign: "center", marginTop: "4px" } }, "Built from his zone totals: each shot sits somewhere inside its zone"));
 }
-// the radar vs the league, shot diet, zone cards and shot chart for one player (pop-up and Compare share it)
 // the panels plus a "compare to" switch: everyone, or only guards / forwards / centers (every radar re-ranks him against that group)
 function insightsBox(first, color, fetchGroup) {
   const box = h("div", {}); let grp = first.group || "all";
@@ -2042,7 +2100,7 @@ function insightsBox(first, color, fetchGroup) {
       grp = k; box.style.opacity = ".55";
       try { paint(await fetchGroup(k)); } catch { /* keep the current graphs */ } finally { box.style.opacity = ""; }
     } }, l)));
-    box.replaceChildren(h("div", { class: "filters", style: { marginTop: "14px", alignItems: "center" } }, h("span", { class: "muted" }, "Compare to"), seg), ...playerInsights(det, color).filter(Boolean));
+    box.replaceChildren(h("div", { class: "ins-float" }, h("span", { class: "muted" }, "Compare to"), seg), ...playerInsights(det, color).filter(Boolean));
   };
   paint(first);
   return box;
@@ -2061,7 +2119,7 @@ function playerInsights(d, color) {
     hasZones && d.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Shot zones · compared to the league"),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "For the rim, midrange, three and post: how well he shoots it (FG%) and how often he shoots it (shots a game), ranked against the other players. A zone he barely uses shows 0 for FG%."),
       percentileRadar(d.zone_ranks, color)) : null,
-    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots)) : null,
+    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group)) : null,
   ];
 }
 async function openStatsPlayer(team, name, source) {
