@@ -1972,7 +1972,7 @@ async function openTeamCard(team) {
       h("div", { class: "stat-tiles" }, tile("PPG", fmt(pg.pts)), tile("OPP PPG", fmt(pg.opp_pts)), tile("RPG", fmt(pg.reb)), tile("APG", fmt(pg.ast)), tile("SPG", fmt(pg.stl)), tile("BPG", fmt(pg.blk)), tile("TOV", fmt(pg.tov)),
         tile("FG%", fmt(pg.fgp)), tile("3P%", fmt(pg.tpp)), tile("FT%", fmt(pg.ftp))),
       h("div", { class: "pc-viz", style: { gridTemplateColumns: "1.4fr 1fr", marginTop: "12px" } },
-        h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, ranked among the ${d.pool} teams (1st = best). Defense and turnovers count lower as better, so a longer spoke is always better.`), percentileRadar(d.ranks, chartColor())),
+        h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, ranked among the ${d.pool} teams (1st = best). For defense (points allowed) and turnovers the spoke follows the number itself, so there a shorter spoke is better; everywhere else longer is better.`), percentileRadar(d.ranks, chartColor())),
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
           d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)));
   };
@@ -2273,7 +2273,14 @@ function shotSpot(ev, side, spread = false) {
   let x, y;
   const z = ev.zone;
   if (z === "dunk") [x, y] = polar(2, 20, 1.2);
-  else if (z === "rim") [x, y] = spread ? polar(8, 56, 1.45) : polar(10, 40, 1.35);
+  else if (z === "rim") {
+    if (!spread) [x, y] = polar(10, 40, 1.35);
+    else for (let k = 0; k < 12; k++) {   // a season of rim shots: layups, dunks and short finishes spread over the whole area around the basket, evenly
+      const a2 = (rnd() * 2 - 1) * 1.75, r = Math.sqrt(64 + rnd() * (88 * 88 - 64));
+      x = HX + r * Math.cos(a2); y = HY + r * Math.sin(a2);
+      if (x >= 40) break;
+    }
+  }
   else if (z === "post") [x, y] = polar(45, 105, 1.0);
   else if (z === "three") {
     if (ev.loc === "deep") { for (let k = 0; k < 10; k++) { [x, y] = polar(280, 405, 0.85); if (y > Y0 + 12 && y < Y0 + CH - 12) break; } }   // logo range: well past the arc, out toward half court

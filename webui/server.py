@@ -483,6 +483,8 @@ def team_card_payload(runner, team):
         better = sum(1 for v in pop if (v < val - 1e-9 if lower else v > val + 1e-9))
         rank = 1 + better
         pct = round(100 * (len(pop) - rank) / (len(pop) - 1)) if len(pop) > 1 else 100
+        if lower:   # defense and turnovers are drawn the other way round: the spoke follows the raw number, so a shorter spoke is the better team
+            pct = 100 - pct
         ranks.append({"label": label, "value": round(val, 1), "pct": pct, "rank": rank, "of": len(pop)})
     per = {k: round(mine.get(k, 0) / g, 1) for k in ("pts", "reb", "ast", "stl", "blk", "tov")}
     per["opp_pts"] = round(mine.get("opp_pts", 0) / max(1, mine.get("opp_games", 0) or g), 1) if mine.get("opp_pts") is not None else None
