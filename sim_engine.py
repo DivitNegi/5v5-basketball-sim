@@ -9107,21 +9107,21 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2026 Oklahoma City Thunder":
+        # 2026 regular-season minutes per game (the reference table): each player's target is his average, +/- 1 minute
         target_ranges = {
-            "Shai G-Alexander": (37, 41),
-            "Jalen Williams": (28, 33),
-            "Alex Caruso": (26, 30),
-            "Chet Holmgren": (31, 36),
-            "Isaiah Hartenstein": (22, 27),
-            "Jarred McCain": (24, 28),
-            "Luguentz Dort": (20, 24),
-            "Cason Wallace": (8, 12),
-            "Ajay Mitchell": (6, 10),
-            
+            "Shai Gilgeous-Alexander": (32, 34), "Chet Holmgren": (28, 30), "Jalen Williams": (27, 29),
+            "Luguentz Dort": (26, 28), "Cason Wallace": (26, 28), "Ajay Mitchell": (25, 27),
+            "Isaiah Hartenstein": (23, 25), "Aaron Wiggins": (21, 23), "Isaiah Joe": (20, 22),
+            "Jaylin Williams": (19, 21), "Alex Caruso": (17, 19), "Jared McCain": (17, 19),
+        }
+        exact_rotation = {
+            "Shai Gilgeous-Alexander": 33, "Chet Holmgren": 23, "Jalen Williams": 23, "Luguentz Dort": 21,
+            "Cason Wallace": 21, "Ajay Mitchell": 21, "Isaiah Hartenstein": 19, "Aaron Wiggins": 17,
+            "Isaiah Joe": 17, "Jaylin Williams": 16, "Alex Caruso": 15, "Jared McCain": 14,
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (8, 16))
-            p.target_minutes = random.randint(low, high)
+            p.target_minutes = exact_rotation.get(p.name, random.randint(low, high))
         return
 
     if team.name == "2026 San Antonio Spurs":

@@ -1829,12 +1829,13 @@ def make_thunder_2026() -> Team:
                0.32, 0.90, 0.70, 0.97, 0.75, 0.50,
                0.67, 0.90,
                clutchness=0.78, height=85, speed=0.68, shot_iq=0.92, archetype='rim_protector', stamina=0.80),
-        Player('Jalen Williams', 'SG',
+        Player('Jalen Williams', 'SF',
                0.33, 0.27, 0.30, 0.02, 0.18, 0.74,
                0.82, 0.81, 0.88, 0.79, 0.86,
                0.45, 0.82, 0.72,
                0.80, 0.40, 0.49, 0.71, 0.64, 0.46,
                0.86, 0.59,
+               secondary_positions=('SG', 'PG', 'PF'),   # a wing who plays forward: he counts as frontcourt in OKC's small lineups
                clutchness=0.82, height=77, speed=0.78, shot_iq=0.94, archetype='three_and_d', stamina=0.87),
         Player('Luguentz Dort', 'SF',
                0.95, 0.12, 0.11, 0.05, 0.10, 0.16,
@@ -1864,12 +1865,13 @@ def make_thunder_2026() -> Team:
                0.79, 0.47, 0.50, 0.64, 0.62, 0.51,
                0.83, 0.59,
                clutchness=0.50, height=75, speed=0.82, shot_iq=0.94, archetype='three_and_d', stamina=0.83),
-        Player('Aaron Wiggins', 'SG',
+        Player('Aaron Wiggins', 'SF',
                0.32, 0.07, 0.24, 0.02, 0.11, 0.22,
                0.86, 0.78, 0.82, 0.67, 0.73,
                0.14, 0.34, 0.65,
                0.68, 0.32, 0.43, 0.58, 0.42, 0.40,
                0.79, 0.60,
+               secondary_positions=('SG', 'PF'),   # a wing who plays forward: he counts as frontcourt in OKC's small lineups
                clutchness=0.50, height=77, speed=0.74, shot_iq=0.94, archetype='balanced', stamina=0.79),
         Player('Jaylin Williams', 'PF',
                0.95, 0.07, 0.04, 0.04, 0.08, 0.17,
@@ -1898,6 +1900,7 @@ def make_thunder_2026() -> Team:
                0.20, 0.61, 0.65,
                0.99, 0.51, 0.46, 0.66, 0.47, 0.43,
                0.95, 0.66,
+               secondary_positions=('PG', 'SF', 'PF'),   # plays the 4 in OKC's small lineups
                clutchness=0.50, height=77, speed=0.86, shot_iq=0.94, archetype='lockdown', stamina=0.72),
         Player('Branden Carlson', 'C',
                0.45, 0.02, 0.12, 0.04, 0.61, 0.29,
@@ -1907,24 +1910,14 @@ def make_thunder_2026() -> Team:
                0.45, 0.68,
                height=84, archetype='rim_protector', stamina=0.55),
     ]
-    pinned_minutes = {
-        'Shai Gilgeous-Alexander': (31.8, 31.8),
-        'Chet Holmgren': (27.7, 27.7),
-        'Jalen Williams': (27.3, 27.3),
-        'Luguentz Dort': (25.7, 25.7),
-        'Isaiah Hartenstein': (23.2, 23.2),
-        'Cason Wallace': (25.5, 25.5),
-        'Ajay Mitchell': (24.8, 24.8),
-        'Aaron Wiggins': (10.6, 10.6),
-        'Jaylin Williams': (9.6, 9.6),
-        'Isaiah Joe': (10.4, 10.4),
-        'Jared McCain': (8.8, 8.8),
-        'Alex Caruso': (8.9, 8.9),
-        'Branden Carlson': (5.7, 5.7),
-    }
+    # Shai at his real 33 minutes; the other eleven keep their real shares, scaled so the team adds up to 240
+    mins = {'Shai Gilgeous-Alexander': 33, 'Chet Holmgren': 23, 'Jalen Williams': 23, 'Luguentz Dort': 21, 'Isaiah Hartenstein': 19,
+            'Cason Wallace': 21, 'Ajay Mitchell': 21, 'Aaron Wiggins': 17, 'Jaylin Williams': 16, 'Isaiah Joe': 17,
+            'Jared McCain': 14, 'Alex Caruso': 15, 'Branden Carlson': 1}
+    pinned_minutes = {name: (m, m) for name, m in mins.items()}
     for player in players:   # minutes follow the real rotation (the 2025-26 table), pinned
         player.target_minutes, player.gui_target_minutes_override = pinned_minutes[player.name]
-    return _real_team('2026 Oklahoma City Thunder', players, (31.8, 27.7, 27.3, 25.7, 23.2, 25.5, 24.8, 10.6, 9.6, 10.4, 8.8, 8.9, 5.7), 1.005)
+    return _real_team('2026 Oklahoma City Thunder', players, tuple(mins[p.name] for p in players), 1.005)
 
 
 def make_magic_2026() -> Team:
