@@ -2170,47 +2170,36 @@ SPOT_MISS_LINES = {
 }
 
 
-def _spot_line(table, shot_type, shooter, defender):
-    """A line naming the real spot of the shot, about half the time (otherwise the usual lines)."""
-    global CURRENT_MID_LOC, CURRENT_THREE_SUB
-    key = CURRENT_MID_LOC if shot_type == "mid" else CURRENT_THREE_SUB if shot_type == "three" else None
-    if key and key in table and random.random() < 0.5:
-        if shot_type == "mid":
-            CURRENT_MID_LOC = None
-        else:
-            CURRENT_THREE_SUB = None
-        return random.choice(table[key]).format(shooter=shooter, defender=defender)
-    return None
+def _shot_result_line(make: bool, shooter: str, defender: str, shot_type: str, defense_line: str) -> str:
+    """The make / miss line. About half the time it names the real spot of the shot (corner, wing, top of the key, elbow, baseline).
+    The same four dice are rolled every time, whatever the spot is, so the wording never changes how the rest of the game's dice fall
+    (a replay of a season game has to play out exactly like the quiet sim did)."""
+    global CURRENT_THREE_LOC, CURRENT_MID_LOC, CURRENT_THREE_SUB
+    spot_roll, pick, _unused, base_pick = random.random(), random.random(), random.random(), random.random()
+    choose = lambda lines: lines[int(pick * len(lines)) % len(lines)]
+    if shot_type == "three" and CURRENT_THREE_LOC == "corner":
+        if spot_roll < 0.5:
+            CURRENT_THREE_LOC = None
+            return choose(CORNER_THREE_MAKE_LINES if make else CORNER_THREE_MISS_LINES).format(shooter=shooter, defender=defender)
+    else:
+        table = SPOT_MAKE_LINES if make else SPOT_MISS_LINES
+        key = CURRENT_MID_LOC if shot_type == "mid" else CURRENT_THREE_SUB if shot_type == "three" else None
+        if key and key in table and spot_roll < 0.5:
+            if shot_type == "mid":
+                CURRENT_MID_LOC = None
+            else:
+                CURRENT_THREE_SUB = None
+            return choose(table[key]).format(shooter=shooter, defender=defender)
+    lines = (broadcast_make_lines if make else broadcast_miss_lines)[shot_family(shot_type)]
+    return lines[int(base_pick * len(lines)) % len(lines)].format(shooter=shooter, defender=defender, defense=defense_line)
 
 
 def commentator_make(shooter: str, defender: str, shot_type: str, defense_line: str) -> str:
-    global CURRENT_THREE_LOC
-    spot = _spot_line(SPOT_MAKE_LINES, shot_type, shooter, defender) if CURRENT_THREE_LOC != "corner" or shot_type != "three" else None
-    if spot:
-        return spot
-    if shot_type == "three" and CURRENT_THREE_LOC == "corner" and random.random() < 0.5:
-        CURRENT_THREE_LOC = None
-        return random.choice(CORNER_THREE_MAKE_LINES).format(shooter=shooter, defender=defender)
-    return random.choice(broadcast_make_lines[shot_family(shot_type)]).format(
-        shooter=shooter,
-        defender=defender,
-        defense=defense_line
-    )
+    return _shot_result_line(True, shooter, defender, shot_type, defense_line)
 
 
 def commentator_miss(shooter: str, defender: str, shot_type: str, defense_line: str) -> str:
-    global CURRENT_THREE_LOC
-    spot = _spot_line(SPOT_MISS_LINES, shot_type, shooter, defender) if CURRENT_THREE_LOC != "corner" or shot_type != "three" else None
-    if spot:
-        return spot
-    if shot_type == "three" and CURRENT_THREE_LOC == "corner" and random.random() < 0.5:
-        CURRENT_THREE_LOC = None
-        return random.choice(CORNER_THREE_MISS_LINES).format(shooter=shooter, defender=defender)
-    return random.choice(broadcast_miss_lines[shot_family(shot_type)]).format(
-        shooter=shooter,
-        defender=defender,
-        defense=defense_line
-    )
+    return _shot_result_line(False, shooter, defender, shot_type, defense_line)
 
 
 def screen_action_context(context: str | None) -> bool:
@@ -12489,11 +12478,13 @@ def tag_three_location(player, context: str, consume: bool) -> str:
             loc, forced_sub = "above_break", hint + "3"
         CURRENT_THREE_LOC = loc
         CURRENT_THREE_SUB = None
+        rolled_sub = "top3" if random.random() < 0.42 else "wing3"   # always rolled, so the dice are used the same way with or without a text hint
         if loc == "above_break":   # above the break is the wing or the top of the key
-            CURRENT_THREE_SUB = forced_sub or ("top3" if random.random() < 0.42 else "wing3")
+            CURRENT_THREE_SUB = forced_sub or rolled_sub
             loc = "above_break|" + CURRENT_THREE_SUB
+        rolled_side = shot_side(player)   # always rolled, so the dice are used the same way with or without a text hint
         if CURRENT_THREE_LOC == "corner" or CURRENT_THREE_SUB == "wing3":   # these spots exist on both sides of the floor
-            loc += "|side_" + (hint_side or shot_side(player))
+            loc += "|side_" + (hint_side or rolled_side)
         if player is not None:
             player._three_loc = None
             player._three_loc_used = loc
@@ -12519,8 +12510,9 @@ def tag_mid_location(player, context: str, consume: bool) -> str:
         if hint:
             loc = hint
         CURRENT_MID_LOC = loc
+        rolled_side = shot_side(player)   # always rolled (see the three-point version)
         if loc in ("mid_base", "mid_wing"):
-            loc += "|side_" + (hint_side or shot_side(player))
+            loc += "|side_" + (hint_side or rolled_side)
         if player is not None:
             player._mid_loc_used = loc
     else:
