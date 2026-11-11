@@ -2290,10 +2290,16 @@ function shotSpot(ev, side, spread = false) {
       for (let k = 0; k < 10; k++) { [x, y] = polar(rMin, rMax, 1.2); if (y > Y0 + 18 && y < Y0 + CH - 18) break; }
     }
   } else if (z === "mid") {
+    // Each midrange spot fills its whole slice of the floor, evenly: the elbow slice runs from the upper paint out to the arc, the wings from the
+    // lane line to the arc, the baseline from beside the lane to the corner. No tight clusters and no empty bands between them.
     const side = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
-    if (want === "base") { x = 34 + rnd() * 105; y = HY + side * (92 + rnd() * 118); }                                   // baseline jumper: beside the lane, level with the block
-    else if (want === "elbow") { const a = (rnd() * 2 - 1) * 0.36, r = 150 + rnd() * 72; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); }   // free-throw line / elbow
-    else { for (let k = 0; k < 14; k++) { const a = side * (0.46 + rnd() * 0.46), r = 100 + rnd() * 125; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (!(x <= 220 && Math.abs(y - HY) <= 80) && Math.abs(y - HY) <= 205) break; } }   // wing, outside the lane
+    const band = want === "elbow" ? [0, 0.4, 95, 232] : want === "wing" ? [0.4, 0.98, 62, 232] : [0.98, 1.95, 58, 232];
+    for (let k = 0; k < 30; k++) {
+      const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = Math.sqrt(band[2] ** 2 + rnd() * (band[3] ** 2 - band[2] ** 2));
+      x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
+      const dyAbs = Math.abs(y - HY);
+      if (x >= 36 && dyAbs <= 214 && !(want !== "elbow" && x <= 220 && dyAbs <= 80 && r < 75)) break;   // on the floor, inside the three-point line, not under the rim
+    }
   } else { for (let k = 0; k < 10; k++) { [x, y] = polar(75, 225, 1.4); if (Math.abs(y - HY) <= 205) break; } }   // anything else: inside the arc
   return side ? [1000 - x, y] : [x, y];
 }
@@ -2303,7 +2309,10 @@ function shotZoneOf(ev, x, y) {
   if (z === "rim" || z === "dunk") return "ra";
   if (z === "post") return "paint";
   const dx = x - SC_GEO.HX, dy = y - SC_GEO.CY, ang = Math.atan2(Math.abs(dy), dx), side = ev.side || (dy > 0 ? "R" : "L");   // L = left of the basket as the zone map is drawn
-  if (z === "mid") return ang < 0.4 ? "elbow" : ang < 0.98 ? `mid_wing_${side}` : `baseline_${side}`;
+  if (z === "mid") {
+    if (x <= 220 && Math.abs(dy) <= 80) return "paint";   // a short jumper or floater inside the lane counts with the paint
+    return ang < 0.4 ? "elbow" : ang < 0.98 ? `mid_wing_${side}` : `baseline_${side}`;
+  }
   if (z === "three") {
     if (ev.loc === "deep") return null;   // logo range sits off the map
     if (x <= 172 && Math.abs(dy) > 220) return `corner3_${side}`;

@@ -12511,8 +12511,8 @@ def tag_mid_location(player, context: str, consume: bool) -> str:
     global CURRENT_MID_LOC
     if consume:
         bh = getattr(player, "ball_handle", 0.7) if player is not None else 0.7
-        base_w = 0.14 + 0.20 * max(0.0, min(1.0, (0.80 - bh) / 0.50))
-        elbow_w = 0.30
+        base_w = 0.24 + 0.16 * max(0.0, min(1.0, (0.80 - bh) / 0.50))   # about a quarter of midrange shots are baseline jumpers, more for bigs
+        elbow_w = 0.28
         r = random.random()
         loc = "mid_base" if r < base_w else "mid_elbow" if r < base_w + elbow_w else "mid_wing"
         hint, hint_side = pbp_location_hint(player, "mid")   # the build-up line named the spot: the shot comes from there
