@@ -15275,8 +15275,9 @@ def shooter_weight(player: Player) -> float:
         role_volume *= max(0.34, 1.0 - (player.fga - 15) * 0.12)
     elif player.name in ("Andrew Nembhard", "Bennedict Mathurin", "Aaron Nesmith", "Obi Toppin", "T.J. McConnell") and player.fga >= 13:
         role_volume *= max(0.44, 1.0 - (player.fga - 12) * 0.10)
-    elif player.fga >= 14:
-        role_volume *= max(0.62, 1.0 - (player.fga - 13) * 0.06)
+    elif player.fga >= getattr(player, "volume_damper_start", 14):
+        # the usual high-volume damper starts at 14 shots; a roster entry can move it later for a true 22-shot scorer (volume_damper_start)
+        role_volume *= max(0.62, 1.0 - (player.fga - (getattr(player, "volume_damper_start", 14) - 1)) * 0.06)
 
     soft_cap = shot_volume_soft_cap(player)
     if getattr(player, "hot_start", False):   # a star who started hot gets the ball more and is readier to shoot it
@@ -16219,6 +16220,13 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
             print(f"{passer.name} pulls the defense inside while {target.name} lifts into a clean catch.")
         return target, passer, play_type
 
+    if off.name == "2020 Houston Rockets" and play_type in ("rockets_harden_iso_kick", "rockets_westbrook_space"):
+        # The 2020 small-ball Rockets ran through two scorers: Harden isolates and often keeps it himself, Westbrook attacks the open lane.
+        # How often each keeps the shot follows his own shot tendency.
+        star = player_by_name(off.on_floor, ("James Harden",) if play_type == "rockets_harden_iso_kick" else ("Russell Westbrook",))
+        if star is not None and can_be_designed_shooter(star) and has_shot_volume_left(star) and random.random() < 0.20 + 0.60 * star.shot_tendency:
+            print(f"{star.name} isolates on the wing with the floor spread." if play_type == "rockets_harden_iso_kick" else f"{star.name} has the lane to himself and attacks.")
+            return star, None, play_type
     if play_type in ("rockets_spread_lob", "rockets_harden_iso_kick", "rockets_corner_shake"):
         passer = choose_play_hub(off, ("James Harden", "Chris Paul"))
         options = designed_shooter_options([p for p in off.on_floor if p is not passer], current_shooter)
@@ -17310,6 +17318,19 @@ def maybe_reroute_hot_start(team: Team, shooter: Player) -> Player:
     if not hot or random.random() >= HOT_START_REROUTE:
         return shooter
     return max(hot, key=lambda p: p.pts)
+
+
+def maybe_reroute_go_to_scorer(team: Team, shooter: Player) -> Player:
+    """A roster entry can mark a player as a go-to scorer (`go_to_rate`, 0-1): that share of the possessions that were ending with a
+    teammate come back to him instead. It is how a true 22-shot scorer keeps his volume on a team whose sets would spread the ball."""
+    if getattr(shooter, "go_to_rate", 0.0) > 0:
+        return shooter
+    stars = [p for p in team.on_floor if p is not shooter and getattr(p, "go_to_rate", 0.0) > 0 and not p.fouled_out and has_shot_volume_left(p)]
+    random.shuffle(stars)
+    for star in stars:
+        if random.random() < star.go_to_rate:
+            return star
+    return shooter
 
 
 def maybe_reroute_spurs_role_shot(team: Team, shooter: Player) -> Player:
@@ -20368,6 +20389,8 @@ def simulate_possession(off: Team, dff: Team,
     rerouted_shooter = maybe_reroute_spurs_role_shot(off, shooter)
     if rerouted_shooter is shooter:
         rerouted_shooter = maybe_reroute_hot_start(off, shooter)
+    if rerouted_shooter is shooter:
+        rerouted_shooter = maybe_reroute_go_to_scorer(off, shooter)
     if rerouted_shooter is not shooter:
         announce_ball_transfer(ball_owner, rerouted_shooter, "reroute")
         last_passer = ball_owner if ball_owner is not rerouted_shooter else last_passer
