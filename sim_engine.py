@@ -8808,8 +8808,8 @@ QUARTER_STARTER_SWAPS = {
     "2027 New York Knicks": ("Karl-Anthony Towns", "Andre Drummond", (2, 4)),
     "2027 Denver Nuggets": ("Christian Braun", "DeMar DeRozan", (2, 4)),
     "2027 Boston Celtics": (
-        ("Jordan Walsh", "Payton Pritchard", (2, 4)),
-        ("Mitchell Robinson", "Neemias Queta", (2, 4)),
+        ("Mike Conley", "Payton Pritchard", (2, 4)),     # Conley starts the halves, Pritchard the 2nd and 4th
+        ("Neemias Queta", "Mitchell Robinson", (2, 4)),
     ),
 }
 
