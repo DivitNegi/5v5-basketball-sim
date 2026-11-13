@@ -2493,7 +2493,9 @@ function shotSpot(ev, side, spread = false) {
   }
   else if (z === "post") [x, y] = polar(45, 105, 1.0);
   else if (z === "three") {
-    if (ev.loc === "deep") { for (let k = 0; k < 10; k++) { [x, y] = polar(280, 405, 0.85); if (y > Y0 + 12 && y < Y0 + CH - 12) break; } }   // logo range: well past the arc, out toward half court
+    if (ev.loc === "deep") {   // deep range: most from 27-31 ft, thinning out toward the logo (no empty strip between the line and the deep shots)
+      for (let k = 0; k < 10; k++) { const r = 266 + 140 * Math.pow(rnd(), 1.7), a = (rnd() * 2 - 1) * 1.0; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (y > Y0 + 12 && y < Y0 + CH - 12 && x < 492) break; }
+    }
     else if (ev.loc === "wing" || ev.loc === "top") {   // above the break: the wings, or the top of the key
       for (let k = 0; k < 10; k++) {
         const sgn = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, ang = ev.loc === "top" ? (rnd() * 2 - 1) * 0.42 : sgn * (0.42 + rnd() * 0.8), r = 242 + rnd() * 27;   // top and wing meet at 0.42; the wing runs right down to where the arc meets the corner line
