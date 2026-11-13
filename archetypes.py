@@ -146,6 +146,29 @@ def _rules():
 
 _RULES = _rules()
 
+# a two-way superstar is named for what he does best on offense (and where he plays)
+TWO_WAY = {
+    ("play", "guard"): "Two-Way Lead Guard", ("play", "wing"): "Two-Way Point Forward Star", ("play", "forward"): "Two-Way Point Forward Star",
+    ("play", "big"): "Two-Way Hub Big",
+    ("finish", "guard"): "Two-Way Slashing Star", ("finish", "wing"): "Two-Way Slashing Star", ("finish", "forward"): "Two-Way Freight Train",
+    ("finish", "big"): "Two-Way Paint Titan",
+    ("mid", "guard"): "Two-Way Shot Creator", ("mid", "wing"): "Two-Way Shot Creator", ("mid", "forward"): "Two-Way Midrange Assassin",
+    ("mid", "big"): "Two-Way Midrange Assassin",
+    ("shoot", "guard"): "Two-Way Sharpshooting Star", ("shoot", "wing"): "Two-Way Sharpshooting Star", ("shoot", "forward"): "Two-Way Stretch Star",
+    ("shoot", "big"): "Two-Way Stretch Star",
+    ("post", "guard"): "Two-Way Post Star", ("post", "wing"): "Two-Way Post Star", ("post", "forward"): "Two-Way Post Star",
+    ("post", "big"): "Two-Way Paint Titan",
+}
+
+
+def _two_way(sk, group):
+    best = max(_OFFENSE, key=lambda k: sk[k])
+    if group == "guard" and best == "play" and max(sk["shoot"], sk["mid"], sk["finish"]) >= sk["play"] - 0.02:
+        best = max(("shoot", "mid", "finish"), key=lambda k: sk[k])   # a guard who scores as well as he passes is a creator, not a lead guard
+    if group in ("wing", "forward") and best != "play" and sk["play"] >= sk[best] - 0.04:
+        best = "play"   # a forward who runs the offense nearly as well as he scores is a point forward
+    return TWO_WAY[(best, group)]
+
 
 def _special(sk, group, usage, player):
     off = max(sk[k] for k in _OFFENSE)
@@ -156,6 +179,8 @@ def _special(sk, group, usage, player):
             if ov is None:
                 ov = _ovr(player)
         if test(sk, group, usage, player, off, dfn, ov if ov is not None else 0.0):
+            if name == "Two-Way Superstar":
+                return _two_way(sk, group)
             return name.replace("{W}", _GROUP_WORD[group])
     return None
 
@@ -163,9 +188,11 @@ def _special(sk, group, usage, player):
 SPECIALS = []
 for _name, _t in _RULES:
     SPECIALS += [_name.replace("{W}", _GROUP_WORD[g]) for g in GROUPS] if "{W}" in _name else [_name]
-SPECIALS = [x for x in SPECIALS if x != "3-and-D Big"]
+SPECIALS = [x for x in SPECIALS if x not in ("3-and-D Big", "Two-Way Superstar")] + sorted(set(TWO_WAY.values()))
 
 ARCHETYPES = sorted(set(SPECIALS) | {f"{ADJECTIVES[s2]} {NOUNS[s1][g]}" for g in GROUPS for s1 in SKILLS for s2 in SKILLS if s1 != s2})
+_COMBOS = {f"{ADJECTIVES[s2]} {NOUNS[s1][g]}" for g in GROUPS for s1 in SKILLS for s2 in SKILLS if s1 != s2}
+assert not (_COMBOS & set(TWO_WAY.values())), _COMBOS & set(TWO_WAY.values())   # star names must not collide with everyday ones
 
 
 def archetype_label(player):
