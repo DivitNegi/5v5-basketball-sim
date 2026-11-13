@@ -2291,18 +2291,26 @@ async function openRatingsEditor(team, name) {
       apply = (val) => { num.value = val; ft.textContent = `${Math.floor(val / 12)}'${val % 12}"`; set(val); };
       row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), ft, num);
     } else if (f.kind === "pos") {
-      const s = h("select", { onchange: (e) => set(e.target.value) }, ["PG", "SG", "SF", "PF", "C"].map((p) => h("option", { value: p, selected: p === v }, p)));
-      apply = (val) => { s.value = val; set(val); };
-      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), s);
+      // one pill per position; the lit one is his position
+      const POS = ["PG", "SG", "SF", "PF", "C"];
+      const pills = POS.map((p) => h("button", { type: "button", class: `re-pill ${p === v ? "on" : ""}`, onclick: () => apply(p) }, p));
+      apply = (val) => { pills.forEach((b) => b.classList.toggle("on", b.textContent === val)); set(val); RE.syncOther?.(val); };
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("div", { class: "re-pills re-wide" }, pills));
     } else if (f.kind === "positions") {
+      // the other positions he can play: toggle any number; his own position is greyed out
+      const POS = ["PG", "SG", "SF", "PF", "C"];
       const have = new Set(v || []);
-      const boxes = ["PG", "SG", "SF", "PF", "C"].map((p) => h("label", { class: "re-chk" }, h("input", { type: "checkbox", checked: have.has(p), onchange: (e) => { e.target.checked ? have.add(p) : have.delete(p); set(["PG", "SG", "SF", "PF", "C"].filter((x) => have.has(x))); } }), p));
-      apply = (val) => { have.clear(); (val || []).forEach((p) => have.add(p)); boxes.forEach((lb) => { const cb = lb.querySelector("input"); cb.checked = have.has(lb.textContent.trim()); }); set(["PG", "SG", "SF", "PF", "C"].filter((x) => have.has(x))); };
-      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("div", { class: "re-chks" }, boxes));
+      const pills = POS.map((p) => h("button", { type: "button", class: `re-pill multi ${have.has(p) ? "on" : ""}`, onclick: () => { have.has(p) ? have.delete(p) : have.add(p); paint(); set(POS.filter((x) => have.has(x))); } }, p));
+      const paint = () => pills.forEach((b) => { const p = b.textContent; b.classList.toggle("on", have.has(p)); b.disabled = p === cur.position; b.title = b.disabled ? "His main position" : ""; });
+      RE.syncOther = () => paint();
+      paint();
+      apply = (val) => { have.clear(); (val || []).forEach((p) => have.add(p)); paint(); set(POS.filter((x) => have.has(x))); };
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("div", { class: "re-pills re-wide" }, pills));
     } else if (f.kind === "bool") {
+      // an on/off switch
       const cb = h("input", { type: "checkbox", checked: !!v, onchange: (e) => set(e.target.checked) });
       apply = (val) => { cb.checked = !!val; set(!!val); };
-      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), cb);
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("label", { class: "re-switch re-wide" }, cb, h("span", { class: "re-knob" }), h("span", { class: "re-sw-txt muted" }, "")));
     } else {
       const txt = h("input", { type: "text", value: v ?? "", class: "re-text", onchange: (e) => set(e.target.value) });
       apply = (val) => { txt.value = val ?? ""; set(val); };
@@ -2323,8 +2331,8 @@ async function openRatingsEditor(team, name) {
     } catch (err) { status.textContent = err.message; refreshCount(); }
   } }, "Save");
   const resetBtn = h("button", { class: "btn", onclick: () => openRatingsEditor(team, name) }, "Undo changes");
-  const originalBtn = h("button", { class: "btn", title: "Put this player back to the ratings in the last commit of his team file", onclick: async () => {
-    if (!confirm(`Reset ${name} to his original ratings? Only this player changes; everyone else in the file is left alone.`)) return;
+  const originalBtn = h("button", { class: "btn", disabled: !d.original, title: d.original ? "Put this player back to how he was before the ratings editor changed him" : "He has not been changed in the ratings editor (edits made in the team file by hand are never reset)", onclick: async () => {
+    if (!confirm(`Reset ${name} to how he was before the ratings editor changed him? Only this player changes, and hand edits to the file are kept.`)) return;
     try {
       const r = await api.post("/api/ratings/reset", { team, name });
       toast(r.message, "ok");

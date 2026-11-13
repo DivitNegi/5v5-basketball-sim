@@ -129,7 +129,7 @@ def read(runner, team, name):
     vals = _values(call)
     rel = path.replace("\\", "/").split("/5v5_sim/")[-1]
     try:
-        orig = original(runner, team, name)   # the committed values, for the per-rating "back to original" buttons
+        orig = original(runner, team, name)   # values from before the editor changed him (None if it has not), for the revert buttons
     except Exception:
         orig = None
     shown, filled, arch = _with_fallbacks(team, vals)
@@ -211,6 +211,10 @@ def save(runner, team, name, changes):
     changes = {k: v for k, v in _clean(changes).items() if vals.get(k) != v}
     if not changes:
         return {"saved": False, "message": "Nothing changed.", **read(runner, team, name)}
+    snaps, key = _snaps(), _snap_key(fn, name)
+    if key not in snaps:   # first editor change to this player: remember what he was, so Reset can bring it back
+        snaps[key] = vals
+        _write_snaps(snaps)
     off = _offsets(text)
     edits = []   # (start, end, replacement)
     kw_nodes = {kw.arg: kw for kw in call.keywords if kw.arg}
@@ -291,34 +295,78 @@ def _refresh_factories(runner):
         pass
 
 
+# "Original" = a player's values from just before the editor first changed him. Edits made by hand (VS Code etc.) are never
+# undone: a player the editor has not touched has no snapshot, so there is nothing to reset. Kept in a small JSON file next to this one.
+import json as _json
+import os as _os
+_SNAP_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "ratings_originals.json")
+
+
+def _snaps():
+    try:
+        with open(_SNAP_PATH, encoding="utf-8") as fh:
+            return _json.load(fh)
+    except Exception:
+        return {}
+
+
+def _write_snaps(d):
+    with open(_SNAP_PATH, "w", encoding="utf-8") as fh:
+        _json.dump(d, fh, indent=1, ensure_ascii=False, sort_keys=True)
+
+
+def _snap_key(fn, name):
+    rel = inspect.getsourcefile(fn).replace("\\", "/").split("/5v5_sim/")[-1]
+    return f"{rel}::{fn.__name__}::{name}"
+
+
 def original(runner, team, name):
-    """This player's ratings as they are in the last git commit of his team file (before any edits since)."""
-    import os
-    import subprocess
+    """This player's values from before the editor first changed him (None if the editor has not changed him)."""
+    snap = _snaps().get(_snap_key(_factory(runner, team), name))
+    if snap is None:
+        return None
+    return {k: (tuple(v) if isinstance(v, list) and k in ("secondary_positions", "badges") else v) for k, v in snap.items()}
+
+
+def _remove_keywords(runner, team, name, keys):
+    """Take keyword arguments the editor added (e.g. speed=) back out of the player's entry."""
     fn = _factory(runner, team)
-    path = inspect.getsourcefile(fn)
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(path)))
-    rel = os.path.relpath(path, repo).replace("\\", "/")
-    res = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=repo, capture_output=True, encoding="utf-8")
-    if res.returncode != 0:
-        raise ValueError("No committed version of this team file to reset to.")
-    tree = ast.parse(res.stdout)
-    func = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == fn.__name__), None)
-    for node in ast.walk(func) if func else []:
-        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Player" and node.args:
-            first = node.args[0]
-            if isinstance(first, ast.Constant) and first.value == name:
-                return _values(node)
-    raise ValueError(f"{name} is not in the committed version of this team, so there is nothing to reset to.")
+    path, text, call = _locate(fn, name)
+    off = _offsets(text)
+    items = list(call.args) + list(call.keywords)
+    cuts = []
+    for i, kw in enumerate(call.keywords):
+        if kw.arg in keys:
+            prev = items[len(call.args) + i - 1]
+            pv = prev.value if isinstance(prev, ast.keyword) else prev
+            cuts.append((off(pv.end_lineno, pv.end_col_offset), off(kw.value.end_lineno, kw.value.end_col_offset)))
+    if not cuts:
+        return
+    for a, b in sorted(cuts, reverse=True):
+        text = text[:a] + text[b:]
+    compile(text, path, "exec")
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+    _reload(fn)
+    if hasattr(runner, "factories"):
+        _refresh_factories(runner)
 
 
 def reset(runner, team, name):
-    """Put this one player back to his last committed ratings (other players and other edits in the file are left alone)."""
+    """Put this one player back to how he was before the editor first changed him. Hand edits to the file are left alone."""
     old = original(runner, team, name)
+    if old is None:
+        return {"saved": False, "message": f"{name} has not been changed in the ratings editor, so there is nothing to reset.", **read(runner, team, name)}
     now = _values(_locate(_factory(runner, team), name)[2])
     changes = {k: v for k, v in old.items() if k in EDITABLE and now.get(k) != v}
-    if not changes:
-        return {"saved": False, "message": f"{name} already has his original ratings.", **read(runner, team, name)}
-    out = save(runner, team, name, changes)
-    out["message"] = f"{name} reset to his original ratings ({len(changes)} value{'s' if len(changes) != 1 else ''})."
-    return out
+    added = [k for k in now if k in EDITABLE and k not in old]   # ratings the editor wrote in that the entry did not have before
+    if changes:
+        save(runner, team, name, changes)
+    if added:
+        _remove_keywords(runner, team, name, added)
+    snaps = _snaps()
+    snaps.pop(_snap_key(_factory(runner, team), name), None)   # back to where he started: no longer counts as edited
+    _write_snaps(snaps)
+    n = len(changes) + len(added)
+    msg = f"{name} reset to his ratings from before the editor changed him ({n} value{'s' if n != 1 else ''})." if n else f"{name} already has his original ratings."
+    return {"saved": bool(n), "message": msg, **read(runner, team, name)}
