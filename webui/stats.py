@@ -163,12 +163,22 @@ POSITION_GROUPS = {"PG": "guards", "SG": "guards", "G": "guards", "SF": "forward
 def player_detail(runner, source, team, name, group="all"):
     sec = runner.sections or {}
     data = datasets(sec)
-    if source not in data:
-        source = next(iter(data), "Live")
-    players, teams_tot = data.get(source, ({}, {}))
-    mine = (players.get(team) or {}).get(name)
-    if mine is None:
+
+    def find(src):   # (team, stats) for this player in one source, his own team first
+        pp = data.get(src, ({}, {}))[0]
+        if team and name in (pp.get(team) or {}):
+            return team, pp[team][name]
+        hits = [(tn, st) for tn, roster in pp.items() for pn, st in roster.items() if pn == name]
+        return max(hits, key=lambda x: x[1].get("games", 0) or 0) if hits else (None, None)
+
+    main = [src for src in ("Season", "Playoffs", "Series", "Live") if src in data and find(src)[0]]
+    if source not in data or not find(source)[0]:
+        source = main[0] if main else next(iter(data), "Live")
+    team, _found = find(source)
+    if team is None:
         return {"error": "No stats for that player yet."}
+    players, teams_tot = data.get(source, ({}, {}))
+    mine = players[team][name]
     pool = [(tn, pn, defaultdict(float, st)) for tn, pp in players.items() for pn, st in pp.items() if (st.get("games", 0) or 0) > 0]
     max_gp = max((s["games"] for _, _, s in pool), default=1)
     min_gp = max(1, round(0.2 * max_gp)) if max_gp > 1 else 1
@@ -287,7 +297,7 @@ def player_detail(runner, source, team, name, group="all"):
     per_game = {k: round(st[k] / g / (60 if k == "minutes" else 1), 1) for k in keys}
     diet = st.get("shot_diet") or {}
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
-    return {"name": name, "team": team, "source": source, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
+    return {"name": name, "team": team, "source": source, "sources": main, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
             "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")},
             "three_split": {"corner": zone("corner3"), "above_break": zone("atb3"), "deep": zone("deep3"), "wing": zone("wing3"), "top": zone("top3"),
                             "corner_L": zone("corner3_L"), "corner_R": zone("corner3_R"), "wing_L": zone("wing3_L"), "wing_R": zone("wing3_R")},

@@ -131,17 +131,31 @@ function withImage(el, url, cls = "") {
   imageState.get(url).then?.((ok) => ok && el.isConnected && attach());
 }
 function logoEl(team, cls = "") {
-  const el = h("div", { class: `logo ${cls}`, style: { "--c": team?.color || "#334155" } }, team?.initials || "?");
+  const el = h("div", { class: `logo ${cls}`, style: { "--c": team?.color || "#334155" }, ...(team?.name ? { "data-team": team.name } : {}) }, team?.initials || "?");
   if (team?.logo) withImage(el, `/media/logo?code=${team.logo}`);
   return el;
 }
 function faceEl(name) {
   const parts = (name || "").split(" ").filter(Boolean);
   const init = ((parts[0] || "")[0] || "") + ((parts[parts.length - 1] || "")[0] || "");
-  const el = h("div", { class: "face" }, init.toUpperCase());
+  const el = h("div", { class: "face", "data-player": name || "" }, init.toUpperCase());
   withImage(el, `/media/headshot?name=${encodeURIComponent(name)}`);
   return el;
 }
+
+// Click any player's name or face, anywhere (box scores, the floor, leaders, awards, schedules...), for his stats pop-up; click any team logo or
+// team header for the team card. Places that already open a pop-up on click keep their own behaviour.
+const NAME_CELLS = ".pcell, .tcell, .rtop, .court-team-head, .tm, .cmp-name, .pname, .face, .logo";
+document.addEventListener("click", (e) => {
+  if (performance.now() - (window.__ppAt || 0) < 120) return;   // a row's own handler just opened one
+  if (e.target.closest("button, select, input, a, label, .picker-btn, .picker-pop, .coach-card, #setup, .seg, .pp-x")) return;
+  const cell = e.target.closest(NAME_CELLS);
+  if (!cell) return;
+  const teamEl = e.target.closest("[data-team]") || (cell.matches(".court-team-head, .tcell, .tm") ? cell.querySelector("[data-team]") : null);
+  const playerEl = cell.matches("[data-player]") ? cell : cell.querySelector("[data-player]") || cell.closest("td, .rtop, .pcell")?.querySelector("[data-player]");
+  if (teamEl && (!playerEl || e.target.closest("[data-team]") || cell.matches(".court-team-head, .tcell, .tm"))) { openTeamCard(teamEl.dataset.team); return; }
+  if (playerEl?.dataset.player) openStatsPlayer("", playerEl.dataset.player, "auto");
+});
 
 // ───────────────────────── team picker ─────────────────────────
 function makePicker(root, onPick) {
@@ -1948,6 +1962,7 @@ const numOf = (v) => {
 };
 // ---- team card pop-up from the standings: record, per-game numbers, league percentile radar, latest games with box scores, schedule button
 async function openTeamCard(team) {
+  window.__ppAt = performance.now();
   document.querySelector(".pp-back")?.remove();
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
   const onKey = (e) => { if (e.key === "Escape") close(); };
@@ -2180,6 +2195,7 @@ function playerInsights(d, color) {
   ];
 }
 async function openStatsPlayer(team, name, source) {
+  window.__ppAt = performance.now();
   document.querySelector(".pp-back")?.remove();
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
   const onKey = (e) => { if (e.key === "Escape") close(); };
@@ -2189,8 +2205,11 @@ async function openStatsPlayer(team, name, source) {
   let d;
   try { d = await api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`); } catch { d = { error: "Could not load that player." }; }
   if (d.error) { body.replaceChildren(h("div", { class: "empty" }, d.error)); return; }
+  team = d.team || team;
   const id = identOf(team), color = chartColor(id);
   let mode = "pg";
+  // Season / Playoffs / Series / Live: every set of stats this player has
+  const srcSeg = (d.sources || []).length > 1 ? h("div", { class: "seg small", style: { marginTop: "8px" } }, d.sources.map((s2) => h("button", { class: s2 === d.source ? "on" : "", onclick: () => openStatsPlayer(team, name, s2) }, s2))) : null;
   const tiles = h("div", {});
   const pct1v = (m, a) => (a ? (100 * m / a).toFixed(1) : "–");
   const paint = () => {
@@ -2209,7 +2228,7 @@ async function openStatsPlayer(team, name, source) {
   const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
   paint();
   body.replaceChildren(
-    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`)), h("div", { style: { marginLeft: "auto" } }, seg)),
+    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
     tiles,
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
 }

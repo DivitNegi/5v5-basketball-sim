@@ -458,6 +458,11 @@ TEAM_METRICS = [   # (label, value(per-game totals), lower_is_better)
 def team_card_payload(runner, team):
     sec = runner.sections or {}
     teams = sec.get("_season_team_totals") or sec.get("_playoff_team_totals") or sec.get("_series_team_totals") or {}
+    if team not in teams:   # a team in the game being played but with no season / series totals yet: use this game
+        from .stats import datasets
+        live_teams = (datasets(sec).get("Live") or ({}, {}))[1]
+        if team in live_teams:
+            teams = {n: dict(t, opp_pts=sum(o.get("pts", 0) for m, o in live_teams.items() if m != n), opp_games=1) for n, t in live_teams.items()}
     mine = teams.get(team)
     if not mine:
         return {"error": "No team stats yet."}
