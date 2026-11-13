@@ -350,9 +350,18 @@ def avg_payload(runner, team="All Teams", quarter="All", rank="Team order", sour
 def teams_payload(runner):
     sec = runner.sections or {}
     out = []
+    rosters = sec.get("_season_player_totals") or {}
     for name, t in (sec.get("_season_team_totals") or {}).items():
         g = max(1, t.get("games", 0))
         ident = team_identity(name)
+        diet = {}   # every player's shots added up, for the per-zone columns
+        for st in (rosters.get(name) or {}).values():
+            for k, v in (st.get("shot_diet") or {}).items():
+                if isinstance(v, (int, float)):
+                    diet[k] = diet.get(k, 0) + v
+        za = lambda *ks: sum(diet.get(k, 0) for k in ks)
+        zm = lambda *ks: sum(diet.get(k + "_made", 0) for k in ks)
+        zpct = lambda *ks: _num(100 * zm(*ks) / za(*ks)) if za(*ks) else None
         poss = t["fga"] + 0.44 * t["fta"] - t["oreb"] + t["tov"]
         opp_poss = t.get("opp_fga", 0) + 0.44 * t.get("opp_fta", 0) - t.get("opp_oreb", 0) + t.get("opp_tov", 0)
         ortg = 100 * t["pts"] / poss if poss else 0
@@ -369,6 +378,9 @@ def teams_payload(runner):
             "reb": _num(t["reb"] / g), "ast": _num(t["ast"] / g), "stl": _num(t["stl"] / g), "blk": _num(t["blk"] / g), "tov": _num(t["tov"] / g),
             "oppfg": _num(100 * t.get("opp_fgm", 0) / t["opp_fga"]) if t.get("opp_fga") else None,
             "opp3": _num(100 * t.get("opp_tpm", 0) / t["opp_tpa"]) if t.get("opp_tpa") else None,
+            "rim_g": _num(za("rim", "dunk") / g), "rim_p": zpct("rim", "dunk"), "mid_g": _num(za("mid") / g), "mid_p": zpct("mid"),
+            "three_g": _num(t["tpa"] / g), "post_g": _num(za("post") / g), "post_p": zpct("post"),
+            "c3_g": _num(za("corner3") / g), "c3_p": zpct("corner3"), "fta_g": _num(t["fta"] / g),
         })
     return {"teams": out}
 

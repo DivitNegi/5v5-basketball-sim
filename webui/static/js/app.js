@@ -956,7 +956,8 @@ function renderPlayers() {
 }
 
 
-const TCOLS = [["w", "W"], ["l", "L"], ["pts", "PTS"], ["opp", "OPP"], ["diff", "DIFF"], ["ortg", "ORtg"], ["drtg", "DRtg"], ["net", "NET"], ["pace", "PACE"], ["efg", "eFG%"], ["ts", "TS%"], ["tpp", "3P%"], ["reb", "REB"], ["ast", "AST"], ["tov", "TO"], ["oppfg", "OPP FG%"], ["opp3", "OPP 3P%"]];
+const TCOLS = [["w", "W"], ["l", "L"], ["pts", "PTS"], ["opp", "OPP"], ["diff", "DIFF"], ["ortg", "ORtg"], ["drtg", "DRtg"], ["net", "NET"], ["pace", "PACE"], ["efg", "eFG%"], ["ts", "TS%"], ["tpp", "3P%"], ["reb", "REB"], ["ast", "AST"], ["tov", "TO"], ["oppfg", "OPP FG%"], ["opp3", "OPP 3P%"],
+  ["rim_g", "RIM/G"], ["rim_p", "RIM%"], ["mid_g", "MID/G"], ["mid_p", "MID%"], ["three_g", "3PA/G"], ["c3_g", "C3/G"], ["c3_p", "C3%"], ["post_g", "POST/G"], ["post_p", "POST%"], ["fta_g", "FTA/G"]];
 const ACOLS = [["gp", "GP"], ["mpg", "MPG"], ["ts", "TS%"], ["efg", "eFG%"], ["usg", "USG%"], ["astto", "AST/TO"], ["p36", "PTS/36"], ["r36", "REB/36"], ["a36", "AST/36"], ["s36", "STK/36"], ["tpar", "3PAr"], ["ftr", "FTr"], ["pm", "+/-"]];
 
 function simpleTable(head, rows) {
