@@ -1309,6 +1309,11 @@ class _ExclusiveServer(ThreadingHTTPServer):
 
 def run(open_browser: bool = True, port: int = 8790):
     handler, runner = build_app()
+    try:   # a restart locks in every saved ratings edit: Reset and the revert arrows only cover edits made since the app started
+        from . import ratings_editor
+        ratings_editor.clear_originals()
+    except Exception:
+        pass
     server = None
     for candidate in range(port, port + 20):
         try:

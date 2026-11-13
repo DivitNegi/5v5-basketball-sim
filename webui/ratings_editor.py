@@ -295,7 +295,7 @@ def _refresh_factories(runner):
         pass
 
 
-# "Original" = a player's values from just before the editor first changed him. Edits made by hand (VS Code etc.) are never
+# "Original" = a player's values from just before the editor first changed him this run of the app (cleared on restart). Edits made by hand (VS Code etc.) are never
 # undone: a player the editor has not touched has no snapshot, so there is nothing to reset. Kept in a small JSON file next to this one.
 import json as _json
 import os as _os
@@ -313,6 +313,11 @@ def _snaps():
 def _write_snaps(d):
     with open(_SNAP_PATH, "w", encoding="utf-8") as fh:
         _json.dump(d, fh, indent=1, ensure_ascii=False, sort_keys=True)
+
+
+def clear_originals():
+    """Forget every stored original (called when the app starts, so saved edits become the new baseline)."""
+    _write_snaps({})
 
 
 def _snap_key(fn, name):
