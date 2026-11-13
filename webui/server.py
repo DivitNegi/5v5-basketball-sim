@@ -653,6 +653,23 @@ def roster_payload(runner, team_name):
     return {"team": ident, "players": players}
 
 
+_ALL_ROSTER_CACHE = []
+
+
+def all_rosters_payload(runner):
+    """Every player on every team, for the ratings editor's All teams list (cached; a ratings save clears it)."""
+    if not _ALL_ROSTER_CACHE:
+        rows = []
+        for name in list(runner.factories):
+            d = roster_payload(runner, name)
+            ident = d.get("team") or {}
+            for p in d.get("players") or []:
+                rows.append({**p, "team": name, "teamShort": ident.get("short"), "teamYear": ident.get("year")})
+        rows.sort(key=lambda c: -(c.get("ovr") or 0))
+        _ALL_ROSTER_CACHE.extend(rows)
+    return {"players": _ALL_ROSTER_CACHE}
+
+
 def _zones_of(diet):
     diet = diet or {}
     z = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
@@ -1137,6 +1154,8 @@ def build_app():
                 return self._json(live.players_for_card())
             if path == "/api/compare":
                 return self._json(compare_payload(runner))
+            if path == "/api/roster/all":
+                return self._json(all_rosters_payload(runner))
             if path == "/api/roster":
                 return self._json(roster_payload(runner, (params.get("team") or [""])[0]))
             if path == "/api/season/avg":

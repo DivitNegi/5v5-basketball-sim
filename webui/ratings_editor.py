@@ -256,6 +256,7 @@ def _refresh_factories(runner):
     try:   # cached rankings and positions were built from the old ratings
         from . import server, stats
         server._STRENGTH_CACHE.clear()
+        server._ALL_ROSTER_CACHE.clear()
         stats._POS_CACHE.clear()
     except Exception:
         pass

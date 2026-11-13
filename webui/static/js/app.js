@@ -2196,11 +2196,12 @@ function playerInsights(d, color) {
 }
 
 // ---- ratings editor: the player's ratings straight from his team file; Save writes them back into that file
-const RE = { team: null, name: null, roster: [], picker: null };
+const RE = { team: null, name: null, roster: [], picker: null, all: false };
 function loadRatingsView() {
   if (!RE.picker) {
-    RE.picker = makePicker($("#reTeamPick"), (t) => { RE.team = t.name; RE.name = null; loadReRoster(); });
+    RE.picker = makePicker($("#reTeamPick"), (t) => { RE.all = false; RE.team = t.name; RE.name = null; loadReRoster(); });
     $("#reSearch").addEventListener("input", renderReRoster);
+    $("#reAllBtn").addEventListener("click", () => { RE.all = !RE.all; RE.name = null; loadReRoster(); });
   }
   if (!RE.team && S.meta?.teams?.length) {
     const t = S.meta.teams.find((x) => x.name === S.teamA) || S.meta.teams[0];
@@ -2208,17 +2209,26 @@ function loadRatingsView() {
   }
 }
 async function loadReRoster() {
-  $("#reRoster").replaceChildren(h("div", { class: "empty" }, "Loading…"));
-  const d = await api.get(`/api/roster?team=${encodeURIComponent(RE.team)}`);
-  RE.roster = d.players || [];
+  $("#reAllBtn").classList.toggle("primary", RE.all);
+  $("#reSearch").placeholder = RE.all ? "Search every player…" : "Filter players…";
+  $("#reRoster").replaceChildren(h("div", { class: "empty" }, RE.all ? "Loading every team…" : "Loading…"));
+  const d = await api.get(RE.all ? "/api/roster/all" : `/api/roster?team=${encodeURIComponent(RE.team)}`);
+  RE.roster = (d.players || []).map((p) => ({ ...p, team: p.team || RE.team }));
   renderReRoster();
-  if (!RE.name && RE.roster.length) openRatingsEditor(RE.team, RE.roster[0].name);
+  if (!RE.name && RE.roster.length) openRatingsEditor(RE.roster[0].team, RE.roster[0].name);
 }
+const RE_MAX_ROWS = 250;   // the All teams list is long; show the top rows and let the search narrow it
 function renderReRoster() {
   const q = ($("#reSearch").value || "").trim().toLowerCase();
-  $("#reRoster").replaceChildren(...RE.roster.filter((p) => !q || p.name.toLowerCase().includes(q)).map((p) =>
-    h("button", { class: `re-player ${p.name === RE.name ? "on" : ""}`, onclick: () => openRatingsEditor(RE.team, p.name) },
-      faceEl(p.name), h("span", { class: "re-pname" }, p.name), h("span", { class: "muted" }, p.pos || ""), h("b", { class: "re-povr" }, p.ovr != null ? Math.round(p.ovr) : "–"))));
+  const hits = RE.roster.filter((p) => !q || p.name.toLowerCase().includes(q) || (RE.all && (p.team || "").toLowerCase().includes(q)));
+  const rows = hits.slice(0, RE_MAX_ROWS).map((p) =>
+    h("button", { class: `re-player ${p.name === RE.name && p.team === RE.team ? "on" : ""}`, onclick: () => openRatingsEditor(p.team, p.name) },
+      faceEl(p.name),
+      h("span", { class: "re-pname" }, p.name, RE.all ? h("span", { class: "re-pteam muted" }, `${p.teamYear || ""} ${p.teamShort || p.team}`.trim()) : null),
+      h("span", { class: "muted" }, p.pos || ""), h("b", { class: "re-povr" }, p.ovr != null ? Math.round(p.ovr) : "–")));
+  if (hits.length > RE_MAX_ROWS) rows.push(h("div", { class: "empty" }, `Showing the top ${RE_MAX_ROWS} of ${hits.length}. Search to find anyone else.`));
+  if (!hits.length) rows.push(h("div", { class: "empty" }, "No player matches."));
+  $("#reRoster").replaceChildren(...rows);
 }
 async function openRatingsEditor(team, name) {
   RE.team = team; RE.name = name; renderReRoster();
@@ -2307,7 +2317,7 @@ async function openRatingsEditor(team, name) {
       Object.assign(orig, r.values); Object.assign(cur, r.values); base = r.overall; ovr.textContent = r.overall; delta.textContent = "";
       body.querySelectorAll(".re-row.changed").forEach((x) => x.classList.remove("changed"));
       status.textContent = r.message; toast(r.message, "ok"); refreshCount();
-      const row = RE.roster.find((p) => p.name === name); if (row) { row.ovr = r.overall; renderReRoster(); }
+      const row = RE.roster.find((p) => p.name === name && p.team === team); if (row) { row.ovr = r.overall; renderReRoster(); }
     } catch (err) { status.textContent = err.message; refreshCount(); }
   } }, "Save");
   const resetBtn = h("button", { class: "btn", onclick: () => openRatingsEditor(team, name) }, "Undo changes");
@@ -2316,7 +2326,7 @@ async function openRatingsEditor(team, name) {
     try {
       const r = await api.post("/api/ratings/reset", { team, name });
       toast(r.message, "ok");
-      const row = RE.roster.find((p) => p.name === name); if (row && r.overall != null) row.ovr = r.overall;
+      const row = RE.roster.find((p) => p.name === name && p.team === team); if (row && r.overall != null) row.ovr = r.overall;
       openRatingsEditor(team, name);
     } catch (err) { status.textContent = err.message; }
   } }, "Reset player");

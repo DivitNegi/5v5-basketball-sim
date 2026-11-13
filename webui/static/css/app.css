@@ -905,3 +905,6 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .re-revert { visibility: hidden; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(245,165,36,.5); background: transparent; color: var(--accent-2, #fbbf24);
   font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
 .re-revert.show { visibility: visible; } .re-revert:hover { background: rgba(245,165,36,.18); }
+
+/* ratings editor: All teams list shows each player's team under his name */
+.re-pname .re-pteam { display: block; font-size: 11px; font-weight: 500; }
