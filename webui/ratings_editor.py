@@ -1,0 +1,252 @@
+"""Ratings editor: read a player's ratings straight from his team file and write edits back into that file.
+
+The team files are plain Python: each player is a `Player('Name', 'POS', <22 numbers>, keyword=value, ...)` call inside a
+`make_<team>_<year>()` function. Reading uses the file's own literals (not the built Player, which the engine adjusts at load time),
+and writing replaces only the argument text that changed, so the rest of the file (comments, layout, other players) is untouched.
+After a save the team module is reloaded and every reference to its old factory functions is swapped for the new ones, so the
+app uses the new ratings straight away, and a restart reads them from the file.
+"""
+import ast
+import importlib
+import inspect
+import sys
+import types
+
+import sim_engine
+
+# the 24 positional fields of Player, in order (see sim_engine.Player)
+POSITIONAL = [
+    "name", "position",
+    "three_tendency", "mid_tendency", "drive_tendency", "post_tendency", "dunk_tendency", "shot_tendency",
+    "three_rating", "mid_rating", "rim_rating", "dunk_rating", "ft_rating",
+    "usage", "playmaking", "ball_handle",
+    "steal", "block", "oreb", "dreb", "foul_draw", "foul_rate",
+    "perimeter_def", "interior_def",
+]
+KEYWORDS = ["clutchness", "secondary_positions", "badges", "rookie", "height", "speed", "stamina", "shot_iq", "iso_tendency", "archetype", "go_to_shot"]
+EDITABLE = POSITIONAL[1:] + KEYWORDS
+POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+# how the editor lays the fields out (label, field, kind)
+GROUPS = [
+    ("Tendencies", [("3-pt", "three_tendency", "unit"), ("Midrange", "mid_tendency", "unit"), ("Drive", "drive_tendency", "unit"),
+                    ("Post", "post_tendency", "unit"), ("Dunk", "dunk_tendency", "unit"), ("Shoot (overall)", "shot_tendency", "unit"),
+                    ("Isolation", "iso_tendency", "unit")]),
+    ("Shooting & finishing", [("3-pt", "three_rating", "unit"), ("Midrange", "mid_rating", "unit"), ("Rim", "rim_rating", "unit"),
+                              ("Dunk", "dunk_rating", "unit"), ("Free throw", "ft_rating", "unit"), ("Shot IQ", "shot_iq", "unit")]),
+    ("Playmaking", [("Usage", "usage", "unit"), ("Playmaking", "playmaking", "unit"), ("Ball handle", "ball_handle", "unit")]),
+    ("Defense & rebounding", [("Perimeter D", "perimeter_def", "unit"), ("Interior D", "interior_def", "unit"), ("Steal", "steal", "unit"),
+                              ("Block", "block", "unit"), ("Off. rebound", "oreb", "unit"), ("Def. rebound", "dreb", "unit")]),
+    ("Other", [("Draws fouls", "foul_draw", "unit"), ("Foul rate", "foul_rate", "unit"), ("Clutch", "clutchness", "unit"),
+               ("Speed", "speed", "unit"), ("Stamina", "stamina", "unit"), ("Height (inches)", "height", "int"),
+               ("Position", "position", "pos"), ("Other positions", "secondary_positions", "positions"),
+               ("Archetype", "archetype", "text"), ("Rookie", "rookie", "bool")]),
+]
+
+
+def _factory(runner, team):
+    fn = runner.factories.get(team)
+    if fn is None or not isinstance(fn, types.FunctionType):
+        raise ValueError("That team is not in the team files.")
+    return inspect.unwrap(fn)   # the factories are wrapped by real_stat_calibration; the Player entries live in the original
+
+
+def _locate(fn, name):
+    """(path, source text, ast.Call node of this player's Player(...) entry) inside the team's factory function."""
+    path = inspect.getsourcefile(fn)
+    with open(path, encoding="utf-8", newline="") as fh:   # newline="": keep the file's own line endings
+        text = fh.read()
+    tree = ast.parse(text)
+    func = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == fn.__name__), None)
+    if func is None:
+        raise ValueError(f"Could not find {fn.__name__} in {path}.")
+    for node in ast.walk(func):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Player" and node.args:
+            first = node.args[0]
+            if isinstance(first, ast.Constant) and first.value == name:
+                return path, text, node
+    raise ValueError(f"{name} is not written as a Player(...) entry in {fn.__name__}, so he has to be edited by hand.")
+
+
+def _literal(node):
+    try:
+        return ast.literal_eval(node)
+    except Exception:
+        return None
+
+
+def _values(call):
+    vals = {}
+    for i, arg in enumerate(call.args[: len(POSITIONAL)]):
+        vals[POSITIONAL[i]] = _literal(arg)
+    for kw in call.keywords:
+        if kw.arg:
+            vals[kw.arg] = _literal(kw.value)
+    return vals
+
+
+def _build(values):
+    kwargs = {k: v for k, v in values.items() if k in POSITIONAL or k in KEYWORDS}
+    p = sim_engine.Player(**kwargs)
+    return p
+
+
+def _overall(team, values):
+    p = _build(values)
+    try:
+        sim_engine.apply_star_clutchness(types.SimpleNamespace(name=team, roster=[p]))
+    except Exception:
+        pass
+    return round(sim_engine.fantasy_ovr(p))
+
+
+def read(runner, team, name):
+    fn = _factory(runner, team)
+    path, _text, call = _locate(fn, name)
+    vals = _values(call)
+    rel = path.replace("\\", "/").split("/5v5_sim/")[-1]
+    return {"team": team, "name": name, "file": rel, "function": fn.__name__, "values": vals, "overall": _overall(team, vals),
+            "groups": [{"title": t, "fields": [{"label": l, "key": k, "kind": kind} for l, k, kind in fs]} for t, fs in GROUPS]}
+
+
+def _clean(changes):
+    out = {}
+    for key, value in (changes or {}).items():
+        if key not in EDITABLE:
+            continue
+        if key == "position":
+            value = str(value).upper()
+            if value not in POSITIONS:
+                raise ValueError("Position must be PG, SG, SF, PF or C.")
+        elif key == "secondary_positions":
+            value = tuple(p for p in (str(x).upper() for x in (value or [])) if p in POSITIONS)
+        elif key == "badges":
+            value = tuple(str(x) for x in (value or []))
+        elif key in ("archetype", "go_to_shot"):
+            value = str(value or "")
+        elif key == "rookie":
+            value = bool(value)
+        elif key == "height":
+            value = int(round(float(value)))
+            if not 60 <= value <= 96:
+                raise ValueError("Height must be between 60 and 96 inches.")
+        else:
+            value = round(float(value), 3)
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"{key} must be between 0 and 1.")
+        out[key] = value
+    return out
+
+
+def preview(runner, team, name, changes):
+    fn = _factory(runner, team)
+    _path, _text, call = _locate(fn, name)
+    vals = _values(call)
+    vals.update(_clean(changes))
+    return {"overall": _overall(team, vals)}
+
+
+def _source(value):
+    if isinstance(value, float):
+        return f"{value:.3f}".rstrip("0").rstrip(".") if value not in (0.0, 1.0) else f"{value:.2f}"
+    if isinstance(value, tuple):
+        return "(" + ", ".join(repr(v) for v in value) + ("," if len(value) == 1 else "") + ")"
+    return repr(value)
+
+
+def _offsets(text):
+    """ast gives (line, UTF-8 byte column); turn that into an index into the text (names like Dončić make bytes and characters differ)."""
+    lines = text.splitlines(keepends=True)
+    starts, pos = [0], 0
+    for line in lines:
+        pos += len(line)
+        starts.append(pos)
+    return lambda lineno, col: starts[lineno - 1] + len(lines[lineno - 1].encode("utf-8")[:col].decode("utf-8", errors="ignore"))
+
+
+def save(runner, team, name, changes):
+    fn = _factory(runner, team)
+    path, text, call = _locate(fn, name)
+    vals = _values(call)
+    changes = {k: v for k, v in _clean(changes).items() if vals.get(k) != v}
+    if not changes:
+        return {"saved": False, "message": "Nothing changed.", **read(runner, team, name)}
+    off = _offsets(text)
+    edits = []   # (start, end, replacement)
+    kw_nodes = {kw.arg: kw for kw in call.keywords if kw.arg}
+    to_append = []
+    for key, value in changes.items():
+        if key in POSITIONAL:
+            node = call.args[POSITIONAL.index(key)]
+            edits.append((off(node.lineno, node.col_offset), off(node.end_lineno, node.end_col_offset), _source(value)))
+        elif key in kw_nodes:
+            node = kw_nodes[key].value
+            edits.append((off(node.lineno, node.col_offset), off(node.end_lineno, node.end_col_offset), _source(value)))
+        else:
+            to_append.append(f"{key}={_source(value)}")
+    if to_append:   # new keyword arguments go just before the closing parenthesis
+        last = (call.keywords[-1].value if call.keywords else call.args[-1])
+        at = off(last.end_lineno, last.end_col_offset)
+        edits.append((at, at, ", " + ", ".join(to_append)))
+    for start, end, rep in sorted(edits, key=lambda e: e[0], reverse=True):
+        text = text[:start] + rep + text[end:]
+    compile(text, path, "exec")   # never write a file that would not load
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+    _reload(fn)
+    if hasattr(runner, "factories"):
+        _refresh_factories(runner)
+    return {"saved": True, "changed": sorted(changes), "message": f"Saved to {read(runner, team, name)['file']}.", **read(runner, team, name)}
+
+
+def _reload(old_fn):
+    """Reload the edited team module and point every reference to its old factory functions at the new ones (also the
+    real_stat_calibration wrappers, which hold the old function inside them, and factory registries kept in dicts)."""
+    global _SWAP
+    mod = sys.modules[old_fn.__module__]
+    old = {k: v for k, v in vars(mod).items() if isinstance(v, types.FunctionType) and v.__module__ == mod.__name__}
+    new_mod = importlib.reload(mod)
+    _SWAP = {id(f): getattr(new_mod, k) for k, f in old.items() if hasattr(new_mod, k)}
+    for m in list(sys.modules.values()):
+        d = getattr(m, "__dict__", None)
+        if not isinstance(d, dict) or m is new_mod:
+            continue
+        for k, v in list(d.items()):
+            nv = _replacement(v)
+            if nv is not None:
+                d[k] = nv
+            elif isinstance(v, dict) and k.isupper():
+                for kk, vv in list(v.items()):
+                    nvv = _replacement(vv)
+                    if nvv is not None:
+                        v[kk] = nvv
+
+
+_SWAP = {}
+
+
+def _replacement(v):
+    if not isinstance(v, types.FunctionType):
+        return None
+    if id(v) in _SWAP:
+        return _SWAP[id(v)]
+    inner = getattr(v, "__wrapped__", None)
+    if inner is not None and id(inner) in _SWAP:
+        import real_stat_calibration as rsc
+        w = rsc._wrap(_SWAP[id(inner)])
+        w._real_stat_wrapped = True
+        return w
+    return None
+
+
+def _refresh_factories(runner):
+    for team, fn in list(runner.factories.items()):
+        nv = _replacement(fn)
+        if nv is not None:
+            runner.factories[team] = nv
+    try:   # cached rankings and positions were built from the old ratings
+        from . import server, stats
+        server._STRENGTH_CACHE.clear()
+        stats._POS_CACHE.clear()
+    except Exception:
+        pass

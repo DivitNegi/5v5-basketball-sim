@@ -2194,6 +2194,90 @@ function playerInsights(d, color) {
     hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group, { three: d.three_split, mid: d.mid_split, fine: d.fine, fineAvg: d.fine_avg })) : null,
   ];
 }
+
+// ---- ratings editor: the player's ratings straight from his team file; Save writes them back into that file
+async function openRatingsEditor(team, name) {
+  window.__ppAt = performance.now();
+  document.querySelector(".pp-back")?.remove();
+  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const body = h("div", { class: "pp-body" }, h("div", { class: "empty" }, "Loading…"));
+  const back = h("div", { class: "pp-back", onclick: (e) => { if (e.target === back) close(); } }, h("div", { class: "pp-card re-card", role: "dialog" }, h("button", { class: "pp-x", onclick: close, title: "Close" }, "✕"), body));
+  document.body.append(back); document.addEventListener("keydown", onKey);
+  let d;
+  try { d = await api.get(`/api/ratings/player?team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`); } catch { d = { error: "Could not load his ratings." }; }
+  if (d.error) { body.replaceChildren(h("div", { class: "empty" }, d.error)); return; }
+  const orig = { ...d.values }, cur = { ...d.values };
+  const id = identOf(team);
+  const ovr = h("div", { class: "re-ovr" }, d.overall), delta = h("div", { class: "re-delta muted" }, "");
+  const status = h("div", { class: "re-status muted" }, `Saves to ${d.file} (${d.function})`);
+  let base = d.overall, timer = null;
+  const changes = () => Object.fromEntries(Object.keys(cur).filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(orig[k])).map((k) => [k, cur[k]]));
+  const refreshCount = () => { const n = Object.keys(changes()).length; saveBtn.disabled = !n; saveBtn.textContent = n ? `Save ${n} change${n === 1 ? "" : "s"}` : "Save"; };
+  const preview = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        const r = await api.post("/api/ratings/preview", { team, name, changes: changes() });
+        if (r.error) { status.textContent = r.error; return; }
+        ovr.textContent = r.overall;
+        const dv = r.overall - base; delta.textContent = dv ? `${dv > 0 ? "+" : ""}${dv} from ${base}` : "";
+        delta.className = `re-delta ${dv > 0 ? "up" : dv < 0 ? "down" : "muted"}`;
+      } catch (err) { status.textContent = err.message; }
+    }, 220);
+  };
+  const field = (f) => {
+    const v = cur[f.key];
+    const mark = (row) => row.classList.toggle("changed", JSON.stringify(cur[f.key]) !== JSON.stringify(orig[f.key]));
+    let row;
+    const set = (val) => { cur[f.key] = val; mark(row); refreshCount(); preview(); };
+    if (f.kind === "unit") {
+      const num = h("input", { type: "number", min: 0, max: 1, step: 0.01, value: v ?? "", placeholder: "auto", class: "re-num", title: v == null ? "Not set in the file: the engine works it out" : "" });
+      const rng = h("input", { type: "range", min: 0, max: 1, step: 0.01, value: v ?? 0 });
+      rng.addEventListener("input", () => { num.value = rng.value; set(Number(rng.value)); });
+      num.addEventListener("change", () => { const x = Math.max(0, Math.min(1, Number(num.value) || 0)); num.value = x; rng.value = x; set(x); });
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), rng, num);
+    } else if (f.kind === "int") {
+      const num = h("input", { type: "number", min: 60, max: 96, step: 1, value: v ?? "", class: "re-num" });
+      const ft = h("span", { class: "muted re-ft" }, v ? `${Math.floor(v / 12)}'${v % 12}"` : "");
+      num.addEventListener("change", () => { const x = Math.round(Number(num.value)); ft.textContent = `${Math.floor(x / 12)}'${x % 12}"`; set(x); });
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), ft, num);
+    } else if (f.kind === "pos") {
+      const s = h("select", { onchange: (e) => set(e.target.value) }, ["PG", "SG", "SF", "PF", "C"].map((p) => h("option", { value: p, selected: p === v }, p)));
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), s);
+    } else if (f.kind === "positions") {
+      const have = new Set(v || []);
+      const boxes = ["PG", "SG", "SF", "PF", "C"].map((p) => h("label", { class: "re-chk" }, h("input", { type: "checkbox", checked: have.has(p), onchange: (e) => { e.target.checked ? have.add(p) : have.delete(p); set(["PG", "SG", "SF", "PF", "C"].filter((x) => have.has(x))); } }), p));
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("div", { class: "re-chks" }, boxes));
+    } else if (f.kind === "bool") {
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("input", { type: "checkbox", checked: !!v, onchange: (e) => set(e.target.checked) }));
+    } else {
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("input", { type: "text", value: v ?? "", class: "re-text", onchange: (e) => set(e.target.value) }));
+    }
+    return row;
+  };
+  const saveBtn = h("button", { class: "btn primary", disabled: true, onclick: async () => {
+    saveBtn.disabled = true; status.textContent = "Saving…";
+    try {
+      const r = await api.post("/api/ratings/save", { team, name, changes: changes() });
+      if (r.error) { status.textContent = r.error; refreshCount(); return; }
+      Object.assign(orig, r.values); Object.assign(cur, r.values); base = r.overall; ovr.textContent = r.overall; delta.textContent = "";
+      body.querySelectorAll(".re-row.changed").forEach((x) => x.classList.remove("changed"));
+      status.textContent = r.message; toast(r.message, "ok"); refreshCount();
+    } catch (err) { status.textContent = err.message; refreshCount(); }
+  } }, "Save");
+  const resetBtn = h("button", { class: "btn", onclick: () => openRatingsEditor(team, name) }, "Undo changes");
+  const backBtn = h("button", { class: "btn", onclick: () => openStatsPlayer(team, name, "auto") }, "‹ Stats");
+  const face = h("div", { class: "pcard-face", style: { "--c": id.color || "#64748b" } }, name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
+  withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
+  body.replaceChildren(
+    h("div", { class: "pcard-head", style: { "--c": id.color || "#64748b" } }, face,
+      h("div", {}, h("div", { class: "pcard-name" }, name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ratings editor`)),
+      h("div", { class: "re-ovr-box" }, h("div", { class: "muted", style: { fontSize: "11px", letterSpacing: ".1em" } }, "OVERALL"), ovr, delta)),
+    h("div", { class: "re-groups" }, d.groups.map((g) => h("div", { class: "pc-panel re-group" }, h("h4", {}, g.title), g.fields.map(field)))),
+    h("div", { class: "re-actions" }, backBtn, resetBtn, h("div", { style: { flex: "1" } }), status, saveBtn));
+  refreshCount();
+}
 async function openStatsPlayer(team, name, source) {
   window.__ppAt = performance.now();
   document.querySelector(".pp-back")?.remove();
@@ -2228,7 +2312,7 @@ async function openStatsPlayer(team, name, source) {
   const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
   paint();
   body.replaceChildren(
-    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
+    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" } }, seg, h("button", { class: "btn", onclick: () => openRatingsEditor(team, name) }, "Edit ratings"))),
     tiles,
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
 }

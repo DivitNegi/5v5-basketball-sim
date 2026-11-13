@@ -1079,6 +1079,12 @@ def build_app():
                     (params.get("quarter") or ["All"])[0]))
             if path == "/api/stats/player":
                 return self._json(stats_player_detail(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0], (params.get("group") or ["all"])[0]))
+            if path == "/api/ratings/player":
+                from . import ratings_editor
+                try:
+                    return self._json(ratings_editor.read(runner, (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
+                except ValueError as exc:
+                    return self._json({"error": str(exc)})
             if path == "/api/coach":
                 return self._json(coach_payload())
             if path == "/api/fantasy":
@@ -1206,6 +1212,16 @@ def build_app():
             if path == "/api/control":
                 error = runner.control(data.get("action", ""), data.get("value"))
                 return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)
+            if path in ("/api/ratings/preview", "/api/ratings/save"):
+                from . import ratings_editor
+                try:
+                    fn = ratings_editor.save if path.endswith("save") else ratings_editor.preview
+                    out = fn(runner, data.get("team", ""), data.get("name", ""), data.get("changes") or {})
+                    if path.endswith("save") and runner.active and out.get("saved"):
+                        out["message"] += " A game already being played keeps the old ratings; the next one uses the new ones."
+                    return self._json(out)
+                except ValueError as exc:
+                    return self._json({"error": str(exc)}, 400)
             if path == "/api/coach":
                 error = coach_action(data)
                 runner._push_live(force=True)
