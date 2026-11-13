@@ -154,6 +154,15 @@ def _source(value):
     return repr(value)
 
 
+def _source_like(value, old_src):
+    """Write a number the way the file already writes it there (0.860 stays three places, 0.86 two), so only the digits change."""
+    if isinstance(value, float) and isinstance(old_src, str) and "." in old_src and old_src.replace(".", "", 1).isdigit():
+        places = len(old_src.split(".")[1])
+        out = f"{value:.{places}f}"
+        return out if abs(float(out) - value) < 1e-9 else f"{value:.3f}"
+    return _source(value)
+
+
 def _offsets(text):
     """ast gives (line, UTF-8 byte column); turn that into an index into the text (names like Dončić make bytes and characters differ)."""
     lines = text.splitlines(keepends=True)
@@ -176,12 +185,10 @@ def save(runner, team, name, changes):
     kw_nodes = {kw.arg: kw for kw in call.keywords if kw.arg}
     to_append = []
     for key, value in changes.items():
-        if key in POSITIONAL:
-            node = call.args[POSITIONAL.index(key)]
-            edits.append((off(node.lineno, node.col_offset), off(node.end_lineno, node.end_col_offset), _source(value)))
-        elif key in kw_nodes:
-            node = kw_nodes[key].value
-            edits.append((off(node.lineno, node.col_offset), off(node.end_lineno, node.end_col_offset), _source(value)))
+        if key in POSITIONAL or key in kw_nodes:
+            node = call.args[POSITIONAL.index(key)] if key in POSITIONAL else kw_nodes[key].value
+            a, b = off(node.lineno, node.col_offset), off(node.end_lineno, node.end_col_offset)
+            edits.append((a, b, _source_like(value, text[a:b])))
         else:
             to_append.append(f"{key}={_source(value)}")
     if to_append:   # new keyword arguments go just before the closing parenthesis
