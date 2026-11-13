@@ -1311,7 +1311,7 @@ function pcRadar(p, color) {
   const shape = axes.map(([, v], i) => pt(i, Math.max(v, 0.04)).map((x) => x.toFixed(1)).join(",")).join(" ");
   const svg = svgEl("svg", { viewBox: "0 0 200 200", class: "pc-radar" });
   svg.innerHTML = [0.33, 0.66, 1].map((f) => `<polygon points="${ring(f)}" class="rg"/>`).join("")
-    + axes.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="rg"/>`; }).join("")
+    + axes.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${C}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="rg"/>`; }).join("")
     + `<polygon points="${shape}" class="rs" style="--c:${color}"/>`
     + axes.map(([l], i) => { const [x, y] = pt(i, 1.2); return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" class="rl" text-anchor="middle" dominant-baseline="middle">${l}</text>`; }).join("");
   return svg;
@@ -1997,7 +1997,7 @@ function percentileRadar(ranks, color) {
   const shape = ranks.map((r, i) => pt(i, Math.max(0.03, (r.pct ?? 0) / 100)).map((v) => v.toFixed(1)).join(",")).join(" ");
   const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "pct-radar" });
   let html = `<circle cx="${C}" cy="${CY}" r="${R}" class="pr-outer"/><circle cx="${C}" cy="${CY}" r="${R * 0.5}" class="pr-mid"/>`
-    + ranks.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="pr-spoke"/>`; }).join("")
+    + ranks.map((_, i) => { const [x, y] = pt(i, 1); return `<line x1="${C}" y1="${C}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="pr-spoke"/>`; }).join("")
     + `<polygon points="${shape}" class="pr-shape" style="--c:${color}"/>`
     + ranks.map((r, i) => { const [x, y] = pt(i, Math.max(0.03, (r.pct ?? 0) / 100)); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" class="pr-dot" style="--c:${color}"/>`; }).join("")
     + `<text x="${C + 6}" y="${CY - R * 0.5 + 14}" class="pr-tick">50%</text><text x="${C + 6}" y="${CY - R + 14}" class="pr-tick">100%</text>`;
