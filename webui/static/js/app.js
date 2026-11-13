@@ -2266,12 +2266,14 @@ async function openRatingsEditor(team, name) {
     const v = cur[f.key];
     let row, apply = null;
     const differsFromCommitted = () => committed && f.key in committed && JSON.stringify(cur[f.key]) !== JSON.stringify(committed[f.key]);
-    const revert = h("button", { class: "re-revert", type: "button", title: "", onclick: () => { if (apply) apply(committed[f.key]); } }, "↺");
+    const unsaved = () => JSON.stringify(cur[f.key]) !== JSON.stringify(orig[f.key]);
+    const target = () => (unsaved() ? orig[f.key] : committed?.[f.key]);   // first click undoes the unsaved change; on a saved edit it goes back to the original
+    const revert = h("button", { class: "re-revert", type: "button", title: "", onclick: () => { if (apply) apply(target()); } }, "↺");
     const mark = (r) => {
       r.classList.toggle("changed", JSON.stringify(cur[f.key]) !== JSON.stringify(orig[f.key]));
-      const off = differsFromCommitted();
+      const off = unsaved() || differsFromCommitted();
       revert.classList.toggle("show", !!off);
-      if (off) { const c = committed[f.key]; revert.title = `Back to the original: ${typeof c === "number" && c <= 1 && f.kind === "unit" ? Math.round(c * 100) : Array.isArray(c) ? c.join(", ") || "none" : c}`; }
+      if (off) { const c = target(); revert.title = `${unsaved() ? "Undo this change" : "Back to the original"}: ${typeof c === "number" && c <= 1 && f.kind === "unit" ? Math.round(c * 100) : Array.isArray(c) ? c.join(", ") || "none" : c}`; }
     };
     const set = (val) => { cur[f.key] = val; mark(row); refreshCount(); preview(); };
     if (f.kind === "unit") {
