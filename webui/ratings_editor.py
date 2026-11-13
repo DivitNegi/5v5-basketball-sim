@@ -24,14 +24,12 @@ POSITIONAL = [
     "perimeter_def", "interior_def",
 ]
 KEYWORDS = ["clutchness", "secondary_positions", "badges", "rookie", "height", "speed", "stamina", "shot_iq", "iso_tendency", "archetype", "go_to_shot"]
-EDITABLE = POSITIONAL[1:] + KEYWORDS
+TENDENCIES = ("three_tendency", "mid_tendency", "drive_tendency", "post_tendency", "dunk_tendency", "shot_tendency", "iso_tendency")
+EDITABLE = [k for k in POSITIONAL[1:] + KEYWORDS if k not in TENDENCIES]   # tendencies are not shown and cannot be changed here
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 # how the editor lays the fields out (label, field, kind)
 GROUPS = [
-    ("Tendencies", [("3-pt", "three_tendency", "unit"), ("Midrange", "mid_tendency", "unit"), ("Drive", "drive_tendency", "unit"),
-                    ("Post", "post_tendency", "unit"), ("Dunk", "dunk_tendency", "unit"), ("Shoot (overall)", "shot_tendency", "unit"),
-                    ("Isolation", "iso_tendency", "unit")]),
     ("Shooting & finishing", [("3-pt", "three_rating", "unit"), ("Midrange", "mid_rating", "unit"), ("Rim", "rim_rating", "unit"),
                               ("Dunk", "dunk_rating", "unit"), ("Free throw", "ft_rating", "unit"), ("Shot IQ", "shot_iq", "unit")]),
     ("Playmaking", [("Usage", "usage", "unit"), ("Playmaking", "playmaking", "unit"), ("Ball handle", "ball_handle", "unit")]),
