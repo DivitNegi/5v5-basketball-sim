@@ -2022,7 +2022,7 @@ function teamInsights(t, id, team) {
       sub("For the rim, midrange, three and post: how well the team shoots it (FG%) and how often (shots a game), ranked among the teams."), percentileRadar(t.zone_ranks, color)) : null,
     hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Team shot chart · ${t.source}`),
       seasonShotChart(id.short || team, t.shots, t.zone_avg, "league", { three: t.three_split, mid: t.mid_split, fine: t.fine, fineAvg: t.fine_avg })) : null,
-  ];
+  ].filter(Boolean);   // replaceChildren would print a skipped panel as "null"
 }
 
 // ---- player pop-up from the Stats tables: totals / per game, and where he ranks against the league (percentile radar)
@@ -2180,7 +2180,7 @@ function seasonShotChart(name, zones, avg, vs, split) {
   paint();
   return h("div", { class: "pc-map-wrap" }, tabs, svg, zsvg, legend,
     h("div", { class: "pc-map-foot" }, h("span", {}, h("b", {}, `${made}/${total}`), " FG", h("span", { class: "muted" }, ` · ${total ? (100 * made / total).toFixed(1) : "–"}%`)), h("span", { class: "lg make" }, "● make"), h("span", { class: "lg miss" }, "✕ miss")),
-    h("div", { class: "muted", style: { fontSize: "12px", textAlign: "center", marginTop: "4px" } }, "Built from his zone totals: each shot sits somewhere inside its zone"));
+    h("div", { class: "muted", style: { fontSize: "12px", textAlign: "center", marginTop: "4px" } }, "Built from the zone totals: each shot sits somewhere inside its zone"));
 }
 // the panels plus a "compare to" switch: everyone, or only guards / forwards / centers (every radar re-ranks him against that group)
 function insightsBox(first, color, fetchGroup) {
@@ -2496,12 +2496,12 @@ function shotSpot(ev, side, spread = false) {
     if (ev.loc === "deep") { for (let k = 0; k < 10; k++) { [x, y] = polar(280, 405, 0.85); if (y > Y0 + 12 && y < Y0 + CH - 12) break; } }   // logo range: well past the arc, out toward half court
     else if (ev.loc === "wing" || ev.loc === "top") {   // above the break: the wings, or the top of the key
       for (let k = 0; k < 10; k++) {
-        const sgn = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, ang = ev.loc === "top" ? (rnd() * 2 - 1) * 0.4 : sgn * (0.44 + rnd() * 0.7), r = 242 + rnd() * 27;
+        const sgn = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, ang = ev.loc === "top" ? (rnd() * 2 - 1) * 0.42 : sgn * (0.42 + rnd() * 0.8), r = 242 + rnd() * 27;   // top and wing meet at 0.42; the wing runs right down to where the arc meets the corner line
         x = HX + r * Math.cos(ang); y = HY + r * Math.sin(ang);
-        if (y > Y0 + 18 && y < Y0 + CH - 18) break;
+        if (Math.abs(y - HY) <= 221 && y > Y0 + 8 && y < Y0 + CH - 8) break;
       }
     }
-    else if (ev.loc === "corner" || (!ev.loc && rnd() < 0.2)) { x = 45 + rnd() * 120; y = (ev.side === "L" ? true : ev.side === "R" ? false : rnd() < 0.5) ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
+    else if (ev.loc === "corner" || (!ev.loc && rnd() < 0.2)) { x = 42 + rnd() * 136; y = (ev.side === "L" ? true : ev.side === "R" ? false : rnd() < 0.5) ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
     else {   // just behind the line: most threes are 24-26 ft out, a few are 27-30 ft pull-ups (a known above-the-break three never comes from the far end)
       const far = !ev.loc && rnd() < 0.08, rMin = 242, rMax = far ? 300 : 268;
       for (let k = 0; k < 10; k++) { [x, y] = polar(rMin, rMax, 1.2); if (y > Y0 + 18 && y < Y0 + CH - 18) break; }
@@ -2533,7 +2533,7 @@ function shotZoneOf(ev, x, y) {
   if (z === "three") {
     if (ev.loc === "deep") return null;   // logo range sits off the map
     if (x <= 172 && Math.abs(dy) > 220) return `corner3_${side}`;
-    return ang < 0.4 ? "top3" : `wing3_${side}`;
+    return ang < 0.42 ? "top3" : `wing3_${side}`;
   }
   return null;
 }
