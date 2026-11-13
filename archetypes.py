@@ -88,7 +88,7 @@ _GROUP_WORD = {"guard": "Guard", "wing": "Wing", "forward": "Forward", "big": "B
 def _ovr(player):
     try:
         import sim_engine
-        return float(sim_engine.fantasy_ovr(player))
+        return float(sim_engine.fantasy_ovr_uncapped(player))
     except Exception:
         return 0.0
 
@@ -98,6 +98,8 @@ def _rules():
     FWD = ("wing", "forward")
     W = _GROUP_WORD
     return [
+        # the very top: a 100 overall who carries the offense and is elite on defense too (Jordan, peak LeBron)
+        ("GOAT", lambda k, g, u, p, o, d, ov: ov >= 99.5 and u >= 0.93 and o >= 0.98 and d >= 0.90),
         # true superstars only: elite at both ends and the man the offense runs through
         ("Two-Way Superstar", lambda k, g, u, p, o, d, ov: ov >= 94 and u >= 0.93 and o >= 0.93 and d >= 0.93),
         ("Unicorn", lambda k, g, u, p, o, d, ov: g in ("forward", "big") and k["shoot"] >= 0.72 and k["intd"] >= 0.85 and k["finish"] >= 0.65),
@@ -175,7 +177,7 @@ def _special(sk, group, usage, player):
     dfn = max(sk[k] for k in _DEFENSE)
     ov = None
     for name, test in _RULES:
-        if name in ("Two-Way Superstar", "Offensive Juggernaut"):
+        if name in ("GOAT", "Two-Way Superstar", "Offensive Juggernaut"):
             if ov is None:
                 ov = _ovr(player)
         if test(sk, group, usage, player, off, dfn, ov if ov is not None else 0.0):
