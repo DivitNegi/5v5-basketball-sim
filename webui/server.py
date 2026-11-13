@@ -455,6 +455,14 @@ TEAM_METRICS = [   # (label, value(per-game totals), lower_is_better)
 ]
 
 
+def _team_insights(runner, team):
+    try:
+        from .stats import team_detail
+        return team_detail(runner, team)
+    except Exception:
+        return None
+
+
 def team_card_payload(runner, team):
     sec = runner.sections or {}
     teams = sec.get("_season_team_totals") or sec.get("_playoff_team_totals") or sec.get("_series_team_totals") or {}
@@ -498,7 +506,8 @@ def team_card_payload(runner, team):
     games = schedule_payload(runner, team)["games"]
     played = [x for x in games if x.get("mine") is not None]
     return {"team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
-            "recent": list(reversed(played[-8:])), "upcoming": schedule_payload(runner, team)["upcoming"][:5], "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"])}
+            "recent": list(reversed(played[-8:])), "upcoming": schedule_payload(runner, team)["upcoming"][:5], "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"]),
+            "insights": _team_insights(runner, team)}
 
 
 HIGHS_STATS = {"PTS": "pts", "REB": "reb", "OREB": "oreb", "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk", "3PM": "tpm", "3PA": "tpa",

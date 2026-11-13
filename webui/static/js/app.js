@@ -969,7 +969,7 @@ function renderTeamsTab() {
   const lowIsGood = ["opp", "drtg", "tov", "oppfg", "opp3"].includes(key);
   const sorted = [...rows].sort((a, b) => lowIsGood ? (a[key] ?? 999) - (b[key] ?? 999) : (b[key] ?? -999) - (a[key] ?? -999));
   const head = h("tr", {}, h("th", { class: "l" }, "Team"), ...TCOLS.map(([k, l]) => h("th", { class: `sortable ${key === k ? "sorted" : ""}`, onclick: () => { SE.tsort = k; renderSeasonBody(); } }, l)));
-  return simpleTable(head, sorted.map((t) => h("tr", {}, h("td", { class: "l" }, teamCell(t)), ...TCOLS.map(([k]) => h("td", { class: k === "net" ? "pts" : "" }, t[k] == null ? "–" : (k === "diff" || k === "net") && t[k] > 0 ? `+${t[k]}` : t[k])))));
+  return simpleTable(head, sorted.map((t) => h("tr", { class: "clickable", title: "Click for the team card", onclick: () => openTeamCard(t.team) }, h("td", { class: "l" }, teamCell(t)), ...TCOLS.map(([k]) => h("td", { class: k === "net" ? "pts" : "" }, t[k] == null ? "–" : (k === "diff" || k === "net") && t[k] > 0 ? `+${t[k]}` : t[k])))));
 }
 function renderAdvancedTab() {
   const box = h("div", { id: "seasonAdv" });
@@ -2002,9 +2002,27 @@ async function openTeamCard(team) {
       h("div", { class: "pc-viz", style: { gridTemplateColumns: "1.4fr 1fr", marginTop: "12px" } },
         h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, ranked among the ${d.pool} teams (1st = best). For defense (points allowed) and turnovers the spoke follows the number itself, so there a shorter spoke is better; everywhere else longer is better.`), percentileRadar(d.ranks, chartColor())),
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
-          d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)));
+          d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)),
+      ...(d.insights ? teamInsights(d.insights, id, team) : []));
   };
   render();
+}
+
+// the team pop-up's deeper panels: advanced radars ranked against the other teams, the team's shot diet and zones, and its whole shot chart
+function teamInsights(t, id, team) {
+  const color = chartColor(id);
+  const zoneRow = h("div", { class: "zone-row" }, [["Rim", t.shots.rim, "rim"], ["Mid", t.shots.mid, "mid"], ["3PT", t.shots.three, "three"], ["Post", t.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
+  const hasZones = Object.values(t.shots).some((z) => z[1] > 0);
+  const sub = (txt) => h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, txt);
+  return [
+    ...(t.adv_groups || []).filter((g) => g.ranks.some((r) => r.pct != null)).map((g) => h("div", { class: "pc-panel", style: { marginTop: "12px" } },
+      h("h4", {}, `${g.title} · against the other ${t.pool - 1} teams`), sub(`${g.desc} The spoke follows the number; for stats where lower is better (defensive rating, turnovers, opponent shooting) a shorter spoke is better, and the rank in brackets always counts 1st as best.`), percentileRadar(g.ranks, color))),
+    hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(t.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null,
+    hasZones && t.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Shot zones · against the other teams"),
+      sub("For the rim, midrange, three and post: how well the team shoots it (FG%) and how often (shots a game), ranked among the teams."), percentileRadar(t.zone_ranks, color)) : null,
+    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Team shot chart · ${t.source}`),
+      seasonShotChart(id.short || team, t.shots, t.zone_avg, "league", { three: t.three_split, mid: t.mid_split, fine: t.fine, fineAvg: t.fine_avg })) : null,
+  ];
 }
 
 // ---- player pop-up from the Stats tables: totals / per game, and where he ranks against the league (percentile radar)
@@ -2423,7 +2441,7 @@ function renderStatsInto(root, data, opts = {}) {
   const defaultCol = Math.max(2, cols.findIndex((c) => ["MPG", "MIN"].includes(c)) >= 0 ? cols.findIndex((c) => ["MPG", "MIN"].includes(c)) : (cols.indexOf("TOTAL") >= 0 ? cols.indexOf("TOTAL") : 2));
   const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;
   const head = h("tr", {}, cols.map((label, i) => h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
-  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 && rank ? `${rank}. ${v}` : (v ?? "—"))));
+  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v)) : (v ?? "—"))));
   const body = [];
   if (flat) {
     let list = [...items];
@@ -2679,7 +2697,10 @@ function paintShots(scope, d) {
   if (!d.rows.length) { tableEl.replaceChildren(h("div", { class: "empty" }, d.note || "Shot data appears once games are played.")); return; }
   const prev = tableEl.querySelector(".table-wrap"), left = prev?.scrollLeft || 0, top = prev?.scrollTop || 0;
   const wrap = h("div", { class: "table-wrap tall" }, h("table", { class: "stats avg" }, h("thead", {}, h("tr", {}, d.columns.map((c, i) => h("th", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, c)))),
-    h("tbody", {}, d.rows.map((r) => h("tr", { class: r.kind === "team" ? "team-row" : "" }, r.cells.map((c, i) => h("td", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, i === 0 ? (identOf(c).short ? `${identOf(c).year || ""} ${identOf(c).short}`.trim() : c) : c)))))));
+    h("tbody", {}, d.rows.map((r) => h("tr", { class: `${r.kind === "team" ? "team-row" : ""} clickable`, title: r.kind === "team" ? "Click for the team card" : "Click for full stats",
+      onclick: () => (r.kind === "team" ? openTeamCard(r.cells[0]) : openStatsPlayer(r.cells[0], String(r.cells[1]).replace(/^\d+\.\s*/, ""), SH.source || "Season")) },
+      r.cells.map((c, i) => h("td", { class: i < (SH.mode === "Matchup Defense" ? 3 : 2) ? "l" : "" }, i === 0 ? (identOf(c).short ? `${identOf(c).year || ""} ${identOf(c).short}`.trim() : c)
+        : i === 1 && r.kind !== "team" && c ? h("div", { class: "pcell" }, faceEl(String(c).replace(/^\d+\.\s*/, "")), h("span", { class: "pname" }, c)) : c)))))));
   tableEl.replaceChildren(wrap); wrap.scrollLeft = left; wrap.scrollTop = top;
 }
 

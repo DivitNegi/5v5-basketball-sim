@@ -304,3 +304,127 @@ def player_detail(runner, source, team, name, group="all"):
             "mid_split": {"base": zone("mid_base"), "elbow": zone("mid_elbow"), "wing": zone("mid_wing"),
                           "base_L": zone("mid_base_L"), "base_R": zone("mid_base_R"), "wing_L": zone("mid_wing_L"), "wing_R": zone("mid_wing_R")},
             "fine": fine_me, "fine_avg": fine_avg}
+
+
+
+# ---- team pop-up: the team's whole shot chart and zone numbers (all its players' shots added up) and advanced team radars,
+# each ranked against every other team in the same set of games (season / playoffs / series / this game)
+TEAM_ADV_GROUPS = [   # (title, description, [(key, label, lower_is_better)])
+    ("Overall", "How good the team is overall: net rating, point margin, win rate, pace, and its offense and defense ratings.",
+     [("net", "Net rating", False), ("diff", "Point margin", False), ("winp", "Win %", False), ("pace", "Pace", False), ("ortg", "Off. rating", False), ("drtg", "Def. rating", True)]),
+    ("Offense", "How the team scores: efficiency, shot profile, ball movement, ball security and offensive rebounding.",
+     [("ortg", "Off. rating", False), ("efg", "Effective FG %", False), ("ts", "True Shooting %", False), ("tpar", "3-pt Attempt Rate", False),
+      ("ftr", "Free Throw Rate", False), ("astr", "Assisted FG %", False), ("tovp", "Turnover %", True), ("orbp", "Off. Rebound %", False)]),
+    ("Defense", "How the team defends: points allowed per possession, opponent shooting, turnovers forced, rebounding, steals and blocks.",
+     [("drtg", "Def. rating", True), ("opp_efg", "Opp. effective FG %", True), ("opp_tpp", "Opp. 3-pt %", True), ("forced", "Opp. turnover %", False),
+      ("drbp", "Def. Rebound %", False), ("stl", "Steals / game", False), ("blk", "Blocks / game", False), ("opp_ftr", "Opp. FT rate", True)]),
+]
+
+
+def _team_metrics(t):
+    t = defaultdict(float, t or {})
+    g = max(1, t["games"] or 1)
+    poss = t["fga"] + 0.44 * t["fta"] - t["oreb"] + t["tov"]
+    opp_poss = t["opp_fga"] + 0.44 * t["opp_fta"] - t["opp_oreb"] + t["opp_tov"]
+
+    def div(a, b, k=100.0):
+        return k * a / b if b else None
+    m = {
+        "ortg": div(t["pts"], poss), "drtg": div(t["opp_pts"], opp_poss) if t["opp_fga"] else None,
+        "diff": (t["pts"] - t["opp_pts"]) / g if t["opp_pts"] else None,
+        "winp": div(t["wins"], g) if "wins" in t else None,
+        "pace": (0.5 * (poss + opp_poss) / g) if opp_poss else poss / g,
+        "efg": div(t["fgm"] + 0.5 * t["tpm"], t["fga"]), "ts": div(t["pts"], 2 * (t["fga"] + 0.44 * t["fta"])),
+        "tpar": div(t["tpa"], t["fga"]), "ftr": div(t["fta"], t["fga"]), "astr": div(t["ast"], t["fgm"]),
+        "tovp": div(t["tov"], t["fga"] + 0.44 * t["fta"] + t["tov"]),
+        "orbp": div(t["oreb"], t["oreb"] + t["opp_dreb"]) if t["opp_dreb"] else None,
+        "drbp": div(t["dreb"], t["dreb"] + t["opp_oreb"]) if (t["dreb"] + t["opp_oreb"]) else None,
+        "opp_efg": div(t["opp_fgm"] + 0.5 * t["opp_tpm"], t["opp_fga"]), "opp_tpp": div(t["opp_tpm"], t["opp_tpa"]),
+        "forced": div(t["opp_tov"], t["opp_fga"] + 0.44 * t["opp_fta"] + t["opp_tov"]) if t["opp_fga"] else None,
+        "stl": t["stl"] / g, "blk": t["blk"] / g, "opp_ftr": div(t["opp_fta"], t["opp_fga"]),
+    }
+    m["net"] = m["ortg"] - m["drtg"] if m["ortg"] is not None and m["drtg"] is not None else None
+    return m
+
+
+def team_detail(runner, team):
+    sec = runner.sections or {}
+    data = datasets(sec)
+    source = next((s for s in ("Season", "Playoffs", "Series", "Live") if team in (data.get(s, ({}, {}))[0])), None)
+    if source is None:
+        return None
+    players, teams_tot = data[source]
+
+    def merged(roster):   # every player's shot diet added up
+        out = defaultdict(int)
+        for st in (roster or {}).values():
+            for k, v in (st.get("shot_diet") or {}).items():
+                if isinstance(v, (int, float)):
+                    out[k] += int(v)
+        return out
+    diets = {tn: merged(pp) for tn, pp in players.items()}
+    games = {tn: max(1, int((teams_tot.get(tn) or {}).get("games", 0) or max((s.get("games", 0) or 0 for s in pp.values()), default=1))) for tn, pp in players.items()}
+    diet, g = diets[team], games[team]
+
+    def zone(d, k):
+        return [int(d.get(k + "_made", 0)), int(d.get(k, 0))]
+
+    def zones_of(d):
+        return {"rim": [a + b for a, b in zip(zone(d, "rim"), zone(d, "dunk"))], "mid": zone(d, "mid"), "three": zone(d, "three"), "post": zone(d, "post")}
+    FINE = [("ra", ("rim", "dunk")), ("paint", ("post",)), ("elbow", ("mid_elbow",)), ("mid_wing", ("mid_wing",)), ("baseline", ("mid_base",)),
+            ("corner3", ("corner3",)), ("wing3", ("wing3",)), ("top3", ("top3",))]
+
+    def fine_of(d):
+        return {k: [sum(int(d.get(x + "_made", 0)) for x in ks), sum(int(d.get(x, 0)) for x in ks)] for k, ks in FINE}
+    all_z = {tn: zones_of(d) for tn, d in diets.items()}
+    all_f = {tn: fine_of(d) for tn, d in diets.items()}
+    zone_avg = {}
+    for zk in ("rim", "mid", "three", "post"):
+        mm, aa = sum(z[zk][0] for z in all_z.values()), sum(z[zk][1] for z in all_z.values())
+        zone_avg[zk] = {"pct": round(100 * mm / aa, 2) if aa else None, "made": mm, "att": aa}
+    fine_avg = {}
+    for k, _ in FINE:
+        mm, aa = sum(f[k][0] for f in all_f.values()), sum(f[k][1] for f in all_f.values())
+        fine_avg[k] = {"pct": round(100 * mm / aa, 2) if aa else None, "att": aa}
+
+    def rank_of(val, pop, lower):
+        """rank 1 = best; the spoke follows the number itself (for lower-is-better stats a shorter spoke is the better team)"""
+        better = sum(1 for v in pop if (v < val - 1e-9 if lower else v > val + 1e-9))
+        below = sum(1 for v in pop if v < val - 1e-9)
+        equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
+        return 1 + better, (round(100 * (below + 0.5 * equal) / len(pop)) if pop else None)
+
+    zone_ranks = []
+    for key, label in (("rim", "Rim"), ("mid", "Midrange"), ("three", "3-pt"), ("post", "Post")):
+        for kind in ("fgp", "att"):
+            def val_of(tn):
+                m, a = all_z[tn][key]
+                return (100 * m / a if a else None) if kind == "fgp" else a / games[tn]
+            val = val_of(team)
+            lbl = f"{label} FG%" if kind == "fgp" else f"{label} shots / game"
+            pop = [v for v in (val_of(tn) for tn in all_z) if v is not None]
+            if val is None:
+                zone_ranks.append({"key": f"{key}_{kind}", "label": lbl, "value": None, "pct": None})
+                continue
+            rk, pct = rank_of(val, pop, False)
+            zone_ranks.append({"key": f"{key}_{kind}", "label": lbl, "value": round(val, 1), "pct": pct, "rank": rk, "of": len(pop)})
+
+    mets = {tn: _team_metrics(dict(teams_tot.get(tn) or {}, games=games[tn])) for tn in players}
+    adv_groups = []
+    for title, desc, picks in TEAM_ADV_GROUPS:
+        ranks = []
+        for key, label, lower in picks:
+            val = mets[team].get(key)
+            pop = [m[key] for m in mets.values() if m.get(key) is not None]
+            if val is None or not pop:
+                ranks.append({"key": key, "label": label, "value": None, "pct": None})
+                continue
+            rk, pct = rank_of(val, pop, lower)
+            ranks.append({"key": key, "label": label, "value": round(val, 1), "pct": pct, "rank": rk, "of": len(pop)})
+        adv_groups.append({"title": title, "desc": desc, "ranks": ranks})
+    return {"source": source, "games": g, "pool": len(players), "shots": zones_of(diet), "zone_avg": zone_avg, "zone_ranks": zone_ranks,
+            "three_split": {"corner": zone(diet, "corner3"), "above_break": zone(diet, "atb3"), "deep": zone(diet, "deep3"), "wing": zone(diet, "wing3"), "top": zone(diet, "top3"),
+                            "corner_L": zone(diet, "corner3_L"), "corner_R": zone(diet, "corner3_R"), "wing_L": zone(diet, "wing3_L"), "wing_R": zone(diet, "wing3_R")},
+            "mid_split": {"base": zone(diet, "mid_base"), "elbow": zone(diet, "mid_elbow"), "wing": zone(diet, "mid_wing"),
+                          "base_L": zone(diet, "mid_base_L"), "base_R": zone(diet, "mid_base_R"), "wing_L": zone(diet, "mid_wing_L"), "wing_R": zone(diet, "mid_wing_R")},
+            "fine": fine_of(diet), "fine_avg": fine_avg, "adv_groups": adv_groups}
