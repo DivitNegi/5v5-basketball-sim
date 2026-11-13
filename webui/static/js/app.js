@@ -2215,7 +2215,8 @@ async function loadReRoster() {
   $("#reSearch").placeholder = RE.all ? "Search every player…" : "Filter players…";
   $("#reRoster").replaceChildren(h("div", { class: "empty" }, RE.all ? "Loading every team…" : "Loading…"));
   const d = await api.get(RE.all ? "/api/roster/all" : `/api/roster?team=${encodeURIComponent(RE.team)}`);
-  RE.roster = (d.players || []).filter((p) => RE.all !== "all" || !p.olympic).map((p) => ({ ...p, team: p.team || RE.team }));
+  const isOlympic = (p) => p.olympic || /olympic|dream team|redeem team/i.test(p.team || "");
+  RE.roster = (d.players || []).filter((p) => RE.all !== "all" || !isOlympic(p)).map((p) => ({ ...p, team: p.team || RE.team }));
   renderReRoster();
   if (!RE.name && RE.roster.length) openRatingsEditor(RE.roster[0].team, RE.roster[0].name);
 }

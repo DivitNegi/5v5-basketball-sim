@@ -101,7 +101,7 @@ def _played(team, values):
 
 
 def _overall(team, values):
-    return round(sim_engine.fantasy_ovr(_played(team, values)))
+    return round(sim_engine.fantasy_ovr_uncapped(_played(team, values)))   # same overall the roster lists show
 
 
 # ratings the engine fills in when a file leaves them out (or, for clutch, leaves it at the 0.50 default)
