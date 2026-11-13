@@ -889,3 +889,14 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .re-player:hover { background: rgba(148,163,184,.08); } .re-player.on { background: rgba(245,165,36,.12); border-color: rgba(245,165,36,.45); }
 .re-player .face { width: 30px; height: 30px; font-size: 11px; }
 .re-pname { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .re-povr { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ratings editor: whole-number readouts with no visible box, coloured like the rating, and a slider filled up to the value */
+.re-row { grid-template-columns: 120px 1fr 52px; }
+.re-row .re-num { background: transparent; border: 0; border-bottom: 1px solid transparent; border-radius: 0; padding: 0 2px; width: 100%;
+  text-align: right; font-size: 19px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px currentColor; -moz-appearance: textfield; appearance: textfield; outline: none; }
+.re-row .re-num::-webkit-outer-spin-button, .re-row .re-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.re-row .re-num:hover { border-bottom-color: rgba(148,163,184,.35); } .re-row .re-num:focus { border-bottom-color: var(--accent, #f5a524); text-shadow: none; }
+.re-row input[type=range] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--tint, #f5a524) var(--fill, 50%), rgba(148,163,184,.18) var(--fill, 50%)); }
+.re-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--tint, #f5a524), 0 2px 6px rgba(0,0,0,.5); cursor: pointer; }
+.re-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--tint, #f5a524); cursor: pointer; }

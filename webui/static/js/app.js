@@ -2252,10 +2252,16 @@ async function openRatingsEditor(team, name) {
     let row;
     const set = (val) => { cur[f.key] = val; mark(row); refreshCount(); preview(); };
     if (f.kind === "unit") {
-      const num = h("input", { type: "number", min: 0, max: 1, step: 0.01, value: v ?? "", placeholder: "auto", class: "re-num", title: v == null ? "Not set in the file: the engine works it out" : "" });
-      const rng = h("input", { type: "range", min: 0, max: 1, step: 0.01, value: v ?? 0 });
-      rng.addEventListener("input", () => { num.value = rng.value; set(Number(rng.value)); });
-      num.addEventListener("change", () => { const x = Math.max(0, Math.min(1, Number(num.value) || 0)); num.value = x; rng.value = x; set(x); });
+      // shown and edited as 0-100; the file keeps 0-1 (a value you do not touch is never rewritten)
+      const shown = (x) => (x == null ? "–" : Math.round(x * 100));
+      const num = h("input", { type: "number", min: 0, max: 100, step: 1, value: v == null ? "" : shown(v), placeholder: "–", class: "re-num", title: v == null ? "Not set in the file: the engine works it out" : "Click to type a value" });
+      const rng = h("input", { type: "range", min: 0, max: 100, step: 1, value: v == null ? 0 : shown(v) });
+      const neutral = /tendency/.test(f.key) || ["usage", "foul_rate"].includes(f.key);   // how often he does something is not good or bad: one calm colour
+      const colourOf = (x) => (neutral ? "#60a5fa" : ratingColor(x));
+      const tint = (x) => { num.style.color = x == null ? "" : colourOf(x); rng.style.setProperty("--fill", `${x ?? 0}%`); rng.style.setProperty("--tint", x == null ? "#64748b" : colourOf(x)); };
+      tint(v == null ? null : shown(v));
+      rng.addEventListener("input", () => { num.value = rng.value; tint(Number(rng.value)); set(Number(rng.value) / 100); });
+      num.addEventListener("change", () => { const x = Math.max(0, Math.min(100, Math.round(Number(num.value) || 0))); num.value = x; rng.value = x; tint(x); set(x / 100); });
       row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), rng, num);
     } else if (f.kind === "int") {
       const num = h("input", { type: "number", min: 60, max: 96, step: 1, value: v ?? "", class: "re-num" });
