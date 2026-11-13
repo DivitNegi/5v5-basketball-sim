@@ -2196,14 +2196,34 @@ function playerInsights(d, color) {
 }
 
 // ---- ratings editor: the player's ratings straight from his team file; Save writes them back into that file
+const RE = { team: null, name: null, roster: [], picker: null };
+function loadRatingsView() {
+  if (!RE.picker) {
+    RE.picker = makePicker($("#reTeamPick"), (t) => { RE.team = t.name; RE.name = null; loadReRoster(); });
+    $("#reSearch").addEventListener("input", renderReRoster);
+  }
+  if (!RE.team && S.meta?.teams?.length) {
+    const t = S.meta.teams.find((x) => x.name === S.teamA) || S.meta.teams[0];
+    RE.picker.set(t); RE.team = t.name; loadReRoster();
+  }
+}
+async function loadReRoster() {
+  $("#reRoster").replaceChildren(h("div", { class: "empty" }, "Loading…"));
+  const d = await api.get(`/api/roster?team=${encodeURIComponent(RE.team)}`);
+  RE.roster = d.players || [];
+  renderReRoster();
+  if (!RE.name && RE.roster.length) openRatingsEditor(RE.team, RE.roster[0].name);
+}
+function renderReRoster() {
+  const q = ($("#reSearch").value || "").trim().toLowerCase();
+  $("#reRoster").replaceChildren(...RE.roster.filter((p) => !q || p.name.toLowerCase().includes(q)).map((p) =>
+    h("button", { class: `re-player ${p.name === RE.name ? "on" : ""}`, onclick: () => openRatingsEditor(RE.team, p.name) },
+      faceEl(p.name), h("span", { class: "re-pname" }, p.name), h("span", { class: "muted" }, p.pos || ""), h("b", { class: "re-povr" }, p.ovr != null ? Math.round(p.ovr) : "–"))));
+}
 async function openRatingsEditor(team, name) {
-  window.__ppAt = performance.now();
-  document.querySelector(".pp-back")?.remove();
-  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
-  const onKey = (e) => { if (e.key === "Escape") close(); };
-  const body = h("div", { class: "pp-body" }, h("div", { class: "empty" }, "Loading…"));
-  const back = h("div", { class: "pp-back", onclick: (e) => { if (e.target === back) close(); } }, h("div", { class: "pp-card re-card", role: "dialog" }, h("button", { class: "pp-x", onclick: close, title: "Close" }, "✕"), body));
-  document.body.append(back); document.addEventListener("keydown", onKey);
+  RE.team = team; RE.name = name; renderReRoster();
+  const body = $("#reBody");
+  body.replaceChildren(h("div", { class: "empty" }, "Loading…"));
   let d;
   try { d = await api.get(`/api/ratings/player?team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`); } catch { d = { error: "Could not load his ratings." }; }
   if (d.error) { body.replaceChildren(h("div", { class: "empty" }, d.error)); return; }
@@ -2264,10 +2284,11 @@ async function openRatingsEditor(team, name) {
       Object.assign(orig, r.values); Object.assign(cur, r.values); base = r.overall; ovr.textContent = r.overall; delta.textContent = "";
       body.querySelectorAll(".re-row.changed").forEach((x) => x.classList.remove("changed"));
       status.textContent = r.message; toast(r.message, "ok"); refreshCount();
+      const row = RE.roster.find((p) => p.name === name); if (row) { row.ovr = r.overall; renderReRoster(); }
     } catch (err) { status.textContent = err.message; refreshCount(); }
   } }, "Save");
   const resetBtn = h("button", { class: "btn", onclick: () => openRatingsEditor(team, name) }, "Undo changes");
-  const backBtn = h("button", { class: "btn", onclick: () => openStatsPlayer(team, name, "auto") }, "‹ Stats");
+  const backBtn = h("button", { class: "btn", onclick: () => openStatsPlayer(team, name, "auto") }, "Stats");
   const face = h("div", { class: "pcard-face", style: { "--c": id.color || "#64748b" } }, name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
   body.replaceChildren(
@@ -2312,7 +2333,7 @@ async function openStatsPlayer(team, name, source) {
   const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
   paint();
   body.replaceChildren(
-    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" } }, seg, h("button", { class: "btn", onclick: () => openRatingsEditor(team, name) }, "Edit ratings"))),
+    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
     tiles,
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
 }
@@ -2749,6 +2770,7 @@ async function boot() {
     if (["qtr", "pcard", "shots"].includes(b.dataset.view)) refreshGameViews();
     if (b.dataset.view === "comp") loadCompare();
     if (b.dataset.view === "coach") loadCoach();
+    if (b.dataset.view === "ratings") loadRatingsView();
     if (b.dataset.view === "lineup") loadLineup();
     if (b.dataset.view === "draft") { loadDraft(); loadTrades(); }
     if (b.dataset.view === "modes") renderCustomTeams();
