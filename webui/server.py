@@ -1212,11 +1212,11 @@ def build_app():
             if path == "/api/control":
                 error = runner.control(data.get("action", ""), data.get("value"))
                 return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)
-            if path in ("/api/ratings/preview", "/api/ratings/save"):
+            if path in ("/api/ratings/preview", "/api/ratings/save", "/api/ratings/reset"):
                 from . import ratings_editor
                 try:
-                    fn = ratings_editor.save if path.endswith("save") else ratings_editor.preview
-                    out = fn(runner, data.get("team", ""), data.get("name", ""), data.get("changes") or {})
+                    fn = ratings_editor.save if path.endswith("save") else ratings_editor.reset if path.endswith("reset") else ratings_editor.preview
+                    out = fn(runner, data.get("team", ""), data.get("name", "")) if path.endswith("reset") else fn(runner, data.get("team", ""), data.get("name", ""), data.get("changes") or {})
                     if path.endswith("save") and runner.active and out.get("saved"):
                         out["message"] += " A game already being played keeps the old ratings; the next one uses the new ones."
                     return self._json(out)

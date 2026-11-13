@@ -257,3 +257,36 @@ def _refresh_factories(runner):
         stats._POS_CACHE.clear()
     except Exception:
         pass
+
+
+def original(runner, team, name):
+    """This player's ratings as they are in the last git commit of his team file (before any edits since)."""
+    import os
+    import subprocess
+    fn = _factory(runner, team)
+    path = inspect.getsourcefile(fn)
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(path)))
+    rel = os.path.relpath(path, repo).replace("\\", "/")
+    res = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=repo, capture_output=True, encoding="utf-8")
+    if res.returncode != 0:
+        raise ValueError("No committed version of this team file to reset to.")
+    tree = ast.parse(res.stdout)
+    func = next((n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == fn.__name__), None)
+    for node in ast.walk(func) if func else []:
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Player" and node.args:
+            first = node.args[0]
+            if isinstance(first, ast.Constant) and first.value == name:
+                return _values(node)
+    raise ValueError(f"{name} is not in the committed version of this team, so there is nothing to reset to.")
+
+
+def reset(runner, team, name):
+    """Put this one player back to his last committed ratings (other players and other edits in the file are left alone)."""
+    old = original(runner, team, name)
+    now = _values(_locate(_factory(runner, team), name)[2])
+    changes = {k: v for k, v in old.items() if k in EDITABLE and now.get(k) != v}
+    if not changes:
+        return {"saved": False, "message": f"{name} already has his original ratings.", **read(runner, team, name)}
+    out = save(runner, team, name, changes)
+    out["message"] = f"{name} reset to his original ratings ({len(changes)} value{'s' if len(changes) != 1 else ''})."
+    return out

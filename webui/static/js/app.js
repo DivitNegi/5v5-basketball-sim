@@ -2294,6 +2294,15 @@ async function openRatingsEditor(team, name) {
     } catch (err) { status.textContent = err.message; refreshCount(); }
   } }, "Save");
   const resetBtn = h("button", { class: "btn", onclick: () => openRatingsEditor(team, name) }, "Undo changes");
+  const originalBtn = h("button", { class: "btn", title: "Put this player back to the ratings in the last commit of his team file", onclick: async () => {
+    if (!confirm(`Reset ${name} to his original ratings? Only this player changes; everyone else in the file is left alone.`)) return;
+    try {
+      const r = await api.post("/api/ratings/reset", { team, name });
+      toast(r.message, "ok");
+      const row = RE.roster.find((p) => p.name === name); if (row && r.overall != null) row.ovr = r.overall;
+      openRatingsEditor(team, name);
+    } catch (err) { status.textContent = err.message; }
+  } }, "Reset player");
   const backBtn = h("button", { class: "btn", onclick: () => openStatsPlayer(team, name, "auto") }, "Stats");
   const face = h("div", { class: "pcard-face", style: { "--c": id.color || "#64748b" } }, name.split(" ").map((w) => w[0]).slice(0, 2).join(""));
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
@@ -2302,7 +2311,7 @@ async function openRatingsEditor(team, name) {
       h("div", {}, h("div", { class: "pcard-name" }, name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ratings editor`)),
       h("div", { class: "re-ovr-box" }, h("div", { class: "muted", style: { fontSize: "11px", letterSpacing: ".1em" } }, "OVERALL"), ovr, delta)),
     h("div", { class: "re-groups" }, d.groups.map((g) => h("div", { class: "pc-panel re-group" }, h("h4", {}, g.title), g.fields.map(field)))),
-    h("div", { class: "re-actions" }, backBtn, resetBtn, h("div", { style: { flex: "1" } }), status, saveBtn));
+    h("div", { class: "re-actions" }, backBtn, resetBtn, originalBtn, h("div", { style: { flex: "1" } }), status, saveBtn));
   refreshCount();
 }
 async function openStatsPlayer(team, name, source) {
