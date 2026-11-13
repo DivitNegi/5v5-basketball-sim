@@ -851,3 +851,11 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 
 /* zone map text uses the page's own font */
 .zl-pct, .zl-delta { font-family: inherit; font-variant-numeric: tabular-nums; }
+
+/* live shot map: the newest mark blinks until the next shot; hover any mark for who, when and the score */
+.shot.latest { animation: shotBlink 1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes shotBlink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+.shot-map .shot { cursor: help; }
+.sc-side { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.sc-side > span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .shot.latest { animation: none; outline: 2px solid #fff; } }

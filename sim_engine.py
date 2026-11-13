@@ -19506,7 +19506,7 @@ def simulate_possession(off: Team, dff: Team,
     if consume_manual_timeout_stop(off):
         return off, 0
 
-    if period >= 4 and period_time < 24 and abs(off.score - dff.score) > 7:
+    if period >= 4 and period_time < 24 and off.score - dff.score > 7:   # only the team that is ahead lets the clock run
         handler = choose_ballhandler(off)
         print(f"{off.name} are up enough to let the clock run. {handler.name} holds it near midcourt.")
         time.sleep(SLEEP * 0.6)

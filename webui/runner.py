@@ -349,6 +349,10 @@ class SimRunner:
         if not ev:
             return
         ev = {"type": "shot", **ev, "made": bool(made), "n": self._shot_count}
+        ctx = sim_engine.SIM_CONTEXT   # the score right after the shot, for the hover card on the shot map
+        ta, tb = ctx.get("teamA"), ctx.get("teamB")
+        if ta is not None and tb is not None:
+            ev["score"] = [ta.score, tb.score]
         self._shot_count += 1
         self.shots.append(ev)
         del self.shots[:-3000]

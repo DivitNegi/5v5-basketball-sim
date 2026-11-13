@@ -1365,8 +1365,16 @@ function pcTilt(card) {
 }
 
 async function loadPlayerCard() {
-  const list = await api.get("/api/game/players");
+  let list = await api.get("/api/game/players");
   const pick = $("#pcardPick");
+  // "Sim series" / "Sim all playoffs" run the games quietly, so the server has no live teams to list. The page still holds the last live
+  // state and every finished game's box score: build the player list from those instead of showing an empty card.
+  const lastSnap = S.gameSnapshots.size ? S.gameSnapshots.get(Math.max(...S.gameSnapshots.keys())) : null;
+  const offline = !list.length;
+  if (offline) {
+    const src = S.live || lastSnap;
+    list = (src?.teams || []).map((t) => ({ team: t.name, short: t.short, players: (t.box || []).map((r) => r.name) }));
+  }
   if (!list.length) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, "Start a game, then pick a player.")); return; }
   if (!GV.pc.team || !list.some((t) => t.team === GV.pc.team)) GV.pc.team = list[0].team;
   const roster = list.find((t) => t.team === GV.pc.team).players;
@@ -1385,7 +1393,9 @@ async function loadPlayerCard() {
       playedGames.map((n) => { const snap = S.gameSnapshots.get(n), mine = snap.teams.find((t) => t.name === GV.pc.team), opp = snap.teams.find((t) => t.name !== GV.pc.team), row = mine.box.find((r) => r.name === GV.pc.name), dnp = !((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
         return h("option", { value: String(n), selected: GV.pc.game === String(n) }, `Game ${n} · vs ${opp?.short || "?"} · ${mine.score}-${opp?.score ?? 0}${dnp ? " · DNP" : ""}`); })),
     h("div", { class: "seg small" }, ["all", "1", "2", "3", "4", "OT"].map((q) => h("button", { class: GV.pc.quarter === q ? "on" : "", onclick: () => { GV.pc.quarter = q; loadPlayerCard(); } }, q === "all" ? "All plays" : q === "OT" ? "OT" : `Q${q}`))));
-  const d = GV.pc.game === "live"
+  const d = GV.pc.game === "live" && offline
+    ? (S.live ? cardFromSnapshot(S.live, GV.pc.team, GV.pc.name, S.shots, GV.pc.quarter) : cardFromSnapshot(lastSnap, GV.pc.team, GV.pc.name, S.gameShots.get(Math.max(...S.gameSnapshots.keys())) || [], GV.pc.quarter))
+    : GV.pc.game === "live"
     ? await api.get(`/api/game/card?team=${encodeURIComponent(GV.pc.team)}&name=${encodeURIComponent(GV.pc.name)}&quarter=${GV.pc.quarter}`)
     : cardFromSnapshot(S.gameSnapshots.get(Number(GV.pc.game)), GV.pc.team, GV.pc.name, S.gameShots.get(Number(GV.pc.game)) || [], GV.pc.quarter);
   if (!d) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, "That player was not in this game.")); return; }
@@ -2371,7 +2381,7 @@ function heatImage(list, sideOf = (ev) => teamSide(ev.team)) {
 }
 function mountShotChart(host, { big = false } = {}) {
   host = typeof host === "string" ? $(host) : host; if (!host) return;
-  const st = { team: "all", player: "all", quarter: "all", result: "all", heat: false, drawn: 0, playersSig: "" };
+  const st = { left: "all", right: "all", quarter: "all", result: "all", heat: false, drawn: 0, playersSig: "" };
   const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 40}`, class: "court-svg shot-map" });
   svg.innerHTML = courtLines();
   const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }); svg.append(dots); svg.insertBefore(heat, svg.firstChild.nextSibling ? svg.children[1] : null);
@@ -2383,7 +2393,8 @@ function mountShotChart(host, { big = false } = {}) {
   const scheduleStats = () => { if (statsTimer) return; statsTimer = setTimeout(() => { statsTimer = null; if (st.heat) redraw(); else updateStats(S.shots.filter(passes)); }, 80); };   // once per burst, not once per shot
   const legend = h("div", { class: "sc-legend" }, h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss"));
   host.replaceChildren(bar, svg, h("div", { class: "sc-foot" }, stats, legend));
-  const passes = (ev) => (st.team === "all" || teamSide(ev.team) === Number(st.team)) && (st.player === "all" || ev.player === st.player)
+  const sidePick = (ev) => (teamSide(ev.team) ? st.right : st.left);
+  const passes = (ev) => sidePick(ev) !== "none" && (sidePick(ev) === "all" || ev.player === sidePick(ev))
     && (st.quarter === "all" || (st.quarter === "OT" ? ev.period >= 5 : ev.period === Number(st.quarter))) && (st.result === "all" || (st.result === "make") === ev.made);
   function dot(ev, animate) {
     const [x, y] = shotSpot(ev, teamSide(ev.team));
@@ -2396,6 +2407,14 @@ function mountShotChart(host, { big = false } = {}) {
       setTimeout(() => g.classList.remove("fresh"), 1400);
     }
     g.setAttribute("data-n", ev.n);
+    const tip = svgEl("title"), clk = Number(ev.clock), per = Number(ev.period);
+    const when = `${per >= 5 ? (per === 5 ? "OT" : `OT${per - 4}`) : `Q${per || "?"}`} ${Number.isFinite(clk) ? `${Math.floor(clk / 60)}:${String(Math.floor(clk % 60)).padStart(2, "0")}` : ""}`.trim();
+    const sc = Array.isArray(ev.score) ? ` · ${S.identities?.[0]?.short || "A"} ${ev.score[0]} – ${ev.score[1]} ${S.identities?.[1]?.short || "B"}` : "";
+    const zoneName = { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[ev.zone] || ev.zone;
+    tip.textContent = `${ev.player}: ${ev.made ? "made" : "missed"} ${zoneName} · ${when}${sc}`;
+    g.append(tip);
+    dots.querySelectorAll(".shot.latest").forEach((el) => el.classList.remove("latest"));
+    g.classList.add("latest");
     dots.append(g);
     while (dots.childNodes.length > 420) dots.firstChild.remove();
   }
@@ -2413,11 +2432,18 @@ function mountShotChart(host, { big = false } = {}) {
     known.clear(); S.shots.forEach((e) => known.add(e.player));
   }
   function refreshControls() {
-    const players = [...new Set(S.shots.filter((e) => st.team === "all" || teamSide(e.team) === Number(st.team)).map((e) => e.player))].sort();
-    const sig = players.join("|") + (S.identities?.[0]?.short || "");
+    const roster = (side) => [...new Set(S.shots.filter((e) => teamSide(e.team) === side).map((e) => e.player))].sort();
+    const left = roster(0), right = roster(1);
+    const sig = left.join("|") + "#" + right.join("|") + (S.identities?.[0]?.short || "");
     if (sig === st.playersSig) return; st.playersSig = sig;
-    if (st.player !== "all" && !players.includes(st.player)) st.player = "all";
-    bar.replaceChildren(sel("team", [["all", "Both teams"], ["0", S.identities?.[0]?.short || "Team A"], ["1", S.identities?.[1]?.short || "Team B"]]), sel("player", [["all", "All players"], ...players.map((n) => [n, n])]),
+    if (!["all", "none"].includes(st.left) && !left.includes(st.left)) st.left = "all";
+    if (!["all", "none"].includes(st.right) && !right.includes(st.right)) st.right = "all";
+    const pick = (key, side, players) => {   // this half of the court: the whole team, one player, or nothing
+      const nm = S.identities?.[side]?.short || (side ? "Team B" : "Team A");
+      return h("label", { class: "fsel sc-side" }, h("span", { class: "muted" }, side ? "Right side" : "Left side"),
+        sel(key, [["all", `${nm} · whole team`], ...players.map((n) => [n, n]), ["none", `Hide ${nm}`]]));
+    };
+    bar.replaceChildren(pick("left", 0, left), pick("right", 1, right),
       sel("quarter", [["all", "All quarters"], ["1", "Q1"], ["2", "Q2"], ["3", "Q3"], ["4", "Q4"], ["OT", "OT"]]), sel("result", [["all", "Makes & misses"], ["make", "Makes"], ["miss", "Misses"]]),
       h("label", { class: "chk" }, h("input", { type: "checkbox", checked: st.heat, onchange: (e) => { st.heat = e.target.checked; redraw(); } }), " Heat map"));
     names.replaceChildren();
