@@ -85,47 +85,85 @@ _DEFENSE = ("perim", "intd")
 _GROUP_WORD = {"guard": "Guard", "wing": "Wing", "forward": "Forward", "big": "Big"}
 
 
+def _ovr(player):
+    try:
+        import sim_engine
+        return float(sim_engine.fantasy_ovr(player))
+    except Exception:
+        return 0.0
+
+
+def _rules():
+    """(name, test) in priority order; the first test that passes names the player. Forward-only ones use group in FWD."""
+    FWD = ("wing", "forward")
+    W = _GROUP_WORD
+    return [
+        # true superstars only: elite at both ends and the man the offense runs through
+        ("Two-Way Superstar", lambda k, g, u, p, o, d, ov: ov >= 94 and u >= 0.93 and o >= 0.93 and d >= 0.93),
+        ("Unicorn", lambda k, g, u, p, o, d, ov: g in ("forward", "big") and k["shoot"] >= 0.72 and k["intd"] >= 0.85 and k["finish"] >= 0.65),
+        ("Heliocentric Engine", lambda k, g, u, p, o, d, ov: u >= 0.95 and k["play"] >= 0.94),
+        ("Point God", lambda k, g, u, p, o, d, ov: g == "guard" and _pct(p, "playmaking") >= 0.97),
+        ("Offensive Juggernaut", lambda k, g, u, p, o, d, ov: ov >= 93 and u >= 0.95 and o >= 0.95 and d < 0.80),
+        ("Athletic Freak", lambda k, g, u, p, o, d, ov: k["ath"] >= 0.92 and k["finish"] >= 0.90 and g != "guard"),
+        ("Defensive Menace", lambda k, g, u, p, o, d, ov: k["perim"] >= 0.88 and k["intd"] >= 0.82 and u < 0.75),
+        # forwards
+        ("Do-Everything Forward", lambda k, g, u, p, o, d, ov: g in FWD and u >= 0.85 and k["play"] >= 0.80 and o >= 0.85),
+        ("Primary Scoring Forward", lambda k, g, u, p, o, d, ov: g in FWD and u >= 0.90 and sorted((k["shoot"], k["mid"], k["finish"]))[1] >= 0.80),
+        ("Stretch Rim Protector", lambda k, g, u, p, o, d, ov: g == "forward" and k["shoot"] >= 0.70 and k["intd"] >= 0.80),
+        ("Small-Ball Five", lambda k, g, u, p, o, d, ov: g == "forward" and k["intd"] >= 0.75 and k["reb"] >= 0.75 and k["ath"] >= 0.65 and float(getattr(p, "height", 0) or 0) <= 80),
+        ("Two-Way Forward", lambda k, g, u, p, o, d, ov: g in FWD and k["perim"] >= 0.78 and k["intd"] >= 0.72 and max(k["shoot"], k["finish"], k["mid"]) >= 0.72),
+        ("Slashing Point Forward", lambda k, g, u, p, o, d, ov: g in FWD and k["play"] >= 0.75 and k["finish"] >= 0.80),
+        ("Post Playmaker", lambda k, g, u, p, o, d, ov: g in FWD and k["post"] >= 0.70 and k["play"] >= 0.70),
+        ("Bully-Ball Forward", lambda k, g, u, p, o, d, ov: g in FWD and k["post"] >= 0.72 and k["finish"] >= 0.80 and k["reb"] >= 0.60),
+        ("Mid-Post Maestro", lambda k, g, u, p, o, d, ov: g in FWD and k["mid"] >= 0.85 and k["post"] >= 0.65),
+        ("Mismatch Forward", lambda k, g, u, p, o, d, ov: g in FWD and k["shoot"] >= 0.75 and k["post"] >= 0.62),
+        ("Swiss Army Forward", lambda k, g, u, p, o, d, ov: g in FWD and sum(v >= 0.60 for v in k.values()) >= 6),
+        ("Floor-Spacing Four", lambda k, g, u, p, o, d, ov: g == "forward" and k["shoot"] >= 0.80 and u <= 0.55),
+        ("Connector Forward", lambda k, g, u, p, o, d, ov: g in FWD and k["play"] >= 0.65 and u <= 0.45 and k["perim"] >= 0.60),
+        ("Hustle Forward", lambda k, g, u, p, o, d, ov: g in FWD and k["reb"] >= 0.80 and d >= 0.65 and u <= 0.35 and k["shoot"] < 0.60),
+        ("Rebounding Machine", lambda k, g, u, p, o, d, ov: g != "big" and k["reb"] >= 0.95),
+        # guards
+        ("Scoring Point Guard", lambda k, g, u, p, o, d, ov: str(getattr(p, "position", "")) == "PG" and u >= 0.90 and k["play"] >= 0.80 and max(k["shoot"], k["finish"]) >= 0.85),
+        ("Defensive Pest", lambda k, g, u, p, o, d, ov: g == "guard" and _pct(p, "steal") >= 0.96 and k["perim"] >= 0.86),
+        ("Combo Guard", lambda k, g, u, p, o, d, ov: g == "guard" and k["shoot"] >= 0.84 and k["play"] >= 0.82 and 0.55 <= u < 0.90),
+        # bigs
+        ("Defensive Anchor", lambda k, g, u, p, o, d, ov: g == "big" and k["intd"] >= 0.90 and k["reb"] >= 0.85 and u < 0.70),
+        ("Post Hub", lambda k, g, u, p, o, d, ov: g == "big" and k["play"] >= 0.80 and k["post"] >= 0.75),
+        ("Old-School Center", lambda k, g, u, p, o, d, ov: g == "big" and k["post"] >= 0.85 and k["shoot"] < 0.35),
+        ("Modern Big", lambda k, g, u, p, o, d, ov: g == "big" and min(k["shoot"], k["play"], k["intd"]) >= 0.60),
+        ("Lob Threat", lambda k, g, u, p, o, d, ov: g == "big" and k["finish"] >= 0.90 and k["ath"] >= 0.70 and u <= 0.40),
+        # anyone
+        ("Three-Level Scorer", lambda k, g, u, p, o, d, ov: u >= 0.82 and min(k["shoot"], k["mid"], k["finish"]) >= 0.70),
+        ("Isolation Scorer", lambda k, g, u, p, o, d, ov: u >= 0.90 and _pct(p, "ball_handle") >= 0.85 and o >= 0.85),
+        ("3-and-D {W}", lambda k, g, u, p, o, d, ov: g != "big" and k["shoot"] >= 0.65 and k["perim"] >= 0.70 and u <= 0.60),
+        ("Spot-Up {W}", lambda k, g, u, p, o, d, ov: u <= 0.25 and k["shoot"] >= 0.80 and k["play"] < 0.45),
+        ("Energy {W}", lambda k, g, u, p, o, d, ov: u <= 0.30 and k["ath"] >= 0.75 and k["reb"] >= 0.70 and d >= 0.65),
+        ("Glue Guy", lambda k, g, u, p, o, d, ov: max(k.values()) < 0.62 and sum(k.values()) / len(k) >= 0.45),
+        ("Depth {W}", lambda k, g, u, p, o, d, ov: max(k.values()) < 0.45),
+        ("All-Around {W}", lambda k, g, u, p, o, d, ov: (lambda v: v[0] - v[4] < 0.12 and v[4] >= 0.70)(sorted(k.values(), reverse=True))),
+    ]
+
+
+_RULES = _rules()
+
+
 def _special(sk, group, usage, player):
     off = max(sk[k] for k in _OFFENSE)
     dfn = max(sk[k] for k in _DEFENSE)
-    if usage >= 0.88 and off >= 0.90 and dfn >= 0.88:
-        return "Two-Way Superstar"
-    if group in ("forward", "big") and sk["shoot"] >= 0.72 and sk["intd"] >= 0.85 and sk["finish"] >= 0.65:
-        return "Unicorn"
-    if usage >= 0.93 and sk["play"] >= 0.92:
-        return "Heliocentric Engine"
-    if group == "guard" and _pct(player, "playmaking") >= 0.97:
-        return "Point God"
-    if usage >= 0.82 and min(sk["shoot"], sk["mid"], sk["finish"]) >= 0.70:
-        return "Three-Level Scorer"
-    if usage >= 0.85 and sk["play"] >= 0.80 and off >= 0.85 and group in ("wing", "forward"):
-        return "Do-Everything Forward"
-    if group == "big" and sk["intd"] >= 0.90 and sk["reb"] >= 0.85 and usage < 0.70:
-        return "Defensive Anchor"
-    if group == "big" and sk["play"] >= 0.80 and sk["post"] >= 0.75:
-        return "Post Hub"
-    if usage >= 0.90 and _pct(player, "ball_handle") >= 0.85 and off >= 0.85:
-        return f"Isolation Scorer"
-    if group != "big" and sk["shoot"] >= 0.65 and sk["perim"] >= 0.70 and usage <= 0.60:
-        return f"3-and-D {_GROUP_WORD[group]}"
-    if usage <= 0.25 and sk["shoot"] >= 0.80 and sk["play"] < 0.45:
-        return f"Spot-Up {_GROUP_WORD[group]}"
-    if usage <= 0.30 and sk["ath"] >= 0.75 and sk["reb"] >= 0.70 and dfn >= 0.65:
-        return f"Energy {_GROUP_WORD[group]}"
-    vals = sorted(sk.values(), reverse=True)
-    if vals[0] < 0.62 and sum(vals) / len(vals) >= 0.45:
-        return "Glue Guy"
-    if vals[0] < 0.45:
-        return f"Depth {_GROUP_WORD[group]}"
-    if vals[0] - vals[4] < 0.12 and vals[4] >= 0.70:
-        return f"All-Around {_GROUP_WORD[group]}"
+    ov = None
+    for name, test in _RULES:
+        if name in ("Two-Way Superstar", "Offensive Juggernaut"):
+            if ov is None:
+                ov = _ovr(player)
+        if test(sk, group, usage, player, off, dfn, ov if ov is not None else 0.0):
+            return name.replace("{W}", _GROUP_WORD[group])
     return None
 
 
-SPECIALS = ["Two-Way Superstar", "Unicorn", "Heliocentric Engine", "Point God", "Three-Level Scorer", "Do-Everything Forward",
-            "Defensive Anchor", "Post Hub", "Isolation Scorer", "Glue Guy"]
-SPECIALS += [f"{w} {_GROUP_WORD[g]}" for w in ("3-and-D",) for g in ("guard", "wing", "forward")]
-SPECIALS += [f"{w} {_GROUP_WORD[g]}" for w in ("Spot-Up", "Energy", "Depth", "All-Around") for g in GROUPS]
+SPECIALS = []
+for _name, _t in _RULES:
+    SPECIALS += [_name.replace("{W}", _GROUP_WORD[g]) for g in GROUPS] if "{W}" in _name else [_name]
+SPECIALS = [x for x in SPECIALS if x != "3-and-D Big"]
 
 ARCHETYPES = sorted(set(SPECIALS) | {f"{ADJECTIVES[s2]} {NOUNS[s1][g]}" for g in GROUPS for s1 in SKILLS for s2 in SKILLS if s1 != s2})
 
