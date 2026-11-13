@@ -158,7 +158,7 @@ document.addEventListener("click", (e) => {
 });
 
 // ───────────────────────── team picker ─────────────────────────
-function makePicker(root, onPick) {
+function makePicker(root, onPick, extras = null) {   // extras: [{ key, label, sub }] listed above the teams; picking one calls onPick({ extra: key, ... })
   let open = false, hl = 0, filtered = [];
   const btn = h("button", { class: "picker-btn", type: "button" });
   const pop = h("div", { class: "picker-pop hidden" });
@@ -168,6 +168,7 @@ function makePicker(root, onPick) {
   root.append(btn, pop);
 
   const show = (team) => {
+    if (team?.extra) { btn.replaceChildren(h("div", { class: "logo picker-all" }, "★"), h("span", { class: "t-name" }, team.label), h("span", { class: "t-year" }, team.sub || "")); return; }
     btn.replaceChildren(logoEl(team), h("span", { class: "t-name" }, team ? team.short : "Choose a team"), h("span", { class: "t-year" }, team?.year || ""));
   };
   const render = () => {
@@ -175,6 +176,8 @@ function makePicker(root, onPick) {
     const teams = S.meta.teams;
     filtered = q ? teams.filter((t) => t.name.toLowerCase().includes(q)) : teams;
     list.replaceChildren();
+    if (extras && !q) extras.forEach((x) => list.append(h("div", { class: "picker-opt picker-extra", onclick: () => choose({ ...x, extra: x.key }) },
+      h("div", { class: "logo picker-all" }, "★"), h("span", {}, x.label), h("span", { class: "t-year" }, x.sub || ""))));
     let lastYear = null;
     filtered.slice(0, 400).forEach((t, i) => {
       if (!q && t.year !== lastYear) { list.append(h("div", { class: "picker-group" }, t.year || "Other")); lastYear = t.year; }
@@ -2199,9 +2202,9 @@ function playerInsights(d, color) {
 const RE = { team: null, name: null, roster: [], picker: null, all: false };
 function loadRatingsView() {
   if (!RE.picker) {
-    RE.picker = makePicker($("#reTeamPick"), (t) => { RE.all = false; RE.team = t.name; RE.name = null; loadReRoster(); });
+    RE.picker = makePicker($("#reTeamPick"), (t) => { if (t.extra) { RE.all = t.extra; } else { RE.all = false; RE.team = t.name; } RE.name = null; loadReRoster(); },
+      [{ key: "all", label: "All teams", sub: "NBA" }, { key: "all+oly", label: "All teams + Olympics", sub: "every player" }]);
     $("#reSearch").addEventListener("input", renderReRoster);
-    $("#reAllBtn").addEventListener("click", () => { RE.all = !RE.all; RE.name = null; loadReRoster(); });
   }
   if (!RE.team && S.meta?.teams?.length) {
     const t = S.meta.teams.find((x) => x.name === S.teamA) || S.meta.teams[0];
@@ -2209,11 +2212,10 @@ function loadRatingsView() {
   }
 }
 async function loadReRoster() {
-  $("#reAllBtn").classList.toggle("primary", RE.all);
   $("#reSearch").placeholder = RE.all ? "Search every player…" : "Filter players…";
   $("#reRoster").replaceChildren(h("div", { class: "empty" }, RE.all ? "Loading every team…" : "Loading…"));
   const d = await api.get(RE.all ? "/api/roster/all" : `/api/roster?team=${encodeURIComponent(RE.team)}`);
-  RE.roster = (d.players || []).map((p) => ({ ...p, team: p.team || RE.team }));
+  RE.roster = (d.players || []).filter((p) => RE.all !== "all" || !p.olympic).map((p) => ({ ...p, team: p.team || RE.team }));
   renderReRoster();
   if (!RE.name && RE.roster.length) openRatingsEditor(RE.roster[0].team, RE.roster[0].name);
 }

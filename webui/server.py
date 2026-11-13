@@ -667,12 +667,17 @@ _ALL_ROSTER_CACHE = []
 def all_rosters_payload(runner):
     """Every player on every team, for the ratings editor's All teams list (cached; a ratings save clears it)."""
     if not _ALL_ROSTER_CACHE:
+        import inspect
         rows = []
-        for name in list(runner.factories):
+        for name, fn in list(runner.factories.items()):
             d = roster_payload(runner, name)
             ident = d.get("team") or {}
+            try:
+                olympic = "teams_olympic" in (inspect.getsourcefile(inspect.unwrap(fn)) or "")
+            except Exception:
+                olympic = False
             for p in d.get("players") or []:
-                rows.append({**p, "team": name, "teamShort": ident.get("short"), "teamYear": ident.get("year")})
+                rows.append({**p, "team": name, "teamShort": ident.get("short"), "teamYear": ident.get("year"), "olympic": olympic})
         rows.sort(key=lambda c: -(c.get("ovr") or 0))
         _ALL_ROSTER_CACHE.extend(rows)
     return {"players": _ALL_ROSTER_CACHE}

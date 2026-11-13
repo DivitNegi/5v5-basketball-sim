@@ -932,3 +932,7 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .re-switch input:checked + .re-knob::after { transform: translateX(16px); }
 .re-switch input:focus-visible + .re-knob { outline: 2px solid #fbbf24; outline-offset: 2px; }
 .re-switch .re-sw-txt::after { content: "No"; } .re-switch input:checked ~ .re-sw-txt::after { content: "Yes"; }
+
+/* team picker: the All teams choices */
+.logo.picker-all { display: grid; place-items: center; color: #1a1206; background: linear-gradient(180deg, #fbbf24, #f59e0b); font-size: 13px; }
+.picker-extra { font-weight: 700; }
