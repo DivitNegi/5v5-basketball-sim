@@ -349,14 +349,21 @@ class SimRunner:
         if not ev:
             return
         ev = {"type": "shot", **ev, "made": bool(made), "n": self._shot_count}
-        ctx = sim_engine.SIM_CONTEXT   # the score right after the shot, for the hover card on the shot map
-        ta, tb = ctx.get("teamA"), ctx.get("teamB")
-        if ta is not None and tb is not None:
-            ev["score"] = [ta.score, tb.score]
         self._shot_count += 1
         self.shots.append(ev)
         del self.shots[:-3000]
-        self.hub.publish(ev)
+        # held back until the next scoreboard line, which gives the game clock and the score right after this shot (the hover card on the map)
+        if not hasattr(self, "_unstamped"):
+            self._unstamped = []
+        self._unstamped.append(ev)
+
+    def _publish_unstamped(self, message: Dict = None):
+        for ev in getattr(self, "_unstamped", []):
+            if message is not None:
+                ev["when"] = f"{message.get('period')} {message.get('clock')}"
+                ev["score"] = [message.get("score_a"), message.get("score_b")]
+            self.hub.publish(ev)
+        self._unstamped = []
 
     def _track_shot(self, kind: str, info: Dict):
         if getattr(sim_engine, "SILENT_SIM_DEPTH", 0) > 0 or self.mode in SEASON_LIKE:
@@ -432,6 +439,7 @@ class SimRunner:
         if self._on_season_message(message):
             return
         if "period" in message and "clock" in message and "score_a" in message:
+            self._publish_unstamped(message)
             if str(message.get("period", "")).lower() == "1st" and str(message.get("clock")) in ("12:00", "10:00") and str(message.get("score_a")) == "0" and str(message.get("score_b")) == "0" and self.shots:
                 self.shots, self._shot_count, self._pending_shot = [], 0, None   # the next game of a series starts a fresh shot map
             self.score = message
@@ -565,6 +573,7 @@ class SimRunner:
             error = traceback.format_exc()
         finally:
             self._flush_shot(False)   # a last attempt that never got a rebound (the buzzer) was a miss
+            self._publish_unstamped()
             self._push_live(force=True)
             try:
                 if mode != "Replay season game":   # the replayed game's own tables must not replace the season's

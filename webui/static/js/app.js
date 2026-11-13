@@ -2411,7 +2411,7 @@ function mountShotChart(host, { big = false } = {}) {
     const when = `${per >= 5 ? (per === 5 ? "OT" : `OT${per - 4}`) : `Q${per || "?"}`} ${Number.isFinite(clk) ? `${Math.floor(clk / 60)}:${String(Math.floor(clk % 60)).padStart(2, "0")}` : ""}`.trim();
     const sc = Array.isArray(ev.score) ? ` · ${S.identities?.[0]?.short || "A"} ${ev.score[0]} – ${ev.score[1]} ${S.identities?.[1]?.short || "B"}` : "";
     const zoneName = { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[ev.zone] || ev.zone;
-    tip.textContent = `${ev.player}: ${ev.made ? "made" : "missed"} ${zoneName} · ${when}${sc}`;
+    tip.textContent = `${ev.player}: ${ev.made ? "made" : "missed"} ${zoneName} · ${ev.when || when}${sc}`;
     g.append(tip);
     dots.querySelectorAll(".shot.latest").forEach((el) => el.classList.remove("latest"));
     g.classList.add("latest");
