@@ -101,7 +101,7 @@ def _rules():
         # true superstars only: elite at both ends and the man the offense runs through
         ("Two-Way Superstar", lambda k, g, u, p, o, d, ov: ov >= 94 and u >= 0.93 and o >= 0.93 and d >= 0.93),
         ("Unicorn", lambda k, g, u, p, o, d, ov: g in ("forward", "big") and k["shoot"] >= 0.72 and k["intd"] >= 0.85 and k["finish"] >= 0.65),
-        ("Heliocentric Engine", lambda k, g, u, p, o, d, ov: u >= 0.95 and k["play"] >= 0.94),
+        ("Heliocentric Engine", lambda k, g, u, p, o, d, ov: u >= 0.95 and k["play"] >= 0.94 and float(getattr(p, "shot_tendency", 0) or 0) >= 0.70),   # runs the offense AND looks for his own shot
         ("Point God", lambda k, g, u, p, o, d, ov: g == "guard" and _pct(p, "playmaking") >= 0.97),
         ("Offensive Juggernaut", lambda k, g, u, p, o, d, ov: ov >= 93 and u >= 0.95 and o >= 0.95 and d < 0.80),
         ("Athletic Freak", lambda k, g, u, p, o, d, ov: k["ath"] >= 0.92 and k["finish"] >= 0.90 and g != "guard"),
