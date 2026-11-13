@@ -2242,6 +2242,7 @@ async function openRatingsEditor(team, name) {
   const ovr = h("div", { class: "re-ovr" }, d.overall), delta = h("div", { class: "re-delta muted" }, "");
   const status = h("div", { class: "re-status muted" }, `Saves to ${d.file} (${d.function})`);
   let base = d.overall, timer = null;
+  const archEl = h("div", { class: "re-arch", title: "Worked out from his ratings; it changes as the ratings do" }, d.archetype || "");
   const changes = () => Object.fromEntries(Object.keys(cur).filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(orig[k])).map((k) => [k, cur[k]]));
   const refreshCount = () => { const n = Object.keys(changes()).length; saveBtn.disabled = !n; saveBtn.textContent = n ? `Save ${n} change${n === 1 ? "" : "s"}` : "Save"; };
   const preview = () => {
@@ -2250,13 +2251,14 @@ async function openRatingsEditor(team, name) {
       try {
         const r = await api.post("/api/ratings/preview", { team, name, changes: changes() });
         if (r.error) { status.textContent = r.error; return; }
-        ovr.textContent = r.overall;
+        ovr.textContent = r.overall; if (r.archetype) archEl.textContent = r.archetype;
         const dv = r.overall - base; delta.textContent = dv ? `${dv > 0 ? "+" : ""}${dv} from ${base}` : "";
         delta.className = `re-delta ${dv > 0 ? "up" : dv < 0 ? "down" : "muted"}`;
       } catch (err) { status.textContent = err.message; }
     }, 220);
   };
   const committed = d.original || null;
+  const fallbacks = new Set(d.fallbacks || []);
   const field = (f) => {
     const v = cur[f.key];
     let row, apply = null;
@@ -2281,7 +2283,7 @@ async function openRatingsEditor(team, name) {
       rng.addEventListener("input", () => { num.value = rng.value; tint(Number(rng.value)); set(Number(rng.value) / 100); });
       num.addEventListener("change", () => { const x = Math.max(0, Math.min(100, Math.round(Number(num.value) || 0))); num.value = x; rng.value = x; tint(x); set(x / 100); });
       apply = (val) => { const x = val == null ? 0 : Math.round(val * 100); num.value = val == null ? "" : x; rng.value = x; tint(val == null ? null : x); set(val); };
-      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), rng, num);
+      row = h("div", { class: "re-row" }, h("span", { class: `re-lbl ${fallbacks.has(f.key) ? "re-fb" : ""}`, title: fallbacks.has(f.key) ? "Not set in his team entry: this is the engine's fallback value he plays with" : "" }, f.label), rng, num);
     } else if (f.kind === "int") {
       const num = h("input", { type: "number", min: 60, max: 96, step: 1, value: v ?? "", class: "re-num" });
       const ft = h("span", { class: "muted re-ft" }, v ? `${Math.floor(v / 12)}'${v % 12}"` : "");
@@ -2314,7 +2316,7 @@ async function openRatingsEditor(team, name) {
     try {
       const r = await api.post("/api/ratings/save", { team, name, changes: changes() });
       if (r.error) { status.textContent = r.error; refreshCount(); return; }
-      Object.assign(orig, r.values); Object.assign(cur, r.values); base = r.overall; ovr.textContent = r.overall; delta.textContent = "";
+      Object.assign(orig, r.values); Object.assign(cur, r.values); base = r.overall; ovr.textContent = r.overall; delta.textContent = ""; if (r.archetype) archEl.textContent = r.archetype;
       body.querySelectorAll(".re-row.changed").forEach((x) => x.classList.remove("changed"));
       status.textContent = r.message; toast(r.message, "ok"); refreshCount();
       const row = RE.roster.find((p) => p.name === name && p.team === team); if (row) { row.ovr = r.overall; renderReRoster(); }
@@ -2335,7 +2337,7 @@ async function openRatingsEditor(team, name) {
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": id.color || "#64748b" } }, face,
-      h("div", {}, h("div", { class: "pcard-name" }, name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ratings editor`)),
+      h("div", {}, h("div", { class: "pcard-name" }, name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ratings editor`), archEl),
       h("div", { class: "re-ovr-box" }, h("div", { class: "muted", style: { fontSize: "11px", letterSpacing: ".1em" } }, "OVERALL"), ovr, delta)),
     h("div", { class: "re-groups" }, d.groups.map((g) => h("div", { class: "pc-panel re-group" }, h("h4", {}, g.title), g.fields.map(field)))),
     h("div", { class: "re-actions" }, backBtn, resetBtn, originalBtn, h("div", { style: { flex: "1" } }), status, saveBtn));

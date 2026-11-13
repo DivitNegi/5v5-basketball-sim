@@ -40,7 +40,7 @@ def make_pacers_2025() -> Team:
                0.46, 0.50, 0.47, 0.69, 0.833, 0.600,
                0.82, 0.78,
                clutchness=0.82, height=80, speed=0.64,
-               shot_iq=0.70, archetype='big', stamina=0.85),
+               shot_iq=0.70, stamina=0.85),
 
         Player("Myles Turner", "C",
                0.36, 0.24, 0.18, 0.22, 0.46, 0.260,

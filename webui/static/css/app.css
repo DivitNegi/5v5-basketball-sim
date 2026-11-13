@@ -908,3 +908,8 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 
 /* ratings editor: All teams list shows each player's team under his name */
 .re-pname .re-pteam { display: block; font-size: 11px; font-weight: 500; }
+
+/* ratings editor: the archetype worked out from his ratings, and ratings that come from the engine's fallback */
+.re-arch { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; letter-spacing: .04em;
+  color: var(--accent-2, #fbbf24); background: rgba(245,165,36,.12); border: 1px solid rgba(245,165,36,.35); }
+.re-lbl.re-fb { text-decoration: underline dotted rgba(148,163,184,.6); text-underline-offset: 3px; cursor: help; }

@@ -4237,14 +4237,12 @@ def default_player_speed(name: str, pos: str) -> float:
     if name in PLAYER_SPEED_OVERRIDES:
         return PLAYER_SPEED_OVERRIDES[name]
 
-    base = {
-        "PG": 0.82,
-        "SG": 0.78,
-        "SF": 0.74,
-        "PF": 0.68,
-        "C": 0.60,
-    }.get(pos.upper(), 0.72)
-    return max(0.45, min(0.98, base))
+    # no speed of his own: a number in his position's range (guards 80-90, forwards 65-75, bigs 55-65), drawn from his name so it
+    # is the same every time he is loaded (and never touches the game's random numbers)
+    lo, hi = {"PG": (0.80, 0.90), "SG": (0.80, 0.90), "SF": (0.65, 0.75), "PF": (0.65, 0.75), "C": (0.55, 0.65)}.get(pos.upper(), (0.65, 0.75))
+    import zlib
+    u = (zlib.crc32(name.encode("utf-8")) % 10001) / 10000.0
+    return round(lo + u * (hi - lo), 2)
 
 
 PLAYER_SHOT_IQ_OVERRIDES = {

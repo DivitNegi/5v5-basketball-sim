@@ -2,6 +2,7 @@
 import re
 from typing import Dict, List, Optional
 
+import archetypes
 import sim_engine
 
 TEAM_YEAR = re.compile(r"^(\d{4}) (.+)$")
@@ -303,7 +304,7 @@ def player_payload(team_name: str, name: str, quarter=None) -> Dict:
         "by_quarter": by_quarter,
         "scope": scope, "quarter": quarter if periods else None,
         "team": ident, "opp": team_identity(opp.name) if opp else None, "score": [team.score, opp.score if opp else 0],
-        "player": line, "archetype": getattr(p, "archetype", ""), "badges": list(getattr(p, "badges", ()) or ()),
+        "player": line, "archetype": archetypes.archetype_label(p), "badges": list(getattr(p, "badges", ()) or ()),
         "shots": shots, "defended": zones(getattr(p, "defended_diet", {})),
         "period": sim_engine.SIM_CONTEXT.get("period"), "clock": sim_engine.SIM_CONTEXT.get("period_time"),
     }

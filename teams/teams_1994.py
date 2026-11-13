@@ -18,8 +18,7 @@ def make_rockets_1994() -> Team:
                0.68, 0.38,
                clutchness=0.80, secondary_positions=("SG",),
                badges=("catch_and_shoot_silver", "floor_general_bronze"),
-               height=75, speed=0.72, shot_iq=0.80, iso_tendency=0.08,
-               archetype="spot-up floor general", stamina=0.78),
+               height=75, speed=0.72, shot_iq=0.80, iso_tendency=0.08, stamina=0.78),
 
         Player("Vernon Maxwell", "SG",
                0.46, 0.30, 0.18, 0.06, 0.22, 0.345,
@@ -29,8 +28,7 @@ def make_rockets_1994() -> Team:
                0.76, 0.52,
                clutchness=0.86, secondary_positions=("PG",),
                badges=("shot_creator_silver", "clutch_silver", "heat_check"),
-               height=76, speed=0.76, shot_iq=0.72, iso_tendency=0.34,
-               archetype="streak scoring guard", stamina=0.75),
+               height=76, speed=0.76, shot_iq=0.72, iso_tendency=0.34, stamina=0.75),
 
         Player("Robert Horry", "SF",
                0.36, 0.24, 0.24, 0.16, 0.34, 0.205,
@@ -40,8 +38,7 @@ def make_rockets_1994() -> Team:
                0.78, 0.78,
                clutchness=0.90, secondary_positions=("PF", "SG"),
                badges=("clutch_gold", "catch_and_shoot_silver", "chasedown_silver"),
-               height=82, speed=0.70, shot_iq=0.82, iso_tendency=0.06,
-               archetype="two-way clutch forward", stamina=0.77),
+               height=82, speed=0.70, shot_iq=0.82, iso_tendency=0.06, stamina=0.77),
 
         Player("Otis Thorpe", "PF",
                0.00, 0.18, 0.28, 0.54, 0.46, 0.250,
@@ -51,8 +48,7 @@ def make_rockets_1994() -> Team:
                0.54, 0.82,
                clutchness=0.70, secondary_positions=("C",),
                badges=("rebounder_gold", "screen_setter", "posterizer_silver"),
-               height=82, speed=0.62, shot_iq=0.76, iso_tendency=0.08,
-               archetype="power finisher", stamina=0.72),
+               height=82, speed=0.62, shot_iq=0.76, iso_tendency=0.08, stamina=0.72),
 
         Player("Hakeem Olajuwon", "C",
                0.04, 0.28, 0.24, 0.44, 0.54, 0.320,
@@ -62,8 +58,7 @@ def make_rockets_1994() -> Team:
                0.80, 0.99,
                clutchness=0.94, secondary_positions=("PF",),
                badges=("clutch_gold", "rim_protector_hof", "post_spin_hof", "rebounder_gold"),
-               height=84, speed=0.72, shot_iq=0.94, iso_tendency=0.62,
-               archetype="two-way post superstar", stamina=0.85),
+               height=84, speed=0.72, shot_iq=0.94, iso_tendency=0.62, stamina=0.85),
 
         Player("Sam Cassell", "PG",
                0.34, 0.36, 0.22, 0.08, 0.04, 0.245,
@@ -73,8 +68,7 @@ def make_rockets_1994() -> Team:
                0.62, 0.36,
                clutchness=0.84, secondary_positions=("SG",),
                badges=("shot_creator_silver", "floor_general_bronze", "clutch_silver"),
-               height=75, speed=0.66, shot_iq=0.82, iso_tendency=0.22,
-               archetype="bench creator", stamina=0.8),
+               height=75, speed=0.66, shot_iq=0.82, iso_tendency=0.22, stamina=0.8),
 
         Player("Mario Elie", "SF",
                0.42, 0.26, 0.22, 0.10, 0.16, 0.185,
@@ -84,8 +78,7 @@ def make_rockets_1994() -> Team:
                0.76, 0.58,
                clutchness=0.82, secondary_positions=("SG",),
                badges=("catch_and_shoot_silver", "clutch_bronze", "connector"),
-               height=77, speed=0.66, shot_iq=0.80, iso_tendency=0.04,
-               archetype="3-and-D connector", stamina=0.76),
+               height=77, speed=0.66, shot_iq=0.80, iso_tendency=0.04, stamina=0.76),
 
         Player("Carl Herrera", "PF",
                0.02, 0.22, 0.30, 0.46, 0.36, 0.145,
@@ -95,8 +88,7 @@ def make_rockets_1994() -> Team:
                0.46, 0.74,
                clutchness=0.60, secondary_positions=("C",),
                badges=("rebounder_bronze", "screen_setter"),
-               height=81, speed=0.56, shot_iq=0.70, iso_tendency=0.02,
-               archetype="backup big", stamina=0.66),
+               height=81, speed=0.56, shot_iq=0.70, iso_tendency=0.02, stamina=0.66),
 
         Player("Scott Brooks", "PG",
                0.38, 0.30, 0.22, 0.10, 0.02, 0.105,
@@ -106,7 +98,7 @@ def make_rockets_1994() -> Team:
                0.56, 0.30,
                clutchness=0.58, secondary_positions=("SG",),
                badges=("floor_general_bronze",), height=71, speed=0.62,
-               shot_iq=0.72, iso_tendency=0.02, archetype="backup guard", stamina=0.7),
+               shot_iq=0.72, iso_tendency=0.02, stamina=0.7),
 
         Player("Matt Bullard", "PF",
                0.58, 0.24, 0.08, 0.10, 0.06, 0.120,
@@ -116,7 +108,7 @@ def make_rockets_1994() -> Team:
                0.40, 0.54,
                clutchness=0.62, secondary_positions=("SF", "C"),
                badges=("catch_and_shoot_silver",), height=82, speed=0.42,
-               shot_iq=0.76, iso_tendency=0.01, archetype="stretch big", stamina=0.62),
+               shot_iq=0.76, iso_tendency=0.01, stamina=0.62),
     ]
     t = Team("1994 Houston Rockets", players)
     t.init_lineup()

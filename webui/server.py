@@ -631,10 +631,18 @@ def _player_card(p):
     for title, fields in RATING_FIELDS:
         groups.append({"title": title, "items": [{"label": label, "value": round(float(getattr(p, key, 0) or 0) * 100)} for key, label in fields]})
     return {
-        "name": p.name, "pos": getattr(p, "position", ""), "ovr": ovr, "height": getattr(p, "height", 0), "archetype": getattr(p, "archetype", ""),
+        "name": p.name, "pos": getattr(p, "position", ""), "ovr": ovr, "height": getattr(p, "height", 0), "archetype": _arch(p),
         "badges": list(getattr(p, "badges", ()) or ()), "rookie": bool(getattr(p, "rookie", False)),
         "stamina": round(float(getattr(p, "stamina", 0) or 0) * 100), "groups": groups,
     }
+
+
+def _arch(p):
+    try:
+        import archetypes
+        return archetypes.archetype_label(p)   # worked out from his ratings
+    except Exception:
+        return ""
 
 
 def roster_payload(runner, team_name):

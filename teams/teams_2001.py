@@ -18,8 +18,7 @@ def make_76ers_2001() -> Team:
                0.74, 0.36,
                clutchness=0.94, secondary_positions=("PG",),
                badges=("clutch_gold", "shot_creator_hof", "ankle_breaker_gold", "transition_engine"),
-               height=72, speed=0.98, shot_iq=0.40, iso_tendency=0.92,
-               archetype="high-volume isolation guard", stamina=0.94),
+               height=72, speed=0.98, shot_iq=0.40, iso_tendency=0.92, stamina=0.94),
 
         Player("Eric Snow", "PG",
                0.12, 0.34, 0.36, 0.18,   0.08, 0.185,
@@ -29,8 +28,7 @@ def make_76ers_2001() -> Team:
                0.88, 0.52,
                clutchness=0.70, secondary_positions=("SG",),
                badges=("floor_general_silver", "pest", "lockdown_bronze"),
-               height=75, speed=0.70, shot_iq=0.78, iso_tendency=0.06,
-               archetype="defensive floor general", stamina=0.78),
+               height=75, speed=0.70, shot_iq=0.78, iso_tendency=0.06, stamina=0.78),
 
         Player("Aaron McKie", "SF",
                0.32, 0.34, 0.22, 0.12,   0.12, 0.255,
@@ -40,8 +38,7 @@ def make_76ers_2001() -> Team:
                0.84, 0.58,
                clutchness=0.78, secondary_positions=("SG", "PG"),
                badges=("connector", "catch_and_shoot_bronze", "lockdown_bronze"),
-               height=77, speed=0.70, shot_iq=0.82, iso_tendency=0.10,
-               archetype="two-way connector", stamina=0.76),
+               height=77, speed=0.70, shot_iq=0.82, iso_tendency=0.10, stamina=0.76),
 
         Player("Tyrone Hill", "PF",
                0.00, 0.26, 0.24, 0.50,   0.26, 0.180,
@@ -51,8 +48,7 @@ def make_76ers_2001() -> Team:
                0.52, 0.76,
                clutchness=0.64, secondary_positions=("C",),
                badges=("rebounder_gold", "screen_setter"),
-               height=81, speed=0.56, shot_iq=0.70, iso_tendency=0.04,
-               archetype="glass-cleaning big", stamina=0.65),
+               height=81, speed=0.56, shot_iq=0.70, iso_tendency=0.04, stamina=0.65),
 
         Player("Dikembe Mutombo", "C",
                0.00, 0.08, 0.24, 0.68,   0.52, 0.220,
@@ -62,8 +58,7 @@ def make_76ers_2001() -> Team:
                0.42, 0.99,
                clutchness=0.68, secondary_positions=("PF",),
                badges=("rim_protector_hof", "rebounder_hof"),
-               height=86, speed=0.44, shot_iq=0.72, iso_tendency=0.02,
-               archetype="defensive anchor", stamina=0.68),
+               height=86, speed=0.44, shot_iq=0.72, iso_tendency=0.02, stamina=0.68),
 
         Player("George Lynch", "SF",
                0.20, 0.30, 0.30, 0.20,   0.18, 0.155,
@@ -73,8 +68,7 @@ def make_76ers_2001() -> Team:
                0.82, 0.66,
                clutchness=0.62, secondary_positions=("PF", "SG"),
                badges=("lockdown_bronze", "rebounder_bronze"),
-               height=80, speed=0.66, shot_iq=0.68, iso_tendency=0.04,
-               archetype="defensive wing", stamina=0.74),
+               height=80, speed=0.66, shot_iq=0.68, iso_tendency=0.04, stamina=0.74),
 
         Player("Jumaine Jones", "SF",
                0.34, 0.24, 0.24, 0.18,   0.24, 0.155,
@@ -84,8 +78,7 @@ def make_76ers_2001() -> Team:
                0.62, 0.64,
                clutchness=0.60, secondary_positions=("PF",),
                badges=("catch_and_shoot_bronze",),
-               height=80, speed=0.66, shot_iq=0.66, iso_tendency=0.04,
-               archetype="combo forward", stamina=0.72),
+               height=80, speed=0.66, shot_iq=0.66, iso_tendency=0.04, stamina=0.72),
 
         Player("Raja Bell", "SG",
                0.40, 0.26, 0.22, 0.12,   0.14, 0.130,
@@ -95,8 +88,7 @@ def make_76ers_2001() -> Team:
                0.80, 0.48,
                clutchness=0.62, secondary_positions=("SF",),
                badges=("catch_and_shoot_bronze", "pest"),
-               height=77, speed=0.70, shot_iq=0.70, iso_tendency=0.04,
-               archetype="3-and-D guard", stamina=0.8),
+               height=77, speed=0.70, shot_iq=0.70, iso_tendency=0.04, stamina=0.8),
 
         Player("Matt Geiger", "C",
                0.04, 0.30, 0.22, 0.44,   0.24, 0.140,
@@ -106,8 +98,7 @@ def make_76ers_2001() -> Team:
                0.40, 0.74,
                clutchness=0.58, secondary_positions=("PF",),
                badges=("screen_setter",),
-               height=85, speed=0.48, shot_iq=0.68, iso_tendency=0.02,
-               archetype="backup center", stamina=0.6),
+               height=85, speed=0.48, shot_iq=0.68, iso_tendency=0.02, stamina=0.6),
 
         Player("Kevin Ollie", "PG",
                0.16, 0.32, 0.34, 0.18,   0.06, 0.100,
@@ -117,8 +108,7 @@ def make_76ers_2001() -> Team:
                0.66, 0.38,
                clutchness=0.58, secondary_positions=("SG",),
                badges=("floor_general_bronze",),
-               height=74, speed=0.66, shot_iq=0.70, iso_tendency=0.03,
-               archetype="backup point guard", stamina=0.66),
+               height=74, speed=0.66, shot_iq=0.70, iso_tendency=0.03, stamina=0.66),
     ]
     t = Team("2001 Philadelphia 76ers", players)
     t.init_lineup()

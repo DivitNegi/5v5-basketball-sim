@@ -9,6 +9,7 @@ import time
 import traceback
 from typing import Dict, Optional
 
+import archetypes
 import sim_engine
 import players_data
 from season_2018 import run_2018_season, run_2018_playoffs, factories_2018
@@ -42,7 +43,7 @@ def rating_summary(p) -> Dict:
     def g(k):
         return round(float(getattr(p, k, 0) or 0) * 100)
     return {
-        "name": p.name, "pos": p.position, "ovr": sim_engine.fantasy_ovr(p), "ht": getattr(p, "height", 0), "arch": getattr(p, "archetype", ""),
+        "name": p.name, "pos": p.position, "ovr": sim_engine.fantasy_ovr(p), "ht": getattr(p, "height", 0), "arch": archetypes.archetype_label(p),
         "badges": list(getattr(p, "badges", ()) or ()), "team": getattr(p, "source_team", ""),
         "r": {"3PT": g("three_rating"), "MID": g("mid_rating"), "RIM": g("rim_rating"), "DUNK": g("dunk_rating"), "FT": g("ft_rating"),
               "PLAY": g("playmaking"), "HANDLE": g("ball_handle"), "PERIM D": g("perimeter_def"), "INT D": g("interior_def"),

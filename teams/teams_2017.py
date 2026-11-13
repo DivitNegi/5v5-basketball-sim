@@ -87,8 +87,7 @@ def make_cavs_2017() -> Team:
                0.65, 0.30,
                clutchness=0.95, secondary_positions=("SG",),
                badges=("ankle_breaker_hof", "shot_creator_gold", "clutch_gold", "closer_gold"),
-               height=75, speed=0.88, shot_iq=0.98, iso_tendency=0.82,
-               archetype="isolation scorer", stamina=0.71),
+               height=75, speed=0.88, shot_iq=0.98, iso_tendency=0.82, stamina=0.71),
 
         Player("JR Smith", "SG",
                0.60, 0.22, 0.14, 0.04,   0.10, 0.300,
@@ -98,8 +97,7 @@ def make_cavs_2017() -> Team:
                0.85, 0.45,
                clutchness=0.76, secondary_positions=("SF",),
                badges=("catch_and_shoot_silver", "limitless_range_bronze"),
-               height=78, speed=0.66, shot_iq=0.85, iso_tendency=0.10,
-               archetype="3-and-D wing", stamina=0.72),
+               height=78, speed=0.66, shot_iq=0.85, iso_tendency=0.10, stamina=0.72),
 
         Player("LeBron James", "SF",
                0.28, 0.18, 0.52, 0.68,   0.40, 0.990,
@@ -109,8 +107,7 @@ def make_cavs_2017() -> Team:
                0.88, 0.86,
                clutchness=0.99, secondary_positions=("PG", "SG", "PF"),
                badges=("clutch_hof", "closer_hof", "elimination_hof", "chasedown_hof", "transition_engine_hof"),
-               height=80, speed=0.88, shot_iq=0.86, iso_tendency=0.90,
-               archetype="point forward", stamina=0.9),
+               height=80, speed=0.88, shot_iq=0.86, iso_tendency=0.90, stamina=0.9),
 
         Player("Kevin Love", "PF",
                0.44, 0.18, 0.12, 0.18,   0.18, 0.380,
@@ -120,8 +117,7 @@ def make_cavs_2017() -> Team:
                0.52, 0.72,
                clutchness=0.78, secondary_positions=("C",),
                badges=("catch_and_shoot_gold", "stretch_big_gold"),
-               height=80, speed=0.52, shot_iq=0.84, iso_tendency=0.08,
-               archetype="stretch rebounder", stamina=0.63),
+               height=80, speed=0.52, shot_iq=0.84, iso_tendency=0.08, stamina=0.63),
 
         Player("Tristan Thompson", "C",
                0.00, 0.02, 0.42, 0.40,   0.42, 0.220,
@@ -131,8 +127,7 @@ def make_cavs_2017() -> Team:
                0.56, 0.82,
                clutchness=0.66, secondary_positions=("PF",),
                badges=("rebound_chaser_gold", "paint_finisher_silver"),
-               height=81, speed=0.62, shot_iq=0.68, iso_tendency=0.02,
-               archetype="rebounding big", stamina=0.75),
+               height=81, speed=0.62, shot_iq=0.68, iso_tendency=0.02, stamina=0.75),
 
         Player("Deron Williams", "PG",
                0.40, 0.34, 0.20, 0.06,   0.05, 0.220,
@@ -142,8 +137,7 @@ def make_cavs_2017() -> Team:
                0.58, 0.34,
                clutchness=0.72, secondary_positions=("SG",),
                badges=("floor_general_silver",),
-               height=75, speed=0.55, shot_iq=0.76, iso_tendency=0.18,
-               archetype="backup creator", stamina=0.6),
+               height=75, speed=0.55, shot_iq=0.76, iso_tendency=0.18, stamina=0.6),
 
         Player("Kyle Korver", "SG",
                0.72, 0.18, 0.06, 0.04,   0.02, 0.240,
@@ -153,8 +147,7 @@ def make_cavs_2017() -> Team:
                0.52, 0.35,
                clutchness=0.84, secondary_positions=("SF",),
                badges=("catch_and_shoot_hof", "limitless_range_silver"),
-               height=79, speed=0.45, shot_iq=0.92, iso_tendency=0.02,
-               archetype="movement shooter", stamina=0.65),
+               height=79, speed=0.45, shot_iq=0.92, iso_tendency=0.02, stamina=0.65),
 
         Player("Iman Shumpert", "SG",
                0.32, 0.24, 0.28, 0.16,   0.24, 0.180,
@@ -164,8 +157,7 @@ def make_cavs_2017() -> Team:
                0.92, 0.42,
                clutchness=0.70, secondary_positions=("SF",),
                badges=("perimeter_lock_silver",),
-               height=77, speed=0.72, shot_iq=0.58, iso_tendency=0.08,
-               archetype="defensive guard", stamina=0.76),
+               height=77, speed=0.72, shot_iq=0.58, iso_tendency=0.08, stamina=0.76),
 
         Player("Richard Jefferson", "SF",
                0.40, 0.28, 0.20, 0.12,   0.25, 0.205,
@@ -175,8 +167,7 @@ def make_cavs_2017() -> Team:
                0.68, 0.60,
                clutchness=0.72, secondary_positions=("PF", "SG"),
                badges=("corner_specialist_silver",),
-               height=79, speed=0.60, shot_iq=0.72, iso_tendency=0.08,
-               archetype="veteran wing", stamina=0.64),
+               height=79, speed=0.60, shot_iq=0.72, iso_tendency=0.08, stamina=0.64),
 
         Player("Channing Frye", "PF",
                0.62, 0.18, 0.08, 0.12,   0.08, 0.220,
@@ -186,8 +177,7 @@ def make_cavs_2017() -> Team:
                0.45, 0.66,
                clutchness=0.76, secondary_positions=("C",),
                badges=("catch_and_shoot_gold", "stretch_big_silver"),
-               height=84, speed=0.40, shot_iq=0.80, iso_tendency=0.02,
-               archetype="stretch big", stamina=0.62),
+               height=84, speed=0.40, shot_iq=0.80, iso_tendency=0.02, stamina=0.62),
     ]
     t = Team("2017 Cleveland Cavaliers", players)
     t.init_lineup()

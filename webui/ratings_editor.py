@@ -12,6 +12,7 @@ import inspect
 import sys
 import types
 
+import archetypes
 import sim_engine
 
 # the 24 positional fields of Player, in order (see sim_engine.Player)
@@ -25,20 +26,20 @@ POSITIONAL = [
 ]
 KEYWORDS = ["clutchness", "secondary_positions", "badges", "rookie", "height", "speed", "stamina", "shot_iq", "iso_tendency", "archetype", "go_to_shot"]
 TENDENCIES = ("three_tendency", "mid_tendency", "drive_tendency", "post_tendency", "dunk_tendency", "shot_tendency", "iso_tendency")
-EDITABLE = [k for k in POSITIONAL[1:] + KEYWORDS if k not in TENDENCIES]   # tendencies are not shown and cannot be changed here
+EDITABLE = [k for k in POSITIONAL[1:] + KEYWORDS if k not in TENDENCIES and k not in ("archetype", "usage")]   # the archetype is worked out from the ratings   # tendencies are not shown and cannot be changed here
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 # how the editor lays the fields out (label, field, kind)
 GROUPS = [
     ("Shooting & finishing", [("3-pt", "three_rating", "unit"), ("Midrange", "mid_rating", "unit"), ("Rim", "rim_rating", "unit"),
                               ("Dunk", "dunk_rating", "unit"), ("Free throw", "ft_rating", "unit"), ("Shot IQ", "shot_iq", "unit")]),
-    ("Playmaking", [("Usage", "usage", "unit"), ("Playmaking", "playmaking", "unit"), ("Ball handle", "ball_handle", "unit")]),
+    ("Playmaking", [("Playmaking", "playmaking", "unit"), ("Ball handle", "ball_handle", "unit")]),
     ("Defense & rebounding", [("Perimeter D", "perimeter_def", "unit"), ("Interior D", "interior_def", "unit"), ("Steal", "steal", "unit"),
                               ("Block", "block", "unit"), ("Off. rebound", "oreb", "unit"), ("Def. rebound", "dreb", "unit")]),
     ("Other", [("Draws fouls", "foul_draw", "unit"), ("Foul rate", "foul_rate", "unit"), ("Clutch", "clutchness", "unit"),
                ("Speed", "speed", "unit"), ("Stamina", "stamina", "unit"), ("Height (inches)", "height", "int"),
                ("Position", "position", "pos"), ("Other positions", "secondary_positions", "positions"),
-               ("Archetype", "archetype", "text"), ("Rookie", "rookie", "bool")]),
+               ("Rookie", "rookie", "bool")]),
 ]
 
 
@@ -89,13 +90,37 @@ def _build(values):
     return p
 
 
-def _overall(team, values):
+def _played(team, values):
+    """The player as the engine plays him: file values plus every fallback (speed, shot IQ, height, stamina, star clutch)."""
     p = _build(values)
     try:
         sim_engine.apply_star_clutchness(types.SimpleNamespace(name=team, roster=[p]))
     except Exception:
         pass
-    return round(sim_engine.fantasy_ovr(p))
+    return p
+
+
+def _overall(team, values):
+    return round(sim_engine.fantasy_ovr(_played(team, values)))
+
+
+# ratings the engine fills in when a file leaves them out (or, for clutch, leaves it at the 0.50 default)
+FALLBACK_KEYS = ("speed", "shot_iq", "clutchness", "height", "stamina")
+
+
+def _with_fallbacks(team, values):
+    """(values with the engine's fallback numbers filled in, the keys that came from a fallback)"""
+    p = _played(team, values)
+    out, filled = dict(values), []
+    for k in FALLBACK_KEYS:
+        eff = getattr(p, k, None)
+        if eff is None:
+            continue
+        eff = int(round(eff)) if k == "height" else round(float(eff), 2)
+        if values.get(k) is None or (values.get(k) != eff and k == "clutchness"):
+            out[k] = eff
+            filled.append(k)
+    return out, filled, archetypes.archetype_label(p)
 
 
 def read(runner, team, name):
@@ -107,7 +132,11 @@ def read(runner, team, name):
         orig = original(runner, team, name)   # the committed values, for the per-rating "back to original" buttons
     except Exception:
         orig = None
-    return {"team": team, "name": name, "file": rel, "function": fn.__name__, "values": vals, "original": orig, "overall": _overall(team, vals),
+    shown, filled, arch = _with_fallbacks(team, vals)
+    if orig is not None:
+        orig = _with_fallbacks(team, orig)[0]
+    return {"team": team, "name": name, "file": rel, "function": fn.__name__, "values": shown, "original": orig, "overall": _overall(team, vals),
+            "fallbacks": filled, "archetype": arch,
             "groups": [{"title": t, "fields": [{"label": l, "key": k, "kind": kind} for l, k, kind in fs]} for t, fs in GROUPS]}
 
 
@@ -145,7 +174,7 @@ def preview(runner, team, name, changes):
     _path, _text, call = _locate(fn, name)
     vals = _values(call)
     vals.update(_clean(changes))
-    return {"overall": _overall(team, vals)}
+    return {"overall": _overall(team, vals), "archetype": archetypes.archetype_label(_played(team, vals))}
 
 
 def _source(value):
