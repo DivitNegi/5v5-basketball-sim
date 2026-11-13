@@ -900,3 +900,8 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .re-row input[type=range] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--tint, #f5a524) var(--fill, 50%), rgba(148,163,184,.18) var(--fill, 50%)); }
 .re-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--tint, #f5a524), 0 2px 6px rgba(0,0,0,.5); cursor: pointer; }
 .re-row input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--tint, #f5a524); cursor: pointer; }
+
+.re-row { grid-template-columns: 120px 1fr 52px 22px; }
+.re-revert { visibility: hidden; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(245,165,36,.5); background: transparent; color: var(--accent-2, #fbbf24);
+  font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+.re-revert.show { visibility: visible; } .re-revert:hover { background: rgba(245,165,36,.18); }

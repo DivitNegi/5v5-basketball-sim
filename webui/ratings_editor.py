@@ -105,7 +105,11 @@ def read(runner, team, name):
     path, _text, call = _locate(fn, name)
     vals = _values(call)
     rel = path.replace("\\", "/").split("/5v5_sim/")[-1]
-    return {"team": team, "name": name, "file": rel, "function": fn.__name__, "values": vals, "overall": _overall(team, vals),
+    try:
+        orig = original(runner, team, name)   # the committed values, for the per-rating "back to original" buttons
+    except Exception:
+        orig = None
+    return {"team": team, "name": name, "file": rel, "function": fn.__name__, "values": vals, "original": orig, "overall": _overall(team, vals),
             "groups": [{"title": t, "fields": [{"label": l, "key": k, "kind": kind} for l, k, kind in fs]} for t, fs in GROUPS]}
 
 

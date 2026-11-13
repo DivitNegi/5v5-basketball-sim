@@ -2246,10 +2246,18 @@ async function openRatingsEditor(team, name) {
       } catch (err) { status.textContent = err.message; }
     }, 220);
   };
+  const committed = d.original || null;
   const field = (f) => {
     const v = cur[f.key];
-    const mark = (row) => row.classList.toggle("changed", JSON.stringify(cur[f.key]) !== JSON.stringify(orig[f.key]));
-    let row;
+    let row, apply = null;
+    const differsFromCommitted = () => committed && f.key in committed && JSON.stringify(cur[f.key]) !== JSON.stringify(committed[f.key]);
+    const revert = h("button", { class: "re-revert", type: "button", title: "", onclick: () => { if (apply) apply(committed[f.key]); } }, "↺");
+    const mark = (r) => {
+      r.classList.toggle("changed", JSON.stringify(cur[f.key]) !== JSON.stringify(orig[f.key]));
+      const off = differsFromCommitted();
+      revert.classList.toggle("show", !!off);
+      if (off) { const c = committed[f.key]; revert.title = `Back to the original: ${typeof c === "number" && c <= 1 && f.kind === "unit" ? Math.round(c * 100) : Array.isArray(c) ? c.join(", ") || "none" : c}`; }
+    };
     const set = (val) => { cur[f.key] = val; mark(row); refreshCount(); preview(); };
     if (f.kind === "unit") {
       // shown and edited as 0-100; the file keeps 0-1 (a value you do not touch is never rewritten)
@@ -2262,24 +2270,33 @@ async function openRatingsEditor(team, name) {
       tint(v == null ? null : shown(v));
       rng.addEventListener("input", () => { num.value = rng.value; tint(Number(rng.value)); set(Number(rng.value) / 100); });
       num.addEventListener("change", () => { const x = Math.max(0, Math.min(100, Math.round(Number(num.value) || 0))); num.value = x; rng.value = x; tint(x); set(x / 100); });
+      apply = (val) => { const x = val == null ? 0 : Math.round(val * 100); num.value = val == null ? "" : x; rng.value = x; tint(val == null ? null : x); set(val); };
       row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), rng, num);
     } else if (f.kind === "int") {
       const num = h("input", { type: "number", min: 60, max: 96, step: 1, value: v ?? "", class: "re-num" });
       const ft = h("span", { class: "muted re-ft" }, v ? `${Math.floor(v / 12)}'${v % 12}"` : "");
       num.addEventListener("change", () => { const x = Math.round(Number(num.value)); ft.textContent = `${Math.floor(x / 12)}'${x % 12}"`; set(x); });
+      apply = (val) => { num.value = val; ft.textContent = `${Math.floor(val / 12)}'${val % 12}"`; set(val); };
       row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), ft, num);
     } else if (f.kind === "pos") {
       const s = h("select", { onchange: (e) => set(e.target.value) }, ["PG", "SG", "SF", "PF", "C"].map((p) => h("option", { value: p, selected: p === v }, p)));
+      apply = (val) => { s.value = val; set(val); };
       row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), s);
     } else if (f.kind === "positions") {
       const have = new Set(v || []);
       const boxes = ["PG", "SG", "SF", "PF", "C"].map((p) => h("label", { class: "re-chk" }, h("input", { type: "checkbox", checked: have.has(p), onchange: (e) => { e.target.checked ? have.add(p) : have.delete(p); set(["PG", "SG", "SF", "PF", "C"].filter((x) => have.has(x))); } }), p));
+      apply = (val) => { have.clear(); (val || []).forEach((p) => have.add(p)); boxes.forEach((lb) => { const cb = lb.querySelector("input"); cb.checked = have.has(lb.textContent.trim()); }); set(["PG", "SG", "SF", "PF", "C"].filter((x) => have.has(x))); };
       row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("div", { class: "re-chks" }, boxes));
     } else if (f.kind === "bool") {
-      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("input", { type: "checkbox", checked: !!v, onchange: (e) => set(e.target.checked) }));
+      const cb = h("input", { type: "checkbox", checked: !!v, onchange: (e) => set(e.target.checked) });
+      apply = (val) => { cb.checked = !!val; set(!!val); };
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), cb);
     } else {
-      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), h("input", { type: "text", value: v ?? "", class: "re-text", onchange: (e) => set(e.target.value) }));
+      const txt = h("input", { type: "text", value: v ?? "", class: "re-text", onchange: (e) => set(e.target.value) });
+      apply = (val) => { txt.value = val ?? ""; set(val); };
+      row = h("div", { class: "re-row" }, h("span", { class: "re-lbl" }, f.label), txt);
     }
+    row.append(revert); mark(row);
     return row;
   };
   const saveBtn = h("button", { class: "btn primary", disabled: true, onclick: async () => {
