@@ -2285,7 +2285,8 @@ function shotSpot(ev, side, spread = false) {
   if (z === "dunk") [x, y] = polar(2, 20, 1.2);
   else if (z === "rim") {
     if (!spread) [x, y] = polar(10, 40, 1.35);
-    else for (let k = 0; k < 12; k++) {   // a season of rim shots: layups, dunks and short finishes spread over the whole area around the basket, evenly
+    else if (rnd() < 0.25) { x = 40 + rnd() * 176; y = HY + (rnd() * 2 - 1) * 76; }   // a close shot: floater or short pull-up anywhere in the lane
+    else for (let k = 0; k < 12; k++) {   // at the basket: layups, dunks and putbacks spread evenly around the rim
       const a2 = (rnd() * 2 - 1) * 1.75, r = Math.sqrt(64 + rnd() * (88 * 88 - 64));
       x = HX + r * Math.cos(a2); y = HY + r * Math.sin(a2);
       if (x >= 40) break;
@@ -2310,12 +2311,12 @@ function shotSpot(ev, side, spread = false) {
     // Each midrange spot fills its whole slice of the floor, evenly: the elbow slice runs from the upper paint out to the arc, the wings from the
     // lane line to the arc, the baseline from beside the lane to the corner. No tight clusters and no empty bands between them.
     const side = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
-    const band = want === "elbow" ? [0, 0.4, 95, 232] : want === "wing" ? [0.4, 0.98, 62, 232] : [0.98, 1.95, 58, 232];
+    const band = want === "elbow" ? [0, 0.4, 140, 234] : want === "wing" ? [0.4, 0.98, 90, 234] : [0.98, 1.95, 82, 234];
     for (let k = 0; k < 30; k++) {
       const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = Math.sqrt(band[2] ** 2 + rnd() * (band[3] ** 2 - band[2] ** 2));
       x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
       const dyAbs = Math.abs(y - HY);
-      if (x >= 36 && dyAbs <= 214 && !(want !== "elbow" && x <= 220 && dyAbs <= 80 && r < 75)) break;   // on the floor, inside the three-point line, not under the rim
+      if (x >= 36 && dyAbs <= 214 && !(x <= 222 && dyAbs <= 82)) break;   // on the floor, inside the three-point line, outside the paint (midrange is never in the lane)
     }
   } else { for (let k = 0; k < 10; k++) { [x, y] = polar(75, 225, 1.4); if (Math.abs(y - HY) <= 205) break; } }   // anything else: inside the arc
   return side ? [1000 - x, y] : [x, y];
@@ -2323,7 +2324,7 @@ function shotSpot(ev, side, spread = false) {
 // which of the twelve hotspot zones a placed shot is in (read off its drawn position, so the zone map always agrees with the X's and O's)
 function shotZoneOf(ev, x, y) {
   const z = ev.zone;
-  if (z === "rim" || z === "dunk") return "ra";
+  if (z === "rim" || z === "dunk") return Math.hypot(x - SC_GEO.HX, y - SC_GEO.CY) <= 40 ? "ra" : "paint";   // a floater or short pull-up away from the rim counts with the paint
   if (z === "post") return "paint";
   const dx = x - SC_GEO.HX, dy = y - SC_GEO.CY, ang = Math.atan2(Math.abs(dy), dx), side = ev.side || (dy > 0 ? "R" : "L");   // L = left of the basket as the zone map is drawn
   if (z === "mid") {
