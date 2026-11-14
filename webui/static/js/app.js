@@ -1426,6 +1426,7 @@ function pcShotMap(name, teamName, quarter, shots) {
   for (const ev of mine) {
     const [x, y] = shotSpot(ev, teamSide(ev.team));
     const d = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}` });
+    d.append(svgEl("circle", { r: 11, class: "hit" }));   // the whole marker answers the hover, not just its outline
     if (ev.made) d.append(svgEl("circle", { r: 8, class: "ring" })); else d.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
     setTip(d, ev.player, [`${ev.made ? "Made" : "Missed"} ${shotZoneName(ev.zone)}`, ev.when || shotWhen(ev)], ev.made ? "make" : "miss");
     g.append(d);
@@ -2808,6 +2809,7 @@ function mountShotChart(host, { big = false } = {}) {
   function dot(ev, animate) {
     const [x, y] = shotSpot(ev, sideOf(ev.team));
     const g = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}${animate ? " fresh" : ""}` });
+    g.append(svgEl("circle", { r: 11, class: "hit" }));   // the whole marker answers the hover, not just its outline
     if (ev.made) { g.append(svgEl("circle", { r: 8, class: "ring" })); if (animate) g.append(svgEl("circle", { r: 8, class: "pulse" })); }
     else g.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
     if (animate) {
