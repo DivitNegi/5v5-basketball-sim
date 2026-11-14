@@ -206,7 +206,8 @@ def player_detail(runner, source, team, name, group="all"):
         below = sum(1 for v in pop if v < val - 1e-9)
         equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
         pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
-        ranks.append({"key": key, "label": label, "value": round(val, 1), "pct": pct})
+        rank = 1 + sum(1 for v in pop if v > val + 1e-9)   # his real place (1 = best), so only one player is ever the leader
+        ranks.append({"key": key, "label": label, "value": round(val, 1), "pct": pct, "rank": rank, "of": len(pop) if pop else None})
     # advanced radar: the same formulas as the Advanced table, ranked against the same qualified players
     ADV_NAMES = ["MPG", "PER", "TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "USG%", "OWS", "DWS", "WS", "WS/48", "OBPM", "DBPM", "BPM", "VORP", "OFF", "DEF", "IMPACT", "+/-", "DOUBLES/G"]
     def adv_row(tn, stats):
@@ -246,7 +247,8 @@ def player_detail(runner, source, team, name, group="all"):
             pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
             if pct is not None and lower:
                 pct = 100 - pct
-            out.append({"key": key, "label": label, "value": round(val, 3 if abs(val) < 2 else 1), "pct": pct})
+            rank = 1 + sum(1 for v in pop if (v < val - 1e-9 if lower else v > val + 1e-9))
+            out.append({"key": key, "label": label, "value": round(val, 3 if abs(val) < 2 else 1), "pct": pct, "rank": rank, "of": len(pop) if pop else None})
         return out
     adv_groups = [{"title": t, "desc": d, "ranks": rank_adv(pk)} for t, d, pk in ADV_GROUPS]
     # shot-zone radar: for each zone, how well he shoots it (FG%) and how much he shoots it (attempts a game), against players who use that zone
@@ -291,7 +293,8 @@ def player_detail(runner, source, team, name, group="all"):
             below = sum(1 for v in pop if v < val - 1e-9)
             equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
             pct = round(100 * (below + 0.5 * equal) / len(pop)) if pop else None
-            zone_ranks.append({"key": f"{key}_{kind}", "label": lbl, "value": round(val, 1), "pct": pct})
+            rank = 1 + sum(1 for v in pop if v > val + 1e-9)
+            zone_ranks.append({"key": f"{key}_{kind}", "label": lbl, "value": round(val, 1), "pct": pct, "rank": rank, "of": len(pop) if pop else None})
     keys = ("minutes", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "plus_minus")
     totals = {k: (round(st[k] / 60, 1) if k == "minutes" else round(st[k], 1) if k == "plus_minus" else int(st[k])) for k in keys}
     per_game = {k: round(st[k] / g / (60 if k == "minutes" else 1), 1) for k in keys}

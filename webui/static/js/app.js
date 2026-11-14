@@ -2040,7 +2040,7 @@ function percentileRadar(ranks, color) {
     + `<text x="${C + 6}" y="${CY - R * 0.5 + 14}" class="pr-tick">50%</text><text x="${C + 6}" y="${CY - R + 14}" class="pr-tick">100%</text>`;
   ranks.forEach((r, i) => {
     const [x, y] = pt(i, 1.2), anchor = Math.abs(x - C) < 14 ? "middle" : x < C ? "end" : "start";
-    html += `<text x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="${anchor}" class="pr-lbl">${r.label}</text><text x="${x.toFixed(1)}" y="${(y + 12).toFixed(1)}" text-anchor="${anchor}" class="pr-pct">${r.pct == null ? "n/a" : r.rank ? (r.rank === 1 ? "(best)" : `(${ordinal(r.rank)} of ${r.of})`) : (r.pct >= 99 ? "(leader)" : `(${ordinal(r.pct)})`)} · ${r.value ?? "–"}</text>`;
+    html += `<text x="${x.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="${anchor}" class="pr-lbl">${r.label}</text><text x="${x.toFixed(1)}" y="${(y + 12).toFixed(1)}" text-anchor="${anchor}" class="pr-pct">${r.pct == null ? "n/a" : r.rank ? (r.rank === 1 ? "(leader)" : `(${ordinal(r.rank)} of ${r.of})`) : (r.pct >= 99 ? "(leader)" : `(${ordinal(r.pct)})`)} · ${r.value ?? "–"}</text>`;
   });
   svg.innerHTML = html;
   return svg;
