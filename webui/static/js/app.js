@@ -342,11 +342,50 @@ const BOX_COLS = [
   ["min", "MIN"], ["pts", "PTS"], ["reb", "REB"], ["oreb", "OREB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tov", "TO"], ["pf", "PF"],
   ["fg", "FG"], ["fgp", "FG%"], ["tp", "3PT"], ["tpp", "3P%"], ["ft", "FT"], ["ftp", "FT%"], ["pm", "+/-"],
 ];
+// During a series (a lone series, a playoff bracket, or a season's playoffs) the picker also offers every earlier game of it, from the bracket's box scores.
+S.boxGame = "live";
+async function refreshBoxSeries() {
+  try { BR.data = await api.get("/api/bracket"); } catch { return; }
+  if ($("#view-box").classList.contains("active")) renderBox();
+}
+function boxSeries() {
+  const names = (S.live?.teams || []).map((t) => t.name);
+  return names.length === 2 ? seriesFor(names[0], names[1]) : null;
+}
+function boxGamePicker() {
+  const sel = $("#boxGame");
+  if (!sel) return;
+  const sr = boxSeries(), games = sr ? [...(sr.games || [])].filter(([n]) => sr.boxes?.[n] || sr.boxes?.[String(n)]).reverse() : [];
+  if (S.boxGame !== "live" && !games.some(([n]) => n === S.boxGame)) S.boxGame = "live";
+  sel.hidden = !games.length;
+  const names = (S.live?.teams || []).map((t) => t.name);
+  const sig = games.map(([n]) => n).join(",") + "|" + S.boxGame + "|" + names.join(",");
+  if (sel.dataset.sig === sig) return;
+  sel.dataset.sig = sig;
+  const scoreOf = (n, sa, sb) => { const aFirst = sr.a === names[0]; const nick = (nm) => (identOf(nm).short || nm).split(" ").pop(); return `${nick(names[0])} ${aFirst ? sa : sb} – ${aFirst ? sb : sa} ${nick(names[1])}`; };
+  sel.replaceChildren(h("option", { value: "live", selected: S.boxGame === "live" }, "Live game"),
+    ...games.map(([n, sa, sb]) => h("option", { value: String(n), selected: S.boxGame === n }, `Game ${n} · ${scoreOf(n, sa, sb)}`)));
+}
+// one earlier series game as the live table's team shape (box rows + totals)
+function boxFromBracket(n, teamName) {
+  const sr = boxSeries(), boxes = sr?.boxes?.[n] || sr?.boxes?.[String(n)];
+  const tm = boxes?.find((t) => t.name === teamName);
+  if (!tm) return null;
+  const pc = (m, a) => (a ? 100 * m / a : null);
+  const rows = (tm.players || []).map((r) => ({ ...r, starter: !!r.st, on: false, fgp: pc(r.fgm, r.fga), tpp: pc(r.tpm, r.tpa), ftp: pc(r.ftm, r.fta) }));
+  const tot = {};
+  ["pts", "reb", "oreb", "ast", "stl", "blk", "tov", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta"].forEach((k) => { tot[k] = rows.reduce((a, r) => a + (r[k] || 0), 0); });
+  Object.assign(tot, { fgp: pc(tot.fgm, tot.fga), tpp: pc(tot.tpm, tot.tpa), ftp: pc(tot.ftm, tot.fta) });
+  return { box: rows, totals: tot, past: true };
+}
 function renderBox() {
   const root = $("#boxTable");
   if (!S.live) { root.replaceChildren(h("div", { class: "empty" }, "No game yet.")); return; }
-  const t = S.live.teams[S.boxTeam];
+  if (!BR.data && !S.boxFetching) { S.boxFetching = true; refreshBoxSeries().finally(() => { S.boxFetching = false; }); }
+  boxGamePicker();
   $$("#boxTeam button").forEach((b, i) => { b.textContent = S.live.teams[i].short; });
+  const t = S.boxGame === "live" ? S.live.teams[S.boxTeam] : boxFromBracket(S.boxGame, S.live.teams[S.boxTeam].name);
+  if (!t) { root.replaceChildren(h("div", { class: "empty" }, "That game's box score is not available.")); return; }
   let players = [...t.box];
   const sortKey = S.boxSort;
   if (sortKey) players.sort((x, y) => (y[sortKey] ?? -1) - (x[sortKey] ?? -1));
@@ -2982,10 +3021,12 @@ async function boot() {
   $$("#boxTeam button").forEach((b) => b.addEventListener("click", () => {
     $$("#boxTeam button").forEach((x) => x.classList.toggle("on", x === b)); S.boxTeam = Number(b.dataset.v); renderBox();
   }));
+  $("#boxGame")?.addEventListener("change", (e) => { S.boxGame = e.target.value === "live" ? "live" : Number(e.target.value); renderBox(); });
+  $("#boxGame")?.addEventListener("focus", refreshBoxSeries);
   $$("#nav .nav-item[data-view]").forEach((b) => b.addEventListener("click", () => {
     $$("#nav .nav-item").forEach((x) => x.classList.toggle("active", x === b));
     $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${b.dataset.view}`));
-    if (b.dataset.view === "box") renderBox();
+    if (b.dataset.view === "box") { renderBox(); refreshBoxSeries(); }
     if (b.dataset.view === "flow") renderFlow("#flowBig", 420);
     if (b.dataset.view === "season") refreshSeason();
     if (b.dataset.view === "shottab") loadShots2().catch((e) => toast(e.message, "err"));
