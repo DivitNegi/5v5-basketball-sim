@@ -796,7 +796,7 @@ function handleEvent(msg) {
 }
 
 // ───────────────────────── season ─────────────────────────
-const SEASON_MODE_NAMES = ["2021 season", "2022 season", "2023 season", "2026 season", "2027 season", "2018 season", "2027 play-in"];
+const SEASON_MODE_NAMES = ["2016 season", "2021 season", "2022 season", "2023 season", "2026 season", "2027 season", "2018 season", "2027 play-in"];
 const isSeasonMode = (m) => SEASON_MODE_NAMES.some((x) => (m || "").startsWith(x));
 const SE = { tab: "standings", data: null, players: null, sort: "pts", filter: "", loading: false };
 

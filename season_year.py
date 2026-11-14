@@ -17,6 +17,7 @@ from sim_engine import (
 )
 
 SEASON_YEARS = {
+    2016: {"label": "2016", "season_label": "2015-16", "play_in": False, "positional": True},   # before the play-in: seeds 1-8 go straight to the playoffs
     2021: {"label": "2021", "season_label": "2020-21", "play_in": True, "positional": True},
     2022: {"label": "2022", "season_label": "2021-22", "play_in": True, "positional": True},
     2023: {"label": "2023", "season_label": "2022-23", "play_in": True, "positional": True},

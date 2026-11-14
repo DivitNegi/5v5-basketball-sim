@@ -1125,7 +1125,7 @@ def _with_2016_big_mid_cleanup(factory):
 
 
 for _name, _fn in list(globals().items()):
-    if _name.startswith("make_") and _name.endswith("_2016") and _name != "make_thunder_2016" and callable(_fn):
+    if _name in ("make_warriors_2016", "make_cavs_2016") and callable(_fn):   # the hand-built 2016 teams only; the rest of 2016 is built from real data
         globals()[_name] = _with_2016_big_mid_cleanup(_fn)
 
 

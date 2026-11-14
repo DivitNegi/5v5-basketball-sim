@@ -20,7 +20,7 @@ from .hub import EventHub
 from .live import live_snapshot, team_identity
 
 # Modes the browser UI can run today. The rest of the Tk modes are added as their screens are built.
-SEASON_MODES = {"2021 season (82 games)": 2021, "2022 season (82 games)": 2022, "2023 season (82 games)": 2023, "2026 season (82 games)": 2026}
+SEASON_MODES = {"2016 season (82 games)": 2016, "2021 season (82 games)": 2021, "2022 season (82 games)": 2022, "2023 season (82 games)": 2023, "2026 season (82 games)": 2026}
 SEASON_LIKE = tuple(SEASON_MODES) + ("2027 season (82 games)", "2018 season (82 games)")
 SUPPORTED_MODES = (
     "Game", "Game 7", "1-on-1", "Playoff series", "Custom 16-team playoffs",
@@ -31,7 +31,7 @@ SUPPORTED_MODES = (
 ) + SEASON_LIKE + ("2027 play-in & playoffs", "Replay season game")
 ALL_MODES = (
     "Game", "Game 7", "1-on-1", "Playoff series", "Custom 16-team playoffs", "Full 2027 playoffs", "2027 season (82 games)",
-    "2018 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)",
+    "2018 season (82 games)", "2016 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2026 season (82 games)",
     "Full 2018 playoffs", "Custom season (82 games)", "Fantasy draft: 2027 players (season + playoffs)",
     "Fantasy draft: all-time (season + playoffs)", "Fantasy draft playoffs", "Olympic tournament",
 )
