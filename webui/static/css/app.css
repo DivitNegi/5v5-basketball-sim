@@ -985,3 +985,13 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 #view-live .col-side .feed-panel { flex: 1 1 auto; min-height: 0; }
 #view-live .col-side .rawlog, #view-live .col-side .feed { flex: 1 1 0; height: auto; max-height: none; min-height: 320px; }
 @media (max-width: 1100px) { #view-live .col-side .rawlog, #view-live .col-side .feed { flex: none; height: 600px; } }
+/* Stats tab / season advanced tables: same compact look as the box scores; names stay pinned while the numbers scroll */
+#statsBody.stats-scroll { max-height: none; overflow: visible; border: 0; }
+#statsBody .stx-wrap table, #seasonAdv .stx-wrap table { width: 100%; min-width: 0; }
+#statsBody .stx-wrap th, #statsBody .stx-wrap td, #seasonAdv .stx-wrap th, #seasonAdv .stx-wrap td { min-width: 0; padding: 7px 8px; font-size: 13.5px; }
+#statsBody .stx-wrap th:nth-child(2), #statsBody .stx-wrap td:nth-child(2) { min-width: 0; text-align: right; }
+#statsBody .stx-wrap td.l, #statsBody .stx-wrap th.l, #seasonAdv .stx-wrap td.l, #seasonAdv .stx-wrap th.l { text-align: left; }
+.stx-wrap tbody tr:not(.team-row) td.l:has(.pcell) { position: sticky; left: 0; z-index: 1; background: var(--panel-solid); }
+.stx-wrap thead th.l { position: sticky; left: 0; z-index: 3; }
+.stx-wrap tr.team-row td .tcell { position: sticky; left: 12px; display: inline-flex; }
+.stx-wrap .pcell { min-width: 200px; }
