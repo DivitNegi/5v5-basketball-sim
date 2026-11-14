@@ -1402,19 +1402,52 @@ async function loadPlayerCard() {
     const row = S.gameSnapshots.get(n)?.teams?.find((t) => t.name === GV.pc.team)?.box?.find((r) => r.name === GV.pc.name);
     return !!row;   // every earlier game his team was in; one he sat out is marked DNP
   });
-  if (GV.pc.game !== "live" && !playedGames.includes(Number(GV.pc.game))) GV.pc.game = "live";
+  // Playoffs: every game of this team's series comes from the bracket (it keeps a box score for each one, including games simmed quietly),
+  // numbered as the series numbers them. The page's own counter runs across every game it has watched, so it is not used here.
+  if (!BR.data) { try { BR.data = await api.get("/api/bracket"); } catch { BR.data = {}; } }
+  const liveTeams = list.map((t) => t.team);
+  const liveSeries = liveTeams.length === 2 ? seriesFor(liveTeams[0], liveTeams[1]) : null;
+  const seriesGames = [];
+  if (liveSeries || Object.keys(BR.data?.series || {}).length) {
+    const mySeries = Object.entries(BR.data?.series || {}).filter(([, sr]) => sr.a === GV.pc.team || sr.b === GV.pc.team).reverse();
+    for (const [key, sr] of mySeries) {
+      const opp = sr.a === GV.pc.team ? sr.b : sr.a;
+      for (const [n] of [...(sr.games || [])].reverse()) {
+        const boxes = sr.boxes?.[n] || sr.boxes?.[String(n)];
+        const mine = boxes?.find((t) => t.name === GV.pc.team), other = boxes?.find((t) => t.name !== GV.pc.team);
+        if (!mine || !mine.players?.some((r) => r.name === GV.pc.name)) continue;
+        const row = mine.players.find((r) => r.name === GV.pc.name);
+        const dnp = !((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
+        const label = `${sr === liveSeries ? "" : `vs ${identOf(opp).short} · `}Game ${n} · ${mine.score}-${other?.score ?? 0}${dnp ? " · DNP" : ""}`;
+        seriesGames.push({ value: `b:${key}:${n}`, label, boxes });
+      }
+    }
+  }
+  const inSeries = seriesGames.length > 0 || !!liveSeries;
+  const validPast = inSeries ? seriesGames.some((g) => g.value === GV.pc.game) : playedGames.includes(Number(GV.pc.game));
+  if (GV.pc.game !== "live" && !validPast) GV.pc.game = "live";
+  const liveNo = liveSeries ? (liveSeries.games || []).length + (liveSeries.winner ? 0 : 1) : S.gameNo;
+  // a bracket box score as a page snapshot; its shots come from the page's own copy of that game when the page watched it
+  const bracketGame = (g) => {
+    const snap = { teams: g.boxes.map((tm) => { const id = identOf(tm.name); return { ...id, name: tm.name, score: tm.score, box: (tm.players || []).map((r) => ({ ...r, listed: r.listed || r.pos || "" })) }; }) };
+    const sig = (v) => (v?.teams || []).map((t) => `${t.name}:${t.score}`).sort().join("|");
+    const seen = [...S.gameSnapshots.keys()].find((n) => sig(S.gameSnapshots.get(n)) === sig(snap));
+    return [snap, seen != null ? (S.gameShots.get(seen) || []) : [], seen];
+  };
   pick.replaceChildren(
     h("select", { onchange: (e) => { GV.pc.team = e.target.value; GV.pc.name = null; loadPlayerCard(); } }, list.map((t) => h("option", { value: t.team, selected: t.team === GV.pc.team }, t.short))),
     h("select", { onchange: (e) => { GV.pc.name = e.target.value; loadPlayerCard(); } }, roster.map((n) => h("option", { value: n, selected: n === GV.pc.name }, n))),
     h("select", { onchange: (e) => { GV.pc.game = e.target.value; loadPlayerCard(); } },
-      h("option", { value: "live", selected: GV.pc.game === "live" }, `Live / Game ${S.gameNo}`),
-      playedGames.map((n) => { const snap = S.gameSnapshots.get(n), mine = snap.teams.find((t) => t.name === GV.pc.team), opp = snap.teams.find((t) => t.name !== GV.pc.team), row = mine.box.find((r) => r.name === GV.pc.name), dnp = !((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
+      h("option", { value: "live", selected: GV.pc.game === "live" }, `Live · Game ${liveNo}`),
+      inSeries ? seriesGames.map((g) => h("option", { value: g.value, selected: GV.pc.game === g.value }, g.label)) : playedGames.map((n) => { const snap = S.gameSnapshots.get(n), mine = snap.teams.find((t) => t.name === GV.pc.team), opp = snap.teams.find((t) => t.name !== GV.pc.team), row = mine.box.find((r) => r.name === GV.pc.name), dnp = !((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
         return h("option", { value: String(n), selected: GV.pc.game === String(n) }, `Game ${n} · vs ${opp?.short || "?"} · ${mine.score}-${opp?.score ?? 0}${dnp ? " · DNP" : ""}`); })),
     h("div", { class: "seg small" }, ["all", "1", "2", "3", "4", "OT"].map((q) => h("button", { class: GV.pc.quarter === q ? "on" : "", onclick: () => { GV.pc.quarter = q; loadPlayerCard(); } }, q === "all" ? "All plays" : q === "OT" ? "OT" : `Q${q}`))));
   const d = GV.pc.game === "live" && offline
     ? (S.live ? cardFromSnapshot(S.live, GV.pc.team, GV.pc.name, S.shots, GV.pc.quarter) : cardFromSnapshot(lastSnap, GV.pc.team, GV.pc.name, S.gameShots.get(Math.max(...S.gameSnapshots.keys())) || [], GV.pc.quarter))
     : GV.pc.game === "live"
     ? await api.get(`/api/game/card?team=${encodeURIComponent(GV.pc.team)}&name=${encodeURIComponent(GV.pc.name)}&quarter=${GV.pc.quarter}`)
+    : String(GV.pc.game).startsWith("b:")
+    ? (() => { const [snap, shots] = bracketGame(seriesGames.find((g) => g.value === GV.pc.game)); return cardFromSnapshot(snap, GV.pc.team, GV.pc.name, shots, GV.pc.quarter); })()
     : cardFromSnapshot(S.gameSnapshots.get(Number(GV.pc.game)), GV.pc.team, GV.pc.name, S.gameShots.get(Number(GV.pc.game)) || [], GV.pc.quarter);
   if (!d) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, "That player was not in this game.")); return; }
   if (d.error) { $("#pcardBody").replaceChildren(h("div", { class: "empty" }, d.error)); return; }
@@ -1427,10 +1460,11 @@ async function loadPlayerCard() {
   const zoneBox = (title, z) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
     h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))));
   const qmatch = (pb) => GV.pc.quarter === "all" || String(periodIndex(pb.period) + 1) === GV.pc.quarter || (GV.pc.quarter === "OT" && periodIndex(pb.period) >= 4);
-  const chosenGame = GV.pc.game === "live" ? S.gameNo : Number(GV.pc.game);
+  const chosenBracket = String(GV.pc.game).startsWith("b:") ? bracketGame(seriesGames.find((g) => g.value === GV.pc.game)) : null;
+  const chosenGame = GV.pc.game === "live" ? S.gameNo : chosenBracket ? chosenBracket[2] : Number(GV.pc.game);
   const qLabel = GV.pc.quarter === "all" ? "game" : GV.pc.quarter === "OT" ? "overtime" : `Q${GV.pc.quarter}`;
   const pastGame = GV.pc.game !== "live";
-  const gameLabel = pastGame ? `Game ${GV.pc.game}` : `Game ${S.gameNo}`;
+  const gameLabel = chosenBracket ? `Game ${String(GV.pc.game).split(":").pop()}` : pastGame ? `Game ${GV.pc.game}` : `Game ${liveNo}`;
   const qNote = GV.pc.quarter !== "all" && pastGame ? h("div", { class: "muted", style: { margin: "6px 0" } }, "The stat tiles show this earlier game's full line; the shot map, shot diet and points chart follow the quarter.") : null;
   const plays = S.goodPlays.filter((pb) => pb.game === chosenGame && pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
   $("#pcardBody").replaceChildren(
@@ -1447,7 +1481,7 @@ async function loadPlayerCard() {
       h("div", { class: "pc-panel" }, h("h4", {}, "Impact"), pcRadar(p, chartColor(d.team))),
       h("div", { class: "pc-panel" }, h("h4", {}, `Shot diet · ${qLabel}`), pcDonut(d.shots)),
       h("div", { class: "pc-panel" }, h("h4", {}, pastGame ? "Field-goal points by quarter" : "Points by quarter"), pcSpark(d.by_quarter, chartColor(d.team)) || h("div", { class: "muted" }, "–"))),
-    h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${gameLabel} · ${qLabel}`), pcShotMap(p.name, GV.pc.team, GV.pc.quarter, GV.pc.game === "live" ? S.shots : (S.gameShots.get(Number(GV.pc.game)) || []))),
+    h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${gameLabel} · ${qLabel}`), pcShotMap(p.name, GV.pc.team, GV.pc.quarter, GV.pc.game === "live" ? S.shots : chosenBracket ? chosenBracket[1] : (S.gameShots.get(Number(GV.pc.game)) || []))),
     h("div", { class: "conf-grid" }, zoneBox(d.scope === "quarter" ? `Shot diet · ${qLabel}` : "Shot diet", d.shots), d.defended ? zoneBox(d.scope === "quarter" ? "Shots defended · full game" : "Shots defended", d.defended) : null),
     h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Positive plays · ${p.name}`),
     h("div", { class: "pc-plays" }, plays.length ? plays.map((pb) => h("div", { class: "ev score" }, h("div", { class: "rail", style: { background: "var(--line-strong)" } }, ""), h("div", {}, h("span", { class: "sc" }, `${pb.period} ${pb.clock} · ${pb.score}`), pb.text))) : h("div", { class: "muted" }, "No plays logged yet for this selection.")));
