@@ -2768,7 +2768,26 @@ function heatImage(list, sideOf = (ev) => teamSide(ev.team)) {
 }
 function mountShotChart(host, { big = false } = {}) {
   host = typeof host === "string" ? $(host) : host; if (!host) return;
-  const st = { left: "all", right: "all", quarter: "all", result: "all", heat: false, drawn: 0, playersSig: "" };
+  const st = { left: "all", right: "all", quarter: "all", result: "all", heat: false, drawn: 0, playersSig: "", game: "live" };
+  // Earlier games of this matchup that the page watched keep their shots (S.gameShots), so the chart can show any of them.
+  // In a series they are numbered as the series numbers them (from the bracket); otherwise by the page's own game count.
+  const pairOf = (teams) => (teams || []).map((t) => t.name).sort().join("|");
+  const pastGames = () => {
+    const live = pairOf(S.live?.teams);
+    if (!live) return [];
+    const sr = (S.live?.teams || []).length === 2 ? seriesFor(S.live.teams[0].name, S.live.teams[1].name) : null;
+    const sig = (teams) => (teams || []).map((t) => `${t.name}:${t.score}`).sort().join("|");
+    return [...S.gameSnapshots.keys()].sort((a, b) => b - a).filter((n) => (S.gameShots.get(n) || []).length && pairOf(S.gameSnapshots.get(n)?.teams) === live).map((n) => {
+      const snap = S.gameSnapshots.get(n);
+      const hit = sr && (sr.games || []).find(([g]) => { const bx = sr.boxes?.[g] || sr.boxes?.[String(g)]; return bx && sig(bx) === sig(snap.teams); });
+      const nick = (t) => (identOf(t.name).short || t.name).split(" ").pop();
+      return { n, label: `Game ${hit ? hit[0] : n} · ${nick(snap.teams[0])} ${snap.teams[0].score} – ${snap.teams[1].score} ${nick(snap.teams[1])}`, snap };
+    });
+  };
+  const pastSnap = () => (st.game === "live" ? null : S.gameSnapshots.get(st.game));
+  const src = () => (st.game === "live" ? S.shots : S.gameShots.get(st.game) || []);
+  const sideOf = (team) => { const snap = pastSnap(); return snap ? (snap.teams[1]?.name === team ? 1 : 0) : teamSide(team); };
+  const identAt = (i) => { const snap = pastSnap(); return snap ? identOf(snap.teams[i]?.name) : S.identities?.[i]; };
   const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 40}`, class: "court-svg shot-map" });
   svg.innerHTML = courtLines();
   const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }); svg.append(dots); svg.insertBefore(heat, svg.firstChild.nextSibling ? svg.children[1] : null);
@@ -2777,14 +2796,14 @@ function mountShotChart(host, { big = false } = {}) {
   const bar = h("div", { class: "filters sc-bar" });
   const stats = h("div", { class: "sc-stats muted" });
   const known = new Set(); let statsTimer = null;
-  const scheduleStats = () => { if (statsTimer) return; statsTimer = setTimeout(() => { statsTimer = null; if (st.heat) redraw(); else updateStats(S.shots.filter(passes)); }, 80); };   // once per burst, not once per shot
+  const scheduleStats = () => { if (statsTimer) return; statsTimer = setTimeout(() => { statsTimer = null; if (st.heat) redraw(); else updateStats(src().filter(passes)); }, 80); };   // once per burst, not once per shot
   const legend = h("div", { class: "sc-legend" }, h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss"));
   host.replaceChildren(bar, svg, h("div", { class: "sc-foot" }, stats, legend));
-  const sidePick = (ev) => (teamSide(ev.team) ? st.right : st.left);
+  const sidePick = (ev) => (sideOf(ev.team) ? st.right : st.left);
   const passes = (ev) => sidePick(ev) !== "none" && (sidePick(ev) === "all" || ev.player === sidePick(ev))
     && (st.quarter === "all" || (st.quarter === "OT" ? ev.period >= 5 : ev.period === Number(st.quarter))) && (st.result === "all" || (st.result === "make") === ev.made);
   function dot(ev, animate) {
-    const [x, y] = shotSpot(ev, teamSide(ev.team));
+    const [x, y] = shotSpot(ev, sideOf(ev.team));
     const g = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}${animate ? " fresh" : ""}` });
     if (ev.made) { g.append(svgEl("circle", { r: 8, class: "ring" })); if (animate) g.append(svgEl("circle", { r: 8, class: "pulse" })); }
     else g.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
@@ -2796,7 +2815,7 @@ function mountShotChart(host, { big = false } = {}) {
     g.setAttribute("data-n", ev.n);
     const clk = Number(ev.clock), per = Number(ev.period);
     const when = `${per >= 5 ? (per === 5 ? "OT" : `OT${per - 4}`) : `Q${per || "?"}`} ${Number.isFinite(clk) ? `${Math.floor(clk / 60)}:${String(Math.floor(clk % 60)).padStart(2, "0")}` : ""}`.trim();
-    const sc = Array.isArray(ev.score) ? ` · ${S.identities?.[0]?.short || "A"} ${ev.score[0]} – ${ev.score[1]} ${S.identities?.[1]?.short || "B"}` : "";
+    const sc = Array.isArray(ev.score) ? ` · ${identAt(0)?.short || "A"} ${ev.score[0]} – ${ev.score[1]} ${identAt(1)?.short || "B"}` : "";
     const zoneName = { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[ev.zone] || ev.zone;
     setTip(g, ev.player, [`${ev.made ? "Made" : "Missed"} ${zoneName} · ${ev.when || when}`, sc.replace(/^ · /, "")], ev.made ? "make" : "miss");
     dots.querySelectorAll(".shot.latest").forEach((el) => el.classList.remove("latest"));
@@ -2811,32 +2830,37 @@ function mountShotChart(host, { big = false } = {}) {
   }
   function redraw() {
     dots.replaceChildren(); heat.replaceChildren();
-    const list = S.shots.filter(passes);
+    const list = src().filter(passes);
     if (st.heat) heat.append(heatImage(list));   // smooth shot-frequency map: hottest where the most shots are taken
     else for (const ev of list.slice(-420)) dot(ev, false);
-    updateStats(list); st.drawn = S.shots.length;
-    known.clear(); S.shots.forEach((e) => known.add(e.player));
+    updateStats(list); st.drawn = src().length;
+    known.clear(); src().forEach((e) => known.add(e.player));
   }
   function refreshControls() {
-    const roster = (side) => [...new Set(S.shots.filter((e) => teamSide(e.team) === side).map((e) => e.player))].sort();
+    const games = pastGames();
+    if (st.game !== "live" && !games.some((g) => g.n === st.game)) st.game = "live";
+    const roster = (side) => [...new Set(src().filter((e) => sideOf(e.team) === side).map((e) => e.player))].sort();
     const left = roster(0), right = roster(1);
-    const sig = left.join("|") + "#" + right.join("|") + (S.identities?.[0]?.short || "");
+    const sig = left.join("|") + "#" + right.join("|") + (S.identities?.[0]?.short || "") + "#" + games.map((g) => g.n).join(",") + "#" + st.game;
     if (sig === st.playersSig) return; st.playersSig = sig;
     if (!["all", "none"].includes(st.left) && !left.includes(st.left)) st.left = "all";
     if (!["all", "none"].includes(st.right) && !right.includes(st.right)) st.right = "all";
     const pick = (key, side, players) => {   // this half of the court: the whole team, one player, or nothing
-      const nm = S.identities?.[side]?.short || (side ? "Team B" : "Team A");
+      const nm = identAt(side)?.short || (side ? "Team B" : "Team A");
       return h("label", { class: "fsel sc-side" }, h("span", { class: "muted" }, side ? "Right side" : "Left side"),
         sel(key, [["all", `${nm} · whole team`], ...players.map((n) => [n, n]), ["none", `Hide ${nm}`]]));
     };
-    bar.replaceChildren(pick("left", 0, left), pick("right", 1, right),
+    const gamePick = games.length ? h("select", { class: "sc-game", onchange: (e) => { st.game = e.target.value === "live" ? "live" : Number(e.target.value); st.left = st.right = "all"; chart.redraw(); } },
+      h("option", { value: "live", selected: st.game === "live" }, "Live game"), games.map((g) => h("option", { value: String(g.n), selected: st.game === g.n }, g.label))) : null;
+    bar.replaceChildren(gamePick || [], pick("left", 0, left), pick("right", 1, right),
       sel("quarter", [["all", "All quarters"], ["1", "Q1"], ["2", "Q2"], ["3", "Q3"], ["4", "Q4"], ["OT", "OT"]]), sel("result", [["all", "Makes & misses"], ["make", "Makes"], ["miss", "Misses"]]),
       h("label", { class: "chk" }, h("input", { type: "checkbox", checked: st.heat, onchange: (e) => { st.heat = e.target.checked; redraw(); } }), " Heat map"));
     names.replaceChildren();
-    [0, 1].forEach((i) => { const t = svgEl("text", { x: i ? 970 : 30, y: 50, "text-anchor": i ? "end" : "start", class: "court-team", fill: S.identities?.[i]?.color || "#a7b2c5" }); t.textContent = S.identities?.[i]?.short || ""; names.append(t); });
+    [0, 1].forEach((i) => { const t = svgEl("text", { x: i ? 970 : 30, y: 50, "text-anchor": i ? "end" : "start", class: "court-team", fill: identAt(i)?.color || "#a7b2c5" }); t.textContent = identAt(i)?.short || ""; names.append(t); });
   }
   const chart = {
     add(ev, animate) {
+      if (st.game !== "live") return;   // looking at an earlier game: the live shots wait until "Live game" is picked again
       if (!known.has(ev.player)) { known.add(ev.player); st.playersSig = ""; refreshControls(); }
       if (!st.heat && passes(ev)) dot(ev, animate);
       scheduleStats();
