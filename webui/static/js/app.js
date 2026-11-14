@@ -2237,8 +2237,8 @@ function seasonShotChart(name, zones, avg, vs, split) {
     out.push(zone(wedge(-0.4, 0.4), "top3", "t", "Top of the key three"));
     for (const s of S) out.push(zone(wedge(s * 0.4, s * 1.18), `wing3_${sd(s)}`, "t", "Wing three"));
     out.push(zone("M0 0 H30 V142.1 L0 154.5 Z", "corner3_L", null, "Left corner three"), zone("M500 0 H470 V142.1 L500 154.5 Z", "corner3_R", null, "Right corner three"));
-    out.push(zone(wedge(-0.4, 0.4), "elbow", "m", "Elbow / free-throw line"));
-    for (const s of S) out.push(zone(wedge(s * 0.4, s * 0.98), `mid_wing_${sd(s)}`, "m", "Mid-range wing"), zone(wedge(s * 0.98, s * 3.1), `baseline_${sd(s)}`, "m", "Baseline jumper"));
+    out.push(zone(wedge(-0.62, 0.62), "elbow", "m", "Elbow / free-throw line"));
+    for (const s of S) out.push(zone(wedge(s * 0.62, s * 1.25), `mid_wing_${sd(s)}`, "m", "Mid-range wing"), zone(wedge(s * 1.25, s * 3.1), `baseline_${sd(s)}`, "m", "Baseline jumper"));
     out.push(zone(`${lane} ${ra}`, "paint", null, "Paint"), zone(ra, "ra", null, "Restricted area", false));
     const frame = svgEl("rect", { x: 0, y: 0, width: 500, height: 470, fill: "none", stroke: "#fff", "stroke-width": 4 });
     const ft = svgEl("path", { d: "M190 190 A60 60 0 0 0 310 190", fill: "none", stroke: "#fff", "stroke-width": 2, "stroke-opacity": ".5", "stroke-dasharray": "5 6" });
@@ -2700,7 +2700,7 @@ function shotSpot(ev, side, spread = false) {
     // Each midrange spot fills its whole slice of the floor, evenly: the elbow slice runs from the upper paint out to the arc, the wings from the
     // lane line to the arc, the baseline from beside the lane to the corner. No tight clusters and no empty bands between them.
     const side = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
-    const band = want === "elbow" ? [0, 0.4, 140, 234] : want === "wing" ? [0.4, 0.98, 90, 234] : [0.98, 1.95, 82, 234];
+    const band = want === "elbow" ? [0, 0.62, 140, 234] : want === "wing" ? [0.62, 1.25, 90, 234] : [1.25, 1.95, 82, 234];
     for (let k = 0; k < 30; k++) {
       const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = Math.sqrt(band[2] ** 2 + rnd() * (band[3] ** 2 - band[2] ** 2));
       x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
@@ -2718,7 +2718,7 @@ function shotZoneOf(ev, x, y) {
   const dx = x - SC_GEO.HX, dy = y - SC_GEO.CY, ang = Math.atan2(Math.abs(dy), dx), side = ev.side || (dy > 0 ? "R" : "L");   // L = left of the basket as the zone map is drawn
   if (z === "mid") {
     if (x <= 220 && Math.abs(dy) <= 80) return "paint";   // a short jumper or floater inside the lane counts with the paint
-    return ang < 0.4 ? "elbow" : ang < 0.98 ? `mid_wing_${side}` : `baseline_${side}`;
+    return ang < 0.62 ? "elbow" : ang < 1.25 ? `mid_wing_${side}` : `baseline_${side}`;
   }
   if (z === "three") {
     if (ev.loc === "heave") return null;   // half-court heaves sit off the zone map
