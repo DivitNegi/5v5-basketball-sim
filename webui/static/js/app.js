@@ -2598,6 +2598,9 @@ async function ppGameLog(root, team, name) {
   list();
 }
 
+// averages keep one decimal even when they land on a whole number (JSON turns 12.0 into 12); counts such as games played stay whole
+const COUNT_COLS = new Set(["GP", "G", "GS", "Gm", "W", "L", "Rank", "#"]);
+const avgCell = (v, col) => (v == null ? "—" : typeof v === "number" && Number.isInteger(v) && !COUNT_COLS.has(col) ? v.toFixed(1) : v);
 function renderStatsInto(root, data, opts = {}) {
   const st = (STX[root.id] ||= { rank: "Team order", flat: false, minGp: 0, search: "", sort: { column: -1, direction: -1 } });
   if (data.reports) { root.replaceChildren(...Object.entries(data.reports).map(([title, text]) => h("details", {}, h("summary", {}, title.replaceAll("_", " ")), h("pre", {}, text)))); return; }
@@ -2626,7 +2629,7 @@ function renderStatsInto(root, data, opts = {}) {
   const defaultCol = Math.max(2, cols.findIndex((c) => ["MPG", "MIN"].includes(c)) >= 0 ? cols.findIndex((c) => ["MPG", "MIN"].includes(c)) : (cols.indexOf("TOTAL") >= 0 ? cols.indexOf("TOTAL") : 2));
   const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;
   const head = h("tr", {}, cols.map((label, i) => h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
-  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v)) : (v ?? "—"))));
+  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v)) : avgCell(v, cols[i]))));
   const body = [];
   if (flat) {
     let list = [...items];
