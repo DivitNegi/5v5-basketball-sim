@@ -980,3 +980,8 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 #view-live .live-row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: stretch; }
 #view-live .live-row2 .flow.small { height: auto; min-height: 320px; }
 @media (max-width: 1100px) { #view-live .live-row2 { grid-template-columns: 1fr; } #view-live .court-scroll table { min-width: 640px; } }
+/* the play-by-play runs exactly as tall as the shot chart beside it */
+#view-live .live-grid { align-items: stretch; }
+#view-live .col-side .feed-panel { flex: 1 1 auto; min-height: 0; }
+#view-live .col-side .rawlog, #view-live .col-side .feed { flex: 1 1 0; height: auto; max-height: none; min-height: 320px; }
+@media (max-width: 1100px) { #view-live .col-side .rawlog, #view-live .col-side .feed { flex: none; height: 600px; } }
