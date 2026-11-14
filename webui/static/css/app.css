@@ -855,7 +855,7 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 /* live shot map: the newest mark blinks until the next shot; hover any mark for who, when and the score */
 .shot.latest { animation: shotBlink 1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes shotBlink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
-.shot-map .shot { cursor: help; }
+.shot-map .shot { cursor: default; }
 .sc-side { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .sc-side > span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .shot.latest { animation: none; outline: 2px solid #fff; } }
@@ -936,3 +936,16 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 /* team picker: the All teams choices */
 .logo.picker-all { display: grid; place-items: center; color: #1a1206; background: linear-gradient(180deg, #fbbf24, #f59e0b); font-size: 13px; }
 .picker-extra { font-weight: 700; }
+
+/* styled hover tooltip for shot dots and shot zones */
+.ui-tip { position: fixed; left: 0; top: 0; z-index: 9999; display: none; pointer-events: none; max-width: 280px;
+  background: var(--panel-solid); border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 11px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .45); color: var(--text); font-size: 12.5px; line-height: 1.45; }
+.ui-tip-t { font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+.ui-tip-t i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.ui-tip.make .ui-tip-t i { background: var(--green); }
+.ui-tip.miss .ui-tip-t i { background: var(--red); }
+.ui-tip.make { border-left: 3px solid var(--green); }
+.ui-tip.miss { border-left: 3px solid var(--red); }
+.ui-tip-l { color: #a7b2c5; }
+.shot-map [data-tip] { cursor: default; }

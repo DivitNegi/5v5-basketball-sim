@@ -1345,6 +1345,39 @@ function pcDonut(z) {
   const legend = h("div", { class: "dn-legend" }, parts.map(([l, n, c]) => h("span", {}, h("i", { style: { background: c } }), `${l} ${total ? Math.round((100 * n) / total) : 0}%`)));
   return h("div", { class: "pc-donut-wrap" }, svg, legend);
 }
+// ---- styled hover tooltip (replaces the browser's plain title box): any element with setTip() shows it
+const shotZoneName = (z) => ({ three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[z] || z || "shot");
+function shotWhen(ev) {
+  const clk = Number(ev.clock), per = Number(ev.period);
+  return `${per >= 5 ? (per === 5 ? "OT" : `OT${per - 4}`) : per ? `Q${per}` : ""} ${Number.isFinite(clk) && ev.clock !== "" && ev.clock != null ? `${Math.floor(clk / 60)}:${String(Math.floor(clk % 60)).padStart(2, "0")}` : ""}`.trim();
+}
+function setTip(el, title, lines = [], kind = "") {
+  el.setAttribute("data-tip", JSON.stringify([title, lines.filter(Boolean), kind]));
+}
+(() => {
+  let box = null;
+  const show = (el, e) => {
+    let t; try { t = JSON.parse(el.getAttribute("data-tip")); } catch { return; }
+    if (!box) { box = document.createElement("div"); box.className = "ui-tip"; document.body.append(box); }
+    const [title, lines, kind] = t;
+    box.className = `ui-tip ${kind || ""}`;
+    box.replaceChildren(h("div", { class: "ui-tip-t" }, kind ? h("i", {}) : null, title), ...lines.map((l) => h("div", { class: "ui-tip-l" }, l)));
+    box.style.display = "block"; move(e);
+  };
+  const move = (e) => {
+    if (!box || box.style.display !== "block") return;
+    const r = box.getBoundingClientRect(), pad = 14;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - pad;
+    if (y + r.height > innerHeight - 8) y = e.clientY - r.height - pad;
+    box.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, y)}px)`;
+  };
+  document.addEventListener("pointerover", (e) => { const el = e.target.closest?.("[data-tip]"); if (el) show(el, e); });
+  document.addEventListener("pointermove", move, { passive: true });
+  document.addEventListener("pointerout", (e) => { const el = e.target.closest?.("[data-tip]"); if (el && !el.contains(e.relatedTarget) && box) box.style.display = "none"; });
+  document.addEventListener("scroll", () => { if (box) box.style.display = "none"; }, true);
+})();
+
 function pcShotMap(name, teamName, quarter, shots) {
   const mine = shots.filter((e) => e.player === name && (quarter === "all" || (quarter === "OT" ? e.period >= 5 : e.period === Number(quarter))));
   const side = mine.length ? teamSide(mine[0].team) : teamSide(teamName);   // he shoots at one basket: show just that half of the floor
@@ -1355,6 +1388,7 @@ function pcShotMap(name, teamName, quarter, shots) {
     const [x, y] = shotSpot(ev, teamSide(ev.team));
     const d = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}` });
     if (ev.made) d.append(svgEl("circle", { r: 8, class: "ring" })); else d.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
+    setTip(d, ev.player, [`${ev.made ? "Made" : "Missed"} ${shotZoneName(ev.zone)}`, ev.when || shotWhen(ev)], ev.made ? "make" : "miss");
     g.append(d);
   }
   const made = mine.filter((e) => e.made).length;
@@ -2151,11 +2185,11 @@ function seasonShotChart(name, zones, avg, vs, split) {
     const inner = "M30 0 V142.1 A237.5 237.5 0 0 0 470 142.1 V0 Z", lane = "M170 0 H330 V190 H170 Z", ra = "M210 52.5 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0 Z";
     zsvg.innerHTML = `<defs><clipPath id="${uid}m"><path clip-rule="evenodd" d="${inner} ${lane}"/></clipPath><clipPath id="${uid}t"><path clip-rule="evenodd" d="M0 0 H500 V470 H0 Z ${inner}"/></clipPath></defs>`;
     const zone = (d, key, clip, title, evenodd = true) => {
-      const { m, a, pct, diff } = info(key), tip = svgEl("title");
-      tip.textContent = `${title}: ${a ? `${m} of ${a} (${pct.toFixed(1)}%)` : "no shots"}${diff == null ? "" : `, ${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} vs ${vs}`}`;
+      const { m, a, pct, diff } = info(key);
       const fill = !a ? NONE : diff == null ? AVG : diff >= 3.5 ? HOT : diff <= -3.5 ? COLD : AVG;
       const el = svgEl("path", { d, fill, "fill-rule": evenodd ? "evenodd" : "nonzero", stroke: "#fff", "stroke-width": 3, "stroke-linejoin": "round", ...(clip ? { "clip-path": `url(#${uid}${clip})` } : {}) });
-      el.append(tip); return el;
+      setTip(el, title, [a ? `${m} of ${a} · ${pct.toFixed(1)}%` : "No shots", diff == null ? "" : `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} vs ${vs}`], !a || diff == null ? "" : diff >= 3.5 ? "make" : diff <= -3.5 ? "miss" : "");
+      return el;
     };
     const S = [-1, 1], sd = (s) => (s < 0 ? "L" : "R"), out = [];
     out.push(zone(wedge(-0.4, 0.4), "top3", "t", "Top of the key three"));
@@ -2645,12 +2679,11 @@ function mountShotChart(host, { big = false } = {}) {
       setTimeout(() => g.classList.remove("fresh"), 1400);
     }
     g.setAttribute("data-n", ev.n);
-    const tip = svgEl("title"), clk = Number(ev.clock), per = Number(ev.period);
+    const clk = Number(ev.clock), per = Number(ev.period);
     const when = `${per >= 5 ? (per === 5 ? "OT" : `OT${per - 4}`) : `Q${per || "?"}`} ${Number.isFinite(clk) ? `${Math.floor(clk / 60)}:${String(Math.floor(clk % 60)).padStart(2, "0")}` : ""}`.trim();
     const sc = Array.isArray(ev.score) ? ` · ${S.identities?.[0]?.short || "A"} ${ev.score[0]} – ${ev.score[1]} ${S.identities?.[1]?.short || "B"}` : "";
     const zoneName = { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[ev.zone] || ev.zone;
-    tip.textContent = `${ev.player}: ${ev.made ? "made" : "missed"} ${zoneName} · ${ev.when || when}${sc}`;
-    g.append(tip);
+    setTip(g, ev.player, [`${ev.made ? "Made" : "Missed"} ${zoneName} · ${ev.when || when}`, sc.replace(/^ · /, "")], ev.made ? "make" : "miss");
     dots.querySelectorAll(".shot.latest").forEach((el) => el.classList.remove("latest"));
     g.classList.add("latest");
     dots.append(g);
