@@ -1450,7 +1450,7 @@ def make_heat_2016() -> Team:
                0.45, 0.48, 0.51, 0.56, 0.72, 0.36,
                0.76, 0.57,
                clutchness=0.50, height=76, speed=0.95, shot_iq=0.85, stamina=0.64),
-        Player('Amar\'e Stoudemire', 'C',
+        Player('Amare Stoudemire', 'C',
                0.00, 0.21, 0.22, 0.10, 0.42, 0.13,
                0.31, 0.85, 0.90, 0.88, 0.73,
                0.12, 0.10, 0.49,
