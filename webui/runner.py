@@ -380,6 +380,11 @@ class SimRunner:
             loc = ("corner" if "corner" in tokens else "deep" if "deep" in tokens else "top" if "top3" in tokens else "wing" if "wing3" in tokens
                    else "above_break" if "above_break" in tokens else "base" if "mid_base" in tokens else "elbow" if "mid_elbow" in tokens
                    else "wing" if "mid_wing" in tokens else None)
+            if info.get("shot_type") == "three":   # the page draws these from further out than an ordinary deep three
+                if "heave" in str(info.get("context") or ""):
+                    loc = "heave"
+                elif getattr(player, "heat_check_attempt", False):
+                    loc = "heatcheck"
             self._pending_shot = {"team": team.name, "player": player.name, "zone": str(info.get("shot_type") or "mid"), "loc": loc, "side": "L" if "side_L" in tokens else "R" if "side_R" in tokens else None, "period": ctx.get("period"), "clock": ctx.get("period_time")}
         elif kind == "make":
             self._flush_shot(True)

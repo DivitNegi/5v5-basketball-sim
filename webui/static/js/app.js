@@ -2677,8 +2677,11 @@ function shotSpot(ev, side, spread = false) {
   }
   else if (z === "post") [x, y] = polar(45, 105, 1.0);
   else if (z === "three") {
-    if (ev.loc === "deep") {   // deep range: most from 27-31 ft, thinning out toward the logo (no empty strip between the line and the deep shots)
-      for (let k = 0; k < 10; k++) { const r = 266 + 140 * Math.pow(rnd(), 1.7), a = (rnd() * 2 - 1) * 1.0; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (y > Y0 + 12 && y < Y0 + CH - 12 && x < 492) break; }
+    if (ev.loc === "deep" || ev.loc === "heatcheck" || ev.loc === "heave") {
+      // 10 units = 1 ft. A deep three is a step or two behind the line (25-30 ft, rarely 31); a heat check can come from 28-35 ft;
+      // only an end-of-quarter heave goes out near half court (38-44 ft, on its own half).
+      const [r0, span, curve, aMax] = ev.loc === "heave" ? [380, 60, 1, 0.5] : ev.loc === "heatcheck" ? [280, 70, 1.4, 0.9] : [252, 55, 1.8, 1.0];
+      for (let k = 0; k < 12; k++) { const r = r0 + span * Math.pow(rnd(), curve), a = (rnd() * 2 - 1) * aMax; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (y > Y0 + 12 && y < Y0 + CH - 12 && x < 492) break; }
     }
     else {
       // Every other three sits just behind the real line: the straight corner segment (to x = 172) or the arc, which meets it at about 1.18 rad.
@@ -2718,7 +2721,7 @@ function shotZoneOf(ev, x, y) {
     return ang < 0.4 ? "elbow" : ang < 0.98 ? `mid_wing_${side}` : `baseline_${side}`;
   }
   if (z === "three") {
-    if (ev.loc === "deep") return null;   // logo range sits off the map
+    if (ev.loc === "heave") return null;   // half-court heaves sit off the zone map
     if (x <= 172 && Math.abs(dy) > 220) return `corner3_${side}`;
     return ang < 0.42 ? "top3" : `wing3_${side}`;
   }
