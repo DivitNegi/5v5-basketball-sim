@@ -6922,7 +6922,7 @@ def series_player_score(stats: Dict) -> float:
     plus_minus = stats["plus_minus"] / gp
     ts_denom = 2 * (stats["fga"] + 0.44 * stats["fta"])
     ts = 0.0 if ts_denom == 0 else stats["pts"] / ts_denom
-    return pts + 0.75 * reb + 1.15 * ast + 2.0 * (stl + blk) + 0.18 * plus_minus + 8.0 * ts - 1.2 * tov
+    return pts + 0.75 * reb + 1.15 * ast + 1.2 * (stl + blk) + 0.18 * plus_minus + 8.0 * ts - 1.2 * tov
 
 
 def print_series_awards(series_totals: Dict, series_team_totals: Dict, winner_name: str):
