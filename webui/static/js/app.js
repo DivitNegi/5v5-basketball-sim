@@ -2622,12 +2622,12 @@ function renderStatsInto(root, data, opts = {}) {
   const rerender = () => renderStatsInto(root, data, opts);
   const rankCols = cols.slice(2).filter((c) => !["Opponent"].includes(c));
   const maxGp = Math.max(1, ...(data.gp || [1]));
-  const controls = h("div", { class: "filters stx-controls" },
-    h("label", {}, "Rank by ", h("select", { onchange: (e) => { st.rank = e.target.value; st.sort = { column: -1, direction: -1 }; rerender(); } }, ["Team order", ...rankCols].map((c) => h("option", { value: c, selected: c === st.rank }, c)))),
-    h("label", {}, "Min games ", h("input", { type: "number", min: 0, max: maxGp, value: st.minGp, style: { width: "70px" }, onchange: (e) => { st.minGp = Math.max(0, Number(e.target.value) || 0); rerender(); } })),
-    h("label", { class: "chk" }, h("input", { type: "checkbox", checked: st.flat, onchange: (e) => { st.flat = e.target.checked; rerender(); } }), " Rank all players (no team headers)"),
-    h("label", {}, "Find player ", h("input", { type: "search", placeholder: "Player name", value: st.search, oninput: (e) => { st.search = e.target.value.toLowerCase(); const pos = e.target.selectionStart; rerender(); const i = $(`#${root.id} .stx-controls input[type=search]`); i.focus(); i.setSelectionRange(pos, pos); } })),
-    h("span", { class: "muted" }, `${maxGp > 1 ? `${maxGp} games played · ` : ""}click a column to sort`));
+  const controls = h("div", { class: "stx-controls" },
+    h("label", {}, h("span", {}, "Find"), h("input", { type: "search", placeholder: "Player name", value: st.search, oninput: (e) => { st.search = e.target.value.toLowerCase(); const pos = e.target.selectionStart; rerender(); const i = $(`#${root.id} .stx-controls input[type=search]`); i.focus(); i.setSelectionRange(pos, pos); } })),
+    h("label", {}, h("span", {}, "Rank by"), h("select", { onchange: (e) => { st.rank = e.target.value; st.sort = { column: -1, direction: -1 }; rerender(); } }, ["Team order", ...rankCols].map((c) => h("option", { value: c, selected: c === st.rank }, c)))),
+    h("label", {}, h("span", {}, "Min games"), h("input", { type: "number", min: 0, max: maxGp, value: st.minGp, onchange: (e) => { st.minGp = Math.max(0, Number(e.target.value) || 0); rerender(); } })),
+    h("label", { class: "chk" }, h("input", { type: "checkbox", checked: st.flat, onchange: (e) => { st.flat = e.target.checked; rerender(); } }), h("span", {}, "One list (no team groups)")),
+    h("span", { class: "stx-hint" }, `${maxGp > 1 ? `${maxGp} games played · ` : ""}click a column to sort`));
   let items = data.rows.map((r, i) => ({ r, gp: data.gp?.[i] ?? maxGp }))
     .filter((x) => x.gp >= st.minGp && (!st.search || String(x.r[1]).toLowerCase().includes(st.search)));
   const colIdx = st.sort.column >= 0 ? st.sort.column : (st.rank !== "Team order" ? cols.indexOf(st.rank) : -1);
@@ -2635,8 +2635,10 @@ function renderStatsInto(root, data, opts = {}) {
   const byCol = (a, b) => dirn * (numOf(a.r[colIdx]) - numOf(b.r[colIdx]));
   const defaultCol = Math.max(2, cols.findIndex((c) => ["MPG", "MIN"].includes(c)) >= 0 ? cols.findIndex((c) => ["MPG", "MIN"].includes(c)) : (cols.indexOf("TOTAL") >= 0 ? cols.indexOf("TOTAL") : 2));
   const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;
-  const head = h("tr", {}, cols.map((label, i) => h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
-  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v)) : avgCell(v, cols[i]))));
+  const showCol = (i) => i !== 0 || flat;
+  const head = h("tr", {}, cols.map((label, i) => !showCol(i) ? null : h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
+  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => !showCol(i) ? null : h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v))
+    : i === 0 ? h("div", { class: "tcell" }, logoEl(identOf(v)), h("span", {}, identOf(v).short || v)) : avgCell(v, cols[i]))));
   const body = [];
   if (flat) {
     let list = [...items];
@@ -2647,7 +2649,7 @@ function renderStatsInto(root, data, opts = {}) {
     items.forEach((x) => { (by.get(x.r[0]) || by.set(x.r[0], []).get(x.r[0])).push(x); });
     for (const [team, list] of by) {
       const id = identOf(team);
-      body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "yr" }, id.year || ""), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${list.length} players`)))));
+      body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length - 1 }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "yr" }, id.year || ""), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${list.length} players`)))));
       list.sort((a, b) => numOf(b.r[defaultCol]) - numOf(a.r[defaultCol])).forEach((x) => body.push(rowEl(x, null)));
     }
   }

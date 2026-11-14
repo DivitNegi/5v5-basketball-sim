@@ -957,3 +957,18 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .pp-games .pc-viz { margin-top: 12px; }
 .box-game { margin-left: auto; margin-right: 10px; }
 .shot .hit { fill: transparent; stroke: none; pointer-events: all; }
+
+/* Stats tab controls: one compact bar */
+#view-stats .panel > .filters { align-items: center; gap: 10px 16px; }
+#view-stats .panel > .filters > label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.stx-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 10px; padding: 10px 14px;
+  background: rgba(255, 255, 255, .025); border: 1px solid var(--line); border-radius: 12px; }
+.stx-controls label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+.stx-controls select { min-width: 150px; }
+.stx-controls input[type=search] { min-width: 0; width: 190px; }
+.stx-controls input[type=number] { min-width: 0; width: 70px; }
+.stx-controls input[type=checkbox] { min-width: 0; width: 16px; height: 16px; padding: 0; margin: 0; accent-color: var(--accent); }
+.stx-controls input { background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 11px; outline: none; color: var(--text); }
+.stx-controls .stx-hint { margin-left: auto; color: var(--muted); font-size: 12.5px; }
+@media (max-width: 640px) { .stx-controls .stx-hint { margin-left: 0; width: 100%; } .stx-controls input[type=search] { width: 100%; } .stx-controls label:first-child { width: 100%; } }
+#view-stats .panel > .filters > label[hidden], #view-stats .panel > .filters > label:has(#statsSearch) { display: none; }
