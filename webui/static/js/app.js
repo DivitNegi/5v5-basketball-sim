@@ -1411,10 +1411,17 @@ function setTip(el, title, lines = [], kind = "") {
     if (y + r.height > innerHeight - 8) y = e.clientY - r.height - pad;
     box.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, y)}px)`;
   };
-  document.addEventListener("pointerover", (e) => { const el = e.target.closest?.("[data-tip]"); if (el) show(el, e); });
-  document.addEventListener("pointermove", move, { passive: true });
-  document.addEventListener("pointerout", (e) => { const el = e.target.closest?.("[data-tip]"); if (el && !el.contains(e.relatedTarget) && box) box.style.display = "none"; });
-  document.addEventListener("scroll", () => { if (box) box.style.display = "none"; }, true);
+  let anchor = null;
+  const hide = () => { if (box) box.style.display = "none"; anchor = null; };
+  document.addEventListener("pointerover", (e) => { const el = e.target.closest?.("[data-tip]"); if (el) { anchor = el; show(el, e); } });
+  // still over a marker but the card is hidden (a live redraw swapped the marker, or something scrolled): bring it back
+  document.addEventListener("pointermove", (e) => {
+    const el = e.target.closest?.("[data-tip]");
+    if (el && (el !== anchor || box?.style.display !== "block")) { anchor = el; show(el, e); } else move(e);
+  }, { passive: true });
+  document.addEventListener("pointerout", (e) => { const el = e.target.closest?.("[data-tip]"); if (el && !el.contains(e.relatedTarget)) hide(); });
+  // only a scroll that moves the hovered marker hides the card (the play-by-play feed scrolls itself all game long)
+  document.addEventListener("scroll", (e) => { if (anchor && (e.target === document || e.target.contains?.(anchor))) hide(); }, true);
 })();
 
 function pcShotMap(name, teamName, quarter, shots) {
