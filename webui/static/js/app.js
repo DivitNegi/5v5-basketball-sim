@@ -2497,17 +2497,18 @@ function shotSpot(ev, side, spread = false) {
     if (ev.loc === "deep") {   // deep range: most from 27-31 ft, thinning out toward the logo (no empty strip between the line and the deep shots)
       for (let k = 0; k < 10; k++) { const r = 266 + 140 * Math.pow(rnd(), 1.7), a = (rnd() * 2 - 1) * 1.0; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (y > Y0 + 12 && y < Y0 + CH - 12 && x < 492) break; }
     }
-    else if (ev.loc === "wing" || ev.loc === "top") {   // above the break: the wings, or the top of the key
-      for (let k = 0; k < 10; k++) {
-        const sgn = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, ang = ev.loc === "top" ? (rnd() * 2 - 1) * 0.42 : sgn * (0.42 + rnd() * 0.8), r = 242 + rnd() * 27;   // top and wing meet at 0.42; the wing runs right down to where the arc meets the corner line
-        x = HX + r * Math.cos(ang); y = HY + r * Math.sin(ang);
-        if (Math.abs(y - HY) <= 221 && y > Y0 + 8 && y < Y0 + CH - 8) break;
+    else {
+      // Every other three sits just behind the real line: the straight corner segment (to x = 172) or the arc, which meets it at about 1.18 rad.
+      // Corner, wing and top share their edges, so the band has no gaps; a few untagged threes are 27-30 ft pull-ups.
+      const BREAK = 1.18, sgn = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1;
+      const kind = ev.loc === "corner" || ev.loc === "wing" || ev.loc === "top" ? ev.loc : (q => q < 0.2 ? "corner" : q < 0.62 ? "wing" : "top")(rnd());
+      if (kind === "corner") { x = 34 + rnd() * 138; y = HY + sgn * (222 + rnd() * 24); }
+      else {
+        const far = !ev.loc && rnd() < 0.08, r = 240 + (far ? 30 + rnd() * 35 : 27 * Math.pow(rnd(), 1.3));
+        const a = kind === "top" ? (rnd() * 2 - 1) * 0.42 : sgn * (0.42 + rnd() * (BREAK - 0.42));
+        x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
+        y = Math.max(Y0 + 4, Math.min(Y0 + CH - 4, y));
       }
-    }
-    else if (ev.loc === "corner" || (!ev.loc && rnd() < 0.2)) { x = 42 + rnd() * 136; y = (ev.side === "L" ? true : ev.side === "R" ? false : rnd() < 0.5) ? Y0 + 8 + rnd() * 18 : Y0 + CH - 26 + rnd() * 18; }   // a corner three
-    else {   // just behind the line: most threes are 24-26 ft out, a few are 27-30 ft pull-ups (a known above-the-break three never comes from the far end)
-      const far = !ev.loc && rnd() < 0.08, rMin = 242, rMax = far ? 300 : 268;
-      for (let k = 0; k < 10; k++) { [x, y] = polar(rMin, rMax, 1.2); if (y > Y0 + 18 && y < Y0 + CH - 18) break; }
     }
   } else if (z === "mid") {
     // Each midrange spot fills its whole slice of the floor, evenly: the elbow slice runs from the upper paint out to the arc, the wings from the
