@@ -600,6 +600,28 @@ def highs_payload(runner, view=HIGHS_VIEWS[0], stat="PTS", team="All Teams"):
     return out
 
 
+def player_games_payload(runner, team, name):
+    """Every regular-season game one player was in, newest first: his line plus the score, for the player pop-up's Games tab."""
+    sec = runner.sections or {}
+    rows = sec.get("_season_game_log") or []
+    fields = sec.get("_season_game_log_fields") or ()
+    if not rows or "gid" not in fields:
+        return {"games": []}
+    idx = {f: i for i, f in enumerate(fields)}
+    keys = ("min", "pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "pm", "fgm", "fga", "tpm", "tpa", "ftm", "fta")
+    out = []
+    for r in rows:
+        if r[idx["player"]] != name or (team and r[idx["team"]] != team):
+            continue
+        m = re.search(r"(\d+)-(\d+)", str(r[idx["result"]]))
+        out.append({"gid": r[idx["gid"]], "game": r[idx["game"]], "team": r[idx["team"]], "opp": r[idx["opp"]], "home": bool(r[idx["home"]]),
+                    "mine": int(m.group(1)) if m else 0, "theirs": int(m.group(2)) if m else 0,
+                    "row": {"name": name, "pos": r[idx["pos"]] if "pos" in idx else "", "st": bool(r[idx["st"]]) if "st" in idx else False,
+                            **{k: (round(r[idx[k]], 1) if k == "min" else r[idx[k]]) for k in keys if k in idx}}})
+    out.sort(key=lambda g: g["game"], reverse=True)
+    return {"games": out}
+
+
 def game_box_payload(runner, gid):
     """One regular-season game's full box score (what Tk opens when you double-click a Highs or Schedule row)."""
     sec = runner.sections or {}
@@ -1128,6 +1150,8 @@ def build_app():
                     (params.get("kind") or ["averages"])[0],
                     (params.get("team") or ["All teams"])[0],
                     (params.get("quarter") or ["All"])[0]))
+            if path == "/api/season/player_games":
+                return self._json(player_games_payload(runner, (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
             if path == "/api/stats/player":
                 return self._json(stats_player_detail(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0], (params.get("group") or ["all"])[0]))
             if path == "/api/ratings/player":

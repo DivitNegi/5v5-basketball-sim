@@ -1443,13 +1443,16 @@ async function loadPlayerCard() {
   const liveSeries = liveTeams.length === 2 ? seriesFor(liveTeams[0], liveTeams[1]) : null;
   const seriesGames = [];
   if (liveSeries || Object.keys(BR.data?.series || {}).length) {
-    const mySeries = Object.entries(BR.data?.series || {}).filter(([, sr]) => sr.a === GV.pc.team || sr.b === GV.pc.team).reverse();
+    // only the series being played now; earlier rounds live in the player pop-up's Games tab
+    const mySeries = Object.entries(BR.data?.series || {}).filter(([, sr]) => (liveSeries ? sr === liveSeries : false) && (sr.a === GV.pc.team || sr.b === GV.pc.team));
+    const liveSig = (S.live?.teams || []).map((t) => `${t.name}:${t.score}`).sort().join("|");
     for (const [key, sr] of mySeries) {
       const opp = sr.a === GV.pc.team ? sr.b : sr.a;
       for (const [n] of [...(sr.games || [])].reverse()) {
         const boxes = sr.boxes?.[n] || sr.boxes?.[String(n)];
         const mine = boxes?.find((t) => t.name === GV.pc.team), other = boxes?.find((t) => t.name !== GV.pc.team);
         if (!mine || !mine.players?.some((r) => r.name === GV.pc.name)) continue;
+        if (sr.winner && n === sr.games.length && liveSig && liveSig === boxes.map((t) => `${t.name}:${t.score}`).sort().join("|")) continue;   // the finished live game is already "Live"
         const row = mine.players.find((r) => r.name === GV.pc.name);
         const dnp = !((row.min || 0) > 0 || (row.fga || 0) > 0 || (row.pts || 0) > 0);
         const label = `${sr === liveSeries ? "" : `vs ${identOf(opp).short} · `}Game ${n} · ${mine.score}-${other?.score ?? 0}${dnp ? " · DNP" : ""}`;
@@ -2476,10 +2479,83 @@ async function openStatsPlayer(team, name, source) {
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
   const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
   paint();
+  const statsView = h("div", {}, tiles,
+    insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
+  const gamesView = h("div", { class: "pp-games" });
+  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["games", "Games"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
+  const show = (v) => {
+    statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; seg.hidden = v !== "stats";
+    tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+    if (v === "games" && !gamesView.childElementCount) ppGameLog(gamesView, team, d.name);
+  };
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
-    tiles,
-    insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
+    tabs, statsView, gamesView);
+  show("stats");
+}
+// The player pop-up's Games tab: every game he played (playoff series from the bracket, the regular season from the season log, any other game
+// this page watched), newest first. Clicking one shows his player card for that game.
+async function ppGameLog(root, team, name) {
+  root.replaceChildren(h("div", { class: "empty" }, "Loading games…"));
+  let season = [];
+  try { BR.data = await api.get("/api/bracket"); } catch { BR.data = BR.data || {}; }
+  try { season = (await api.get(`/api/season/player_games?team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`)).games || []; } catch { season = []; }
+  const sig = (teams) => (teams || []).map((t) => `${t.name}:${t.score}`).sort().join("|");
+  const snapOf = (boxes) => ({ teams: boxes.map((tm) => ({ ...identOf(tm.name), name: tm.name, score: tm.score, box: (tm.players || []).map((r) => ({ ...r, listed: r.listed || r.pos || "" })) })) });
+  const pageGame = (snap) => [...S.gameSnapshots.keys()].find((n) => sig(S.gameSnapshots.get(n)?.teams) === sig(snap.teams));
+  const shortOf = (nm) => identOf(nm || "").short || nm || "";
+  const groups = [], used = new Set();
+  for (const [, sr] of Object.entries(BR.data?.series || {}).reverse()) {
+    if (sr.a !== team && sr.b !== team) continue;
+    const opp = sr.a === team ? sr.b : sr.a, items = [];
+    for (const [n] of [...(sr.games || [])].reverse()) {
+      const boxes = sr.boxes?.[n] || sr.boxes?.[String(n)];
+      if (!boxes?.find((t) => t.name === team)?.players?.some((r) => r.name === name)) continue;
+      const snap = snapOf(boxes), seen = pageGame(snap);
+      if (seen != null) used.add(seen);
+      items.push({ label: `Game ${n}`, snap, shots: seen != null ? S.gameShots.get(seen) || [] : [] });
+    }
+    const w = (sr.games || []).filter(([, sa, sb]) => (sr.a === team ? sa > sb : sb > sa)).length, l = (sr.games || []).length - w;
+    const res = sr.winner ? ` · ${sr.winner === team ? "won" : "lost"} ${Math.max(w, l)}-${Math.min(w, l)}` : ` · ${w}-${l}`;
+    if (items.length) groups.push([`Playoffs · vs ${shortOf(opp)}${res}`, items]);
+  }
+  const other = [...S.gameSnapshots.keys()].sort((a, b) => b - a)
+    .filter((n) => !used.has(n) && S.gameSnapshots.get(n)?.teams?.find((t) => t.name === team)?.box?.some((r) => r.name === name));
+  if (other.length) groups.push(["Watched games", other.map((n) => ({ label: `Game ${n}`, snap: S.gameSnapshots.get(n), shots: S.gameShots.get(n) || [] }))]);
+  if (season.length) groups.push(["Regular season", season.map((g) => ({ label: `Game ${g.game}`,
+    snap: { teams: [{ ...identOf(g.team), name: g.team, score: g.mine, box: [{ ...g.row, listed: g.row.pos || "" }] }, { ...identOf(g.opp), name: g.opp, score: g.theirs, box: [] }] }, shots: [] }))]);
+  if (!groups.length) { root.replaceChildren(h("div", { class: "empty" }, "No games for this player yet.")); return; }
+  const row = (it) => {
+    const mine = it.snap.teams.find((t) => t.name === team), opp = it.snap.teams.find((t) => t.name !== team), r = mine.box.find((x) => x.name === name);
+    const dnp = !((r.min || 0) > 0 || (r.fga || 0) > 0 || (r.pts || 0) > 0), win = mine.score > (opp?.score ?? 0);
+    const cells = dnp ? [h("td", { class: "muted", colspan: 9 }, "DNP")]
+      : [h("td", {}, Number(r.min || 0).toFixed(1)), h("td", { class: "pts" }, r.pts), h("td", {}, r.reb), h("td", {}, r.ast), h("td", {}, r.stl), h("td", {}, r.blk),
+         h("td", {}, `${r.fgm}/${r.fga}`), h("td", {}, `${r.tpm}/${r.tpa}`), h("td", {}, r.pm > 0 ? `+${r.pm}` : String(r.pm ?? ""))];
+    return h("tr", { class: "pl-row", title: "Open his card for this game", onclick: () => card(it) },
+      h("td", { class: "l" }, it.label), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(opp?.name || "")), shortOf(opp?.name))),
+      h("td", { class: win ? "pm-pos" : "pm-neg" }, `${win ? "W" : "L"} ${mine.score}-${opp?.score ?? 0}`), ...cells);
+  };
+  const head = h("tr", {}, ["Game", "Opponent", "Result", "MIN", "PTS", "REB", "AST", "STL", "BLK", "FG", "3P", "+/-"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)));
+  const list = () => root.replaceChildren(...groups.map(([title, items]) => h("div", { class: "pp-group" }, h("h4", {}, title),
+    h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head.cloneNode(true)), h("tbody", {}, items.map(row)))))));
+  const card = (it) => {
+    const c = cardFromSnapshot(it.snap, team, name, it.shots), p = c.player;
+    const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: `v${String(v).length > 6 ? " frac" : ""}` }, v));
+    const hasShots = it.shots.some((e) => e.player === name);
+    root.replaceChildren(
+      h("div", { class: "filters" }, h("button", { class: "btn", onclick: list }, "‹ All games"),
+        h("b", {}, `${it.label} · ${c.team.short || team} ${c.score[0]} – ${c.score[1]} ${shortOf(c.opp?.name)}`)),
+      h("div", { class: "stat-tiles" }, tile("MIN", Number(p.min || 0).toFixed(1)), tile("PTS", p.pts), tile("REB", p.reb), tile("AST", p.ast), tile("STL", p.stl), tile("BLK", p.blk),
+        tile("TO", p.tov), tile("PF", p.pf ?? 0), tile("+/-", p.pm > 0 ? `+${p.pm}` : String(p.pm ?? 0)), tile("FG", `${p.fgm}/${p.fga}`), tile("3PT", `${p.tpm}/${p.tpa}`),
+        tile("FT", `${p.ftm}/${p.fta}`), tile("FG%", pct1(p.fgm, p.fga)), tile("TS%", p.ts ?? "–")),
+      h("div", { class: "pc-viz" },
+        h("div", { class: "pc-panel" }, h("h4", {}, "Impact"), pcRadar(p, chartColor(c.team))),
+        hasShots ? h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(c.shots)) : null,
+        hasShots ? h("div", { class: "pc-panel" }, h("h4", {}, "Field-goal points by quarter"), pcSpark(c.by_quarter, chartColor(c.team)) || h("div", { class: "muted" }, "–")) : null),
+      hasShots ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${it.label}`), pcShotMap(name, team, "all", it.shots))
+        : h("div", { class: "muted", style: { marginTop: "10px" } }, "The shot map is only kept for games this page watched."));
+  };
+  list();
 }
 
 function renderStatsInto(root, data, opts = {}) {

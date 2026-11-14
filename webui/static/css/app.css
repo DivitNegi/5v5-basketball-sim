@@ -949,3 +949,7 @@ td.top-scorer .pcell .face, td.top-scorer .pcell .logo { width: 26px; height: 26
 .ui-tip.miss { border-left: 3px solid var(--red); }
 .ui-tip-l { color: #a7b2c5; }
 .shot-map [data-tip] { cursor: default; }
+.pp-tabs { margin: 0 0 14px; }
+.pp-group { margin-bottom: 16px; }
+.pp-group h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-2); }
+.pp-games .pc-viz { margin-top: 12px; }
