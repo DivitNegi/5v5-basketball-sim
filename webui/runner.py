@@ -569,7 +569,8 @@ class SimRunner:
                     self.post = {"standings": (result or {}).get("_season_standings"), "factories": None, "year": 2027}
                 else:
                     result = run_2018_season(sink_sections, _Sink(self._on_score))
-                    self.post = {"standings": (result or {}).get("_season_standings"), "factories": None, "year": 2018}
+                    # the 2018 teams go with the standings: without them the playoffs fall back to the 2027 teams and fail on the first 2018 name
+                    self.post = {"standings": (result or {}).get("_season_standings"), "factories": factories_2018(), "year": 2018}
                 self._on_section(result or {})
                 self._on_score({"postseason_ready": True})
             elif mode == "2027 play-in & playoffs":
