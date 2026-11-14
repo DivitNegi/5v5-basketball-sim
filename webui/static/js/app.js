@@ -682,7 +682,7 @@ function applyScore(msg, paint = true) {
 function paintScore(before) {
   renderScoreboard();
   [0, 1].forEach((i) => { if (S.score[i] !== before[i]) bumpScore(i); });
-  renderFlow("#flowMini", 170);
+  renderFlow("#flowMini", 320);
   if ($("#view-flow").classList.contains("active")) renderFlow("#flowBig", 420);
 }
 
@@ -713,7 +713,7 @@ function clearAllResults(msg, keepSeason = false) {
   GV.pc = { team: null, name: null, quarter: "all", game: "live" };
   if (keepSeason) {   // the playoffs follow the season just played: its stats stay, only the live game and bracket start over
     document.querySelector(".pp-back")?.remove();
-    renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
+    renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 320);
     $("#pcardBody")?.replaceChildren(h("div", { class: "empty" }, "Start a game, then pick a player."));
     return;
   }
@@ -723,7 +723,7 @@ function clearAllResults(msg, keepSeason = false) {
   AV.data = null; AV.team = "All Teams"; AV.quarter = "All"; AV.rank = "Team order"; AV.sort = null; AV.filter = "";
   SE.data = null; SE.players = null; SE.advStats = null; SE.highs = null; SE.sbox = null; SE.sched = null; SE.upcoming = []; SE.team = null; SE.tsort = null; SE.teams = null;
   document.querySelector(".pp-back")?.remove();
-  renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
+  renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 320);
   $("#pcardBody")?.replaceChildren(h("div", { class: "empty" }, "Start a game, then pick a player."));
   $("#compBody")?.replaceChildren(h("div", { class: "empty" }, "Pick two players once games have been played."));
 }
@@ -760,7 +760,7 @@ function resetGame(msg) {
   $("#sbPeriod").textContent = "1ST"; $("#sbClock").textContent = S.rules === "FIBA" ? "10:00" : "12:00";
   $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
   $("#simPlayoffs").classList.toggle("hidden", msg.mode !== "2027 play-in & playoffs");
-  renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
+  renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 320);
 }
 
 function connect() {
@@ -773,7 +773,7 @@ function connect() {
     if (st.live) applyLive(st.live);
     api.get("/api/trade/prompt").then((r) => showTradePrompt(r.prompt)).catch(() => {});
     api.get("/api/game/shotlog").then((r) => { S.shots = r.shots || []; redrawShotCharts(); }).catch(() => {});
-    if (st.flow?.length) { S.flow = st.flow; renderFlow("#flowMini", 170); }
+    if (st.flow?.length) { S.flow = st.flow; renderFlow("#flowMini", 320); }
   };
   es.onerror = () => { conn.className = "conn bad"; conn.lastElementChild.textContent = "Reconnecting…"; };
   es.onmessage = (e) => { evQueue.push(JSON.parse(e.data)); scheduleDrain(); };
@@ -3097,7 +3097,7 @@ async function boot() {
     if (e.code === "Space") { e.preventDefault(); $("#pause").click(); }
   });
 
-  renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 170);
+  renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 320);
   connect();
   setInterval(()=>{ const view=$(".view.active")?.id; if(view==="view-coach")loadCoach(); else if(view==="view-draft")loadDraft(); else if(view==="view-broadcast")loadBroadcast(); },1000);
 }
