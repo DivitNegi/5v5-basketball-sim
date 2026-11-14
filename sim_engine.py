@@ -7155,6 +7155,12 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
         if fantasy_customization:
             restore_fantasy_config(teamA, fantasy_config_state.get(teamA.name))
             restore_fantasy_config(teamB, fantasy_config_state.get(teamB.name))
+        if game_num == 1:
+            # A new series starts with a clean record. Two teams meet at most once in one playoffs, so an existing entry for this pair is
+            # from an earlier run (last season's Finals rematched in a new series) and its old games would mix into this one.
+            _old = BRACKET_STATE.get("series") or {}
+            if _old.pop(f"{teamA.name}|{teamB.name}", None) is not None or _old.pop(f"{teamB.name}|{teamA.name}", None) is not None:
+                publish_bracket_state()
         teamA_is_home = team_a_home_game(game_num)
         home_team = teamA if teamA_is_home else teamB
         away_team = teamB if teamA_is_home else teamA
