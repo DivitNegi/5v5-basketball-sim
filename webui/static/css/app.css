@@ -699,7 +699,9 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 @keyframes shotFloat { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-22px); opacity: 0; } }
 .court-team { font-size: 22px; font-weight: 800; }
 .sc-bar { margin-bottom: 8px; }
-.sc-foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; }
+.sc-foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 12px; margin-top: 8px; font-size: 12.5px; }
+.sc-foot .sc-stats.r { text-align: right; }
+@media (max-width: 640px) { .sc-foot { grid-template-columns: 1fr 1fr; } .sc-foot .sc-legend { grid-column: 1 / -1; justify-content: center; order: 3; } }
 .sc-legend { display: flex; gap: 14px; }
 .sc-legend .make { color: var(--green); } .sc-legend .miss { color: var(--red); }
 @media (prefers-reduced-motion: reduce) { .shot.fresh, .shot .pulse, .shot .floater { animation: none; } }

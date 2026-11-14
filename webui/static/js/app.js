@@ -2791,17 +2791,17 @@ function mountShotChart(host, { big = false } = {}) {
   const src = () => (st.game === "live" ? S.shots : S.gameShots.get(st.game) || []);
   const sideOf = (team) => { const snap = pastSnap(); return snap ? (snap.teams[1]?.name === team ? 1 : 0) : teamSide(team); };
   const identAt = (i) => { const snap = pastSnap(); return snap ? identOf(snap.teams[i]?.name) : S.identities?.[i]; };
-  const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 40}`, class: "court-svg shot-map" });
+  const svg = svgEl("svg", { viewBox: `0 0 ${SC_GEO.W} ${SC_GEO.H - 8}`, class: "court-svg shot-map" });
   svg.innerHTML = courtLines();
   const heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }); svg.append(dots); svg.insertBefore(heat, svg.firstChild.nextSibling ? svg.children[1] : null);
   const names = svgEl("g", { class: "court-names" }); svg.append(names);
   const sel = (key, opts) => h("select", { onchange: (e) => { st[key] = e.target.value; redraw(); } }, opts.map(([v, t]) => h("option", { value: v, selected: v === st[key] }, t)));
   const bar = h("div", { class: "filters sc-bar" });
-  const stats = h("div", { class: "sc-stats muted" });
+  const statsL = h("div", { class: "sc-stats muted" }), statsR = h("div", { class: "sc-stats muted r" });
   const known = new Set(); let statsTimer = null;
   const scheduleStats = () => { if (statsTimer) return; statsTimer = setTimeout(() => { statsTimer = null; if (st.heat) redraw(); else updateStats(src().filter(passes)); }, 80); };   // once per burst, not once per shot
   const legend = h("div", { class: "sc-legend" }, h("span", { class: "lg make" }, "◯ make"), h("span", { class: "lg miss" }, "✕ miss"));
-  host.replaceChildren(bar, svg, h("div", { class: "sc-foot" }, stats, legend));
+  host.replaceChildren(bar, svg, h("div", { class: "sc-foot" }, statsL, legend, statsR));
   const sidePick = (ev) => (sideOf(ev.team) ? st.right : st.left);
   const passes = (ev) => sidePick(ev) !== "none" && (sidePick(ev) === "all" || ev.player === sidePick(ev))
     && (st.quarter === "all" || (st.quarter === "OT" ? ev.period >= 5 : ev.period === Number(st.quarter))) && (st.result === "all" || (st.result === "make") === ev.made);
@@ -2826,10 +2826,18 @@ function mountShotChart(host, { big = false } = {}) {
     dots.append(g);
     while (dots.childNodes.length > 420) dots.firstChild.remove();
   }
+  // one line under each half of the court, for whatever that half is showing (the whole team or one player)
   function updateStats(list) {
-    const fg = (arr) => `${arr.filter((e) => e.made).length}/${arr.length}`, tp = list.filter((e) => e.zone === "three");
-    const by = (z) => list.filter((e) => e.zone === z || (z === "mid" && e.zone === "post_fade"));
-    stats.textContent = list.length ? `FG ${fg(list)} · 3PT ${fg(tp)} · rim ${fg([...by("rim"), ...by("dunk")])} · mid ${fg(by("mid"))} · post ${fg(by("post"))}` : "No shots yet.";
+    const fg = (arr) => `${arr.filter((e) => e.made).length}/${arr.length}`;
+    const line = (arr, side) => {
+      const pick = side ? st.right : st.left;
+      if (pick === "none") return "";
+      if (!arr.length) return "No shots yet.";
+      const by = (z) => arr.filter((e) => e.zone === z || (z === "mid" && e.zone === "post_fade"));
+      return `FG ${fg(arr)} · 3PT ${fg(by("three"))} · rim ${fg([...by("rim"), ...by("dunk")])} · mid ${fg(by("mid"))} · post ${fg(by("post"))}`;
+    };
+    statsL.textContent = line(list.filter((e) => !sideOf(e.team)), 0);
+    statsR.textContent = line(list.filter((e) => sideOf(e.team)), 1);
   }
   function redraw() {
     dots.replaceChildren(); heat.replaceChildren();
