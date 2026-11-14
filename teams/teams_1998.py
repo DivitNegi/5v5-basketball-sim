@@ -6,9 +6,9 @@ def make_bulls_1998() -> Team:
     players = [
         Player('Michael Jordan', 'SG',
                0.10, 0.52, 0.28, 0.15, 0.20, 0.34,
-               0.82, 0.96, 0.97, 0.88, 0.89,
-               0.25, 0.62, 0.88,
-               0.80, 0.59, 0.38, 0.57, 0.550, 0.350,
+               0.70, 0.99, 0.99, 0.92, 0.89,
+               0.25, 0.62, 0.92,
+               0.86, 0.59, 0.38, 0.57, 0.850, 0.350,
                0.94, 0.68,
                clutchness=0.99, height=78, speed=0.82, shot_iq=0.92,
                badges=('clutch_hof', 'closer_hof', 'shot_creator_hof'), stamina=0.86),

@@ -330,7 +330,7 @@ def make_clippers_2024() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player("James Harden", "PG",
-               0.52, 0.24, 0.20, 0.04, 0.14, 0.630,
+               0.52, 0.24, 0.20, 0.04, 0.14, 0.830,
                0.89, 0.86, 0.92, 0.72, 0.88,
                0.25, 0.92, 0.88,
                0.58, 0.44, 0.38, 0.56, 0.800, 0.667,
