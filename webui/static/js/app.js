@@ -2713,9 +2713,11 @@ function shotSpot(ev, side, spread = false) {
     // Each midrange spot fills its whole slice of the floor, evenly: the elbow slice runs from the upper paint out to the arc, the wings from the
     // lane line to the arc, the baseline from beside the lane to the corner. No tight clusters and no empty bands between them.
     const side = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
-    const band = want === "elbow" ? [0, 0.62, 140, ev.loc === "elbow" ? 190 : 234] : want === "wing" ? [0.62, 1.25, 90, 234] : [1.25, 1.95, 82, 234];
+    const band = want === "elbow" ? [0, 0.62, 140, 234] : want === "wing" ? [0.62, 1.25, 90, 234] : [1.25, 1.95, 82, 234];
     for (let k = 0; k < 30; k++) {
-      const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = Math.sqrt(band[2] ** 2 + rnd() * (band[3] ** 2 - band[2] ** 2));
+      const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = want === "elbow" && ev.loc === "elbow"
+        ? band[2] + (band[3] - band[2]) * Math.pow(rnd(), 2.4)   // a free-throw-line jumper: bunched at the line, thinning out toward the arc (no empty band)
+        : Math.sqrt(band[2] ** 2 + rnd() * (band[3] ** 2 - band[2] ** 2));
       x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
       const dyAbs = Math.abs(y - HY);
       if (x >= 36 && dyAbs <= 214 && !(x <= 222 && dyAbs <= 82)) break;   // on the floor, inside the three-point line, outside the paint (midrange is never in the lane)
