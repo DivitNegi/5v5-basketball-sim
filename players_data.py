@@ -1048,6 +1048,18 @@ def build_fantasy_player_pools(year_prefix: str = None, use_cache: bool = False)
     return {pos: list(items) for pos, items in cached.items()}
 
 
+# Same player listed under different spellings across team files (accents, "C.J."/"CJ", "III"/"Jr." suffixes).
+# Fathers and sons who share a name (Gary Payton / Gary Payton II) stay apart: suffixes are only dropped for the names below.
+_SAME_PLAYER_SUFFIX = {"robert williams iii": "robert williams", "gg jackson ii": "gg jackson", "xavier tillman sr": "xavier tillman"}
+
+
+def fantasy_name_key(name: str) -> str:
+    import re, unicodedata
+    key = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode().lower()
+    key = re.sub(r"\s+", " ", re.sub(r"[.'’]", "", key)).strip()
+    return _SAME_PLAYER_SUFFIX.get(key, key)
+
+
 def _build_fantasy_player_pools_uncached(year_prefix: str = None) -> Dict[str, List[Tuple[Player, str]]]:
     """
     Fantasy draft pool across simulator teams.
@@ -1064,18 +1076,26 @@ def _build_fantasy_player_pools_uncached(year_prefix: str = None) -> Dict[str, L
         assign_player_badges(team)
         for p in team.roster:
             clone = fantasy_player_clone(p, team.name)
-            versions_by_name.setdefault(p.name, []).append(clone)
+            versions_by_name.setdefault(fantasy_name_key(p.name), []).append(clone)
 
     for custom_player in load_custom_fantasy_players():
         assign_player_badges(Team("Custom Player", [custom_player]))
         clone = fantasy_player_clone(custom_player, "Custom Player")
-        versions_by_name.setdefault(clone.name, []).append(clone)
+        versions_by_name.setdefault(fantasy_name_key(clone.name), []).append(clone)
 
     pools: Dict[str, List[Tuple[Player, str]]] = {pos: [] for pos in ("PG", "SG", "SF", "PF", "C")}
     for versions in versions_by_name.values():
         versions.sort(key=fantasy_ovr, reverse=True)
+        # one board name per player: the spelling most of his versions use (accented spelling wins a tie)
+        spellings = {}
+        for v in versions:
+            spellings[v.name] = spellings.get(v.name, 0) + 1
+        display = max(spellings, key=lambda n: (spellings[n], n != n.encode("ascii", "ignore").decode(), len(n)))
+        for v in versions:
+            v.fantasy_base_name = display   # drafting one version takes every spelling off the board
         representative = versions[0]
         representative.fantasy_versions = versions
+        representative.fantasy_display_name = display
         pos = representative.position if representative.position in pools else "SF"
         ovr = fantasy_ovr(representative)
         version_note = f" | {len(versions)} versions" if len(versions) > 1 else ""

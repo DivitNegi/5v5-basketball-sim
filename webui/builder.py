@@ -60,8 +60,9 @@ def _vid(v: Player) -> str:
 
 def _lookup(pid: str) -> Optional[Player]:
     name, _, source = str(pid).partition("||")
+    key = players_data.fantasy_name_key(name)
     for player in all_pool_players():
-        if player.name != name and getattr(player, "fantasy_base_name", None) != name:
+        if players_data.fantasy_name_key(player.name) != key and players_data.fantasy_name_key(getattr(player, "fantasy_base_name", "")) != key:
             continue
         for v in _versions(player):
             if v.name == name and _source(v) == source:
@@ -86,9 +87,10 @@ def pool_payload(search: str = "", hide_custom: bool = False) -> Dict:
         source = _source(player)
         if hide_custom and source == "Custom Player":
             continue
-        if term and term not in _fold(player.name) and term not in _fold(source) and term not in player.position.lower():
+        shown = getattr(player, "fantasy_display_name", player.name)
+        if term and term not in _fold(shown) and not any(term in _fold(v.name) for v in _versions(player))                 and term not in _fold(source) and term not in player.position.lower():
             continue
-        rows.append({"id": _vid(_versions(player)[0]), "name": player.name, "pos": player.position, "ovr": sim_engine.fantasy_ovr(player), "source": source,
+        rows.append({"id": _vid(_versions(player)[0]), "name": shown, "pos": player.position, "ovr": sim_engine.fantasy_ovr(player), "source": source,
                      "versions": [{"id": _vid(v), "label": f"{v.name} | {_source(v)} | {v.position} | OVR {sim_engine.fantasy_ovr(v)}",
                                    "name": v.name, "pos": v.position, "ovr": sim_engine.fantasy_ovr(v), "source": _source(v)}
                                   for j, v in enumerate(_versions(player))]})
