@@ -1150,6 +1150,20 @@ def build_app():
                     (params.get("kind") or ["averages"])[0],
                     (params.get("team") or ["All teams"])[0],
                     (params.get("quarter") or ["All"])[0]))
+            if path.startswith("/api/builder/"):
+                from . import builder
+                q = {k: v[0] for k, v in params.items()}
+                if path == "/api/builder/pool":
+                    return self._json(builder.pool_payload(q.get("search", ""), q.get("hide") == "1"))
+                if path == "/api/builder/preview":
+                    return self._json(builder.preview_payload(q.get("id", "")))
+                if path == "/api/builder/meta":
+                    return self._json(builder.form_meta())
+                if path == "/api/builder/player":
+                    try:
+                        return self._json(builder.player_form(int(q.get("index", -1))))
+                    except ValueError:
+                        return self._json({"error": "Bad player index."})
             if path == "/api/season/player_games":
                 return self._json(player_games_payload(runner, (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
             if path == "/api/stats/player":
@@ -1286,6 +1300,15 @@ def build_app():
             if path == "/api/start":
                 error = runner.start(data.get("mode", "Game"), data.get("teamA", ""), data.get("teamB", ""), data.get("rules", "NBA"), data.get("options"))
                 return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)
+            if path in ("/api/builder/team", "/api/builder/player/preview", "/api/builder/player/save"):
+                from . import builder
+                if path == "/api/builder/team":
+                    res = builder.create_team(runner, data.get("name", ""), data.get("players") or [])
+                elif path == "/api/builder/player/preview":
+                    res = builder.player_preview(data)
+                else:
+                    res = builder.save_player(runner, data)
+                return self._json(res, 400 if res.get("error") else 200)
             if path == "/api/control":
                 error = runner.control(data.get("action", ""), data.get("value"))
                 return self._json({"ok": error is None, "error": error}, 200 if error is None else 400)
