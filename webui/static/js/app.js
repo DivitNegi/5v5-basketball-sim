@@ -688,7 +688,10 @@ function paintScore(before) {
 
 function applyStatus(s) {
   S.active = !!s.active; S.paused = !!s.paused; S.speed = s.speed ?? S.speed;
-  $("#speedVal").textContent = `${Number(S.speed).toFixed(S.speed < 10 ? 1 : 0)}×`;
+  if (s.seasonSpeed !== undefined) S.seasonSpeed = !!s.seasonSpeed;
+  // while a season sims, the buttons set how long each game takes; the top step runs it as fast as possible
+  $("#speedVal").textContent = S.seasonSpeed && S.speed >= 20 ? "Max" : `${Number(S.speed).toFixed(S.speed < 10 ? 1 : 0)}×`;
+  $("#speedLbl").textContent = S.seasonSpeed ? "season speed" : "speed";
   $("#pauseText").textContent = S.paused ? "Resume" : "Pause";
   $("#pauseIcon").textContent = S.paused ? "▶" : "❚❚";
   $("#start").disabled = S.active;
@@ -769,7 +772,7 @@ function connect() {
   es.onopen = async () => {
     conn.className = "conn ok"; conn.lastElementChild.textContent = "Connected";
     const st = await api.get("/api/state");
-    applyStatus({ text: st.status, active: st.active, paused: st.paused, speed: st.speed });
+    applyStatus({ text: st.status, active: st.active, paused: st.paused, speed: st.speed, seasonSpeed: st.seasonSpeed });
     if (st.live) applyLive(st.live);
     api.get("/api/trade/prompt").then((r) => showTradePrompt(r.prompt)).catch(() => {});
     api.get("/api/game/shotlog").then((r) => { S.shots = r.shots || []; redrawShotCharts(); }).catch(() => {});

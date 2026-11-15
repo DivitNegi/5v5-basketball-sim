@@ -128,6 +128,10 @@ class SimRunner:
         self.mode = None
         self.status = "Ready"
         self.speed = 1.0
+        # While a whole season is simmed the speed buttons set how long each game takes, like the Tk app (20x = as fast as possible).
+        # It is kept apart from the live-game speed, so watching a game does not change the season speed you chose.
+        self.season_speed = 20.0
+        self.in_season = False
         self.factories = players_data.gui_team_factories()
         self.score = None              # latest parsed scoreboard line
         self.series = None             # latest series record
@@ -164,14 +168,31 @@ class SimRunner:
 
     def state(self) -> Dict:
         return {
-            "active": self.active, "mode": self.mode, "status": self.status, "speed": self.speed,
+            "active": self.active, "mode": self.mode, "status": self.status, "speed": self.shown_speed(), "seasonSpeed": self.in_season,
             "paused": bool(sim_engine.SIM_PAUSED), "score": self.score, "series": self.series,
             "flow": self.flow, "live": self.last_live, "sectionsReady": bool(self.sections), "season": self.season_state(),
         }
 
     def set_status(self, text: str):
         self.status = text
-        self.hub.publish({"type": "status", "text": text, "active": self.active, "paused": bool(sim_engine.SIM_PAUSED), "speed": self.speed})
+        self.hub.publish({"type": "status", "text": text, "active": self.active, "paused": bool(sim_engine.SIM_PAUSED), "speed": self.shown_speed(), "seasonSpeed": self.in_season})
+
+    def shown_speed(self) -> float:
+        return self.season_speed if self.in_season else self.speed
+
+    def _apply_season_speed(self):
+        v = self.season_speed
+        sim_engine.SEASON_GAME_DELAY = 0.0 if v >= 20.0 else max(0.0, 0.25 / v - 0.0125)   # the Tk formula: 1x = a quarter second a game
+
+    def _season_speed_on(self, start: float = 20.0):
+        self.in_season = True
+        self.season_speed = start
+        self._apply_season_speed()
+        self.set_status(self.status)
+
+    def _season_speed_off(self):
+        self.in_season = False
+        sim_engine.SEASON_GAME_DELAY = 0.0
 
     # --------------------------------------------------------------- control
     def start(self, mode: str, team_a: str, team_b: str, rules: str = "NBA", options: Optional[Dict] = None) -> Optional[str]:
@@ -316,8 +337,12 @@ class SimRunner:
 
     def control(self, action: str, value=None) -> Optional[str]:
         if action == "speed":
-            self.speed = max(0.5, min(20.0, round(float(value), 2)))
-            sim_engine.SIM_SLEEP_SCALE = 1.0 / self.speed
+            if self.in_season:
+                self.season_speed = max(0.5, min(20.0, round(float(value), 2)))
+                self._apply_season_speed()
+            else:
+                self.speed = max(0.5, min(20.0, round(float(value), 2)))
+                sim_engine.SIM_SLEEP_SCALE = 1.0 / self.speed
             self.set_status(self.status)
             return None
         if not self.active:
@@ -550,13 +575,17 @@ class SimRunner:
                 names, factories, user_team = sim_engine.run_fantasy_season_draft(year_prefix)
                 if names and factories:
                     self.set_status("Fantasy season running")
+                    self._season_speed_on(1.0)   # as in Tk, a fantasy season starts slow so you can follow your team: + speeds it up
                     result = sim_engine.run_quiet_82_game_season(names, factories, _Sink(self._on_section), _Sink(self._on_score))
+                    self._season_speed_off()
                     self.post = {"standings": (result or {}).get("_season_standings"), "factories": dict(factories), "year": 2027 if year_prefix else None}
                     self._on_section(result or {})
                     self._on_score({"postseason_ready": True})
             elif mode == "Custom season (82 games)":
                 selected = self.options.get("teams", [])
+                self._season_speed_on()
                 result = sim_engine.run_quiet_82_game_season(selected, self.factories, _Sink(self._on_section), _Sink(self._on_score))
+                self._season_speed_off()
                 self.post = {"standings": (result or {}).get("_season_standings"),
                              "factories": {n: self.factories[n] for n in selected}, "year": None}
                 self._on_section(result or {})
@@ -564,6 +593,7 @@ class SimRunner:
             elif mode in SEASON_LIKE:
                 sim_engine.GUI_SERIES_UPDATE_QUEUE = None
                 self.set_status("Season running")
+                self._season_speed_on()
                 sink_sections = _Sink(self._on_section)
                 if mode in SEASON_MODES:
                     year = SEASON_MODES[mode]
@@ -576,6 +606,7 @@ class SimRunner:
                     result = run_2018_season(sink_sections, _Sink(self._on_score))
                     # the 2018 teams go with the standings: without them the playoffs fall back to the 2027 teams and fail on the first 2018 name
                     self.post = {"standings": (result or {}).get("_season_standings"), "factories": factories_2018(), "year": 2018}
+                self._season_speed_off()
                 self._on_section(result or {})
                 self._on_score({"postseason_ready": True})
             elif mode == "2027 play-in & playoffs":
@@ -584,6 +615,7 @@ class SimRunner:
         except Exception:
             error = traceback.format_exc()
         finally:
+            self._season_speed_off()
             self._flush_shot(False)   # a last attempt that never got a rebound (the buzzer) was a miss
             self._publish_unstamped()
             self._push_live(force=True)
