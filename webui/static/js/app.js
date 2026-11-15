@@ -2692,8 +2692,14 @@ function shotSpot(ev, side, spread = false) {
   };
   if (z === "dunk") inLane(0, 20, 1.3, 1.4, 60);
   else if (z === "rim") {
-    if (rnd() < 0.7) inLane(3, 40, 1.9, 1.55, 70);   // at the basket: layups, putbacks, tips (within ~4 ft, most of them right at the rim)
-    else inLane(42, 125, 1.5, 0.95, 92);              // a floater or short runner: 4-17 ft, rarer the further out
+    const q = rnd();
+    if (q < 0.6) inLane(3, 40, 1.9, 1.55, 70);   // at the basket: layups, putbacks, tips (within ~4 ft, most of them right at the rim)
+    else if (q < 0.76) {                          // a dump-off or a big finishing along the edges: the baseline side of the lane and the blocks
+      // in front of the backboard (it sits 4 ft off the baseline); only out wide, past the lane line, can a finish come from the baseline side
+      const wide = rnd() < 0.25, dy = wide ? 80 + 22 * rnd() : 46 + 36 * rnd();
+      x = wide ? 50 + 60 * rnd() : 78 + 70 * Math.pow(rnd(), 1.3); y = HY + (rnd() < 0.5 ? -1 : 1) * dy;
+    }
+    else inLane(42, 125, 1.5, 0.95, 92);          // a floater or short runner: 4-17 ft, rarer the further out
   }
   else if (z === "post") inLane(35, 85, 1.3, 1.15, 96);   // post-ups and hooks: around the block, rarely past the lane lines
   else if (z === "three") {
