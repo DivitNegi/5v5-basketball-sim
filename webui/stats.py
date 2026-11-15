@@ -302,7 +302,7 @@ def player_detail(runner, source, team, name, group="all"):
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
     return {"name": name, "team": team, "source": source, "sources": main, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
             "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")},
-            "three_split": {"corner": zone("corner3"), "above_break": zone("atb3"), "deep": zone("deep3"), "wing": zone("wing3"), "top": zone("top3"),
+            "three_split": {"corner": zone("corner3"), "above_break": zone("atb3"), "deep": zone("deep3"), "wing": zone("wing3"), "top": zone("top3"), "heave": zone("heave3"), "heatcheck": zone("heatcheck3"),
                             "corner_L": zone("corner3_L"), "corner_R": zone("corner3_R"), "wing_L": zone("wing3_L"), "wing_R": zone("wing3_R")},
             "mid_split": {"base": zone("mid_base"), "elbow": zone("mid_elbow"), "wing": zone("mid_wing"),
                           "base_L": zone("mid_base_L"), "base_R": zone("mid_base_R"), "wing_L": zone("mid_wing_L"), "wing_R": zone("mid_wing_R")},
@@ -427,7 +427,7 @@ def team_detail(runner, team):
             ranks.append({"key": key, "label": label, "value": round(val, 1), "pct": pct, "rank": rk, "of": len(pop)})
         adv_groups.append({"title": title, "desc": desc, "ranks": ranks})
     return {"source": source, "games": g, "pool": len(players), "shots": zones_of(diet), "zone_avg": zone_avg, "zone_ranks": zone_ranks,
-            "three_split": {"corner": zone(diet, "corner3"), "above_break": zone(diet, "atb3"), "deep": zone(diet, "deep3"), "wing": zone(diet, "wing3"), "top": zone(diet, "top3"),
+            "three_split": {"corner": zone(diet, "corner3"), "above_break": zone(diet, "atb3"), "deep": zone(diet, "deep3"), "wing": zone(diet, "wing3"), "top": zone(diet, "top3"), "heave": zone(diet, "heave3"), "heatcheck": zone(diet, "heatcheck3"),
                             "corner_L": zone(diet, "corner3_L"), "corner_R": zone(diet, "corner3_R"), "wing_L": zone(diet, "wing3_L"), "wing_R": zone(diet, "wing3_R")},
             "mid_split": {"base": zone(diet, "mid_base"), "elbow": zone(diet, "mid_elbow"), "wing": zone(diet, "mid_wing"),
                           "base_L": zone(diet, "mid_base_L"), "base_R": zone(diet, "mid_base_R"), "wing_L": zone(diet, "mid_wing_L"), "wing_R": zone(diet, "mid_wing_R")},

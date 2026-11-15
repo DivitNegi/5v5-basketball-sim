@@ -6464,7 +6464,12 @@ def add_to_shot_diet(diet: Dict[str, int], shot_type: str, context: str = "", ma
                         diet[f"{k2}_made"] = diet.get(f"{k2}_made", 0) + 1
                     else:
                         diet[k2] = diet.get(k2, 0) + 1
-    for tok in ("rim_float", "mid_long"):   # how far out (season charts place this many as floaters / long twos)
+    if shot_type == "three":   # heaves and heat checks: season charts draw them at their real range
+        if "heave" in contexts:
+            contexts = contexts | {"heave3"}
+        if "heatcheck" in contexts:
+            contexts = contexts | {"heatcheck3"}
+    for tok in ("rim_float", "mid_long", "heave3", "heatcheck3"):   # how far out (season charts place this many as floaters, long twos, heaves)
         if tok in contexts:
             k2 = f"{tok}_made" if made else tok
             diet[k2] = diet.get(k2, 0) + 1
@@ -12582,6 +12587,8 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
                      defender: Player = None, quality_mult: float | None = None):
     if shot_type == "three":
         context = tag_three_location(player, context, True)
+        if player is not None and getattr(player, "heat_check_attempt", False) and "heave" not in context:
+            context = f"{context}|heatcheck"
     elif shot_type == "mid":
         context = tag_mid_location(player, context, True)
         context = tag_shot_distance(player, "mid", context)
@@ -12638,6 +12645,8 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
 def record_shot_make(team: Team, shot_type: str, context: str = "", player: Player = None, defender: Player = None):
     if shot_type == "three":
         context = tag_three_location(player, context, False)
+        if player is not None and getattr(player, "heat_check_attempt", False) and "heave" not in context:
+            context = f"{context}|heatcheck"
     elif shot_type == "mid":
         context = tag_mid_location(player, context, False)
         context = reuse_shot_distance(player, "mid", context)

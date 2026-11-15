@@ -2203,7 +2203,9 @@ function seasonShotChart(name, zones, avg, vs, split) {
     };
     const t = split.three || {}, m2 = split.mid || {}, z = [0, 0];
     const sided = (o, name, loc) => (o[`${name}_L`] || o[`${name}_R`]) ? [[loc, "L", o[`${name}_L`] || z], [loc, "R", o[`${name}_R`] || z]] : [[loc, null, o[name] || z]];
-    tag("three", [...sided(t, "corner", "corner"), ["deep", null, t.deep || z], ...sided(t, "wing", "wing"), ["top", null, t.top || z]]);
+    // heaves (near half court) and heat checks (28-35 ft) are part of the deep count; they get their own spots
+    const deepRest = t.deep ? [Math.max(0, t.deep[0] - (t.heave?.[0] || 0) - (t.heatcheck?.[0] || 0)), Math.max(0, t.deep[1] - (t.heave?.[1] || 0) - (t.heatcheck?.[1] || 0))] : z;
+    tag("three", [...sided(t, "corner", "corner"), ["heave", null, t.heave || z], ["heatcheck", null, t.heatcheck || z], ["deep", null, deepRest], ...sided(t, "wing", "wing"), ["top", null, t.top || z]]);
     tag("mid", [...sided(m2, "base", "base"), ["elbow", null, m2.elbow || z], ...sided(m2, "wing", "wing")]);
     // how far out: so many of his paint shots were floaters and so many jumpers long twos (made ones first, like the location split)
     const d = split.dist || {};
@@ -2211,8 +2213,9 @@ function seasonShotChart(name, zones, avg, vs, split) {
       const [m, a] = d[key] || [0, 0];
       if (!a) return;
       const list = events.filter((e) => e.zone === zone), made = list.filter((e) => e.made), miss = list.filter((e) => !e.made);
-      made.forEach((e, i) => { e.dist = i < m ? farTag : nearTag; });
-      miss.forEach((e, i) => { e.dist = i < a - m ? farTag : nearTag; });
+      // spread evenly through the list (which is grouped by spot), so every spot gets its share -- not all the long twos on the baseline
+      const spread = (arr, k) => arr.forEach((e, i) => { e.dist = Math.floor((i + 1) * k / arr.length) > Math.floor(i * k / arr.length) ? farTag : nearTag; });
+      spread(made, Math.min(m, made.length)); spread(miss, Math.min(Math.max(0, a - m), miss.length));
     };
     far("rim", "rim_float", "float", "close"); far("mid", "mid_long", "long", "short");
   }
