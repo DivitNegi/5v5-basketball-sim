@@ -12547,16 +12547,35 @@ def tag_shot_distance(player, shot_type: str, context: str) -> str:
     rim_close (0-3 ft) or rim_float (3-10 ft); mid_short (10-16 ft) or mid_long (16 ft to the arc)."""
     prof = getattr(player, "shot_profile", None) or {}
     if shot_type == "rim":
-        close, near = prof.get("r", 0.0), prof.get("s", 0.0)
-        p = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
-        tok = "rim_float" if random.random() < p else "rim_close"
+        pending = getattr(player, "_pending_rim_dist", None) if player is not None else None
+        if pending:   # decided with the make chance (shot_make_prob), so a floater really is harder to make
+            tok = pending
+            player._pending_rim_dist = None
+        elif "putback" in str(context or ""):
+            tok = "rim_close"   # a putback or tip: at the basket
+        else:   # e.g. a blocked shot (recorded before any make chance): from his real split
+            close, near = prof.get("r", 0.0), prof.get("s", 0.0)
+            p = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
+            p = min(0.92, p / (1 - RIM_PUTBACK_SHARE))
+            tok = "rim_float" if random.random() < p else "rim_close"
     elif shot_type == "mid":
         short, long_ = prof.get("m", 0.0), prof.get("l", 0.0)
         p = long_ / (short + long_) if short + long_ > 0.04 else DEFAULT_LONG_MID_SHARE
         tok = "mid_long" if random.random() < p else "mid_short"
     else:
         return context
+    if player is not None:
+        player._dist_tok_used = (shot_type, tok)   # the make reuses it, so made floaters / long twos are counted as made
     return f"{context}|{tok}" if context else tok
+
+
+def reuse_shot_distance(player, shot_type: str, context: str) -> str:
+    """The make of a rim / midrange attempt carries the distance tag its attempt got."""
+    used = getattr(player, "_dist_tok_used", None) if player is not None else None
+    if not used or used[0] != shot_type:
+        return context
+    player._dist_tok_used = None
+    return f"{context}|{used[1]}" if context else used[1]
 
 
 def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Player = None,
@@ -12621,6 +12640,9 @@ def record_shot_make(team: Team, shot_type: str, context: str = "", player: Play
         context = tag_three_location(player, context, False)
     elif shot_type == "mid":
         context = tag_mid_location(player, context, False)
+        context = reuse_shot_distance(player, "mid", context)
+    elif shot_type == "rim":
+        context = reuse_shot_distance(player, "rim", context)
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("make", team=team, player=player, shot_type=shot_type, context=context)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
@@ -13082,9 +13104,36 @@ def compress_star_rating(rating: float) -> float:
     )
 
 
+# Real NBA paint shooting by distance: about 66% from 0-3 ft, about 42% from 3-10 ft. The rating-based chance is a blend of the two,
+# so a floater gets half the chance of a finish at the rim on the same attempt, normalised to the player's own mix so his overall
+# finishing % (and the team's scoring) stays where his ratings put it.
+FLOATER_RELATIVE_MAKE = 0.50
+# Putbacks and tips (roughly a tenth of rim attempts) are always right at the basket, so the other attempts carry a slightly higher
+# floater share and the player's overall split stays his real one.
+RIM_PUTBACK_SHARE = 0.10
+
+
 def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
                    team: Team = None, opponent: Team = None,
                    period: int = 1, period_time: int = 720) -> float:
+    """The make chance, with a rim attempt's distance decided here: right at the rim or a floater (from the player's real splits), and the
+    chance adjusted for the distance (a floater is harder), normalised so his overall finishing % is unchanged."""
+    p = _shot_make_prob_base(shooter, defender, shot_type, team, opponent, period, period_time)
+    if shot_type != "rim" or shooter is None:
+        return p
+    prof = getattr(shooter, "shot_profile", None) or {}
+    close, near = prof.get("r", 0.0), prof.get("s", 0.0)
+    share = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
+    share = min(0.92, share / (1 - RIM_PUTBACK_SHARE))
+    tok = "rim_float" if random.random() < share else "rim_close"
+    shooter._pending_rim_dist = tok
+    avg = share * FLOATER_RELATIVE_MAKE + (1 - share)
+    return max(0.0, min(0.97, p * (FLOATER_RELATIVE_MAKE if tok == "rim_float" else 1.0) / avg))
+
+
+def _shot_make_prob_base(shooter: Player, defender: Player, shot_type: str,
+                         team: Team = None, opponent: Team = None,
+                         period: int = 1, period_time: int = 720) -> float:
     if team is None or opponent is None:
         team = Team("temp", [shooter])
         opponent = Team("temp opponent", [defender])

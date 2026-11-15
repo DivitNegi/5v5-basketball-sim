@@ -2741,7 +2741,7 @@ function shotSpot(ev, side, spread = false) {
     if (ev.dist === "short") band[3] = Math.min(band[3], 172);                    // 10-16 ft jumper (a little slack so the bands meet)
     else if (ev.dist === "long") band[2] = Math.max(band[2], 165);                // 16 ft out to the arc
     for (let k = 0; k < 30; k++) {
-      const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = want === "elbow" && ev.loc === "elbow"
+      const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = want === "elbow" && ev.loc === "elbow" && ev.dist !== "long"
         ? band[2] + (band[3] - band[2]) * Math.pow(rnd(), 2.4)   // a free-throw-line jumper: bunched at the line, thinning out toward the arc (no empty band)
         : Math.sqrt(band[2] ** 2 + rnd() * (band[3] ** 2 - band[2] ** 2));
       x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
