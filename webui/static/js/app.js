@@ -148,7 +148,7 @@ function faceEl(name) {
 const NAME_CELLS = ".pcell, .tcell, .rtop, .court-team-head, .tm, .cmp-name, .pname, .face, .logo";
 document.addEventListener("click", (e) => {
   if (performance.now() - (window.__ppAt || 0) < 120) return;   // a row's own handler just opened one
-  if (e.target.closest("button, select, input, a, label, .picker-btn, .picker-pop, .coach-card, #setup, .seg, .pp-x")) return;
+  if (e.target.closest("button, select, input, a, label, .picker-btn, .picker-pop, .coach-card, #setup, .seg, .pp-x, .bld-card")) return;
   const cell = e.target.closest(NAME_CELLS);
   if (!cell) return;
   const teamEl = e.target.closest("[data-team]") || (cell.matches(".court-team-head, .tcell, .tm") ? cell.querySelector("[data-team]") : null);
@@ -2965,6 +2965,231 @@ function showTradePrompt(pr) {
   document.body.append(h("div", { id: "tradeModal", class: "tm-backdrop" }, box));
 }
 
+// ───────────────────────── Create Team / Create Player / Edit Player (the Tk dialogs) ─────────────────────────
+function bldModal(title, wide = true) {
+  document.querySelector(".pp-back.bld")?.remove();
+  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const status = h("span", { class: "bld-status" });
+  const body = h("div", { class: "bld-body" });
+  const card = h("div", { class: `pp-card bld-card${wide ? " wide" : ""}`, role: "dialog" }, h("button", { class: "pp-x", onclick: close, title: "Close" }, "✕"),
+    h("div", { class: "bld-head" }, h("h2", {}, title), status), body);
+  const back = h("div", { class: "pp-back bld", onclick: (e) => { if (e.target === back) close(); } }, card);
+  document.body.append(back); document.addEventListener("keydown", onKey);
+  return { body, close, setStatus: (t, kind = "") => { status.textContent = t; status.className = `bld-status ${kind}`; } };
+}
+function bldBusy() { if (S.active) { toast("Finish or clear the current sim first.", "err"); return true; } return false; }
+
+async function openTeamBuilder() {
+  if (bldBusy()) return;
+  const m = bldModal("Create Custom Team");
+  const st = { pool: [], sel: -1, version: null, roster: [], rsel: -1, hideCustom: false, search: "" };
+  const customCount = S.meta.teams.filter((t) => t.custom).length;
+  const nameIn = h("input", { class: "bld-in", value: `Custom Team ${customCount + 1}`, "aria-label": "Team name" });
+  const searchIn = h("input", { class: "bld-in", type: "search", placeholder: "Search name, team or position" });
+  const hideBtn = h("button", { class: "btn", onclick: () => { st.hideCustom = !st.hideCustom; hideBtn.textContent = st.hideCustom ? "Show Custom Players" : "Hide Custom Players"; loadPool(); } }, "Hide Custom Players");
+  const versionSel = h("select", { class: "bld-in", onchange: () => { st.version = poolVersions().find((v) => v.id === versionSel.value) || null; preview(); } });
+  const poolList = h("div", { class: "bld-list" }), rosterList = h("div", { class: "bld-list" });
+  const previewBox = h("pre", { class: "bld-preview" }, "Select a player to view ratings.");
+  const posSel = h("select", { class: "bld-in small", onchange: () => setPosition() }, ["PG", "SG", "SF", "PF", "C"].map((p) => h("option", { value: p }, p)));
+  const poolVersions = () => st.pool[st.sel]?.versions || [];
+  const ready = () => m.setStatus(`${st.roster.length} selected. First 5 are starters; move players and set positions before Create Team.`);
+
+  const preview = async () => {
+    if (!st.version) { previewBox.textContent = "Select a player to view ratings."; return; }
+    const d = await api.get(`/api/builder/preview?id=${encodeURIComponent(st.version.id)}`);
+    previewBox.textContent = d.text || "";
+  };
+  const pickPool = (i) => {
+    st.sel = i;
+    const vs = poolVersions();
+    versionSel.replaceChildren(...vs.map((v) => h("option", { value: v.id }, v.label)));
+    st.version = vs[0] || null;
+    poolList.querySelectorAll(".bld-row").forEach((r, j) => r.classList.toggle("on", j === i));
+    preview();
+  };
+  const renderPool = () => {
+    poolList.replaceChildren(...st.pool.map((p, i) => h("div", { class: `bld-row${i === st.sel ? " on" : ""}`, onclick: () => pickPool(i), ondblclick: () => { pickPool(i); add(); } },
+      faceEl(p.name), h("span", { class: "nm" }, p.name), h("span", { class: "pos" }, p.pos), h("span", { class: "ovr" }, `OVR ${p.ovr}`), h("span", { class: "src" }, p.source))));
+    if (!st.pool.length) poolList.append(h("div", { class: "empty" }, "No players match that search."));
+  };
+  let searchTimer = null;
+  const loadPool = async () => {
+    const d = await api.get(`/api/builder/pool?search=${encodeURIComponent(st.search)}&hide=${st.hideCustom ? 1 : 0}`);
+    st.pool = d.players || []; st.sel = -1; renderPool();
+    if (st.pool.length) pickPool(0); else { versionSel.replaceChildren(); st.version = null; preview(); }
+    m.setStatus(`${st.roster.length} selected. Pick 5-10 players; choose the version, then Add Player.`);
+  };
+  searchIn.addEventListener("input", () => { st.search = searchIn.value; clearTimeout(searchTimer); searchTimer = setTimeout(loadPool, 180); });
+
+  const renderRoster = () => {
+    rosterList.replaceChildren(...st.roster.map((p, i) => h("div", { class: `bld-row${i === st.rsel ? " on" : ""}`, onclick: () => pickRoster(i), ondblclick: () => { pickRoster(i); remove(); } },
+      h("span", { class: "idx" }, `${i + 1}.`), h("span", { class: `role ${i < 5 ? "st" : ""}` }, i < 5 ? "STARTER" : "BENCH"), faceEl(p.name),
+      h("span", { class: "nm" }, p.name), h("span", { class: "pos" }, p.pos), h("span", { class: "ovr" }, `OVR ${p.ovr}`), h("span", { class: "src" }, p.source))));
+    if (!st.roster.length) rosterList.append(h("div", { class: "empty" }, "Add 5-10 players. The first five start."));
+  };
+  const pickRoster = (i) => { st.rsel = i; posSel.value = st.roster[i]?.pos || "SF"; renderRoster(); };
+  const add = () => {
+    if (!st.version) { m.setStatus("Pick a player from the fantasy pool first.", "err"); return; }
+    if (st.roster.length >= 10) { m.setStatus("Custom teams are capped at 10 players.", "err"); return; }
+    const v = st.version;
+    st.roster.push({ id: v.id, name: v.name, pos: v.pos, ovr: v.ovr, source: v.source });
+    st.rsel = st.roster.length - 1; posSel.value = v.pos; renderRoster();
+    m.setStatus(`${v.name} added. Move him into the first five to start, or change his position.`);
+  };
+  const remove = () => {
+    if (st.rsel < 0 || !st.roster[st.rsel]) { m.setStatus("Pick a roster player to remove.", "err"); return; }
+    st.roster.splice(st.rsel, 1); st.rsel = Math.min(st.rsel, st.roster.length - 1); renderRoster(); ready();
+  };
+  const move = (d) => {
+    const i = st.rsel, j = Math.max(0, Math.min(st.roster.length - 1, i + d));
+    if (i < 0 || i === j) return;
+    [st.roster[i], st.roster[j]] = [st.roster[j], st.roster[i]]; st.rsel = j; renderRoster();
+  };
+  const setPosition = () => {
+    const p = st.roster[st.rsel];
+    if (!p) { m.setStatus("Pick a roster player before changing position.", "err"); return; }
+    p.pos = posSel.value; renderRoster();
+    m.setStatus(`${p.name} will play ${p.pos}. First five roster slots are starters.`);
+  };
+  const autoFill = async () => {
+    const d = await api.get(`/api/builder/pool?search=&hide=0`);
+    for (const p of d.players || []) {
+      if (st.roster.length >= 10) break;
+      if (st.roster.some((r) => r.name === p.name)) continue;
+      const v = p.versions[0];
+      st.roster.push({ id: v.id, name: v.name, pos: v.pos, ovr: v.ovr, source: v.source });
+    }
+    renderRoster(); ready();
+  };
+  const create = async () => {
+    if (st.roster.length < 5) { m.setStatus("Pick at least 5 players before creating the team.", "err"); return; }
+    try {
+      const d = await api.post("/api/builder/team", { name: nameIn.value, players: st.roster.map((p) => ({ id: p.id, position: p.pos })) });
+      S.meta = await api.get("/api/meta");
+      const t = S.meta.teams.find((x) => x.name === d.name);
+      if (t && S.pickers?.[0]) { S.pickers[0].set(t); S.teamA = t.name; }
+      toast(`${d.name} is now available in the team dropdowns.`, "ok");
+      m.close();
+    } catch (e) { m.setStatus(e.message, "err"); }
+  };
+
+  m.body.append(
+    h("div", { class: "bld-row2" }, h("label", { class: "bld-lab" }, "Team Name"), nameIn),
+    h("div", { class: "bld-cols" },
+      h("div", {}, h("div", { class: "bld-sub" }, "Fantasy Pool"), h("div", { class: "bld-tools" }, searchIn, hideBtn), poolList),
+      h("div", {}, h("div", { class: "bld-sub" }, "Your Custom Roster"), h("div", { class: "bld-tools" }, versionSel), rosterList)),
+    previewBox,
+    h("div", { class: "bld-actions" },
+      h("button", { class: "btn", onclick: add }, "Add Player"), h("button", { class: "btn", onclick: remove }, "Remove"),
+      h("button", { class: "btn", onclick: () => move(-1) }, "Move Up"), h("button", { class: "btn", onclick: () => move(1) }, "Move Down"),
+      h("label", { class: "bld-lab" }, "Position"), posSel, h("button", { class: "btn", onclick: setPosition }, "Set Position"),
+      h("button", { class: "btn", onclick: autoFill }, "Auto Fill 10"),
+      h("span", { class: "grow" }), h("button", { class: "btn", onclick: m.close }, "Close"), h("button", { class: "btn primary", onclick: create }, "Create Team")));
+  renderRoster();
+  m.setStatus("Loading the fantasy pool…");
+  await loadPool();
+  searchIn.focus();
+}
+
+async function openPlayerCreator(index = null) {
+  if (bldBusy()) return;
+  const meta = await api.get("/api/builder/meta");
+  let form = null;
+  if (index != null) {
+    form = await api.get(`/api/builder/player?index=${index}`);
+    if (form.error) { toast(form.error, "err"); return; }
+  }
+  const editing = form != null;
+  const m = bldModal(editing ? "Edit Player" : "Create Player");
+  m.setStatus(`Created players save to ${meta.path}`);
+  const nameIn = h("input", { class: "bld-in", value: form?.name ?? "Custom Player" });
+  const posSel = h("select", { class: "bld-in" }, meta.positions.map((p) => h("option", { value: p, selected: p === (form?.position ?? "SG") }, p)));
+  const inputs = {};
+  const cell = (label, el) => h("label", { class: "bld-field" }, h("span", {}, label), el);
+  const grid = h("div", { class: "bld-grid" }, cell("Name", nameIn), cell("Position", posSel),
+    ...meta.fields.map((f) => { inputs[f.key] = h("input", { class: "bld-in", type: "number", min: 0, max: 100, value: form?.values?.[f.key] ?? f.default }); return cell(f.label, inputs[f.key]); }));
+  const feetSel = h("select", { class: "bld-in small" }, [5, 6, 7].map((n) => h("option", { value: n, selected: n === (form?.feet ?? 6) }, n)));
+  const inchSel = h("select", { class: "bld-in small" }, [...Array(12).keys()].map((n) => h("option", { value: n, selected: n === (form?.inches ?? 6) }, n)));
+  const badgeSel = h("select", { class: "bld-in" }, h("option", { value: "" }, "Pick a badge…"), meta.badges.map((b) => h("option", { value: b.code }, b.label)));
+  const levelSel = h("select", { class: "bld-in" }, meta.levels.map((l) => h("option", { value: l }, l)));
+  const chosenSel = h("select", { class: "bld-in" });
+  const goSel = h("select", { class: "bld-in" }, meta.goTo.map((g) => h("option", { value: g.code, selected: g.code === (form?.goTo ?? "") }, g.label)));
+  const previewBox = h("pre", { class: "bld-preview tall" }, "…");
+  const badges = (form?.badges || []).map((b) => ({ ...b }));
+  const labelOf = (code) => meta.badges.find((b) => b.code === code)?.label || code;
+  const renderBadges = () => {
+    const keep = chosenSel.value;
+    chosenSel.replaceChildren(...(badges.length ? badges.map((b) => h("option", { value: b.code }, `${labelOf(b.code)} (${b.level})`)) : [h("option", { value: "" }, "No extra badges")]));
+    if (badges.some((b) => b.code === keep)) chosenSel.value = keep;
+  };
+  const record = () => ({ index, name: nameIn.value, position: posSel.value, feet: Number(feetSel.value), inches: Number(inchSel.value), badges, goTo: goSel.value,
+    values: Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value])) });
+  let pvTimer = null;
+  const preview = async () => {
+    const r = await fetch("/api/builder/player/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(record()) });
+    const d = await r.json().catch(() => ({}));
+    previewBox.textContent = d.text || "Could not build that player. Check the name and ratings.";
+    return d;
+  };
+  const later = () => { clearTimeout(pvTimer); pvTimer = setTimeout(preview, 250); };
+  const addBadge = () => {
+    const code = badgeSel.value;
+    if (!code) return;
+    const level = levelSel.value || "Bronze";
+    const at = badges.findIndex((b) => b.code === code);
+    if (at >= 0) badges.splice(at, 1);
+    badges.push({ code, level }); renderBadges(); chosenSel.value = code;
+    m.setStatus(`Added extra badge: ${labelOf(code)} (${level})`);
+    badgeSel.value = ""; levelSel.value = "Bronze"; preview();
+  };
+  const removeBadge = () => {
+    const at = badges.findIndex((b) => b.code === chosenSel.value);
+    if (at < 0) { m.setStatus("Pick an extra badge to remove.", "err"); return; }
+    const [b] = badges.splice(at, 1); renderBadges(); m.setStatus(`Removed extra badge: ${labelOf(b.code)} (${b.level})`); preview();
+  };
+  const clearBadges = () => { badges.length = 0; renderBadges(); m.setStatus("Cleared all extra badges."); preview(); };
+  const save = async () => {
+    try {
+      const d = await api.post("/api/builder/player/save", record());
+      m.setStatus(`${d.verb} ${d.name}. Reopen Create Team to see the updated pool.`, "ok");
+      toast(`${d.verb} player: ${d.name}`, "ok");
+      if (!editing) { index = null; }
+    } catch (e) { m.setStatus(e.message, "err"); }
+  };
+  posSel.addEventListener("change", async () => { const d = await preview(); m.setStatus(`${posSel.value} secondary positions auto-set to ${d.secondary || "-"}.`); });
+  goSel.addEventListener("change", () => { m.setStatus(`Go-to shot set to ${goSel.selectedOptions[0]?.textContent || "Auto"}.`); preview(); });
+  badgeSel.addEventListener("change", addBadge);
+  [nameIn, feetSel, inchSel, ...Object.values(inputs)].forEach((el) => el.addEventListener("input", later));
+  [feetSel, inchSel].forEach((el) => el.addEventListener("change", later));
+  m.body.append(grid,
+    h("div", { class: "bld-grid extras" },
+      cell("Height", h("div", { class: "bld-inline" }, feetSel, h("span", {}, "ft"), inchSel, h("span", {}, "in"))),
+      cell("Go-To Shot", goSel), cell("Badge Level", levelSel), cell("Extra Badge", badgeSel), cell("Selected Extras", chosenSel)),
+    previewBox,
+    h("div", { class: "bld-actions" },
+      h("button", { class: "btn", onclick: addBadge }, "Add Badge"), h("button", { class: "btn", onclick: removeBadge }, "Remove Badge"),
+      h("button", { class: "btn", onclick: clearBadges }, "Clear Badges"), h("button", { class: "btn", onclick: preview }, "Preview Stats"),
+      h("button", { class: "btn primary", onclick: save }, editing ? "Save Changes" : "Save Player"),
+      h("span", { class: "grow" }), h("button", { class: "btn", onclick: m.close }, "Close")));
+  renderBadges(); preview();
+}
+
+async function openPlayerEditPicker() {
+  if (bldBusy()) return;
+  const meta = await api.get("/api/builder/meta");
+  if (!meta.players.length) { toast("No custom players yet. Use Create Player first.", "err"); return; }
+  const m = bldModal("Edit Player", false);
+  m.setStatus("Choose a custom player to edit");
+  let sel = 0;
+  const list = h("div", { class: "bld-list" });
+  const render = () => list.replaceChildren(...meta.players.map((p, i) => h("div", { class: `bld-row${i === sel ? " on" : ""}`, onclick: () => { sel = i; render(); }, ondblclick: () => { sel = i; edit(); } },
+    faceEl(p.name), h("span", { class: "nm" }, p.name), h("span", { class: "pos" }, p.pos))));
+  const edit = () => { m.close(); openPlayerCreator(meta.players[sel].index); };
+  m.body.append(list, h("div", { class: "bld-actions" }, h("button", { class: "btn primary", onclick: edit }, "Edit Selected"), h("span", { class: "grow" }), h("button", { class: "btn", onclick: m.close }, "Close")));
+  render();
+}
+
 // ───────────────────────── boot ─────────────────────────
 async function boot() {
   S.meta = await api.get("/api/meta");
@@ -2998,6 +3223,9 @@ async function boot() {
   };
   modeSel.addEventListener("change", syncMode);
 
+  $("#bldTeam")?.addEventListener("click", openTeamBuilder);
+  $("#bldPlayer")?.addEventListener("click", () => openPlayerCreator());
+  $("#bldEdit")?.addEventListener("click", openPlayerEditPicker);
   const pickA = makePicker($("#pickA"), (t) => { S.teamA = t.name; });
   const pickB = makePicker($("#pickB"), (t) => { S.teamB = t.name; });
   const preferred = S.meta.teams.filter((t) => t.year === "2027");

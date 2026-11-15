@@ -1021,7 +1021,7 @@ select.bld-in { min-width: 0; }
 .bld-row .nm { font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bld-row .pos { width: 26px; color: var(--muted); font-weight: 700; font-size: 12px; }
 .bld-row .ovr { width: 58px; font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 12.5px; }
-.bld-row .src { color: var(--muted); font-size: 12px; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bld-row .src { color: var(--muted); font-size: 12px; flex: 0 0 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .bld-row .idx { width: 22px; color: var(--muted); }
 .bld-row .role { font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 2px 6px; border-radius: 5px; background: rgba(148, 163, 184, .14); color: var(--muted); }
 .bld-row .role.st { background: rgba(245, 165, 36, .16); color: var(--accent-2); }
@@ -1030,7 +1030,7 @@ select.bld-in { min-width: 0; }
 .bld-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .bld-actions .grow { flex: 1; }
 .bld-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 12px; }
-.bld-grid.extras { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.bld-grid.extras { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .bld-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .bld-inline { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 @media (max-width: 760px) { .bld-cols { grid-template-columns: 1fr; } .bld-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

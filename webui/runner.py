@@ -54,6 +54,11 @@ def rating_summary(p) -> Dict:
 FF_LINE_PAUSE = 0.0015   # seconds per play-by-play line while a "sim to" jump is running
 
 
+
+def _custom_teams():
+    from . import builder   # teams made with Create Team
+    return builder.custom_team_factories
+
 class WebOutputProxy(GuiOutputProxy):
     """The Tk app's output proxy, minus its 1 ms pause per write while a "sim to" jump is fast-forwarding."""
     def write(self, text):
@@ -152,7 +157,7 @@ class SimRunner:
 
     def meta(self) -> Dict:
         return {
-            "teams": [team_identity(name) for name in self.factories],
+            "teams": [{**team_identity(name), "custom": name in _custom_teams()} for name in self.factories],
             "modes": [{"name": m, "ready": m in SUPPORTED_MODES} for m in ALL_MODES],
             "rules": ["NBA", "FIBA"],
         }
