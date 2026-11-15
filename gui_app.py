@@ -12,7 +12,6 @@ YEAR_SEASON_MODES = {"2016 season (82 games)": 2016, "2021 season (82 games)": 2
 from sim_engine import _REAL_SLEEP  # underscore names are skipped by `import *`
 import random as _random_for_cast
 _cast_rng = _random_for_cast.Random()   # the cast filter must not draw from the sim's seeded generator
-from web_app import run_web_gui_app
 from broadcast import BroadcastBooth
 import media_ids
 
@@ -203,7 +202,9 @@ def run_gui_app():
             print(f"Tkinter GUI could not start: {exc}")
             print(f"Python used: {sys.executable}")
             return
-        run_web_gui_app(exc)
+        print(f"Tkinter is not available ({exc}); opening the web app instead.")
+        from webui.server import run as run_web_app   # the full web UI (main_web.py) replaces the old fallback page
+        run_web_app()
         return
 
     factories = gui_team_factories()
