@@ -92,8 +92,6 @@ def pool_payload(search: str = "", hide_custom: bool = False) -> Dict:
                      "versions": [{"id": _vid(v), "label": f"{v.name} | {_source(v)} | {v.position} | OVR {sim_engine.fantasy_ovr(v)}",
                                    "name": v.name, "pos": v.position, "ovr": sim_engine.fantasy_ovr(v), "source": _source(v)}
                                   for j, v in enumerate(_versions(player))]})
-        if len(rows) >= 350:   # Tk shows the first 350 matches
-            break
     return {"players": rows}
 
 

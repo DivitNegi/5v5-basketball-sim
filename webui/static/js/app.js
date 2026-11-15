@@ -3042,11 +3042,23 @@ async function openTeamBuilder() {
     poolList.querySelectorAll(".bld-row").forEach((r, j) => r.classList.toggle("on", j === i));
     preview();
   };
-  const renderPool = () => {
-    poolList.replaceChildren(...st.pool.map((p, i) => h("div", { class: `bld-row${i === st.sel ? " on" : ""}`, onclick: () => pickPool(i), ondblclick: () => { pickPool(i); add(); } },
-      faceEl(p.name), h("span", { class: "nm" }, p.name), h("span", { class: "pos" }, p.pos), h("span", { class: "ovr" }, `OVR ${p.ovr}`), h("span", { class: "src" }, p.source))));
-    if (!st.pool.length) poolList.append(h("div", { class: "empty" }, "No players match that search."));
+  // every player in the pool (1,000+): rows are added 120 at a time as you scroll toward the bottom, so the list opens quickly
+  let shown = 0;
+  const poolRow = (p, i) => h("div", { class: `bld-row${i === st.sel ? " on" : ""}`, onclick: () => pickPool(i), ondblclick: () => { pickPool(i); add(); } },
+    faceEl(p.name), h("span", { class: "nm" }, p.name), h("span", { class: "pos" }, p.pos), h("span", { class: "ovr" }, `OVR ${p.ovr}`), h("span", { class: "src" }, p.source));
+  const morePool = () => {
+    const next = Math.min(st.pool.length, shown + 120);
+    poolList.querySelector(".bld-more")?.remove();
+    for (let i = shown; i < next; i++) poolList.append(poolRow(st.pool[i], i));
+    shown = next;
+    if (shown < st.pool.length) poolList.append(h("div", { class: "bld-more muted" }, `Showing ${shown} of ${st.pool.length} · scroll for more`));
   };
+  const renderPool = () => {
+    poolList.replaceChildren(); shown = 0; poolList.scrollTop = 0;
+    if (!st.pool.length) { poolList.append(h("div", { class: "empty" }, "No players match that search.")); return; }
+    morePool();
+  };
+  poolList.addEventListener("scroll", () => { if (shown < st.pool.length && poolList.scrollTop + poolList.clientHeight > poolList.scrollHeight - 200) morePool(); });
   let searchTimer = null;
   const loadPool = async () => {
     const d = await api.get(`/api/builder/pool?search=${encodeURIComponent(st.search)}&hide=${st.hideCustom ? 1 : 0}`);
