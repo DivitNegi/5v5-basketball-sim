@@ -19559,6 +19559,11 @@ def simulate_possession(off: Team, dff: Team,
     if period <= 3 and period_time <= 24:
         possession_time = period_time
         print(f"{off.name} hold for the final shot of the quarter.")
+    elif period <= 3 and 32 <= period_time <= 40 and not getattr(off, "reset_after_oreb", False) and random.random() < two_for_one_rate(off):
+        # 2-for-1: get a shot up with ~26-30 seconds left, so the other team's possession still leaves time for one more of yours
+        # (the reply possession starts inside 31 s, so it cannot chain into another 2-for-1)
+        possession_time = max(4, period_time - random.randint(26, 30))
+        print(f"{off.name} push it to get a two-for-one before the end of the quarter.")
     elif period_time <= 24:
         possession_time = random.randint(3, max(3, min(9, period_time)))
         if off.score < dff.score:
@@ -21337,13 +21342,36 @@ def maybe_announce_fatigue(teamA: Team, teamB: Team):
         time.sleep(SLEEP * 0.35)
 
 
+def two_for_one_rate(team: Team) -> float:
+    """How often a team that gets the ball with ~28-40 s left in a quarter hurries for a 2-for-1. Modern teams do it most of the time;
+    it was much rarer before the analytics era."""
+    try:
+        year = int(str(team.name)[:4])
+    except ValueError:
+        return 0.65
+    if year >= 2014:
+        return 0.70
+    if year >= 2000:
+        return 0.50
+    return 0.30
+
+
 def should_intentionally_foul(possession_team: Team, teamA: Team, teamB: Team,
                               period: int, period_time: int) -> bool:
-    if period < 4 or period_time > 40:
+    if period < 4 or period_time > 75:
         return False
 
     fouling_team = teamB if possession_team is teamA else teamA
     margin = fouling_team.score - possession_team.score
+
+    # Before the last 40 seconds: a team down three or more possessions starts sending the other team to the line around the minute mark,
+    # and one down 4-6 from about 50 seconds (real NBA late-game practice). Closer than that, it still plays defense.
+    if period_time > 40:
+        if -10 <= margin <= -7 and period_time <= 65:
+            return random.random() < 0.55
+        if -6 <= margin <= -4 and period_time <= 50:
+            return random.random() < 0.45
+        return False
 
     # If the game is effectively decided below the shot clock, let it end.
     if period_time < 24 and abs(margin) > 7:
@@ -21355,7 +21383,7 @@ def should_intentionally_foul(possession_team: Team, teamA: Team, teamB: Team,
 
     # Up 3 very late: foul before a three-point attempt sometimes.
     if margin == 3 and period_time <= 10:
-        return random.random() < 0.72
+        return random.random() < 0.20   # most NBA teams defend up 3; roughly one in five fouls to take the tying three away
 
     # Only foul when trailing late.
     if margin >= 0:
