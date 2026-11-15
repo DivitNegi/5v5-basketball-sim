@@ -2143,7 +2143,7 @@ function teamInsights(t, id, team) {
     hasZones && t.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Shot zones · against the other teams"),
       sub("For the rim, midrange, three and post: how well the team shoots it (FG%) and how often (shots a game), ranked among the teams."), percentileRadar(t.zone_ranks, color)) : null,
     hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Team shot chart · ${t.source}`),
-      seasonShotChart(id.short || team, t.shots, t.zone_avg, "league", { three: t.three_split, mid: t.mid_split, fine: t.fine, fineAvg: t.fine_avg })) : null,
+      seasonShotChart(id.short || team, t.shots, t.zone_avg, "league", { three: t.three_split, mid: t.mid_split, dist: t.dist_split, fine: t.fine, fineAvg: t.fine_avg })) : null,
   ].filter(Boolean);   // replaceChildren would print a skipped panel as "null"
 }
 
@@ -2205,6 +2205,16 @@ function seasonShotChart(name, zones, avg, vs, split) {
     const sided = (o, name, loc) => (o[`${name}_L`] || o[`${name}_R`]) ? [[loc, "L", o[`${name}_L`] || z], [loc, "R", o[`${name}_R`] || z]] : [[loc, null, o[name] || z]];
     tag("three", [...sided(t, "corner", "corner"), ["deep", null, t.deep || z], ...sided(t, "wing", "wing"), ["top", null, t.top || z]]);
     tag("mid", [...sided(m2, "base", "base"), ["elbow", null, m2.elbow || z], ...sided(m2, "wing", "wing")]);
+    // how far out: so many of his paint shots were floaters and so many jumpers long twos (made ones first, like the location split)
+    const d = split.dist || {};
+    const far = (zone, key, farTag, nearTag) => {
+      const [m, a] = d[key] || [0, 0];
+      if (!a) return;
+      const list = events.filter((e) => e.zone === zone), made = list.filter((e) => e.made), miss = list.filter((e) => !e.made);
+      made.forEach((e, i) => { e.dist = i < m ? farTag : nearTag; });
+      miss.forEach((e, i) => { e.dist = i < a - m ? farTag : nearTag; });
+    };
+    far("rim", "rim_float", "float", "close"); far("mid", "mid_long", "long", "short");
   }
   const total = events.length, state = { view: "shots" };
   const svg = svgEl("svg", { viewBox: "20 60 490 520", class: "court-svg pc-map pro" });
@@ -2334,7 +2344,7 @@ function playerInsights(d, color) {
     hasZones && d.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot zones · compared to ${cmpLbl}`),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "For the rim, midrange, three and post: how well he shoots it (FG%) and how often he shoots it (shots a game), ranked against the other players. A zone he barely uses shows 0 for FG%."),
       percentileRadar(d.zone_ranks, color)) : null,
-    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group, { three: d.three_split, mid: d.mid_split, fine: d.fine, fineAvg: d.fine_avg })) : null,
+    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group, { three: d.three_split, mid: d.mid_split, dist: d.dist_split, fine: d.fine, fineAvg: d.fine_avg })) : null,
   ];
 }
 
@@ -2692,7 +2702,8 @@ function shotSpot(ev, side, spread = false) {
   };
   if (z === "dunk") inLane(0, 20, 1.3, 1.4, 60);
   else if (z === "rim") {
-    const q = rnd();
+    // the engine says whether it was right at the rim (0-3 ft) or a floater / runner (3-10 ft+), from the player's real splits
+    const q = ev.dist === "close" ? rnd() * 0.76 : ev.dist === "float" ? 0.8 : rnd();
     if (q < 0.6) inLane(3, 40, 1.9, 1.55, 70);   // at the basket: layups, putbacks, tips (within ~4 ft, most of them right at the rim)
     else if (q < 0.76) {                          // a dump-off or a big finishing along the edges: the baseline side of the lane and the blocks
       // in front of the backboard (it sits 4 ft off the baseline); only out wide, past the lane line, can a finish come from the baseline side
@@ -2727,6 +2738,8 @@ function shotSpot(ev, side, spread = false) {
     // lane line to the arc, the baseline from beside the lane to the corner. No tight clusters and no empty bands between them.
     const side = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
     const band = want === "elbow" ? [0, 0.62, 140, 234] : want === "wing" ? [0.62, 1.25, 90, 234] : [1.25, 1.95, 82, 234];
+    if (ev.dist === "short") band[3] = Math.min(band[3], 172);                    // 10-16 ft jumper (a little slack so the bands meet)
+    else if (ev.dist === "long") band[2] = Math.max(band[2], 165);                // 16 ft out to the arc
     for (let k = 0; k < 30; k++) {
       const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = want === "elbow" && ev.loc === "elbow"
         ? band[2] + (band[3] - band[2]) * Math.pow(rnd(), 2.4)   // a free-throw-line jumper: bunched at the line, thinning out toward the arc (no empty band)
@@ -3041,8 +3054,25 @@ async function openTeamBuilder() {
   };
   searchIn.addEventListener("input", () => { st.search = searchIn.value; clearTimeout(searchTimer); searchTimer = setTimeout(loadPool, 180); });
 
+  // drag a roster row up or down to reorder (the first five start)
+  let dragFrom = -1;
+  const dropAt = (e, i) => { const r = e.currentTarget.getBoundingClientRect(); return e.clientY > r.top + r.height / 2 ? i + 1 : i; };
+  const clearMarks = () => rosterList.querySelectorAll(".drop-before, .drop-after").forEach((el) => el.classList.remove("drop-before", "drop-after"));
   const renderRoster = () => {
-    rosterList.replaceChildren(...st.roster.map((p, i) => h("div", { class: `bld-row${i === st.rsel ? " on" : ""}`, onclick: () => pickRoster(i), ondblclick: () => { pickRoster(i); remove(); } },
+    rosterList.replaceChildren(...st.roster.map((p, i) => h("div", { class: `bld-row${i === st.rsel ? " on" : ""}`, draggable: "true", title: "Drag to reorder",
+      onclick: () => pickRoster(i), ondblclick: () => { pickRoster(i); remove(); },
+      ondragstart: (e) => { dragFrom = i; e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* old browsers */ } e.currentTarget.classList.add("dragging"); },
+      ondragend: (e) => { e.currentTarget.classList.remove("dragging"); clearMarks(); dragFrom = -1; },
+      ondragover: (e) => { if (dragFrom < 0) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; clearMarks(); e.currentTarget.classList.add(dropAt(e, i) > i ? "drop-after" : "drop-before"); },
+      ondrop: (e) => {
+        e.preventDefault(); clearMarks();
+        if (dragFrom < 0) return;
+        let to = dropAt(e, i);
+        const [moved] = st.roster.splice(dragFrom, 1);
+        if (to > dragFrom) to -= 1;
+        st.roster.splice(to, 0, moved); st.rsel = to; dragFrom = -1; renderRoster();
+        m.setStatus(`${moved.name} moved to #${to + 1}${to < 5 ? " (starter)" : " (bench)"}.`);
+      } },
       h("span", { class: "idx" }, `${i + 1}.`), h("span", { class: `role ${i < 5 ? "st" : ""}` }, i < 5 ? "STARTER" : "BENCH"), faceEl(p.name),
       h("span", { class: "nm" }, p.name), h("span", { class: "pos" }, p.pos), h("span", { class: "ovr" }, `OVR ${p.ovr}`), h("span", { class: "src" }, p.source))));
     if (!st.roster.length) rosterList.append(h("div", { class: "empty" }, "Add 5-10 players. The first five start."));

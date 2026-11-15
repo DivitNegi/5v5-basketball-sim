@@ -1043,3 +1043,7 @@ select.bld-in { min-width: 0; }
 .sc-bar > select.sc-game { flex: 1 1 100%; }
 .sc-bar .chk { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 4px; color: var(--text-2); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .sc-bar input[type=checkbox] { min-width: 0; width: 16px; height: 16px; padding: 0; margin: 0; accent-color: var(--accent); }
+.bld-row[draggable="true"] { cursor: grab; }
+.bld-row.dragging { opacity: .45; }
+.bld-row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.bld-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
