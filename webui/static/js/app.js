@@ -3015,7 +3015,9 @@ async function openTeamBuilder() {
   const draft = readTeamDraft();
   const st = { pool: [], sel: -1, version: null, roster: draft?.roster || [], rsel: -1, hideCustom: !!draft?.hideCustom, search: draft?.search || "" };
   let created = false;
-  const m = bldModal("Create Custom Team", true, () => { if (!created) writeTeamDraft({ name: nameIn.value, roster: st.roster, search: st.search, hideCustom: st.hideCustom }); });
+  // saved after every change (each player added, removed, moved or re-positioned, the name, the search), and again on close
+  const saveDraft = () => { if (!created) writeTeamDraft({ name: nameIn.value, roster: st.roster, search: st.search, hideCustom: st.hideCustom }); };
+  const m = bldModal("Create Custom Team", true, () => saveDraft());
   const customCount = S.meta.teams.filter((t) => t.custom).length;
   const nameIn = h("input", { class: "bld-in", value: draft?.name || `Custom Team ${customCount + 1}`, "aria-label": "Team name" });
   const searchIn = h("input", { class: "bld-in", type: "search", placeholder: "Search name, team or position", value: st.search });
@@ -3052,7 +3054,9 @@ async function openTeamBuilder() {
     if (st.pool.length) pickPool(0); else { versionSel.replaceChildren(); st.version = null; preview(); }
     m.setStatus(`${st.roster.length} selected. Pick 5-10 players; choose the version, then Add Player.`);
   };
-  searchIn.addEventListener("input", () => { st.search = searchIn.value; clearTimeout(searchTimer); searchTimer = setTimeout(loadPool, 180); });
+  nameIn.addEventListener("input", saveDraft);
+  hideBtn.addEventListener("click", saveDraft);
+  searchIn.addEventListener("input", () => { st.search = searchIn.value; saveDraft(); clearTimeout(searchTimer); searchTimer = setTimeout(loadPool, 180); });
 
   // drag a roster row up or down to reorder (the first five start)
   let dragFrom = -1;
@@ -3076,6 +3080,7 @@ async function openTeamBuilder() {
       h("span", { class: "idx" }, `${i + 1}.`), h("span", { class: `role ${i < 5 ? "st" : ""}` }, i < 5 ? "STARTER" : "BENCH"), faceEl(p.name),
       h("span", { class: "nm" }, p.name), h("span", { class: "pos" }, p.pos), h("span", { class: "ovr" }, `OVR ${p.ovr}`), h("span", { class: "src" }, p.source))));
     if (!st.roster.length) rosterList.append(h("div", { class: "empty" }, "Add 5-10 players. The first five start."));
+    saveDraft();
   };
   const pickRoster = (i) => { st.rsel = i; posSel.value = st.roster[i]?.pos || "SF"; renderRoster(); };
   const add = () => {
