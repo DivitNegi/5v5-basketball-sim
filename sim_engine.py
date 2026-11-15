@@ -2123,6 +2123,11 @@ def three_location(shooter) -> str:
         spot -= 0.15
     spot = max(0.0, min(1.0, spot))
     corner_p = 0.18 + 0.46 * spot
+    prof = getattr(shooter, "shot_profile", None)
+    if prof and prof.get("c3") is not None and prof.get("n3", 0) > 0:
+        # his real share of threes from the corner (Basketball-Reference), trusted more the more threes he took
+        w = min(1.0, prof["n3"] / 2.5)
+        corner_p = w * prof["c3"] + (1 - w) * corner_p
     return "corner" if random.random() < corner_p else "above_break"
 
 
@@ -6459,6 +6464,10 @@ def add_to_shot_diet(diet: Dict[str, int], shot_type: str, context: str = "", ma
                         diet[f"{k2}_made"] = diet.get(f"{k2}_made", 0) + 1
                     else:
                         diet[k2] = diet.get(k2, 0) + 1
+    for tok in ("rim_float", "mid_long"):   # how far out (season charts place this many as floaters / long twos)
+        if tok in contexts:
+            k2 = f"{tok}_made" if made else tok
+            diet[k2] = diet.get(k2, 0) + 1
     if made:
         diet[f"{shot_type}_made"] = diet.get(f"{shot_type}_made", 0) + 1
 
@@ -12527,12 +12536,38 @@ def tag_mid_location(player, context: str, consume: bool) -> str:
     return f"{context}|{loc}" if context else loc
 
 
+# League-typical splits for players without real shooting data: about 40% of non-dunk paint attempts from 3-10 ft (floaters, runners,
+# short hooks), and about 45% of midrange jumpers from 16 ft out to the arc.
+DEFAULT_FLOAT_SHARE = 0.40
+DEFAULT_LONG_MID_SHARE = 0.45
+
+
+def tag_shot_distance(player, shot_type: str, context: str) -> str:
+    """How far out a rim or midrange attempt was taken, from the player's real distance splits when the sim has them:
+    rim_close (0-3 ft) or rim_float (3-10 ft); mid_short (10-16 ft) or mid_long (16 ft to the arc)."""
+    prof = getattr(player, "shot_profile", None) or {}
+    if shot_type == "rim":
+        close, near = prof.get("r", 0.0), prof.get("s", 0.0)
+        p = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
+        tok = "rim_float" if random.random() < p else "rim_close"
+    elif shot_type == "mid":
+        short, long_ = prof.get("m", 0.0), prof.get("l", 0.0)
+        p = long_ / (short + long_) if short + long_ > 0.04 else DEFAULT_LONG_MID_SHARE
+        tok = "mid_long" if random.random() < p else "mid_short"
+    else:
+        return context
+    return f"{context}|{tok}" if context else tok
+
+
 def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Player = None,
                      defender: Player = None, quality_mult: float | None = None):
     if shot_type == "three":
         context = tag_three_location(player, context, True)
     elif shot_type == "mid":
         context = tag_mid_location(player, context, True)
+        context = tag_shot_distance(player, "mid", context)
+    elif shot_type == "rim":
+        context = tag_shot_distance(player, "rim", context)
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("attempt", team=team, player=player, shot_type=shot_type, context=context)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:

@@ -43,12 +43,43 @@ OVERRIDES = {
 }
 
 
+_SHOT_PROFILES = None
+
+
+def _fold(name: str) -> str:
+    import unicodedata
+    n = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode().lower()
+    for junk in (".", "'", ",", " jr", " sr", " iii", " ii", " iv"):
+        n = n.replace(junk, "")
+    return " ".join(n.split())
+
+
+def shot_profiles():
+    """Real shooting splits per team-season and player (shot_profiles.json, from Basketball-Reference): where each player's shots came from."""
+    global _SHOT_PROFILES
+    if _SHOT_PROFILES is None:
+        import json, os
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shot_profiles.json")
+        try:
+            with open(path, encoding="utf-8") as handle:
+                _SHOT_PROFILES = json.load(handle)
+        except (OSError, ValueError):
+            _SHOT_PROFILES = {}
+    return _SHOT_PROFILES
+
+
 def apply_overrides(team):
     table = OVERRIDES.get(getattr(team, "name", ""))
     if table:
         for player in team.roster:
             for attr, value in table.get(player.name, {}).items():
                 setattr(player, attr, value)
+    profiles = shot_profiles().get(getattr(team, "name", ""))
+    if profiles:
+        for player in team.roster:
+            prof = profiles.get(_fold(player.name))
+            if prof:
+                player.shot_profile = prof
     return team
 
 

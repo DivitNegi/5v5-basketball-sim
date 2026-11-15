@@ -415,7 +415,9 @@ class SimRunner:
                     loc = "heave"
                 elif getattr(player, "heat_check_attempt", False):
                     loc = "heatcheck"
-            self._pending_shot = {"team": team.name, "player": player.name, "zone": str(info.get("shot_type") or "mid"), "loc": loc, "side": "L" if "side_L" in tokens else "R" if "side_R" in tokens else None, "period": ctx.get("period"), "clock": ctx.get("period_time")}
+            dist = ("float" if "rim_float" in tokens else "close" if "rim_close" in tokens else "long" if "mid_long" in tokens
+                    else "short" if "mid_short" in tokens else None)   # how far out, from the player's real distance splits
+            self._pending_shot = {"team": team.name, "player": player.name, "zone": str(info.get("shot_type") or "mid"), "loc": loc, "dist": dist, "side": "L" if "side_L" in tokens else "R" if "side_R" in tokens else None, "period": ctx.get("period"), "clock": ctx.get("period_time")}
         elif kind == "make":
             self._flush_shot(True)
         elif kind == "miss":

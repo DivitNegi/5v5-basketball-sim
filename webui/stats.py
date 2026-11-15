@@ -306,6 +306,7 @@ def player_detail(runner, source, team, name, group="all"):
                             "corner_L": zone("corner3_L"), "corner_R": zone("corner3_R"), "wing_L": zone("wing3_L"), "wing_R": zone("wing3_R")},
             "mid_split": {"base": zone("mid_base"), "elbow": zone("mid_elbow"), "wing": zone("mid_wing"),
                           "base_L": zone("mid_base_L"), "base_R": zone("mid_base_R"), "wing_L": zone("mid_wing_L"), "wing_R": zone("mid_wing_R")},
+            "dist_split": {"rim_float": zone("rim_float"), "mid_long": zone("mid_long")},
             "fine": fine_me, "fine_avg": fine_avg}
 
 
@@ -430,4 +431,5 @@ def team_detail(runner, team):
                             "corner_L": zone(diet, "corner3_L"), "corner_R": zone(diet, "corner3_R"), "wing_L": zone(diet, "wing3_L"), "wing_R": zone(diet, "wing3_R")},
             "mid_split": {"base": zone(diet, "mid_base"), "elbow": zone(diet, "mid_elbow"), "wing": zone(diet, "mid_wing"),
                           "base_L": zone(diet, "mid_base_L"), "base_R": zone(diet, "mid_base_R"), "wing_L": zone(diet, "mid_wing_L"), "wing_R": zone(diet, "mid_wing_R")},
+            "dist_split": {"rim_float": zone(diet, "rim_float"), "mid_long": zone(diet, "mid_long")},
             "fine": fine_of(diet), "fine_avg": fine_avg, "adv_groups": adv_groups}
