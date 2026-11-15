@@ -2979,9 +2979,9 @@ function showTradePrompt(pr) {
 }
 
 // ───────────────────────── Create Team / Create Player / Edit Player (the Tk dialogs) ─────────────────────────
-function bldModal(title, wide = true) {
+function bldModal(title, wide = true, onClose = null) {
   document.querySelector(".pp-back.bld")?.remove();
-  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+  const close = () => { try { onClose?.(); } catch { /* keep closing */ } back.remove(); document.removeEventListener("keydown", onKey); };
   const onKey = (e) => { if (e.key === "Escape") close(); };
   const status = h("span", { class: "bld-status" });
   const body = h("div", { class: "bld-body" });
@@ -2993,14 +2993,20 @@ function bldModal(title, wide = true) {
 }
 function bldBusy() { if (S.active) { toast("Finish or clear the current sim first.", "err"); return true; } return false; }
 
+// A half-built team is kept when the dialog closes (click outside, ✕, Close, Escape) and comes back next time it opens, even after a refresh.
+const TEAM_DRAFT_KEY = "bld.teamDraft";
+const readTeamDraft = () => { try { return JSON.parse(localStorage.getItem(TEAM_DRAFT_KEY) || "null"); } catch { return null; } };
+const writeTeamDraft = (d) => { try { d ? localStorage.setItem(TEAM_DRAFT_KEY, JSON.stringify(d)) : localStorage.removeItem(TEAM_DRAFT_KEY); } catch { /* storage blocked */ } };
 async function openTeamBuilder() {
   if (bldBusy()) return;
-  const m = bldModal("Create Custom Team");
-  const st = { pool: [], sel: -1, version: null, roster: [], rsel: -1, hideCustom: false, search: "" };
+  const draft = readTeamDraft();
+  const st = { pool: [], sel: -1, version: null, roster: draft?.roster || [], rsel: -1, hideCustom: !!draft?.hideCustom, search: draft?.search || "" };
+  let created = false;
+  const m = bldModal("Create Custom Team", true, () => { if (!created) writeTeamDraft({ name: nameIn.value, roster: st.roster, search: st.search, hideCustom: st.hideCustom }); });
   const customCount = S.meta.teams.filter((t) => t.custom).length;
-  const nameIn = h("input", { class: "bld-in", value: `Custom Team ${customCount + 1}`, "aria-label": "Team name" });
-  const searchIn = h("input", { class: "bld-in", type: "search", placeholder: "Search name, team or position" });
-  const hideBtn = h("button", { class: "btn", onclick: () => { st.hideCustom = !st.hideCustom; hideBtn.textContent = st.hideCustom ? "Show Custom Players" : "Hide Custom Players"; loadPool(); } }, "Hide Custom Players");
+  const nameIn = h("input", { class: "bld-in", value: draft?.name || `Custom Team ${customCount + 1}`, "aria-label": "Team name" });
+  const searchIn = h("input", { class: "bld-in", type: "search", placeholder: "Search name, team or position", value: st.search });
+  const hideBtn = h("button", { class: "btn", onclick: () => { st.hideCustom = !st.hideCustom; hideBtn.textContent = st.hideCustom ? "Show Custom Players" : "Hide Custom Players"; loadPool(); } }, st.hideCustom ? "Show Custom Players" : "Hide Custom Players");
   const versionSel = h("select", { class: "bld-in", onchange: () => { st.version = poolVersions().find((v) => v.id === versionSel.value) || null; preview(); } });
   const poolList = h("div", { class: "bld-list" }), rosterList = h("div", { class: "bld-list" });
   const previewBox = h("pre", { class: "bld-preview" }, "Select a player to view ratings.");
@@ -3083,6 +3089,7 @@ async function openTeamBuilder() {
       const t = S.meta.teams.find((x) => x.name === d.name);
       if (t && S.pickers?.[0]) { S.pickers[0].set(t); S.teamA = t.name; }
       toast(`${d.name} is now available in the team dropdowns.`, "ok");
+      created = true; writeTeamDraft(null);   // the team is made: start the next one fresh
       m.close();
     } catch (e) { m.setStatus(e.message, "err"); }
   };
@@ -3100,7 +3107,8 @@ async function openTeamBuilder() {
       h("button", { class: "btn", onclick: autoFill }, "Auto Fill 10"),
       h("span", { class: "grow" }), h("button", { class: "btn", onclick: m.close }, "Close"), h("button", { class: "btn primary", onclick: create }, "Create Team")));
   renderRoster();
-  m.setStatus("Loading the fantasy pool…");
+  if (draft?.roster?.length) m.setStatus(`Picked up where you left off: ${draft.roster.length} player${draft.roster.length === 1 ? "" : "s"} on the roster.`);
+  else m.setStatus("Loading the fantasy pool…");
   await loadPool();
   searchIn.focus();
 }

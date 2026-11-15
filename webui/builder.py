@@ -53,30 +53,43 @@ def _versions(player: Player) -> List[Player]:
     return versions
 
 
+def _vid(v: Player) -> str:
+    """A version's id: name + team-season, so a saved draft still finds the same player after the pool changes."""
+    return f"{v.name}||{_source(v)}"
+
+
 def _lookup(pid: str) -> Optional[Player]:
-    """'i:j' = version j of pool player i."""
-    try:
-        i, j = (int(x) for x in str(pid).split(":"))
-        return _versions(all_pool_players()[i])[j]
-    except (ValueError, IndexError):
-        return None
+    name, _, source = str(pid).partition("||")
+    for player in all_pool_players():
+        if player.name != name and getattr(player, "fantasy_base_name", None) != name:
+            continue
+        for v in _versions(player):
+            if v.name == name and _source(v) == source:
+                return v
+    return None
 
 
 def _source(p: Player) -> str:
     return getattr(p, "source_team", "All-Time")
 
 
+def _fold(text: str) -> str:
+    """Lower-case without accents, so 'jokic' finds Jokić."""
+    import unicodedata
+    return unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode().lower()
+
+
 def pool_payload(search: str = "", hide_custom: bool = False) -> Dict:
-    term = (search or "").strip().lower()
+    term = _fold((search or "").strip())
     rows = []
     for i, player in enumerate(all_pool_players()):
         source = _source(player)
         if hide_custom and source == "Custom Player":
             continue
-        if term and term not in player.name.lower() and term not in source.lower() and term not in player.position.lower():
+        if term and term not in _fold(player.name) and term not in _fold(source) and term not in player.position.lower():
             continue
-        rows.append({"id": f"{i}:0", "name": player.name, "pos": player.position, "ovr": sim_engine.fantasy_ovr(player), "source": source,
-                     "versions": [{"id": f"{i}:{j}", "label": f"{v.name} | {_source(v)} | {v.position} | OVR {sim_engine.fantasy_ovr(v)}",
+        rows.append({"id": _vid(_versions(player)[0]), "name": player.name, "pos": player.position, "ovr": sim_engine.fantasy_ovr(player), "source": source,
+                     "versions": [{"id": _vid(v), "label": f"{v.name} | {_source(v)} | {v.position} | OVR {sim_engine.fantasy_ovr(v)}",
                                    "name": v.name, "pos": v.position, "ovr": sim_engine.fantasy_ovr(v), "source": _source(v)}
                                   for j, v in enumerate(_versions(player))]})
         if len(rows) >= 350:   # Tk shows the first 350 matches
