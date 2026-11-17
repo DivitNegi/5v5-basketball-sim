@@ -2053,7 +2053,6 @@ function renderCustomTeams(){ const root=$("#customTeams"); root.replaceChildren
 async function startSpecial(mode,options={}){ try{await api.post("/api/start",{mode,teamA:S.teamA,teamB:S.teamB,rules:S.rules,options});}catch(e){toast(e.message,"err");} }
 
 async function fillOnePlayers(side){ const team=$("#oneTeam"+side).value,d=await api.get(`/api/roster?team=${encodeURIComponent(team)}`),sel=$("#onePlayer"+side); sel.replaceChildren(...d.players.map((p)=>h("option",{value:p.name},`${p.name} · ${p.pos} · ${p.ovr}`))); }
-async function loadReplays(){ const d=await api.get("/api/replays"),root=$("#replayBody"); root.replaceChildren(...(d.games.length?d.games.map((g)=>h("div",{class:"replay-row"},h("b",{},`Game ${g.game}`),h("span",{},`${g.teamA} vs ${g.teamB}`),h("button",{class:"btn",disabled:!g.available,onclick:()=>startSpecial("Replay season game",{order:g.order})},"Replay"))):[h("div",{class:"empty"},"Complete a season to create replays.")])); }
 function broadcastText(e){ const names=Object.entries(e).filter(([k])=>k!=="kind").map(([k,v])=>`${k.replaceAll("_"," ")}: ${v}`).join(" · "); return names||"Live game event"; }
 async function loadBroadcast(){ const d=await api.get("/api/broadcast"),root=$("#broadcastBody"),follow=root.scrollHeight-root.scrollTop-root.clientHeight<60; root.replaceChildren(...(d.events.length?d.events.map((e)=>h("div",{class:"broadcast-event"},h("span",{class:"kind"},e.kind),h("span",{},broadcastText(e)))):[h("div",{class:"empty"},"Broadcast events appear once a game starts.")])); if(follow)root.scrollTop=root.scrollHeight; }
 
@@ -3356,7 +3355,6 @@ async function boot() {
   $("#olympics").addEventListener("click",()=>startSpecial("Olympic tournament"));
   $("#oneTeamA").addEventListener("change",()=>fillOnePlayers("A")); $("#oneTeamB").addEventListener("change",()=>fillOnePlayers("B"));
   $("#oneStart").addEventListener("click",()=>startSpecial("1-on-1",{teamA:$("#oneTeamA").value,playerA:$("#onePlayerA").value,teamB:$("#oneTeamB").value,playerB:$("#onePlayerB").value,target:11,winBy:2}));
-  $("#replayRefresh").addEventListener("click",loadReplays);
   $$("#statsTabs button").forEach((b) => b.addEventListener("click", () => {
     $$("#statsTabs button").forEach((x) => x.classList.toggle("on", x === b));
     $("#statsKind").value = b.dataset.k; $("#statsKind").dispatchEvent(new Event("change", { bubbles: true }));
@@ -3394,7 +3392,6 @@ async function boot() {
     if (b.dataset.view === "lineup") loadLineup();
     if (b.dataset.view === "draft") { loadDraft(); loadTrades(); }
     if (b.dataset.view === "modes") renderCustomTeams();
-    if (b.dataset.view === "replay") loadReplays();
     if (b.dataset.view === "broadcast") loadBroadcast();
   }));
   document.addEventListener("keydown", (e) => {
