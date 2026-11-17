@@ -22259,6 +22259,21 @@ def finish_sticky_fast_stage():
         SIM_STICKY_FAST = None
 
 
+QUARTER_BREAK_REST_SECONDS = 130   # the break between the 1st/2nd and 3rd/4th quarters (and before overtime)
+
+
+def rest_at_break(teamA: Team, teamB: Team, halftime: bool = False):
+    """Everyone gets their legs back at a break: halftime (15 minutes) wipes the stint fatigue clean; a quarter break recovers like
+    sitting on the bench for that long (two seconds of stint for every second of rest). Fatigue from total minutes played stays."""
+    for team in (teamA, teamB):
+        for p in team.roster:
+            if halftime:
+                p.current_stint = 0
+            else:
+                p.current_stint = max(0, getattr(p, "current_stint", 0) - QUARTER_BREAK_REST_SECONDS * 2)
+            p.last_fatigue_notice_stint = min(getattr(p, "last_fatigue_notice_stint", 0), p.current_stint)
+
+
 def simulate_game(teamA: Team, teamB: Team):
     global SIM_FAST_FORWARD, SIM_JUMP_TARGET
     SIM_FAST_FORWARD = False
@@ -22433,6 +22448,8 @@ def simulate_game(teamA: Team, teamB: Team):
             maybe_shot_diet_adjustment(teamA, teamB, period)
             maybe_shot_diet_adjustment(teamB, teamA, period)
 
+        rest_at_break(teamA, teamB, halftime=q == 2)   # before the break's lineup calls, so they see rested legs
+
         # QUARTER SUBS GO HERE, OUTSIDE THE WHILE LOOP
         if getattr(teamA, "garbage_time_pending", False) or getattr(teamB, "garbage_time_pending", False):
             enter_garbage_time(teamA, teamB, period, 0)
@@ -22563,6 +22580,7 @@ def simulate_game(teamA: Team, teamB: Team):
             append_quarter_player_stats(teamA, period, ot_player_start_A)
             append_quarter_player_stats(teamB, period, ot_player_start_B)
 
+            rest_at_break(teamA, teamB)
             if auto_subs_allowed(teamA):
                 force_closing_lineup(teamA)
             if auto_subs_allowed(teamB):
