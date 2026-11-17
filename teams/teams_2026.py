@@ -1810,7 +1810,8 @@ def make_knicks_2026() -> Team:
                0.73, 0.53,
                clutchness=0.50, height=74, speed=0.82, shot_iq=0.94, stamina=0.74),
     ]
-    return _real_team('2026 New York Knicks', players, (32.1, 29.9, 29.4, 27.4, 26.4, 22.1, 15.1, 18.6, 12.4, 5.6, 13.3, 7.7), 0.947)
+    # Towns plays like the second option (the scaled real minutes had him at 27.4, 5th of the starters); the list still sums to 240
+    return _real_team('2026 New York Knicks', players, (34, 32, 33, 34, 30, 20, 15, 13, 9, 3, 12, 5), 0.947)
 
 
 def make_thunder_2026() -> Team:
