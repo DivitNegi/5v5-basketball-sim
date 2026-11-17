@@ -1173,11 +1173,11 @@ function renderTree() {
   const col = (title, body, cls = "") => h("div", { class: `br-col ${cls}` }, h("h4", {}, title), body);
   const champ = d.champion ? h("div", { class: "br-champ" }, h("div", { class: "muted" }, "CHAMPIONS"), h("div", { class: "t" }, identOf(d.champion).short),
     d.finals_mvp ? h("div", { class: "muted" }, `Finals MVP: ${typeof d.finals_mvp === "string" ? d.finals_mvp : `${d.finals_mvp.player || d.finals_mvp.name || ""}${d.finals_mvp.line ? " · " + d.finals_mvp.line : ""}`}`) : null) : null;
-  const center = h("div", { class: "br-col br-finals-col" }, h("h4", {}, Object.keys(F)[0] || "NBA Finals"), h("div", { class: "br-trophy" }, "🏆"), finals.map((s) => brCard(s, "final")));
+  const center = h("div", { class: "br-col br-finals-col a-f" }, h("h4", {}, Object.keys(F)[0] || "NBA Finals"), h("div", { class: "br-trophy" }, "🏆"), finals.map((s) => brCard(s, "final")));
   return h("div", {}, champ, h("div", { class: "bracket-wrap" }, h("div", { class: "bracket" },
-    col("East · 1st round", pairs(E["First Round"], "east")), col("East · semis", pairs(E["Semifinals"], "east")), col("East · finals", solo(E["Conference Finals"], "east")),
+    col("East · 1st round", pairs(E["First Round"], "east"), "a-e1"), col("East · semis", pairs(E["Semifinals"], "east"), "a-e2"), col("East · finals", solo(E["Conference Finals"], "east"), "a-e3"),
     center,
-    col("West · finals", solo(W["Conference Finals"], "west"), "west"), col("West · semis", pairs(W["Semifinals"], "west"), "west"), col("West · 1st round", pairs(W["First Round"], "west"), "west"))));
+    col("West · finals", solo(W["Conference Finals"], "west"), "west a-w3"), col("West · semis", pairs(W["Semifinals"], "west"), "west a-w2"), col("West · 1st round", pairs(W["First Round"], "west"), "west a-w1"))));
 }
 function piCard(g, note, conf, label) {
   const sel = BR.pi && BR.pi[0] === conf && BR.pi[1] === label;

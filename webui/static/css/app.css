@@ -323,7 +323,7 @@ table.stats tr.cut td { border-bottom: 1px dashed rgba(245,165,36,.6); }
 .filters input { background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 12px; min-width: 220px; outline: none; }
 
 /* bracket */
-.bracket-wrap { overflow-x: auto; padding: 6px 2px 14px; }
+.bracket-wrap { overflow-x: auto; padding: 6px 2px 14px; container-type: inline-size; container-name: bracket; }
 .bracket { display: grid; grid-template-columns: repeat(7, minmax(168px, 1fr)); gap: 18px; min-width: 1240px; align-items: stretch; }
 .br-col { display: flex; flex-direction: column; min-height: 440px; }
 .br-col h4 { margin: 0 0 10px; text-align: center; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
@@ -351,6 +351,19 @@ table.stats tr.cut td { border-bottom: 1px dashed rgba(245,165,36,.6); }
 .br-team.win { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 30%, transparent), transparent); }
 .br-team.win .w { color: var(--accent-2); }
 .br-finals-col { justify-content: center; }
+/* Too narrow for East | Finals | West side by side (the West half used to hide off to the right): East on top, West under it, both reading
+   left to right toward the Finals column on the right. */
+@container bracket (max-width: 1239px) {
+  .bracket { min-width: 0; gap: 14px 16px; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(140px, .85fr);
+             grid-template-areas: "e1 e2 e3 f" "w1 w2 w3 f"; }
+  .a-e1 { grid-area: e1; } .a-e2 { grid-area: e2; } .a-e3 { grid-area: e3; } .a-f { grid-area: f; }
+  .a-w1 { grid-area: w1; } .a-w2 { grid-area: w2; } .a-w3 { grid-area: w3; }
+  .br-col { min-height: 0; }
+  .br-col.west .br-pair::after { left: auto; right: -9px; border: 2px solid var(--line-strong); border-left: 0; border-radius: 0 7px 7px 0; }
+  .br-col.west .br-pair::before { left: auto; right: -18px; }
+  .br-solo.west::before { left: auto; right: -18px; }
+  .br-team { gap: 6px; padding: 6px 8px; font-size: 12.5px; }
+}
 .br-finals-col .br-trophy { text-align: center; font-size: 34px; margin-bottom: 6px; filter: drop-shadow(0 4px 14px rgba(245, 165, 36, .4)); }
 .br-champ { text-align: center; padding: 16px; border: 1px solid rgba(245, 165, 36, .4); border-radius: 14px; background: rgba(245, 165, 36, .08); margin-bottom: 14px; }
 .br-champ .t { font-size: 22px; font-weight: 800; color: var(--accent-2); }
