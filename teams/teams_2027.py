@@ -2268,6 +2268,13 @@ def make_knicks_2027() -> Team:
                clutchness=0.700, secondary_positions=('SF',), height=77, speed=0.790,
                shot_iq=0.700, stamina=0.70),
     ]
+    # Rotation (sums to 240): Towns plays like the second option he is -- the automatic estimate had him lowest of the five starters
+    # (~31 minutes, under 30 in the playoffs).
+    mins = {'Jalen Brunson': 35, 'Karl-Anthony Towns': 34, 'Mikal Bridges': 34, 'OG Anunoby': 33, 'Josh Hart': 31, 'Miles McBride': 20,
+            'Jordan Clarkson': 15, 'Andre Drummond': 14, 'Landry Shamet': 14, 'Jose Alvarado': 10}
+    for player in players:
+        if player.name in mins:
+            player.target_minutes = player.gui_target_minutes_override = mins[player.name]
     t = Team('2027 New York Knicks', players)
     t.init_lineup()
     return t
