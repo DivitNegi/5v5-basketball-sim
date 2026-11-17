@@ -1433,7 +1433,7 @@ def make_cavs_2027() -> Team:
 def make_pistons_2027() -> Team:
     players = [
         Player('Cade Cunningham', 'PG',
-               0.38, 0.28, 0.36, 0.06, 0.16, 0.76,
+               0.40, 0.28, 0.36, 0.06, 0.16, 0.76,
                0.800, 0.970, 0.940, 0.750, 0.810,
                0.45, 0.967, 0.860,
                0.630, 0.650, 0.380, 0.630, 0.950, 0.600,
@@ -1441,7 +1441,7 @@ def make_pistons_2027() -> Team:
                clutchness=0.700, secondary_positions=('SG',), height=78, speed=0.830,
                shot_iq=0.50, badges=('shot_creator_gold', 'clutch_silver'), stamina=0.85),
         Player('Duncan Robinson', 'SG',
-               0.64, 0.16, 0.08, 0.02, 0.10, 0.26,
+               0.88, 0.06, 0.06, 0.02, 0.10, 0.30,
                0.930, 0.790, 0.970, 0.700, 0.760,
                0.12, 0.587, 0.720,
                0.370, 0.510, 0.330, 0.470, 0.540, 0.400,
@@ -1449,23 +1449,23 @@ def make_pistons_2027() -> Team:
                clutchness=0.800, secondary_positions=('SF',), height=79, speed=0.590,
                shot_iq=0.750, badges=('movement_shooter', 'catch_shoot'), stamina=0.70),
         Player('Ausar Thompson', 'SF',
-               0.20, 0.14, 0.34, 0.10, 0.44, 0.22,
-               0.600, 0.570, 0.880, 0.910, 0.570,
+               0.06, 0.14, 0.34, 0.10, 0.44, 0.22,
+               0.500, 0.570, 0.880, 0.910, 0.570,
                0.16, 0.673, 0.780,
                0.980, 0.730, 0.670, 0.650, 0.430, 0.533,
                0.970, 0.890,
                clutchness=0.400, secondary_positions=('PF',), height=79, speed=0.940,
                shot_iq=0.300, badges=('lockdown_gold', 'chasedown'), stamina=0.88),
         Player('John Collins', 'PF',
-               0.36, 0.22, 0.22, 0.20, 0.44, 0.26,
+               0.20, 0.30, 0.22, 0.20, 0.44, 0.16,
                0.830, 0.740, 0.970, 0.900, 0.780,
-               0.16, 0.490, 0.600,
+               0.13, 0.490, 0.600,
                0.460, 0.660, 0.570, 0.640, 0.400, 0.600,
                0.490, 0.700,
                clutchness=0.600, secondary_positions=('C',), height=81, speed=0.710,
                shot_iq=0.650, stamina=0.72),
         Player('Jalen Duren', 'C',
-               0.00, 0.06, 0.24, 0.36, 0.60, 0.18,
+               0.00, 0.06, 0.24, 0.36, 0.60, 0.28,
                0.350, 0.700, 0.960, 0.900, 0.700,
                0.14, 0.500, 0.590,
                0.420, 0.700, 0.900, 0.940, 0.470, 0.733,
@@ -1473,15 +1473,15 @@ def make_pistons_2027() -> Team:
                clutchness=0.400, height=82, speed=0.730,
                shot_iq=0.700, badges=('lob_threat', 'rebounder'), stamina=0.84),
         Player('Daniss Jenkins', 'PG',
-               0.38, 0.20, 0.28, 0.02, 0.10, 0.24,
+               0.64, 0.20, 0.28, 0.02, 0.10, 0.40,
                0.830, 0.840, 0.800, 0.600, 0.820,
-               0.12, 0.790, 0.860,
+               0.16, 0.790, 0.860,
                0.630, 0.500, 0.450, 0.460, 0.720, 0.467,
                0.690, 0.320,
                clutchness=0.750, secondary_positions=('SG',), height=76, speed=0.750,
                shot_iq=0.800, stamina=0.78),
         Player('Isaiah Joe', 'SG',
-               0.58, 0.16, 0.10, 0.02, 0.10, 0.24,
+               0.76, 0.16, 0.10, 0.02, 0.10, 0.28,
                0.870, 0.920, 0.960, 0.600, 0.890,
                0.12, 0.573, 0.740,
                0.460, 0.420, 0.370, 0.500, 0.850, 0.400,
@@ -1489,15 +1489,15 @@ def make_pistons_2027() -> Team:
                clutchness=0.300, secondary_positions=('PG',), height=76, speed=0.720,
                shot_iq=0.650, badges=('catch_shoot',), stamina=0.78),
         Player('Paul Reed', 'C',
-               0.14, 0.16, 0.22, 0.28, 0.42, 0.20,
-               0.760, 0.740, 0.980, 0.750, 0.650,
-               0.12, 0.473, 0.520,
+               0.25, 0.16, 0.22, 0.28, 0.42, 0.12,
+               0.620, 0.740, 0.980, 0.750, 0.650,
+               0.09, 0.473, 0.520,
                0.910, 0.900, 0.920, 0.760, 0.640, 0.667,
                0.430, 0.690,
                clutchness=0.650, secondary_positions=('PF',), height=81, speed=0.490,
                shot_iq=0.600, stamina=0.83),
         Player('Ron Holland', 'PF',
-               0.28, 0.18, 0.30, 0.08, 0.28, 0.24,
+               0.95, 0.12, 0.30, 0.08, 0.28, 0.24,
                0.700, 0.640, 0.910, 0.800, 0.800,
                0.14, 0.517, 0.750,
                0.900, 0.560, 0.560, 0.670, 0.570, 0.533,
@@ -1513,7 +1513,7 @@ def make_pistons_2027() -> Team:
                clutchness=0.700, secondary_positions=('SF',), height=78, speed=0.840,
                shot_iq=0.450, stamina=0.75),
         Player('Ebuka Okorie', 'PG',
-               0.33, 0.18, 0.26, 0.02, 0.04, 0.19,
+               0.12, 0.18, 0.26, 0.02, 0.04, 0.19,
                0.770, 0.770, 0.756, 0.450, 0.830,
                0.15, 0.733, 0.860,
                0.700, 0.290, 0.310, 0.510, 0.670, 0.500,
@@ -1521,7 +1521,22 @@ def make_pistons_2027() -> Team:
                clutchness=0.400, secondary_positions=('SG',), height=74, speed=0.860,
                shot_iq=0.650, stamina=0.82),
     ]
+    # 2026-27 (Basketball-Reference, first 12 games): minutes are the real per-game averages scaled to one 240-minute game (Javonte Green
+    # is not on this roster). Attempt roles = (paced FGA target, soft cap), tuned until the games average the table's attempts.
+    mins = {'Cade Cunningham': 34, 'Duncan Robinson': 29, 'Daniss Jenkins': 27, 'Ausar Thompson': 27, 'Paul Reed': 25, 'John Collins': 25,
+            'Kevin Huerter': 23, 'Jalen Duren': 18, 'Ron Holland': 15, 'Isaiah Joe': 13, 'Ebuka Okorie': 4}
+    for player in players:
+        player.target_minutes = player.gui_target_minutes_override = mins[player.name]
     t = Team('2027 Detroit Pistons', players)
+    attempt_roles = {
+        'Cade Cunningham': (16.4, 18.2), 'Duncan Robinson': (11.7, 11.7), 'Daniss Jenkins': (11.6, 9.8), 'Ausar Thompson': (8.5, 8.5),
+        'Paul Reed': (8.4, 8.4), 'John Collins': (9.1, 9.1), 'Kevin Huerter': (10.0, 8.1), 'Jalen Duren': (10.2, 8.5),
+        'Ron Holland': (5.1, 5.1), 'Isaiah Joe': (7.8, 6.3), 'Ebuka Okorie': (4.0, 2.4),
+    }
+    for player in t.roster:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
     t.init_lineup()
     return t
 
