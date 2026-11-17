@@ -2718,9 +2718,9 @@ function shotSpot(ev, side, spread = false) {
   else if (z === "post") inLane(35, 85, 1.3, 1.15, 96);   // post-ups and hooks: around the block, rarely past the lane lines
   else if (z === "three") {
     if (ev.loc === "deep" || ev.loc === "heatcheck" || ev.loc === "heave") {
-      // 10 units = 1 ft. A deep three is a step or two behind the line (25-30 ft, rarely 31); a heat check can come from 28-35 ft;
+      // 10 units = 1 ft. A deep three is a Limitless-range look well behind the line (26-33 ft); a heat check can come from 28-35 ft;
       // only an end-of-quarter heave goes out near half court (38-44 ft, on its own half).
-      const [r0, span, curve, aMax] = ev.loc === "heave" ? [380, 60, 1, 0.5] : ev.loc === "heatcheck" ? [280, 70, 1.4, 0.9] : [252, 55, 1.8, 1.0];
+      const [r0, span, curve, aMax] = ev.loc === "heave" ? [380, 60, 1, 0.5] : ev.loc === "heatcheck" ? [280, 70, 1.4, 0.9] : [262, 70, 1.3, 1.0];
       for (let k = 0; k < 12; k++) { const r = r0 + span * Math.pow(rnd(), curve), a = (rnd() * 2 - 1) * aMax; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (y > Y0 + 12 && y < Y0 + CH - 12 && x < 492) break; }
     }
     else {

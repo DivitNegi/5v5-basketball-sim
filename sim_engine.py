@@ -2098,6 +2098,9 @@ CORNER_THREE_MAKE_BONUS = 0.014     # the corner three is the shortest: a small 
 ABOVE_BREAK_THREE_PENALTY = 0.006   # ...paid for by a small cost above the break, so the league average stays put
 
 
+LIMITLESS_DEEP_SHARE = {1: 0.07, 2: 0.11, 3: 0.16, 4: 0.22}   # share of a Limitless shooter's regular threes taken from logo range, by badge tier
+
+
 def three_location(shooter) -> str:
     """Where this player's next three comes from.
 
@@ -2108,6 +2111,10 @@ def three_location(shooter) -> str:
         return "above_break"
     if getattr(shooter, "limitless_range_attempt", False):
         return "deep"
+    # Limitless Range: a share of his ordinary threes come from well behind the line (27-33 ft) -- real logo shooters (Curry, Lillard, Trae)
+    # take a quarter to a third of their threes from 28+ ft, a typical player ~5%. Location only: his 3P% is already calibrated to his real
+    # mix, which includes those deep looks.
+    deep_p = LIMITLESS_DEEP_SHARE.get(limitless_range_tier(shooter), 0.0)
     badges = tuple(getattr(shooter, "badges", ()) or ())
     archetype = str(getattr(shooter, "archetype", "") or "").lower()
     spot = 0.0
@@ -2122,6 +2129,9 @@ def three_location(shooter) -> str:
     if any(str(b).startswith(("shot_creator", "limitless")) for b in badges):
         spot -= 0.15
     spot = max(0.0, min(1.0, spot))
+    # pull-up creators launch from logo range; spot-up shooters with the same badge mostly catch it at the line (Klay ~12% vs Curry ~30%)
+    if deep_p and random.random() < deep_p * (1.0 - 0.6 * spot):
+        return "deep"
     corner_p = 0.18 + 0.46 * spot
     prof = getattr(shooter, "shot_profile", None)
     if prof and prof.get("c3") is not None and prof.get("n3", 0) > 0:
