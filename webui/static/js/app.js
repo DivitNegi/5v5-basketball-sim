@@ -502,7 +502,9 @@ function rawLine(line, shot) {
   }
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
-  if (!root._stick && el.className !== "pbp-sys") { root._behind = (root._behind || 0) + 1; syncLatestButton(); }
+  // the "N new" button is refreshed once per batch (drainEvents): it reads the log's scroll height, and reading it after every line
+  // made the browser lay out all 5,000 lines per line -- a jump while scrolled up crawled at ~15 lines a second
+  if (!root._stick && el.className !== "pbp-sys") { root._behind = (root._behind || 0) + 1; root._wantSync = true; }
   if (root._stick) root._wantPin = true;   // the batch scrolls once, after all its lines are in
 }
 
@@ -818,6 +820,7 @@ function drainEvents() {
   if (lastLive) { applyLive(lastLive.data); scheduleGameViews(); scheduleStats(); }
   const log = $("#rawlog");
   if (log._wantPin) { log._wantPin = false; if (log._stick) pinBottom(log); }
+  if (log._wantSync) { log._wantSync = false; syncLatestButton(); }
   if (evQueue.length) scheduleDrain();
 }
 function handleEvent(msg) {
