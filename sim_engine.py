@@ -15207,8 +15207,10 @@ def run_late_game_quick_possession(off: Team, dff: Team, period: int, period_tim
         spent = min(period_time, random.randint(2, 4))
     elif period_time <= 16:
         spent = min(period_time, random.randint(3, 5))
+    elif period_time > 24 and dff.score - off.score <= 3:
+        spent = random.randint(6, 10)   # down one possession with time left: quick, but a real look
     else:
-        spent = min(period_time, random.randint(4, 6))
+        spent = min(period_time, random.randint(4, 7))
     score_time = max(0, period_time - spent)
     quick_clock = period_time <= 24
     need_three = off.score <= dff.score - 3
@@ -19699,6 +19701,11 @@ def simulate_possession(off: Team, dff: Team,
         return run_late_game_last_shot_possession(off, dff, period, period_time, teamA, teamB, matchups)
 
     if period >= 4 and 5 < period_time <= 24 and off.score < dff.score:
+        return run_late_game_quick_possession(off, dff, period, period_time, teamA, teamB, matchups)
+
+    # Trailing in the last minute: no patient half-court set. Down two possessions or more, every second counts; down one possession,
+    # they still push once inside 45 seconds (holding for the last shot is handled above).
+    if period >= 4 and 24 < period_time <= 60 and off.score < dff.score and (dff.score - off.score >= 4 or period_time <= 45):
         return run_late_game_quick_possession(off, dff, period, period_time, teamA, teamB, matchups)
 
     possession_time = random.randint(*HALF_COURT_POSSESSION_RANGE)
