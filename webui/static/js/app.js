@@ -1341,7 +1341,7 @@ async function loadQuarters() {
 }
 
 // ---- player card
-const zoneOfShot = (z) => (z === "dunk" || z === "rim" ? "rim" : z === "three" ? "three" : z === "post" ? "post" : "mid");
+const zoneOfShot = (z) => (z === "dunk" || z === "rim" ? "rim" : z === "three" ? "three" : z === "post" || z === "post_fade" ? "post" : "mid");   // post fades count as post shots, like the box score
 function cardFromSnapshot(snap, teamName, playerName, shots = [], quarter = "all") {
   const team = snap?.teams?.find((t) => t.name === teamName);
   const opp = snap?.teams?.find((t) => t.name !== teamName);
@@ -2716,6 +2716,7 @@ function shotSpot(ev, side, spread = false) {
     else inLane(42, 125, 1.5, 0.95, 92);          // a floater or short runner: 4-17 ft, rarer the further out
   }
   else if (z === "post") inLane(35, 85, 1.3, 1.15, 96);   // post-ups and hooks: around the block, rarely past the lane lines
+  else if (z === "post_fade") inLane(70, 80, 1.2, 1.35, 125);   // fadeaways off the block: 7-15 ft, the short corner to the edge of the lane
   else if (z === "three") {
     if (ev.loc === "deep" || ev.loc === "heatcheck" || ev.loc === "heave") {
       // 10 units = 1 ft. A deep three is a Limitless-range look well behind the line (26-33 ft); a heat check can come from 28-35 ft;
@@ -2760,7 +2761,7 @@ function shotZoneOf(ev, x, y) {
   if (z === "rim" || z === "dunk") return Math.hypot(x - SC_GEO.HX, y - SC_GEO.CY) <= 40 ? "ra" : "paint";   // a floater or short pull-up away from the rim counts with the paint
   if (z === "post") return "paint";
   const dx = x - SC_GEO.HX, dy = y - SC_GEO.CY, ang = Math.atan2(Math.abs(dy), dx), side = ev.side || (dy > 0 ? "R" : "L");   // L = left of the basket as the zone map is drawn
-  if (z === "mid") {
+  if (z === "mid" || z === "post_fade") {
     if (x <= 220 && Math.abs(dy) <= 80) return "paint";   // a short jumper or floater inside the lane counts with the paint
     return ang < 0.62 ? "elbow" : ang < 1.25 ? `mid_wing_${side}` : `baseline_${side}`;
   }
@@ -2878,7 +2879,7 @@ function mountShotChart(host, { big = false } = {}) {
       const pick = side ? st.right : st.left;
       if (pick === "none") return "";
       if (!arr.length) return "No shots yet.";
-      const by = (z) => arr.filter((e) => e.zone === z || (z === "mid" && e.zone === "post_fade"));
+      const by = (z) => arr.filter((e) => e.zone === z || (z === "post" && e.zone === "post_fade"));   // post fades count as post shots, like the box score
       return `FG ${fg(arr)} · 3PT ${fg(by("three"))} · rim ${fg([...by("rim"), ...by("dunk")])} · mid ${fg(by("mid"))} · post ${fg(by("post"))}`;
     };
     statsL.textContent = line(list.filter((e) => !sideOf(e.team)), 0);
