@@ -1345,6 +1345,7 @@ async function loadQuarters() {
 
 // ---- player card
 const zoneOfShot = (z) => (z === "dunk" || z === "rim" ? "rim" : z === "three" ? "three" : z === "post" || z === "post_fade" ? "post" : "mid");   // post fades count as post shots, like the box score
+const BOX_Q_KEYS = ["min", "pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "pm", "fgm", "fga", "tpm", "tpa", "ftm", "fta"];
 function cardFromSnapshot(snap, teamName, playerName, shots = [], quarter = "all") {
   const team = snap?.teams?.find((t) => t.name === teamName);
   const opp = snap?.teams?.find((t) => t.name !== teamName);
@@ -1352,9 +1353,17 @@ function cardFromSnapshot(snap, teamName, playerName, shots = [], quarter = "all
   if (!team || !p) return null;
   const inQ = (e) => quarter === "all" || (quarter === "OT" ? e.period >= 5 : e.period === Number(quarter));
   const mine = shots.filter((e) => e.player === playerName && inQ(e));
-  const tsd = 2 * (p.fga + .44 * p.fta);
-  return { team, opp, score: [team.score, opp?.score || 0], player: { ...p, ts: tsd ? +(100 * p.pts / tsd).toFixed(1) : null },
-    archetype: "", badges: [], past: true,
+  // an earlier game's box keeps each player's quarter split (q: period -> values in BOX_Q_KEYS order): the tiles follow the quarter
+  const split = quarter !== "all" && p.q ? Object.entries(p.q).filter(([per]) => quarter === "OT" ? Number(per) >= 5 : Number(per) === Number(quarter)) : null;
+  let line = p;
+  if (split) {
+    line = { ...p };
+    BOX_Q_KEYS.forEach((k, i) => { line[k] = split.reduce((sum, [, v]) => sum + (v[i] || 0), 0); });
+    line.min = +line.min.toFixed(1);
+  }
+  const tsd = 2 * (line.fga + .44 * line.fta);
+  return { team, opp, score: [team.score, opp?.score || 0], player: { ...line, ts: tsd ? +(100 * line.pts / tsd).toFixed(1) : null },
+    archetype: "", badges: [], past: true, quarterLine: !!split,
     shots: mine.reduce((z, e) => { const k = zoneOfShot(e.zone); z[k][1]++; if (e.made) z[k][0]++; return z; }, { rim: [0, 0], mid: [0, 0], three: [0, 0], post: [0, 0] }),
     by_quarter: Object.entries(shots.filter((e) => e.player === playerName).reduce((q, e) => { if (e.made) q[e.period] = (q[e.period] || 0) + (e.zone === "three" ? 3 : 2); else q[e.period] = q[e.period] || 0; return q; }, {})).map(([k, v]) => ({ period: Number(k), pts: v })).sort((a, b) => a.period - b.period), defended: null };
 }
@@ -1555,7 +1564,7 @@ async function loadPlayerCard() {
   const qLabel = GV.pc.quarter === "all" ? "game" : GV.pc.quarter === "OT" ? "overtime" : `Q${GV.pc.quarter}`;
   const pastGame = GV.pc.game !== "live";
   const gameLabel = chosenBracket ? `Game ${String(GV.pc.game).split(":").pop()}` : pastGame ? `Game ${GV.pc.game}` : `Game ${liveNo}`;
-  const qNote = GV.pc.quarter !== "all" && pastGame ? h("div", { class: "muted", style: { margin: "6px 0" } }, "The stat tiles show this earlier game's full line; the shot map, shot diet and points chart follow the quarter.") : null;
+  const qNote = GV.pc.quarter !== "all" && pastGame && !d.quarterLine ? h("div", { class: "muted", style: { margin: "6px 0" } }, "The stat tiles show this earlier game's full line; the shot map, shot diet and points chart follow the quarter.") : null;
   const plays = S.goodPlays.filter((pb) => pb.game === chosenGame && pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
   $("#pcardBody").replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": d.team.color } }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null,

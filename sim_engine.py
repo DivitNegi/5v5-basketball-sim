@@ -7125,6 +7125,20 @@ def push_gui_playoff_update(playoff_player_totals: Dict, playoff_team_totals: Di
     GUI_SERIES_UPDATE_QUEUE.put(sections)
 
 
+# a box line's per-quarter split, stored as one short list per period in this order (the page's player card reads it)
+BOX_QUARTER_KEYS = ("min", "pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "pm", "fgm", "fga", "tpm", "tpa", "ftm", "fta")
+_BOX_QUARTER_SOURCE = ("minutes", "pts", "reb", "ast", "stl", "blk", "tov", "oreb", "dreb", "pf", "plus_minus", "fgm", "fga", "tpm", "tpa", "ftm", "fta")
+
+
+def box_quarter_split(team: Team, player_key: str) -> Dict[str, list]:
+    out = {}
+    for row in (getattr(team, "quarter_player_stats", None) or {}).get(player_key, []):
+        vals = [row.get(k, 0) for k in _BOX_QUARTER_SOURCE]
+        vals[0] = round(vals[0] / 60, 1)
+        out[str(row.get("period"))] = vals
+    return out
+
+
 def box_score_snapshot(team: Team) -> Dict:
     """Compact full box score of a finished game: every player's line plus team extras."""
     players = []
@@ -7132,6 +7146,7 @@ def box_score_snapshot(team: Team) -> Dict:
         if p.minutes <= 0 and p.pts == 0 and p.fga == 0:
             continue
         players.append({
+            "q": box_quarter_split(team, player_stat_key(team, p)),
             "name": player_stat_key(team, p), "pos": p.position, "st": bool(getattr(p, "is_starter", False)),
             "min": round(p.minutes / 60, 1), "pts": p.pts, "reb": p.reb, "ast": p.ast, "stl": p.stl,
             "blk": p.blk_stat, "tov": p.tov, "oreb": p.oreb_stat, "dreb": p.dreb_stat, "pf": p.pf,
