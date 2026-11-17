@@ -1752,7 +1752,7 @@ def make_knicks_2026() -> Team:
                0.23, 0.67, 0.29,
                0.71, 0.63, 0.97, 0.97, 0.80, 0.67,
                0.60, 0.85,
-               clutchness=0.80, height=84, speed=0.66, shot_iq=0.79, stamina=0.70),
+               clutchness=0.80, secondary_positions=('PF',), height=84, speed=0.66, shot_iq=0.79, stamina=0.70),
         Player('Josh Hart', 'SF',
                0.34, 0.14, 0.28, 0.05, 0.08, 0.27,
                0.87, 0.82, 0.87, 0.66, 0.72,

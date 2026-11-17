@@ -2225,7 +2225,7 @@ def make_knicks_2027() -> Team:
                0.24, 0.827, 0.650,
                0.420, 0.570, 0.760, 0.930, 0.800, 0.667,
                0.500, 0.800,
-               clutchness=0.980, height=84, speed=0.760,
+               clutchness=0.980, secondary_positions=('PF',), height=84, speed=0.760,
                shot_iq=0.980, stamina=0.68),
         Player('Miles McBride', 'SG',
                0.48, 0.18, 0.18, 0.02, 0.08, 0.22,
