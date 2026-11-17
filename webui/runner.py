@@ -420,7 +420,7 @@ class SimRunner:
             self._pending_shot = {"team": team.name, "player": player.name, "zone": str(info.get("shot_type") or "mid"), "loc": loc, "dist": dist, "side": "L" if "side_L" in tokens else "R" if "side_R" in tokens else None, "period": ctx.get("period"), "clock": ctx.get("period_time")}
         elif kind == "make":
             self._flush_shot(True)
-        elif kind == "miss":
+        elif kind in ("miss", "dead_ball"):   # dead_ball: a missed or blocked shot went out of bounds / the horn went, with no rebound
             self._flush_shot(False)
 
     def _on_shot_hook(self, kind: str, **info):

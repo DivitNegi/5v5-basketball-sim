@@ -7585,6 +7585,9 @@ def period_label(period: int) -> str:
 
 
 def print_scoreboard(period: int, period_time: int, teamA: Team, teamB: Team):
+    if SHOT_RESULT_HOOK is not None:
+        # the play is dead: a shot still waiting for its result went out of bounds (or missed at the horn) without a rebound, so it missed
+        SHOT_RESULT_HOOK("dead_ball")
     label = period_label(period)
     print(f"{label} | {format_time(period_time)} | {teamA.name}: {teamA.score}  {teamB.name}: {teamB.score}")
 
