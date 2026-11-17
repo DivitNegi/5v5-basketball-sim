@@ -2395,6 +2395,41 @@ def commentator_game_winner(shooter: str, team: str, shot_type: str, score_time:
     return random.choice(pool).format(shooter=shooter, team=team, time_left=time_left_phrase(score_time))
 
 
+BUZZER_WINNER_LINES = {
+    "three": [
+        "{shooter} lets it fly as the horn sounds... BANG! GOOD! {shooter} WINS IT FOR {team_up}!",
+        "Catch, rise, fire, horn... and it is GOOD! {shooter} with the dagger three at the buzzer! {team} win it!",
+        "{shooter} for the win... got it! The red light is on and {team} storm the floor!",
+        "The ball is in the air as the clock hits zero... SPLASH! {shooter} wins it for {team} at the horn!",
+    ],
+    "other": [
+        "{shooter} gets it up before the horn... it drops! {shooter} WINS IT FOR {team_up}!",
+        "The clock hits zero with the ball in the air... and it rolls in! {shooter} is the hero for {team}!",
+        "{shooter} for the win... GOOD! A buzzer-beater, and {team} pull it out!",
+    ],
+}
+BUZZER_WINNER_FOLLOWUPS = [
+    "Bedlam. {shooter} is mobbed by his teammates at midcourt.",
+    "{shooter} holds the pose as the bench empties onto the floor.",
+    "What a finish. {shooter} turns and screams at the crowd as {team} pile on him.",
+    "The building erupts. {shooter} has delivered when it mattered most.",
+    "{team} pour off the bench and swallow {shooter} in a celebration at center court.",
+]
+
+
+def commentator_buzzer_winner(shooter: str, team: str, shot_type: str) -> List[str]:
+    """A game-winner with no time left: the call, then the celebration."""
+    short = team.split(" ", 1)[1] if team[:4].isdigit() else team
+    pool = BUZZER_WINNER_LINES["three" if shot_type == "three" else "other"]
+    fmt = {"shooter": shooter, "team": short, "team_up": short.upper()}
+    return [random.choice(pool).format(**fmt), random.choice(BUZZER_WINNER_FOLLOWUPS).format(**fmt)]
+
+
+def is_buzzer_game_winner(off: "Team", dff: "Team", period: int, points: int) -> bool:
+    """The horn has sounded on the last period (4th or an overtime) and this shot just put the team ahead from tied or behind."""
+    return period >= 4 and off.score > dff.score and off.score - points <= dff.score
+
+
 def commentator_game_tying_shot(shooter: str, team: str, shot_type: str, score_time: int) -> str:
     pool = late_game_tying_three_lines if shot_type == "three" else late_game_tying_lines
     return random.choice(pool).format(shooter=shooter, team=team, time_left=time_left_phrase(score_time))
@@ -14960,7 +14995,14 @@ def end_of_quarter_catch_shoot_three(off: Team, dff: Team, period: int, period_t
         if inbounder is not shooter:
             record_assist(inbounder, off, 3)
         record_score_event(off, dff, 3, period, 0, teamA, teamB)
-        print(f"{shooter.name} buries the catch-and-shoot three before the horn.")
+        if is_buzzer_game_winner(off, dff, period, 3):
+            for line in commentator_buzzer_winner(shooter.name, off.name, "three"):
+                print(line)
+                time.sleep(SLEEP * 1.1)
+        elif period >= 4 and off.score == dff.score:
+            print(f"{shooter.name} buries the catch-and-shoot three at the horn to tie it! We are going to overtime!")
+        else:
+            print(f"{shooter.name} buries the catch-and-shoot three before the horn.")
         print_scoreboard(period, 0, teamA, teamB)
     else:
         print(f"{shooter.name}'s catch-and-shoot three at the horn is off.")
@@ -15122,7 +15164,12 @@ def run_late_game_last_shot_possession(off: Team, dff: Team, period: int, period
             record_assist(last_passer, off, pts)
         record_score_event(off, dff, pts, period, score_time, teamA, teamB, check_timeout=False)
         if is_late_go_ahead_make(score_before, dff.score, pts, period, score_time):
-            print(commentator_game_winner(shooter.name, off.name, shot_type, score_time))
+            if score_time <= 0:
+                for line in commentator_buzzer_winner(shooter.name, off.name, shot_type):
+                    print(line)
+                    time.sleep(SLEEP * 1.1)
+            else:
+                print(commentator_game_winner(shooter.name, off.name, shot_type, score_time))
         elif off.score == dff.score:
             print(commentator_game_tying_shot(shooter.name, off.name, shot_type, score_time))
         else:
@@ -15134,7 +15181,7 @@ def run_late_game_last_shot_possession(off: Team, dff: Team, period: int, period
 
     update_shot_rhythm(shooter, False, shot_type)
     if deficit == 0:
-        print(f"{shooter.name} cannot win it at the horn.")
+        print(f"{shooter.name} cannot win it at the horn." if score_time <= 1 else f"{shooter.name} misses the go-ahead look with {score_time} seconds left.")
     elif need_three:
         print(f"{shooter.name} cannot tie it from deep.")
     else:
@@ -15146,7 +15193,7 @@ def run_late_game_last_shot_possession(off: Team, dff: Team, period: int, period
         return dff, spent
 
     reb_team, rebounder = choose_rebounder(off, dff, "rim" if is_paint_shot(shot_type) else "jumper")
-    print(f"{rebounder.name} pulls down the rebound as the clock runs out.")
+    print(f"{rebounder.name} pulls down the rebound with {score_time} seconds left.")
     print_scoreboard(period, score_time, teamA, teamB)
     return (off if reb_team is off else dff), spent
 
