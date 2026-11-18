@@ -5,7 +5,7 @@ from sim_engine import *
 def make_lakers_1987() -> Team:
     players = [
         Player("Magic Johnson", "PG",
-               0.00, 0.36, 0.30, 0.14, 0.25, 0.260,
+               0.03, 0.36, 0.30, 0.14, 0.25, 0.950,
                0.60, 0.92, 0.98, 0.82, 0.85,
                0.40, 0.99, 0.92,
                0.89, 0.31, 0.40, 0.80, 0.990, 0.733,
@@ -13,7 +13,7 @@ def make_lakers_1987() -> Team:
                clutchness=0.94, stamina=0.92),
 
         Player("Byron Scott", "SG",
-               0.42, 0.30, 0.20, 0.08, 0.24, 0.285,
+               0.05, 0.48, 0.20, 0.08, 0.24, 0.885,
                0.86, 0.84, 0.84, 0.78, 0.82,
                0.22, 0.54, 0.64,
                0.69, 0.35, 0.38, 0.47, 0.600, 0.667,
@@ -21,7 +21,7 @@ def make_lakers_1987() -> Team:
                clutchness=0.80, stamina=0.78),
 
         Player("James Worthy", "SF",
-               0.08, 0.36, 0.34, 0.22, 0.55, 0.340,
+               0.08, 0.36, 0.34, 0.22, 0.55, 0.900,
                0.52, 0.88, 0.94, 0.90, 0.76,
                0.26, 0.52, 0.68,
                0.78, 0.57, 0.55, 0.71, 0.867, 0.733,
@@ -29,22 +29,22 @@ def make_lakers_1987() -> Team:
                clutchness=0.88, stamina=0.85),
 
         Player("A.C. Green", "PF",
-               0.02, 0.24, 0.30, 0.44, 0.45, 0.190,
+               0.02, 0.24, 0.30, 0.44, 0.45, 0.590,
                0.12, 0.76, 0.88, 0.84, 0.74,
                0.14, 0.34, 0.38,
                0.61, 0.60, 0.86, 0.84, 0.667, 0.800,
                0.50, 0.85, stamina=0.83),
 
         Player("Kareem Abdul-Jabbar", "C",
-               0.02, 0.34, 0.20, 0.44, 0.30, 0.300,
+               0.02, 0.34, 0.20, 0.34, 0.30, 0.500,
                0.08, 0.92, 0.99, 0.99, 0.78,
-               0.22, 0.48, 0.42,
+               0.18, 0.48, 0.42,
                0.56, 0.95, 0.95, 0.96, 0.800, 0.733,
                0.37, 0.96,
                clutchness=0.88, stamina=0.8),
 
         Player("Michael Cooper", "SG",
-               0.36, 0.28, 0.24, 0.12, 0.25, 0.185,
+               0.18, 0.34, 0.24, 0.12, 0.25, 0.680,
                0.80, 0.78, 0.82, 0.78, 0.82,
                0.14, 0.62, 0.64,
                0.91, 0.31, 0.33, 0.49, 0.467, 0.667,
@@ -52,34 +52,57 @@ def make_lakers_1987() -> Team:
                clutchness=0.78, stamina=0.86),
 
         Player("Mychal Thompson", "PF",
-               0.04, 0.30, 0.24, 0.42, 0.35, 0.210,
+               0.04, 0.30, 0.24, 0.42, 0.35, 0.610,
                0.16, 0.82, 0.88, 0.82, 0.72,
                0.16, 0.42, 0.42,
                0.58, 0.61, 0.52, 0.63, 0.667, 0.867,
                0.45, 0.79, stamina=0.7),
 
         Player("Kurt Rambis", "PF",
-               0.00, 0.18, 0.28, 0.54, 0.32, 0.105,
+               0.00, 0.18, 0.28, 0.54, 0.32, 0.400,
                0.05, 0.68, 0.82, 0.76, 0.66,
                0.08, 0.30, 0.30,
                0.71, 0.55, 0.83, 0.81, 0.467, 0.933,
                0.34, 0.82, stamina=0.74),
 
         Player("Mike Smrek", "C",
-               0.00, 0.16, 0.24, 0.60, 0.26, 0.080,
+               0.00, 0.16, 0.24, 0.60, 0.26, 0.580,
                0.05, 0.64, 0.78, 0.72, 0.62,
                0.06, 0.22, 0.22,
                0.64, 0.83, 0.84, 0.99, 0.333, 0.867,
                0.65, 0.72, stamina=0.6),
 
         Player("Wes Matthews", "PG",
-               0.24, 0.32, 0.32, 0.12, 0.18, 0.120,
+               0.03, 0.40, 0.32, 0.12, 0.18, 0.600,
                0.70, 0.76, 0.80, 0.70, 0.76,
                0.10, 0.56, 0.58,
                0.87, 0.29, 0.32, 0.43, 0.467, 0.667,
                0.92, 0.38, stamina=0.65),
     ]
+    # 1986-87 (Basketball-Reference regular season): minutes are the real per-game averages scaled to one 240-minute game (Billy Thompson,
+    # Brickowski and Branch are not on this roster). Attempt roles = (paced FGA target, real FGA as the soft cap), tuned until the games
+    # average the table's attempts.
+    mins = {'Magic Johnson': 35, 'James Worthy': 33, 'Byron Scott': 32, 'Kareem Abdul-Jabbar': 30, 'A.C. Green': 27, 'Michael Cooper': 27,
+            'Mychal Thompson': 20, 'Kurt Rambis': 19, 'Wes Matthews': 10, 'Mike Smrek': 7}
+    for player in players:
+        player.target_minutes = player.gui_target_minutes_override = mins[player.name]
     t = Team("1987 Los Angeles Lakers", players)
+    attempt_roles = {
+        'Magic Johnson': (21.0, 16.4),
+        'Byron Scott': (13.8, 13.8),
+        'James Worthy': (17.0, 14.7),
+        'A.C. Green': (7.4, 7.4),
+        'Kareem Abdul-Jabbar': (10.6, 12.7),
+        'Michael Cooper': (11.0, 9.0),
+        'Mychal Thompson': (10.0, 8.2),
+        'Kurt Rambis': (3.4, 4.0),
+        'Mike Smrek': (1.7, 1.7),
+        'Wes Matthews': (5.5, 3.7),
+    }
+    for player in t.roster:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
     t.init_lineup()
     return t
 
