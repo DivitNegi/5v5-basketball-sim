@@ -2098,6 +2098,7 @@ CORNER_THREE_MAKE_BONUS = 0.014     # the corner three is the shortest: a small 
 ABOVE_BREAK_THREE_PENALTY = 0.006   # ...paid for by a small cost above the break, so the league average stays put
 
 
+LOGO_SHARE_TOP_LIMITLESS = 0.55   # share of a top-tier Limitless shooter's deep threes that come from the logo (30-36 ft)
 LIMITLESS_DEEP_SHARE = {1: 0.07, 2: 0.11, 3: 0.16, 4: 0.22}   # share of a Limitless shooter's regular threes taken from logo range, by badge tier
 
 
@@ -6514,7 +6515,9 @@ def add_to_shot_diet(diet: Dict[str, int], shot_type: str, context: str = "", ma
             contexts = contexts | {"heave3"}
         if "heatcheck" in contexts:
             contexts = contexts | {"heatcheck3"}
-    for tok in ("rim_float", "mid_long", "heave3", "heatcheck3"):   # how far out (season charts place this many as floaters, long twos, heaves)
+        if "logo" in contexts:
+            contexts = contexts | {"logo3"}
+    for tok in ("rim_float", "mid_long", "heave3", "heatcheck3", "logo3"):   # how far out (season charts place this many as floaters, long twos, heaves)
         if tok in contexts:
             k2 = f"{tok}_made" if made else tok
             diet[k2] = diet.get(k2, 0) + 1
@@ -12566,6 +12569,9 @@ def tag_three_location(player, context: str, consume: bool) -> str:
         rolled_side = shot_side(player)   # always rolled, so the dice are used the same way with or without a text hint
         if CURRENT_THREE_LOC == "corner" or CURRENT_THREE_SUB == "wing3":   # these spots exist on both sides of the floor
             loc += "|side_" + (hint_side or rolled_side)
+        if CURRENT_THREE_LOC == "deep" and player is not None and "heave" not in str(context or "") \
+                and not getattr(player, "heat_check_attempt", False) and limitless_range_tier(player) >= 4 and random.random() < LOGO_SHARE_TOP_LIMITLESS:
+            loc += "|logo"   # 30-36 ft: from the logo
         if player is not None:
             player._three_loc = None
             player._three_loc_used = loc
@@ -14917,6 +14923,18 @@ def shoot_retained_free_throw(shooter: Player, team: Team, period: int, period_t
     time.sleep(SLEEP * 0.5)
 
 
+def record_heave_miss_for_charts(team: Team, player: Player):
+    """A missed buzzer heave does not count as a field-goal attempt, but the shot charts still show it: only the heave3 counter moves
+    (no three / deep3 / FGA), and the live chart gets the attempt (the dead ball right after resolves it as a miss)."""
+    for holder in (team, player):
+        diet = getattr(holder, "shot_diet", None)
+        if diet is None:
+            diet = holder.shot_diet = {}
+        diet["heave3"] = diet.get("heave3", 0) + 1
+    if SHOT_RESULT_HOOK is not None:
+        SHOT_RESULT_HOOK("attempt", team=team, player=player, shot_type="three", context="heave|contested|deep")
+
+
 def end_of_quarter_heave(off: Team, dff: Team, period: int, period_time: int,
                          teamA: Team, teamB: Team):
     sorted_pm = sorted(
@@ -14946,6 +14964,7 @@ def end_of_quarter_heave(off: Team, dff: Team, period: int, period_time: int,
         print_scoreboard(period, 0, teamA, teamB)
         print(f"{shooter.name} drills the half-court heave at the buzzer.")
     else:
+        record_heave_miss_for_charts(off, shooter)
         print_scoreboard(period, 0, teamA, teamB)
         print(f"{shooter.name}'s half-court heave is off the mark. It won't count against his stats.")
     time.sleep(SLEEP * 0.9)

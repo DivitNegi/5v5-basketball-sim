@@ -413,6 +413,8 @@ class SimRunner:
             if info.get("shot_type") == "three":   # the page draws these from further out than an ordinary deep three
                 if "heave" in str(info.get("context") or ""):
                     loc = "heave"
+                elif "logo" in tokens:
+                    loc = "logo"
                 elif getattr(player, "heat_check_attempt", False):
                     loc = "heatcheck"
             dist = ("float" if "rim_float" in tokens else "close" if "rim_close" in tokens else "long" if "mid_long" in tokens

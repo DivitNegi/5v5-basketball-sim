@@ -2206,7 +2206,7 @@ function seasonShotChart(name, zones, avg, vs, split) {
   }
   if (split) {   // give his shots their real locations and sides: so many left / right corner and wing threes, baseline / wing jumpers on each side, elbow, top, deep
     const tag = (zone, parts) => {
-      const list = events.filter((e) => e.zone === zone), made = list.filter((e) => e.made), miss = list.filter((e) => !e.made);
+      const list = events.filter((e) => e.zone === zone && !e.extra), made = list.filter((e) => e.made), miss = list.filter((e) => !e.made);
       for (const [loc, side, [m, a]] of parts) {
         made.splice(0, m).forEach((e) => { e.loc = loc; if (side) e.side = side; });
         miss.splice(0, Math.max(0, a - m)).forEach((e) => { e.loc = loc; if (side) e.side = side; });
@@ -2215,8 +2215,12 @@ function seasonShotChart(name, zones, avg, vs, split) {
     const t = split.three || {}, m2 = split.mid || {}, z = [0, 0];
     const sided = (o, name, loc) => (o[`${name}_L`] || o[`${name}_R`]) ? [[loc, "L", o[`${name}_L`] || z], [loc, "R", o[`${name}_R`] || z]] : [[loc, null, o[name] || z]];
     // heaves (near half court) and heat checks (28-35 ft) are part of the deep count; they get their own spots
-    const deepRest = t.deep ? [Math.max(0, t.deep[0] - (t.heave?.[0] || 0) - (t.heatcheck?.[0] || 0)), Math.max(0, t.deep[1] - (t.heave?.[1] || 0) - (t.heatcheck?.[1] || 0))] : z;
-    tag("three", [...sided(t, "corner", "corner"), ["heave", null, t.heave || z], ["heatcheck", null, t.heatcheck || z], ["deep", null, deepRest], ...sided(t, "wing", "wing"), ["top", null, t.top || z]]);
+    // only made heaves are in the deep count (a missed heave is not a field-goal attempt; it is only in the heave count)
+    const sub = (k, i) => (t[k]?.[i] || 0);
+    const deepRest = t.deep ? [Math.max(0, t.deep[0] - sub("heave", 0) - sub("heatcheck", 0) - sub("logo", 0)), Math.max(0, t.deep[1] - sub("heave", 0) - sub("heatcheck", 1) - sub("logo", 1))] : z;
+    // missed heaves are not in his 3PA: they are extra dots, drawn at half court
+    for (let i = 0; i < Math.max(0, sub("heave", 1) - sub("heave", 0)); i++) events.push({ player: name, zone: "three", made: false, n: n++, team: "", loc: "heave", extra: true });
+    tag("three", [...sided(t, "corner", "corner"), ["heave", null, [sub("heave", 0), sub("heave", 0)]], ["heatcheck", null, t.heatcheck || z], ["logo", null, t.logo || z], ["deep", null, deepRest], ...sided(t, "wing", "wing"), ["top", null, t.top || z]]);
     tag("mid", [...sided(m2, "base", "base"), ["elbow", null, m2.elbow || z], ...sided(m2, "wing", "wing")]);
     // how far out: so many of his paint shots were floaters and so many jumpers long twos (made ones first, like the location split)
     const d = split.dist || {};
@@ -2729,10 +2733,11 @@ function shotSpot(ev, side, spread = false) {
   else if (z === "post") inLane(35, 85, 1.3, 1.15, 96);   // post-ups and hooks: around the block, rarely past the lane lines
   else if (z === "post_fade") inLane(70, 80, 1.2, 1.35, 125);   // fadeaways off the block: 7-15 ft, the short corner to the edge of the lane
   else if (z === "three") {
-    if (ev.loc === "deep" || ev.loc === "heatcheck" || ev.loc === "heave") {
+    if (ev.loc === "deep" || ev.loc === "heatcheck" || ev.loc === "heave" || ev.loc === "logo") {
       // 10 units = 1 ft. A deep three is a Limitless-range look well behind the line (26-33 ft); a heat check can come from 28-35 ft;
       // only an end-of-quarter heave goes out near half court (38-44 ft, on its own half).
-      const [r0, span, curve, aMax] = ev.loc === "heave" ? [380, 60, 1, 0.5] : ev.loc === "heatcheck" ? [280, 70, 1.4, 0.9] : [262, 70, 1.3, 1.0];
+      // a top-tier Limitless shooter's logo three: 30-36 ft
+      const [r0, span, curve, aMax] = ev.loc === "heave" ? [380, 60, 1, 0.5] : ev.loc === "heatcheck" ? [280, 70, 1.4, 0.9] : ev.loc === "logo" ? [300, 60, 1.2, 0.8] : [262, 70, 1.3, 1.0];
       for (let k = 0; k < 12; k++) { const r = r0 + span * Math.pow(rnd(), curve), a = (rnd() * 2 - 1) * aMax; x = HX + r * Math.cos(a); y = HY + r * Math.sin(a); if (y > Y0 + 12 && y < Y0 + CH - 12 && x < 492) break; }
     }
     else {
