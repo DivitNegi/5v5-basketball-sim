@@ -446,7 +446,7 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, c
             g = max(1, mvp_stats.get("games", 1))
             finals_mvp = {
                 "player": mvp_name, "team": champion,
-                "line": f"{mvp_stats.get('pts', 0) / g:.1f} PTS, {mvp_stats.get('reb', 0) / g:.1f} REB, {mvp_stats.get('ast', 0) / g:.1f} AST",
+                "line": f"{mvp_stats.get('pts', 0) / g:.1f} PTS, {mvp_stats.get('reb', 0) / g:.1f} REB, {mvp_stats.get('ast', 0) / g:.1f} AST in the Finals ({g} games)",
             }
             print(f"FINALS MVP: {mvp_name} ({champion}) - {finals_mvp['line']}")
             stage["lines"].append(f"FINALS MVP: {mvp_name} - {finals_mvp['line']}")
