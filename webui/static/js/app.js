@@ -2136,7 +2136,7 @@ async function openTeamCard(team) {
       h("div", { class: "stat-tiles" }, tile("PPG", fmt(pg.pts)), tile("OPP PPG", fmt(pg.opp_pts)), tile("RPG", fmt(pg.reb)), tile("APG", fmt(pg.ast)), tile("SPG", fmt(pg.stl)), tile("BPG", fmt(pg.blk)), tile("TOV", fmt(pg.tov)),
         tile("FG%", fmt(pg.fgp)), tile("3P%", fmt(pg.tpp)), tile("FT%", fmt(pg.ftp))),
       h("div", { class: "pc-viz", style: { gridTemplateColumns: "1.4fr 1fr", marginTop: "12px" } },
-        h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, ranked among the ${d.pool} teams (1st = best). For defense (points allowed) and turnovers the spoke follows the number itself, so there a shorter spoke is better; everywhere else longer is better.`), percentileRadar(d.ranks, chartColor())),
+        h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, ranked among the ${d.pool} teams (1st = best). A longer spoke is always better: for defense (points allowed) and turnovers, fewer is a longer spoke.`), percentileRadar(d.ranks, chartColor())),
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
           d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)),
       ...(d.insights ? teamInsights(d.insights, id, team) : []));
@@ -2152,7 +2152,7 @@ function teamInsights(t, id, team) {
   const sub = (txt) => h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, txt);
   return [
     ...(t.adv_groups || []).filter((g) => g.ranks.some((r) => r.pct != null)).map((g) => h("div", { class: "pc-panel", style: { marginTop: "12px" } },
-      h("h4", {}, `${g.title} · against the other ${t.pool - 1} teams`), sub(`${g.desc} The spoke follows the number; for stats where lower is better (defensive rating, turnovers, opponent shooting) a shorter spoke is better, and the rank in brackets always counts 1st as best.`), percentileRadar(g.ranks, color))),
+      h("h4", {}, `${g.title} · against the other ${t.pool - 1} teams`), sub(`${g.desc} A longer spoke is always better: for stats where lower is better (defensive rating, turnovers, opponent shooting) a lower number makes a longer spoke. The rank in brackets counts 1st as best.`), percentileRadar(g.ranks, color))),
     hasZones ? h("div", { class: "pc-viz", style: { marginTop: "12px" } }, h("div", { class: "pc-panel" }, h("h4", {}, "Shot diet"), pcDonut(t.shots)), h("div", { class: "pc-panel" }, h("h4", {}, "By zone"), zoneRow)) : null,
     hasZones && t.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Shot zones · against the other teams"),
       sub("For the rim, midrange, three and post: how well the team shoots it (FG%) and how often (shots a game), ranked among the teams."), percentileRadar(t.zone_ranks, color)) : null,

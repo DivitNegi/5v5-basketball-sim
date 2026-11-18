@@ -398,11 +398,12 @@ def team_detail(runner, team):
         fine_avg[k] = {"pct": round(100 * mm / aa, 2) if aa else None, "att": aa}
 
     def rank_of(val, pop, lower):
-        """rank 1 = best; the spoke follows the number itself (for lower-is-better stats a shorter spoke is the better team)"""
+        """rank 1 = best; the spoke always runs from worst (0) to best (100), so for lower-is-better stats a low number is a long spoke"""
         better = sum(1 for v in pop if (v < val - 1e-9 if lower else v > val + 1e-9))
         below = sum(1 for v in pop if v < val - 1e-9)
         equal = sum(1 for v in pop if abs(v - val) <= 1e-9)
-        return 1 + better, (round(100 * (below + 0.5 * equal) / len(pop)) if pop else None)
+        above = len(pop) - below - equal
+        return 1 + better, (round(100 * ((above if lower else below) + 0.5 * equal) / len(pop)) if pop else None)
 
     zone_ranks = []
     for key, label in (("rim", "Rim"), ("mid", "Midrange"), ("three", "3-pt"), ("post", "Post")):
