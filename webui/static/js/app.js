@@ -154,7 +154,8 @@ document.addEventListener("click", (e) => {
   const teamEl = e.target.closest("[data-team]") || (cell.matches(".court-team-head, .tcell, .tm") ? cell.querySelector("[data-team]") : null);
   const playerEl = cell.matches("[data-player]") ? cell : cell.querySelector("[data-player]") || cell.closest("td, .rtop, .pcell")?.querySelector("[data-player]");
   if (teamEl && (!playerEl || e.target.closest("[data-team]") || cell.matches(".court-team-head, .tcell, .tm"))) { openTeamCard(teamEl.dataset.team); return; }
-  if (playerEl?.dataset.player) openStatsPlayer("", playerEl.dataset.player, "auto");
+  // the table he was clicked in names its team (data-pteam), so a 2018 player opens as the 2018 version, not whichever year has the most games
+  if (playerEl?.dataset.player) openStatsPlayer(cell.closest("[data-pteam]")?.dataset.pteam || "", playerEl.dataset.player, "auto");
 });
 
 // ───────────────────────── team picker ─────────────────────────
@@ -300,7 +301,7 @@ function renderCourt() {
     for (const g of S.leaving.filter((x) => x.side === i)) rows.push(h("tr", { class: "leaving", style: { "--delay": `-${Math.round(nowMs - g.at)}ms` } }, h("td", { class: "l", colspan: STAT_COLS.length + 1 }, `↓ ${g.name} checks out`)));
     S.prevOnCourt[i] = now;
     const tot = t.totals;
-    return h("div", { class: "court-team", style: { "--c": t.color } },
+    return h("div", { class: "court-team", "data-pteam": t.name, style: { "--c": t.color } },
       h("div", { class: "court-team-head" }, logoEl(t), t.short, h("span", { class: "tot" }, `FG ${tot.fgm}-${tot.fga} · 3PT ${tot.tpm}-${tot.tpa} · FT ${tot.ftm}-${tot.fta}`)),
       h("div", { class: "court-scroll" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...STAT_COLS.map(([, l]) => h("th", {}, l)))), h("tbody", {}, rows))));
   });
@@ -404,7 +405,7 @@ function renderBox() {
   body.push(...starters.map(row));
   if (bench.length) { body.push(h("tr", { class: "sep" }, h("td", { class: "l", colspan: BOX_COLS.length + 1 }, "Bench"))); body.push(...bench.map(row)); }
   body.push(totals);
-  root.replaceChildren(h("table", { class: "stats" }, h("thead", {}, head), h("tbody", {}, body)));
+  root.replaceChildren(h("table", { class: "stats", "data-pteam": S.live.teams[S.boxTeam].name }, h("thead", {}, head), h("tbody", {}, body)));
 }
 
 // ───────────────────────── play-by-play ─────────────────────────
@@ -1205,7 +1206,7 @@ function renderPlayIn() {
 }
 // box score tables for one game: [{name, score, players:[...]}]
 function bracketBoxTables(boxes) {
-  return h("div", { class: "conf-grid" }, boxes.map((tm) => h("div", {}, h("h3", {}, `${identOf(tm.name).short} · ${tm.score}`),
+  return h("div", { class: "conf-grid" }, boxes.map((tm) => h("div", { "data-pteam": tm.name }, h("h3", {}, `${identOf(tm.name).short} · ${tm.score}`),
     h("div", { class: "table-wrap" }, h("table", { class: "stats" },
       h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3PT", "FT", "+/-"].map((x) => h("th", {}, x)))),
       h("tbody", {}, (tm.players || []).map((p) => h("tr", { class: p.st ? "" : "bench" }, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))),
@@ -1226,7 +1227,7 @@ function seriesAverages(sr) {
         h("td", {}, `${f1(s.tpm / g)}/${f1(s.tpa / g)}`), h("td", {}, pct(s.tpm, s.tpa)), h("td", {}, `${f1(s.ftm / g)}/${f1(s.fta / g)}`), h("td", {}, pct(s.ftm, s.fta)),
         h("td", {}, ts ? (100 * s.pts / ts).toFixed(1) : "0.0"), h("td", {}, (s.plus_minus / g >= 0 ? "+" : "") + f1(s.plus_minus / g)));
     });
-    return h("div", {}, h("h3", {}, `${identOf(team).short} · series averages`),
+    return h("div", { "data-pteam": team }, h("h3", {}, `${identOf(team).short} · series averages`),
       h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...cols.map((c) => h("th", {}, c)))), h("tbody", {}, body))));
   }));
 }
@@ -1400,7 +1401,9 @@ function pcDonut(z) {
   return h("div", { class: "pc-donut-wrap" }, svg, legend);
 }
 // ---- styled hover tooltip (replaces the browser's plain title box): any element with setTip() shows it
-const shotZoneName = (z) => ({ three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[z] || z || "shot");
+// what a shot is called in the hover card; a midrange jumper the engine placed (and the play-by-play named) says where it came from
+const shotZoneName = (z, ev) => (z === "mid" && ["base", "elbow", "wing"].includes(ev?.loc) ? { base: "baseline jumper", elbow: "elbow jumper", wing: "wing jumper" }[ev.loc]
+  : { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[z] || z || "shot");
 function shotWhen(ev) {
   const clk = Number(ev.clock), per = Number(ev.period);
   return `${per >= 5 ? (per === 5 ? "OT" : `OT${per - 4}`) : per ? `Q${per}` : ""} ${Number.isFinite(clk) && ev.clock !== "" && ev.clock != null ? `${Math.floor(clk / 60)}:${String(Math.floor(clk % 60)).padStart(2, "0")}` : ""}`.trim();
@@ -1450,7 +1453,7 @@ function pcShotMap(name, teamName, quarter, shots) {
     const d = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}` });
     d.append(svgEl("circle", { r: 11, class: "hit" }));   // the whole marker answers the hover, not just its outline
     if (ev.made) d.append(svgEl("circle", { r: 8, class: "ring" })); else d.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
-    setTip(d, ev.player, [`${ev.made ? "Made" : "Missed"} ${shotZoneName(ev.zone)}`, ev.when || shotWhen(ev)], ev.made ? "make" : "miss");
+    setTip(d, ev.player, [`${ev.made ? "Made" : "Missed"} ${shotZoneName(ev.zone, ev)}`, ev.when || shotWhen(ev)], ev.made ? "make" : "miss");
     g.append(d);
   }
   const made = mine.filter((e) => e.made).length;
@@ -2760,7 +2763,14 @@ function shotSpot(ev, side, spread = false) {
     const band = want === "elbow" ? [0, 0.62, 140, 234] : want === "wing" ? [0.62, 1.25, 90, 234] : [1.25, 1.95, 82, 234];
     if (ev.dist === "short") band[3] = Math.min(band[3], 172);                    // 10-16 ft jumper (a little slack so the bands meet)
     else if (ev.dist === "long") band[2] = Math.max(band[2], 165);                // 16 ft out to the arc
-    for (let k = 0; k < 30; k++) {
+    if (ev.loc === "elbow") {
+      // A shot the engine tagged as an elbow jumper sits AT an elbow: the corner where the free-throw line meets the lane line (a few feet
+      // around it, mostly just outside the lane), with an occasional one at the middle of the line. Not a wide slice out toward the arc.
+      const centre = rnd() < 0.18, dy = centre ? 40 * rnd() : 62 + 52 * rnd(), sgn = side;
+      x = (dy > 84 ? 200 : 226) + 55 * Math.pow(rnd(), 1.3);
+      y = HY + sgn * dy;
+    }
+    else for (let k = 0; k < 30; k++) {
       const a = (want === "elbow" ? (rnd() * 2 - 1) * band[1] : side * (band[0] + rnd() * (band[1] - band[0]))), r = want === "elbow" && ev.loc === "elbow" && ev.dist !== "long"
         ? band[2] + (band[3] - band[2]) * Math.pow(rnd(), 2.4)   // a free-throw-line jumper: bunched at the line, thinning out toward the arc (no empty band)
         : Math.sqrt(band[2] ** 2 + rnd() * (band[3] ** 2 - band[2] ** 2));
@@ -2881,7 +2891,7 @@ function mountShotChart(host, { big = false } = {}) {
     const clk = Number(ev.clock), per = Number(ev.period);
     const when = `${per >= 5 ? (per === 5 ? "OT" : `OT${per - 4}`) : `Q${per || "?"}`} ${Number.isFinite(clk) ? `${Math.floor(clk / 60)}:${String(Math.floor(clk % 60)).padStart(2, "0")}` : ""}`.trim();
     const sc = Array.isArray(ev.score) ? ` · ${identAt(0)?.short || "A"} ${ev.score[0]} – ${ev.score[1]} ${identAt(1)?.short || "B"}` : "";
-    const zoneName = { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[ev.zone] || ev.zone;
+    const zoneName = shotZoneName(ev.zone, ev);
     setTip(g, ev.player, [`${ev.made ? "Made" : "Missed"} ${zoneName} · ${ev.when || when}`, sc.replace(/^ · /, "")], ev.made ? "make" : "miss");
     dots.querySelectorAll(".shot.latest").forEach((el) => el.classList.remove("latest"));
     g.classList.add("latest");

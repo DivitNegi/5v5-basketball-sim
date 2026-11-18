@@ -172,7 +172,13 @@ def player_detail(runner, source, team, name, group="all"):
         return max(hits, key=lambda x: x[1].get("games", 0) or 0) if hits else (None, None)
 
     main = [src for src in ("Season", "Playoffs", "Series", "Live") if src in data and find(src)[0]]
-    if source not in data or not find(source)[0]:
+    # A team was named (he was clicked in that team's box score or table): only offer the sources that really hold THAT team's stats for him,
+    # so 2018 Tatum never turns into the 82-game 2024 Tatum just because the bigger sample wins the by-name search. When no source has that
+    # exact team (or no team was named), keep the by-name lookup.
+    exact = [src for src in main if team and name in (data[src][0].get(team) or {})]
+    if exact:
+        main = exact
+    if source not in data or source not in main:
         source = main[0] if main else next(iter(data), "Live")
     team, _found = find(source)
     if team is None:
