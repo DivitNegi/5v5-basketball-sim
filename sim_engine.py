@@ -14463,6 +14463,8 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
     inbounder = max(off.on_floor, key=lambda p: p.playmaking)
     low_clock_inbound = period_time <= 8 or late_ato
     spent = min(period_time, 1 if low_clock_inbound else random.randint(2, 4))
+    if is_game_winner_chance(off, dff, period, period_time):
+        spent = max(spent, period_time - game_winner_shot_clock(period_time))
     score_time = max(0, period_time - spent)
     need_three = late_ato and off.score <= dff.score - 3
     need_quick_two = late_ato and off.score in (dff.score - 1, dff.score - 2)
@@ -15044,10 +15046,20 @@ def end_of_quarter_catch_shoot_three(off: Team, dff: Team, period: int, period_t
     time.sleep(SLEEP * 0.9)
 
 
+def is_game_winner_chance(off: "Team", dff: "Team", period: int, period_time: int) -> bool:
+    """4th quarter / OT, shot clock off, tied or down one possession: this is the last shot of the game."""
+    return period >= 4 and period_time <= 24 and 0 <= dff.score - off.score <= 3
+
+
+def game_winner_shot_clock(period_time: int) -> int:
+    """Seconds left when a game-winning / game-tying last shot goes up: at the horn, or with 1-2 seconds left."""
+    return min(period_time, random.choices((0, 1, 2), weights=(50, 30, 20))[0])
+
+
 def should_take_late_game_last_shot(off: Team, dff: Team, period: int, period_time: int) -> bool:
     if period < 4:
         return False
-    if period_time < 18 or period_time > 30:
+    if period_time < 6 or period_time > 30:
         return False
     deficit = dff.score - off.score
     # Tied: hold for a winner. Down 1-3: hold for a tying or winning shot.
@@ -15065,9 +15077,9 @@ def run_late_game_last_shot_possession(off: Team, dff: Team, period: int, period
     # offense still has to get a shot up within 24 seconds of taking the
     # ball, so at least (period_time - 24) has to be left when it goes up.
     if period_time > 24:
-        score_time = max(0, period_time - 24) + (random.randint(0, 2) if period_time >= 20 else random.randint(0, 1))
+        score_time = max(0, period_time - 24) + game_winner_shot_clock(2)
     else:
-        score_time = random.randint(0, 2) if period_time >= 20 else random.randint(0, 1)
+        score_time = game_winner_shot_clock(period_time)
     spent = max(1, period_time - score_time)
 
     shooter = choose_closing_star_scorer(off, need_three=need_three)
@@ -15245,6 +15257,8 @@ def run_late_game_quick_possession(off: Team, dff: Team, period: int, period_tim
         spent = random.randint(6, 10)   # down one possession with time left: quick, but a real look
     else:
         spent = min(period_time, random.randint(4, 7))
+    if is_game_winner_chance(off, dff, period, period_time):
+        spent = period_time - game_winner_shot_clock(period_time)
     score_time = max(0, period_time - spent)
     quick_clock = period_time <= 24
     need_three = off.score <= dff.score - 3
@@ -19596,6 +19610,8 @@ def run_ato_play(off: Team, dff: Team, period: int, period_time: int,
     need_three = period >= 4 and period_time <= 90 and off.score <= dff.score - 3
     need_two = period >= 4 and period_time <= 90 and off.score in (dff.score - 1, dff.score - 2)
     spent = min(period_time, random.randint(7, 14))
+    if is_game_winner_chance(off, dff, period, period_time):
+        spent = period_time - game_winner_shot_clock(period_time)   # the set is run for the last shot
     score_time = max(0, period_time - spent)
     initiator = max(off.on_floor, key=lambda p: 0.48 * p.playmaking + 0.32 * p.ball_handle + 0.20 * p.usage)
 
