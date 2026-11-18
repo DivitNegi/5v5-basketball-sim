@@ -3307,9 +3307,20 @@ async function boot() {
       const seen = new Map();
       d.teams.forEach((t) => { if (!seen.has(t.franchise)) seen.set(t.franchise, t.name); });
       chosen = [...seen.values()].slice(0, 30);
-    } else chosen = d.teams.slice(0, 30).map((t) => t.name);
+    } else {
+      // The strongest 30, but a franchise's near-duplicate seasons (2017 / 2018 / 2019 Warriors) count once: walking down the ranking, a team is skipped
+      // when the same franchise already has a stronger pick within SIMILAR_YEARS. Far-apart eras of one franchise (1987 and 2001 Lakers) can both stay.
+      const SIMILAR_YEARS = 3, picked = [];
+      for (const t of d.teams) {
+        const yr = parseInt(t.name, 10);
+        if (picked.some((p) => p.franchise === t.franchise && Math.abs(p.yr - yr) <= SIMILAR_YEARS)) continue;
+        picked.push({ name: t.name, franchise: t.franchise, yr });
+        if (picked.length === 30) break;
+      }
+      chosen = picked.map((p) => p.name);
+    }
     customSelected.clear(); chosen.forEach((n) => customSelected.add(n)); renderCustomTeams();
-    toast(`${chosen.length} teams selected${kind === "franchise" ? " (the best team of each franchise)" : " (the 30 strongest)"}. Press Run 30-team season to play them.`, "ok");
+    toast(`${chosen.length} teams selected${kind === "franchise" ? " (the best team of each franchise)" : " (the 30 strongest, one per franchise era)"}. Press Run 30-team season to play them.`, "ok");
   };
   $("#strong30").addEventListener("click", () => pickTeams("top").catch((e) => toast(e.message, "err")));
   $("#bestPerFranchise").addEventListener("click", () => pickTeams("franchise").catch((e) => toast(e.message, "err")));
