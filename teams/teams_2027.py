@@ -210,7 +210,7 @@ def make_heat_2027() -> Team:
     players = [
         Player('Davion Mitchell', 'PG',
                        0.44, 0.23, 0.30, 0.040, 0.11, 0.81,
-                       0.85, 0.76, 0.75, 0.57, 0.65,
+                       0.89, 0.76, 0.75, 0.57, 0.65,
                        0.30, 0.88, 0.78,
                        0.46, 0.37, 0.33, 0.45, 0.327, 0.767,
                        0.98, 0.44,
@@ -222,7 +222,7 @@ def make_heat_2027() -> Team:
                        0.220, 0.520, 0.580,
                        0.37, 0.51, 0.31, 0.47, 0.533, 0.600,
                        0.84, 0.60,
-                       clutchness=0.840, secondary_positions=("SF",), stamina=0.6, shot_iq = .80),
+                       clutchness=0.840, secondary_positions=("SF",), stamina=0.6, shot_iq = .90),
         Player('Andrew Wiggins', 'SF',
                        0.41, 0.23, 0.26, 0.10, 0.36, 0.60,
                        0.86, 0.74, 0.88, 0.75, 0.78,
@@ -731,7 +731,7 @@ def make_mavs_2027() -> Team:
         # perimeter_def, interior_def
         Player('Kyrie Irving', 'PG',
                0.90, 0.34, 0.24, 0.50, 0.02, 0.830,
-               0.920, 0.960, 0.99, 0.500, 0.900,
+               0.920, 0.980, 0.99, 0.500, 0.900,
                0.280, 0.65, 0.990,
                0.75, 0.51, 0.43, 0.51, 0.500, 0.667,
                0.75, 0.40,
@@ -2225,7 +2225,7 @@ def make_knicks_2027() -> Team:
                0.24, 0.827, 0.650,
                0.420, 0.570, 0.760, 0.930, 0.800, 0.667,
                0.500, 0.800,
-               clutchness=0.980, secondary_positions=('PF',), height=84, speed=0.760,
+               clutchness=0.980, height=84, speed=0.760,
                shot_iq=0.980, stamina=0.68),
         Player('Miles McBride', 'SG',
                0.48, 0.18, 0.18, 0.02, 0.08, 0.22,
@@ -2268,13 +2268,6 @@ def make_knicks_2027() -> Team:
                clutchness=0.700, secondary_positions=('SF',), height=77, speed=0.790,
                shot_iq=0.700, stamina=0.70),
     ]
-    # Rotation (sums to 240): Towns plays like the second option he is -- the automatic estimate had him lowest of the five starters
-    # (~31 minutes, under 30 in the playoffs).
-    mins = {'Jalen Brunson': 35, 'Karl-Anthony Towns': 34, 'Mikal Bridges': 34, 'OG Anunoby': 33, 'Josh Hart': 31, 'Miles McBride': 20,
-            'Jordan Clarkson': 15, 'Andre Drummond': 14, 'Landry Shamet': 14, 'Jose Alvarado': 10}
-    for player in players:
-        if player.name in mins:
-            player.target_minutes = player.gui_target_minutes_override = mins[player.name]
     t = Team('2027 New York Knicks', players)
     t.init_lineup()
     return t
