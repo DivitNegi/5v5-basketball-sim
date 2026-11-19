@@ -11895,6 +11895,41 @@ def missed_shot_out_of_bounds_chance(shot_type: str) -> float:
     return 0.015
 
 
+DEAD_BALL_MISCUE_BASE = 0.030   # per half-court possession, before ball security
+
+
+def dead_ball_miscue_chance(off: "Team") -> float:
+    on = [p for p in off.on_floor if not p.fouled_out] or off.on_floor
+    security = sum(0.55 * p.ball_handle + 0.45 * p.playmaking for p in on) / len(on)
+    risk = sum(max(0.70, min(2.20, getattr(p, "turnover_risk", 1.0))) for p in on) / len(on)
+    return DEAD_BALL_MISCUE_BASE * risk * max(0.55, min(1.45, 1.0 + (0.62 - security) * 1.6))
+
+
+def dead_ball_miscue(off: "Team"):
+    on = [p for p in off.on_floor if not p.fouled_out] or off.on_floor
+    big = random.random() < 0.35
+    if big:
+        pool = sorted(on, key=lambda p: -p.height)[:2]
+        culprit = random.choice(pool)
+        line = random.choice([
+            f"{culprit.name} is whistled for a moving screen. Turnover.",
+            f"Three seconds on {culprit.name}. {off.name} give it back.",
+            f"{culprit.name} gets called for the illegal screen. Turnover by {off.name}.",
+            f"{culprit.name} shuffles his feet on the catch in the post. Travel.",
+        ])
+    else:
+        culprit = random.choices(on, weights=[max(0.05, p.usage) for p in on], k=1)[0]
+        line = random.choice([
+            f"{culprit.name} is called for traveling. Turnover by {off.name}.",
+            f"{culprit.name} steps on the sideline. Turnover.",
+            f"{culprit.name} loses the handle off his foot and out of bounds.",
+            f"{culprit.name} gets whistled for the carry on the crossover.",
+            f"{culprit.name} picks up his dribble and shuffles his pivot foot. Travel.",
+            f"{culprit.name} throws it to where nobody is cutting. Out of bounds.",
+        ])
+    return culprit, line
+
+
 def shot_clock_violation_chance(off: Team, dff: Team, period: int, period_time: int) -> float:
     # Rare, but a little more likely against strong defense.
     defense_pressure = sum(0.5 * p.perimeter_def + 0.5 * p.interior_def for p in dff.on_floor) / len(dff.on_floor)
@@ -19802,6 +19837,15 @@ def simulate_possession(off: Team, dff: Team,
         dead_ball_subs(teamA, teamB, period, period_time - possession_time)
         return dff, possession_time
 
+    # Dead-ball miscues (travel, carry, three seconds, stepping out, moving screen): the season ran ~2.4 turnovers a game light
+    if period_time >= 24 and not (period >= 4 and period_time <= 120 and abs(off.score - dff.score) <= 6)             and random.random() < dead_ball_miscue_chance(off):
+        culprit, line = dead_ball_miscue(off)
+        spent = min(possession_time, random.randint(3, 10))
+        print(line)
+        commit_turnover(culprit, off)
+        dead_ball_subs(teamA, teamB, period, period_time - spent)
+        return dff, spent
+
     if getattr(dff, "game_plan", {}).get("foul_strategy") == "selective_hack" and period_time > 120:
         hack_targets = [
             p for p in off.on_floor
@@ -20651,6 +20695,8 @@ def simulate_possession(off: Team, dff: Team,
                 combo_chance = dribble_combo_chance(combo_creator, combo_defender, play_context, period, period_time) * 0.85
                 break
 
+    if true_iso_attempt:
+        combo_chance = 0.0   # the isolation's own move line already describes how he got the shot: no second dribble chain
     if random.random() < combo_chance:
         combo_action, combo_quality = dribble_combo_action(combo_creator, combo_defender, off, dff, period, period_time, play_context)
         print_dribble_combo(combo_creator, combo_defender, combo_action)
@@ -21087,7 +21133,8 @@ def simulate_possession(off: Team, dff: Team,
     # second, separate go-to-shot sequence after it is redundant and can
     # flatly contradict it (freezes the defender and rises cleanly, then in
     # the next line is somehow still driving at the rim).
-    iso_already_described = play_context == "iso" and iso_mult is not None and iso_mult >= 1.10
+    # an isolation is set-up line + move line + the shot result: no extra two-line shot sequence on top
+    iso_already_described = play_context == "iso" and iso_mult is not None
     chain_will_describe_shot = should_print_dribble_chain(shooter, shot_type, attempt_context)
     signature_line = None if combo_shot_described or chain_will_describe_shot or catch_shoot_context or (shot_type == "dunk" and pnr_result != "alley_oop") else signature_move_line(shooter, shot_type, attempt_context)
     if signature_line:
