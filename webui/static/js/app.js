@@ -777,6 +777,10 @@ function connect() {
     const st = await api.get("/api/state");
     applyStatus({ text: st.status, active: st.active, paused: st.paused, speed: st.speed, seasonSpeed: st.seasonSpeed });
     if (st.live) applyLive(st.live);
+    // a page opened (or refreshed) in the middle of a run: show the series / playoffs buttons for that mode (they were only set at reset)
+    const runMode = st.active ? st.mode : null;
+    $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(runMode));
+    $("#simPlayoffs").classList.toggle("hidden", runMode !== "2027 play-in & playoffs");
     api.get("/api/trade/prompt").then((r) => showTradePrompt(r.prompt)).catch(() => {});
     api.get("/api/game/shotlog").then((r) => { S.shots = r.shots || []; redrawShotCharts(); }).catch(() => {});
     if (st.flow?.length) { S.flow = st.flow; renderFlow("#flowMini", 320); }
