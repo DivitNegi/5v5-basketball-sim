@@ -75,11 +75,11 @@ def make_warriors_2019() -> Team:
                0.28, 0.84, stamina=0.6),
     ]
     # --- real rotation + shot volume (Basketball-Reference) ---
-    mins = {'Kevin Durant': 31, 'Klay Thompson': 33, 'Stephen Curry': 32, 'Draymond Green': 28, 'DeMarcus Cousins': 26, 'Andre Iguodala': 22, 'Kevon Looney': 21, 'Shaun Livingston': 15, 'Quinn Cook': 15, 'Andrew Bogut': 17}
+    mins = {'Kevin Durant': 35, 'Klay Thompson': 35, 'Stephen Curry': 34, 'Draymond Green': 32, 'DeMarcus Cousins': 25, 'Andre Iguodala': 26, 'Kevon Looney': 15, 'Shaun Livingston': 15, 'Quinn Cook': 15, 'Andrew Bogut': 8}
     for player in players:
         if player.name in mins:
             player.target_minutes = player.gui_target_minutes_override = mins[player.name]
-    attempt_roles = {'Kevin Durant': (16.5, 17.4), 'Klay Thompson': (20.0, 18.0), 'Stephen Curry': (20.0, 19.5), 'Draymond Green': (6.0, 6.3), 'DeMarcus Cousins': (17.0, 12.4), 'Andre Iguodala': (3.8, 4.4), 'Kevon Looney': (3.8, 4.2), 'Shaun Livingston': (4.0, 3.3), 'Quinn Cook': (7.5, 6.2), 'Andrew Bogut': (5.5, 3.3)}   # (paced FGA target, real FGA soft cap)
+    attempt_roles = {'Kevin Durant': (16.5, 17.9), 'Klay Thompson': (20.0, 18.5), 'Stephen Curry': (20.0, 19.5), 'Draymond Green': (7.0, 6.6), 'DeMarcus Cousins': (17.0, 12.1), 'Andre Iguodala': (4.5, 4.9), 'Kevon Looney': (3.5, 3.5), 'Shaun Livingston': (4.5, 3.3), 'Quinn Cook': (8.0, 6.2), 'Andrew Bogut': (3.0, 2.2)}   # (paced FGA target, real FGA soft cap)
     for player in players:
         if player.name in attempt_roles:
             player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]

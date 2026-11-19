@@ -1295,7 +1295,7 @@ def make_warriors_2018() -> Team:
                0.94, 0.70,
                stamina=0.85, height=77),
         Player("Draymond Green", "PF",
-               0.35, 0.19, 0.28, 0.12, 0.26, 0.461,
+               0.45, 0.19, 0.28, 0.12, 0.26, 0.461,
                0.74, 0.74, 0.93, 0.49, 0.78,
                0.128, 0.99, 0.78,
                0.88, 0.81, 0.51, 0.78, 0.78, 0.49,
@@ -1304,7 +1304,7 @@ def make_warriors_2018() -> Team:
         Player("Kevin Durant", "SF",
                0.50, 0.62, 0.20, 0.06, 0.29, 0.894,
                0.94, 0.97, 0.98, 0.61, 0.89,
-               0.320, 0.94, 0.62,
+               0.320, 0.70, 0.90,
                0.33, 0.84, 0.43, 0.71, 0.89, 0.41,
                0.75, 0.85,
                stamina=0.84, height=83),
@@ -1370,7 +1370,7 @@ def make_warriors_2018() -> Team:
     for player in players:
         if player.name in mins:
             player.target_minutes = player.gui_target_minutes_override = mins[player.name]
-    attempt_roles = {'Klay Thompson': (21.0, 15.6), 'Kevin Durant': (20.5, 17.4), 'Stephen Curry': (11.0, 16.4), 'Draymond Green': (7.5, 8.3), 'Quinn Cook': (9.0, 6.1), 'Nick Young': (3.5, 5.6), 'Andre Iguodala': (5.5, 4.7), 'Shaun Livingston': (8.0, 4.5), 'Omri Casspi': (3.6, 3.6), 'David West': (8.0, 4.9), 'Zaza Pachulia': (8.0, 3.5)}   # (paced FGA target, real FGA soft cap)
+    attempt_roles = {'Klay Thompson': (19.0, 15.6), 'Kevin Durant': (14.0, 17.4), 'Stephen Curry': (11.5, 16.4), 'Draymond Green': (9.5, 8.3), 'Quinn Cook': (9.5, 6.1), 'Nick Young': (3.5, 5.6), 'Andre Iguodala': (6.5, 4.7), 'Shaun Livingston': (8.5, 4.5), 'Omri Casspi': (4.5, 3.6), 'David West': (8.0, 4.9), 'Zaza Pachulia': (8.0, 3.5)}   # (paced FGA target, real FGA soft cap)
     for player in players:
         if player.name in attempt_roles:
             player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
