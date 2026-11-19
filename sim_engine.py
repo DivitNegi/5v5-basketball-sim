@@ -4709,8 +4709,16 @@ def _balance_lineup_positions_impl(team: Team):
     def _prefer_under_target(candidates):
         # a player who is behind his minutes target is picked before one who is already past it (used to be the 2026 Lakers only,
         # which left a low-rated big like Aday Mara with a 20-minute target and 5 minutes: the best-rated big always won)
-        under = [p for p in candidates if p.minutes / 60 < target_minutes(p, team)]
-        return under or candidates
+        # behind PACE, not just under the full-game number: early in a game every player is "under" his target, which let the
+        # best-rated forward (already ahead of his pace) win every balance
+        ctx = SIM_CONTEXT if isinstance(globals().get("SIM_CONTEXT"), dict) else {}
+        period, clock = ctx.get("period"), ctx.get("period_time")
+        if isinstance(period, int) and isinstance(clock, (int, float)):
+            share = max(0.05, ((period - 1) * rules_quarter_seconds() + (rules_quarter_seconds() - clock)) / 60 / 48.0)
+        else:
+            share = 1.0
+        under = [p for p in candidates if p.minutes / 60 < target_minutes(p, team) * share]
+        return under or [p for p in candidates if p.minutes / 60 < target_minutes(p, team)] or candidates
 
     if current and not any(can_play_center_slot(p) for p in current):
         bench_big = _prefer_under_target([p for p in bench_pool if can_play_center_slot(p)])
@@ -4797,7 +4805,7 @@ def _balance_lineup_positions_impl(team: Team):
     while len(plain) >= 2:
         keep = max(plain, key=_keep_score)
         sit = min((p for p in plain if p is not keep), key=lambda p: (_keep_score(p), -p.minutes))
-        replacements = [p for p in bench_pool if not is_plain_center(p) and not identity_contains(current, p)]
+        replacements = _prefer_under_target([p for p in bench_pool if not is_plain_center(p) and not identity_contains(current, p)])
         if not replacements:
             break
         sub_in = max(replacements, key=lambda p: (lineup_slot_eligible(p, "PF"), starter_minute_need(p, team), overall_rating(p)))
@@ -4815,7 +4823,7 @@ def _balance_lineup_positions_impl(team: Team):
     while len(bigs) >= 2:
         keep = max(bigs, key=_keep_score)
         sit = min((p for p in bigs if p is not keep), key=lambda p: (_keep_score(p), -p.minutes))
-        replacements = [p for p in bench_pool if not _center_type(p) and not identity_contains(current, p)]
+        replacements = _prefer_under_target([p for p in bench_pool if not _center_type(p) and not identity_contains(current, p)])
         if not replacements:
             break
         sub_in = max(replacements, key=lambda p: (lineup_slot_eligible(p, "PF"), starter_minute_need(p, team), overall_rating(p)))
@@ -8776,7 +8784,7 @@ def mandatory_closers(team: Team) -> Tuple[str, ...]:
         return ("Stephen Curry", "Klay Thompson", "Draymond Green")
     if team.name == "2017 Golden State Warriors":
         return ("Stephen Curry", "Klay Thompson", "Kevin Durant", "Draymond Green")
-    if team.name == "2019 Golden State Warriors":
+    if team.name == "2019 Golden State Warriors" and not team_has_pinned_minutes(team):   # the team file now sets real minutes
         return ("Stephen Curry", "Klay Thompson", "Draymond Green")
     if team.name == "2021 Brooklyn Nets":
         return ("Kevin Durant", "Kyrie Irving", "James Harden")
@@ -9786,7 +9794,7 @@ def _initialize_minute_targets_core(team: Team):
             p.target_minutes = random.randint(low, high)
         return
 
-    if team.name == "2019 Golden State Warriors":
+    if team.name == "2019 Golden State Warriors" and not team_has_pinned_minutes(team):   # the team file now sets real minutes
         target_ranges = {
             "Stephen Curry": (40, 44),
             "Klay Thompson": (38, 42),
@@ -9857,6 +9865,10 @@ def apply_rotation_profile(team: Team):
         style["rotation_depth"] = max(style.get("rotation_depth", 8), 10)
     elif profile == "star-heavy playoff":
         style["rotation_depth"] = min(style.get("rotation_depth", 8), 8)
+    if team_has_pinned_minutes(team):
+        # minutes set for the team (team file or Coach tab): everyone given a real share of minutes is in the rotation
+        pinned = sum(1 for p in team.roster if (getattr(p, "gui_target_minutes_override", None) or 0) >= 8)
+        style["rotation_depth"] = max(style.get("rotation_depth", 8), pinned)
     team.coach_style = style
 
 

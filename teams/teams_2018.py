@@ -1288,14 +1288,14 @@ def make_pistons_2018() -> Team:
 def make_warriors_2018() -> Team:
     players = [
         Player("Klay Thompson", "SG",
-               0.84, 0.61, 0.15, 0.03, 0.11, 0.887,
+               0.45, 0.61, 0.15, 0.03, 0.11, 0.887,
                0.97, 0.95, 0.89, 0.35, 0.84,
-               0.290, 0.63, 0.70,
+               0.300, 0.63, 0.70,
                0.50, 0.54, 0.44, 0.57, 0.29, 0.36,
                0.94, 0.70,
                stamina=0.85, height=77),
         Player("Draymond Green", "PF",
-               0.60, 0.19, 0.28, 0.12, 0.26, 0.461,
+               0.35, 0.19, 0.28, 0.12, 0.26, 0.461,
                0.74, 0.74, 0.93, 0.49, 0.78,
                0.128, 0.99, 0.78,
                0.88, 0.81, 0.51, 0.78, 0.78, 0.49,
@@ -1316,21 +1316,21 @@ def make_warriors_2018() -> Team:
                0.55, 0.73,
                stamina=0.55, height=83),
         Player("Stephen Curry", "PG",
-               0.99, 0.15, 0.28, 0.03, 0.08, 0.900,
+               0.68, 0.15, 0.28, 0.03, 0.08, 0.900,
                0.99, 0.94, 0.93, 0.64, 0.91,
-               0.340, 0.65, 0.95,
+               0.310, 0.65, 0.95,
                0.80, 0.44, 0.40, 0.70, 0.20, 0.45,
                0.67, 0.44,
                stamina=0.81, height=74),
         Player("Quinn Cook", "PG",
-               0.15, 0.30, 0.23, 0.03, 0.08, 0.301,
+               0.45, 0.30, 0.23, 0.03, 0.08, 0.301,
                0.95, 0.92, 0.85, 0.38, 0.79,
                0.160, 0.68, 0.85,
                0.45, 0.09, 0.45, 0.58, 0.35, 0.50,
                0.67, 0.38,
                stamina=0.64, height=73),
         Player("Nick Young", "SG",
-               0.43, 0.38, 0.12, 0.03, 0.09, 0.027,
+               0.55, 0.38, 0.12, 0.03, 0.09, 0.550,
                0.89, 0.87, 0.89, 0.30, 0.81,
                0.027, 0.10, 0.67,
                0.50, 0.10, 0.37, 0.43, 0.41, 0.48,
@@ -1351,7 +1351,7 @@ def make_warriors_2018() -> Team:
                0.74, 0.58,
                stamina=0.55, height=79),
         Player("Omri Casspi", "SF",
-               0.15, 0.30, 0.23, 0.06, 0.08, 0.133,
+               0.03, 0.30, 0.23, 0.06, 0.08, 0.133,
                0.92, 0.85, 0.89, 0.59, 0.68,
                0.089, 0.64, 0.56,
                0.33, 0.73, 0.47, 0.81, 0.90, 0.55,
@@ -1365,6 +1365,17 @@ def make_warriors_2018() -> Team:
                0.59, 0.83,
                stamina=0.55, height=81),
     ]
+    # --- real rotation + shot volume (Basketball-Reference) ---
+    mins = {'Klay Thompson': 33, 'Draymond Green': 31, 'Kevin Durant': 33, 'Zaza Pachulia': 13, 'Stephen Curry': 31, 'Quinn Cook': 18, 'Nick Young': 16, 'Andre Iguodala': 24, 'Shaun Livingston': 15, 'Omri Casspi': 13, 'David West': 13}
+    for player in players:
+        if player.name in mins:
+            player.target_minutes = player.gui_target_minutes_override = mins[player.name]
+    attempt_roles = {'Klay Thompson': (21.0, 15.6), 'Kevin Durant': (20.5, 17.4), 'Stephen Curry': (11.0, 16.4), 'Draymond Green': (7.5, 8.3), 'Quinn Cook': (9.0, 6.1), 'Nick Young': (3.5, 5.6), 'Andre Iguodala': (5.5, 4.7), 'Shaun Livingston': (8.0, 4.5), 'Omri Casspi': (3.6, 3.6), 'David West': (8.0, 4.9), 'Zaza Pachulia': (8.0, 3.5)}   # (paced FGA target, real FGA soft cap)
+    for player in players:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
+    # --- end real rotation ---
     return _team("2018 Golden State Warriors", players, (34.3, 32.7, 34.2, 10.2, 32.0, 22.4, 17.4, 25.3, 11.5, 10.1, 9.9))
 
 

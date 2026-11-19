@@ -5,67 +5,67 @@ from sim_engine import *
 def make_warriors_2019() -> Team:
     players = [
         Player("Stephen Curry", "PG",
-               0.90, 0.18, 0.19, 0.05,   0.02, 0.420,
+               0.90, 0.18, 0.19, 0.05, 0.02, 0.850,
                0.99, 0.92, 0.88, 0.65, 0.92,
                0.31, 0.68, 0.95,
                0.49, 0.51, 0.32, 0.53, 0.533, 0.667,
                0.69, 0.30, stamina=0.85),
 
         Player("Klay Thompson", "SG",
-               0.80, 0.24, 0.13, 0.05,   0.05, 0.40,
+               0.45, 0.24, 0.13, 0.05, 0.05, 0.850,
                0.99, 0.92, 0.90, 0.82, 0.84,
-               0.20, 0.45, 0.75,
+               0.300, 0.45, 0.75,
                0.42, 0.56, 0.36, 0.52, 0.467, 0.600,
                0.92, 0.65, secondary_positions=("SF",), stamina=0.8),
 
         Player("Kevin Durant", "SF",
-               0.36, 0.36, 0.18, 0.10,   0.32, 0.410,
+               0.28, 0.36, 0.18, 0.10, 0.32, 0.410,
                0.92, 0.99, 0.94, 0.88, 0.88,
                0.30, 0.70, 0.90,
                0.40, 0.75, 0.35, 0.64, 0.88, 0.733,
-               0.79, 0.72, stamina=0.86),
+               0.79, 0.72, secondary_positions=('PF',), stamina=0.86),
 
         Player("Draymond Green", "PF",
-               0.18, 0.28, 0.28, 0.22,   0.25, 0.15,
+               0.80, 0.28, 0.28, 0.22, 0.25, 0.15,
                0.68, 0.72, 0.84, 0.70, 0.70,
                0.17, 0.88, 0.84,
                0.85, 0.80, 0.41, 0.88, 0.667, 0.990,
                0.88, 0.93, stamina=0.9),
 
         Player("DeMarcus Cousins", "C",
-               0.22, 0.28, 0.24, 0.26,   0.40, 0.285,
+               0.22, 0.28, 0.24, 0.26, 0.40, 0.750,
                0.78, 0.82, 0.88, 0.84, 0.74,
-               0.22, 0.62, 0.58,
+               0.320, 0.62, 0.58,
                0.65, 0.72, 0.70, 0.91, 0.867, 0.990,
-               0.42, 0.79, stamina=0.58),
+               0.42, 0.79, secondary_positions=('PF',), stamina=0.58),
 
         Player("Andre Iguodala", "SF",
                0.24, 0.22, 0.38, 0.16,   0.30, 0.210,
                0.76, 0.78, 0.84, 0.72, 0.64,
                0.12, 0.72, 0.70,
                0.63, 0.55, 0.40, 0.58, 0.600, 0.800,
-               0.94, 0.80, stamina=0.79),
+               0.94, 0.80, secondary_positions=('SG', 'PF'), stamina=0.79),
 
         Player("Kevon Looney", "C",
                0.01, 0.12, 0.38, 0.49,   0.45, 0.168,
                0.05, 0.68, 0.86, 0.82, 0.62,
                0.10, 0.34, 0.32,
                0.60, 0.71, 0.95, 0.78, 0.600, 0.867,
-               0.47, 0.73, stamina=0.81),
+               0.47, 0.73, secondary_positions=('PF',), stamina=0.81),
 
         Player("Shaun Livingston", "PG",
                0.04, 0.56, 0.34, 0.06,   0.12, 0.155,
                0.10, 0.86, 0.84, 0.45, 0.78,
                0.10, 0.58, 0.58,
                0.61, 0.51, 0.36, 0.48, 0.600, 0.733,
-               0.76, 0.51, stamina=0.73),
+               0.76, 0.51, secondary_positions=('SG',), stamina=0.73),
 
         Player("Quinn Cook", "PG",
-               0.58, 0.24, 0.14, 0.04,   0.02, 0.190,
+               0.58, 0.24, 0.14, 0.04, 0.02, 0.190,
                0.86, 0.82, 0.76, 0.45, 0.78,
-               0.12, 0.52, 0.60,
+               0.200, 0.52, 0.60,
                0.85, 0.28, 0.31, 0.42, 0.400, 0.600,
-               0.90, 0.37, stamina=0.76),
+               0.90, 0.37, secondary_positions=('SG',), stamina=0.76),
 
         Player("Andrew Bogut", "C",
                0.00, 0.10, 0.34, 0.56,   0.35, 0.103,
@@ -74,6 +74,17 @@ def make_warriors_2019() -> Team:
                0.59, 0.84, 0.78, 0.91, 0.533, 0.933,
                0.28, 0.84, stamina=0.6),
     ]
+    # --- real rotation + shot volume (Basketball-Reference) ---
+    mins = {'Kevin Durant': 31, 'Klay Thompson': 33, 'Stephen Curry': 32, 'Draymond Green': 28, 'DeMarcus Cousins': 26, 'Andre Iguodala': 22, 'Kevon Looney': 21, 'Shaun Livingston': 15, 'Quinn Cook': 15, 'Andrew Bogut': 17}
+    for player in players:
+        if player.name in mins:
+            player.target_minutes = player.gui_target_minutes_override = mins[player.name]
+    attempt_roles = {'Kevin Durant': (16.5, 17.4), 'Klay Thompson': (20.0, 18.0), 'Stephen Curry': (20.0, 19.5), 'Draymond Green': (6.0, 6.3), 'DeMarcus Cousins': (17.0, 12.4), 'Andre Iguodala': (3.8, 4.4), 'Kevon Looney': (3.8, 4.2), 'Shaun Livingston': (4.0, 3.3), 'Quinn Cook': (7.5, 6.2), 'Andrew Bogut': (5.5, 3.3)}   # (paced FGA target, real FGA soft cap)
+    for player in players:
+        if player.name in attempt_roles:
+            player.target_fga_per_game, player.target_fga_soft_cap = attempt_roles[player.name]
+            player.target_fga_precision = 1.0
+    # --- end real rotation ---
     team = Team("2019 Golden State Warriors", players)
     team.init_lineup()
     return team
