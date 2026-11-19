@@ -2867,7 +2867,7 @@ def make_jazz_2027() -> Team:
                0.410, 0.520, 0.550, 0.660, 0.850, 0.533,
                0.650, 0.660,
                clutchness=0.700, secondary_positions=('PF',), height=85, speed=0.630,
-               shot_iq=0.900, badges=('catch_shoot',), stamina=0.72),
+               shot_iq=0.500, badges=('catch_shoot',), stamina=0.72),
         Player('Jaren Jackson Jr.', 'PF',
                0.34, 0.24, 0.16, 0.20, 0.32, 0.26,
                0.800, 0.570, 0.970, 0.800, 0.800,

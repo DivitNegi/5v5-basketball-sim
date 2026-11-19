@@ -2766,8 +2766,13 @@ function shotSpot(ev, side, spread = false) {
     const side = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1, q = rnd(), want = ev.loc === "base" || ev.loc === "elbow" || ev.loc === "wing" ? ev.loc : q < 0.3 ? "base" : q < 0.5 ? "elbow" : "wing";
     const band = want === "elbow" ? [0, 0.62, 140, 234] : want === "wing" ? [0.62, 1.25, 90, 234] : [1.25, 1.95, 82, 234];
     if (ev.dist === "short") band[3] = Math.min(band[3], 172);                    // 10-16 ft jumper (a little slack so the bands meet)
-    else if (ev.dist === "long") band[2] = Math.max(band[2], 165);                // 16 ft out to the arc
-    if (ev.loc === "elbow") {
+    else if (ev.dist === "long") { band[2] = Math.max(band[2], 165); band[3] = 236; }   // 16 ft out to the arc
+    if (ev.loc === "elbow" && ev.dist === "long") {
+      // a long two from the top: straight out past the free-throw line, 17 ft to just inside the arc (was drawn at the elbow, leaving that band empty)
+      const r = 172 + 62 * Math.sqrt(rnd()), a = (rnd() * 2 - 1) * 0.62;
+      x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
+    }
+    else if (ev.loc === "elbow") {
       // A shot the engine tagged as an elbow jumper sits AT an elbow: the corner where the free-throw line meets the lane line (a few feet
       // around it, mostly just outside the lane), with an occasional one at the middle of the line. Not a wide slice out toward the arc.
       const centre = rnd() < 0.18, dy = centre ? 40 * rnd() : 62 + 52 * rnd(), sgn = side;
