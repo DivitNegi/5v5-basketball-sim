@@ -1622,6 +1622,17 @@ def_per_make.extend([
     "nearly takes it away, but the touch wins."
 ])
 
+acrobat_make_lines = [
+    "{shooter} hangs in the air, switches hands around {defender}, and spins it in.",
+    "{shooter} absorbs the bump from {defender}, contorts mid-air, and kisses it high off the glass.",
+    "{shooter} goes up under {defender}'s arm and reverses it in on the far side.",
+    "{shooter} double-clutches past {defender}'s contest and flips it in.",
+    "{shooter} twists through traffic and scoops it in over {defender}.",
+    "{shooter} euro-steps away from {defender} and lays it in off-balance.",
+    "{shooter} floats it over {defender}'s fingertips and it drops.",
+    "{shooter} somehow finishes through {defender}: wrong foot, wrong hand, still good.",
+]
+
 def_int_make.extend([
     "gets vertical, but the finish has just enough touch.",
     "forces a tough angle, but it still falls.",
@@ -4863,6 +4874,7 @@ BADGE_TIER_LABEL = {
 }
 
 BADGE_DEFAULT_LEVELS = {
+    "acrobat": "bronze",
     "ankle_breaker": "bronze",
     "catch_shoot": "bronze",
     "chasedown": "bronze",
@@ -5114,6 +5126,14 @@ def maybe_limitless_range_three(player: Player, team: Team, period: int, period_
     return "limitless" if random.random() < min(0.055, chance) else None
 
 
+ACROBAT_FINISHERS = {
+    "Kyrie Irving": "hof", "Shai Gilgeous-Alexander": "hof", "Shai G-Alexander": "hof", "Michael Jordan": "hof", "Julius Erving": "hof",
+    "Dwyane Wade": "gold", "Manu Ginobili": "gold", "Derrick Rose": "gold", "Allen Iverson": "gold", "Tony Parker": "gold",
+    "Ja Morant": "gold", "Kobe Bryant": "gold", "LeBron James": "gold", "Jalen Brunson": "gold", "Giannis Antetokounmpo": "gold",
+    "Luka Dončić": "silver", "De'Aaron Fox": "silver", "Stephen Curry": "silver", "Russell Westbrook": "silver", "Zion Williamson": "silver",
+}
+
+
 def assign_player_badges(team: Team):
     for p in team.roster:
         # Normalize any manually entered badges first so old raw strings like
@@ -5157,6 +5177,14 @@ def assign_player_badges(team: Team):
         ankle_level = badge_level_from_rating(ankle_score, 0.76, 0.84, 0.91, 0.97)
         if ankle_level and p.ball_handle >= 0.82:
             add_badge(p, "ankle_breaker", ankle_level)
+
+        # Acrobat: a finisher who still gets tough layups to drop -- contested, off-balance, around length, floaters in traffic
+        acro_score = p.rim_rating * 0.58 + p.ball_handle * 0.22 + p.drive_tendency * 0.20
+        acro_level = badge_level_from_rating(acro_score, 0.79, 0.84, 0.88, 0.92)
+        if acro_level and p.rim_rating >= 0.86 and p.drive_tendency >= 0.22 and p.ball_handle >= 0.70:
+            add_badge(p, "acrobat", acro_level)
+        if p.name in ACROBAT_FINISHERS:   # the famous tough-shot finishers: at least this level
+            add_badge(p, "acrobat", ACROBAT_FINISHERS[p.name])
 
         poster_score = p.dunk_rating * 0.62 + p.dunk_tendency * 0.28 + p.rim_rating * 0.10
         poster_level = badge_level_from_rating(poster_score, 0.66, 0.76, 0.86, 0.94)
@@ -13253,7 +13281,31 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     tok = "rim_float" if random.random() < share else "rim_close"
     shooter._pending_rim_dist = tok
     avg = share * FLOATER_RELATIVE_MAKE + (1 - share)
-    return max(0.0, min(0.97, p * (FLOATER_RELATIVE_MAKE if tok == "rim_float" else 1.0) / avg))
+    p = p * (FLOATER_RELATIVE_MAKE if tok == "rim_float" else 1.0) / avg
+    p *= acrobat_finish_multiplier(shooter, defender, tok)
+    return max(0.0, min(0.97, p))
+
+
+ACROBAT_TOUGH_BONUS = {1: 0.05, 2: 0.08, 3: 0.11, 4: 0.15}   # make-chance boost on a fully tough layup, by badge tier
+
+
+def acrobat_finish_multiplier(shooter: Player, defender: Player, rim_tok: str) -> float:
+    """Acrobat badge: tough layups drop more often. Full effect on a contested / bad-look layup or one over a real rim protector, part of it
+    on a floater in traffic or an ordinary look, none on a wide-open layup."""
+    shooter._acrobat_boost = False
+    tier = badge_tier(shooter, "acrobat")
+    if tier <= 0:
+        return 1.0
+    q = getattr(shooter, "shot_quality_mult", 1.0)
+    tough = 1.0 if q < 0.97 else 0.0 if q >= 1.08 else 0.45
+    if defender is not None and getattr(defender, "interior_def", 0.0) >= 0.78 and q < 1.08:
+        tough = max(tough, 0.8)
+    if rim_tok == "rim_float" and q < 1.08:
+        tough = max(tough, 0.6)
+    if tough <= 0:
+        return 1.0
+    shooter._acrobat_boost = tough >= 0.6
+    return 1.0 + ACROBAT_TOUGH_BONUS.get(tier, 0.0) * tough
 
 
 def _shot_make_prob_base(shooter: Player, defender: Player, shot_type: str,
@@ -21489,6 +21541,8 @@ def simulate_possession(off: Team, dff: Team,
         elif shot_type == "dunk":
             line = random.choice(dunk_poster_lines).format(defender=defender.name)
             print(f"{shooter.name} rises up and {line}")
+        elif shot_type == "rim" and getattr(shooter, "_acrobat_boost", False) and random.random() < 0.45:
+            print(random.choice(acrobat_make_lines).format(shooter=shooter.name, defender=defender.name))
         else:
             line = context_defense_line(shot_type, quality_label, True, pnr_result or play_context, defender)
             print(commentator_make(shooter.name, defender.name, shot_type, line))
@@ -22374,6 +22428,8 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
                 print(random.choice(and_one_lines).format(off=shooter.name, deff=defender.name))
             elif shot_type == "dunk":
                 print(f"{shooter.name} {random.choice(dunk_poster_lines).format(defender=defender.name)}")
+            elif shot_type == "rim" and getattr(shooter, "_acrobat_boost", False) and random.random() < 0.45:
+                print(random.choice(acrobat_make_lines).format(shooter=shooter.name, defender=defender.name))
             elif shot_type == "rim":
                 # Same finger-roll/scoop/reverse/etc. layup variety the main
                 # game uses, so a made layup isn't just "finishes inside"
