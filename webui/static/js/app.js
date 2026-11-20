@@ -2694,6 +2694,12 @@ async function openStatsPlayer(team, name, source) {
 }
 // The player pop-up's Games tab: every game he played (playoff series from the bracket, the regular season from the season log, any other game
 // this page watched), newest first. Clicking one shows his player card for that game.
+// an opponent's short name; a mixed-year season can pit the 2027 Spurs against the 2014 Spurs, so the year stays whenever it is not his own team's
+function oppShort(nm, team) {
+  const o = identOf(nm || ""), me = identOf(team || "");
+  if (!o.short) return nm || "";
+  return o.year && (o.year !== me.year || o.short === me.short) ? `${o.year} ${o.short}` : o.short;
+}
 async function ppCollectGames(team, name) {
   let season = [];
   try { BR.data = await api.get("/api/bracket"); } catch { BR.data = BR.data || {}; }
@@ -2701,7 +2707,7 @@ async function ppCollectGames(team, name) {
   const sig = (teams) => (teams || []).map((t) => `${t.name}:${t.score}`).sort().join("|");
   const snapOf = (boxes) => ({ teams: boxes.map((tm) => ({ ...identOf(tm.name), name: tm.name, score: tm.score, box: (tm.players || []).map((r) => ({ ...r, listed: r.listed || r.pos || "" })) })) });
   const pageGame = (snap) => [...S.gameSnapshots.keys()].find((n) => sig(S.gameSnapshots.get(n)?.teams) === sig(snap.teams));
-  const shortOf = (nm) => identOf(nm || "").short || nm || "";
+  const shortOf = (nm) => oppShort(nm, team);
   const groups = [], used = new Set();
   for (const [, sr] of Object.entries(BR.data?.series || {}).reverse()) {
     if (sr.a !== team && sr.b !== team) continue;
@@ -2727,7 +2733,7 @@ async function ppCollectGames(team, name) {
 async function ppGameLog(root, team, name, openItem = null) {
   root.replaceChildren(h("div", { class: "empty" }, "Loading games…"));
   const groups = await ppCollectGames(team, name);
-  const shortOf = (nm) => identOf(nm || "").short || nm || "";
+  const shortOf = (nm) => oppShort(nm, team);
   if (!groups.length) { root.replaceChildren(h("div", { class: "empty" }, "No games for this player yet.")); return; }
   const row = (it) => {
     const mine = it.snap.teams.find((t) => t.name === team), opp = it.snap.teams.find((t) => t.name !== team), r = mine.box.find((x) => x.name === name);
@@ -2765,7 +2771,7 @@ async function ppGameLog(root, team, name, openItem = null) {
 async function ppHighs(root, team, name, openGame) {
   root.replaceChildren(h("div", { class: "empty" }, "Loading highs…"));
   const groups = await ppCollectGames(team, name);
-  const shortOf = (nm) => identOf(nm || "").short || nm || "";
+  const shortOf = (nm) => oppShort(nm, team);
   const STATS = [["Points", (r) => r.pts], ["Rebounds", (r) => r.reb], ["Assists", (r) => r.ast], ["Steals", (r) => r.stl], ["Blocks", (r) => r.blk],
     ["Offensive rebounds", (r) => r.oreb], ["Field goals made", (r) => r.fgm], ["Field-goal attempts", (r) => r.fga], ["Threes made", (r) => r.tpm],
     ["Three attempts", (r) => r.tpa], ["Free throws made", (r) => r.ftm], ["Minutes", (r) => Number(r.min || 0)], ["Plus / minus", (r) => r.pm],
