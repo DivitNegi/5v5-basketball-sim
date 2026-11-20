@@ -943,7 +943,7 @@ async function refreshSeason() {
     SE.data = await api.get("/api/season");
     renderSeasonBar();
     if ($("#view-season").classList.contains("active")) {
-      if (SE.tab === "players") { const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source }); AV.data = await api.get(`/api/season/avg?${q}`); }
+      if (SE.tab === "players") { const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source }); AV.data = await api.get(`/api/season/avg?${q}`); (AV.data.rows || []).forEach(withTwos); }
       if (SE.tab === "advanced") SE.advStats = await api.get("/api/stats?kind=advanced&source=Season&team=All+teams&quarter=All");
       if (SE.tab === "teams") SE.teams = (await api.get("/api/season/teams")).teams;
       if (SE.tab === "shots") { SH.source = SH.source || "Season"; await loadShots2(); }
@@ -2720,7 +2720,7 @@ async function ppCollectGames(team, name) {
   const other = [...S.gameSnapshots.keys()].sort((a, b) => b - a)
     .filter((n) => !used.has(n) && S.gameSnapshots.get(n)?.teams?.find((t) => t.name === team)?.box?.some((r) => r.name === name));
   if (other.length) groups.push(["Watched games", other.map((n) => ({ label: `Game ${n}`, snap: S.gameSnapshots.get(n), shots: S.gameShots.get(n) || [] }))]);
-  if (season.length) groups.push(["Regular season", season.map((g) => ({ label: `Game ${g.game}`,
+  if (season.length) groups.push(["Regular season", season.map((g) => ({ label: `Game ${g.game}`, gid: g.gid,
     snap: { teams: [{ ...identOf(g.team), name: g.team, score: g.mine, box: [{ ...g.row, listed: g.row.pos || "" }] }, { ...identOf(g.opp), name: g.opp, score: g.theirs, box: [] }] }, shots: [] }))]);
   return groups;
 }
@@ -2791,13 +2791,29 @@ async function ppHighs(root, team, name, openGame) {
         h("td", { class: "l" }, label), h("td", { class: "pts" }, val),
         h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(opp?.name || "")), `${best.g.it.label} vs ${shortOf(opp?.name)}`)),
         h("td", { class: won ? "pm-pos" : "pm-neg" }, `${won ? "W" : "L"} ${mine.score}-${opp?.score ?? 0}`),
-        h("td", { class: "muted" }, ties > 1 ? `${ties} times` : ""));
+        h("td", { class: "muted" }, ties > 1 ? `${ties} times` : ""),
+        h("td", {}, h("button", { class: "btn small", title: "Both teams' full box score for this game", onclick: (e) => { e.stopPropagation(); showBox(best.g.it); } }, "Box score")));
     }).filter(Boolean);
     return h("div", { class: "pp-group" }, h("h4", {}, `${title} highs · ${list.length} game${list.length === 1 ? "" : "s"}`),
       h("div", { class: "table-wrap" }, h("table", { class: "stats" },
-        h("thead", {}, h("tr", {}, ["Stat", "High", "Game", "Result", ""].map((c, i) => h("th", { class: i === 0 || i === 2 ? "l" : "" }, c)))), h("tbody", {}, rows))));
+        h("thead", {}, h("tr", {}, ["Stat", "High", "Game", "Result", "", ""].map((c, i) => h("th", { class: i === 0 || i === 2 ? "l" : "" }, c)))), h("tbody", {}, rows))));
   });
-  root.replaceChildren(...(panels.length ? panels : [h("div", { class: "empty" }, "No games for this player yet.")]));
+  const list = () => root.replaceChildren(...(panels.length ? panels : [h("div", { class: "empty" }, "No games for this player yet.")]));
+  // a high's whole game: a regular-season game comes from the season box score (its snapshot only holds his own line); playoff and
+  // watched games already carry both teams' full boxes
+  async function showBox(it) {
+    let b;
+    if (it.gid != null) {
+      b = await api.get(`/api/season/box?gid=${encodeURIComponent(it.gid)}`);
+      if (b.error) { toast(b.error, "err"); return; }
+    } else {
+      b = { teams: it.snap.teams.map((t) => ({ ...identOf(t.name), name: t.name, score: t.score,
+        players: (t.box || []).map((r) => ({ ...r, pos: r.pos || r.listed || "", min: Number(r.min || 0), st: !!(r.st ?? r.starter) })) })) };
+    }
+    root.replaceChildren(h("div", { class: "filters" }, h("button", { class: "btn", onclick: list }, "‹ Back to highs"),
+      h("b", {}, `${it.label} · ${b.teams.map((t) => `${t.short || shortOf(t.name)} ${t.score}`).join("  –  ")}`)), fullBox(b, { player: name, team }));
+  }
+  list();
 }
 
 // averages keep one decimal even when they land on a whole number (JSON turns 12.0 into 12); counts such as games played stay whole
