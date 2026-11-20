@@ -13406,6 +13406,8 @@ def compress_star_rating(rating: float) -> float:
 # so a floater gets half the chance of a finish at the rim on the same attempt, normalised to the player's own mix so his overall
 # finishing % (and the team's scoring) stays where his ratings put it.
 FLOATER_RELATIVE_MAKE = 0.50
+# A wide-open floater has nobody to shoot over, so it plays much closer to a layup than a contested one does.
+OPEN_FLOATER_RELATIVE_MAKE = 0.80
 # Putbacks and tips (roughly a tenth of rim attempts) are always right at the basket, so the other attempts carry a slightly higher
 # floater share and the player's overall split stays his real one.
 RIM_PUTBACK_SHARE = 0.10
@@ -13427,8 +13429,13 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     share = min(0.92, share / (1 - RIM_PUTBACK_SHARE))
     tok = "rim_float" if random.random() < share else "rim_close"
     shooter._pending_rim_dist = tok
-    avg = share * FLOATER_RELATIVE_MAKE + (1 - share)
-    p = p * (FLOATER_RELATIVE_MAKE if tok == "rim_float" else 1.0) / avg
+    rel = OPEN_FLOATER_RELATIVE_MAKE if getattr(shooter, "shot_quality_mult", 1.0) >= 1.08 else FLOATER_RELATIVE_MAKE
+    avg = share * rel + (1 - share)
+    # An elite finisher's close-range chance can come out past the cap; whatever the cap cuts goes to his floaters instead, so his
+    # overall finishing % really is unchanged (it used to just vanish, which cost a 0.99 finisher ~13 points on open looks).
+    close_p = min(0.97, p / avg)
+    float_p = min(close_p, (p - (1 - share) * close_p) / share) if share > 0 else 0.0
+    p = float_p if tok == "rim_float" else close_p
     p *= acrobat_finish_multiplier(shooter, defender, tok)
     return max(0.0, min(0.97, p))
 
