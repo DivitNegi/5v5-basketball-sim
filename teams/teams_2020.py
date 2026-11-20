@@ -4,16 +4,16 @@ from sim_engine import *
 
 def make_lakers_2020() -> Team:
     players = [
-        Player("LeBron James", "SF",
+        Player("LeBron James", 'PG',
                0.30, 0.30, 0.30, 0.60, 0.35, 0.850,
                0.83, 0.88, 0.99, 0.92, 0.74,
-               0.50, 0.98, 0.84,
-               0.46, 0.57, 0.38, 0.69, 0.867, 0.733,
-               0.88, 0.80, stamina=0.93, shot_iq = .70),
+               0.50, 0.99, 0.84,
+               0.60, 0.57, 0.50, 0.80, 0.867, 0.733,
+               0.89, 0.80, stamina=0.93, shot_iq = .70, secondary_positions=('SG', 'SF', 'PF', 'C')),
 
         Player("Anthony Davis", "PF",
                0.1, 0.25, 0.35, 0.16, 0.50, 0.800,
-               0.83, 0.88, 0.99, 0.95, 0.84,
+               0.77, 0.85, 0.99, 0.95, 0.84,
                0.25, 0.50, 0.62,
                0.53, 0.88, 0.74, 0.87, 0.990, 0.800,
                0.80, 0.95, stamina=0.78),
@@ -25,12 +25,12 @@ def make_lakers_2020() -> Team:
                0.53, 0.45, 0.35, 0.50, 0.533, 0.667,
                0.87, 0.45, stamina=0.8),
 
-        Player("Danny Green", "SG",
+        Player("Danny Green", "SF",   # the small forward next to LeBron at the point (2019-20 starting five)
                0.55, 0.20, 0.15, 0.10, 0.10, 0.228,
                0.82, 0.78, 0.78, 0.60, 0.78,
                0.12, 0.45, 0.45,
                0.89, 0.30, 0.32, 0.45, 0.467, 0.667,
-               0.94, 0.39, stamina=0.7),
+               0.94, 0.39, stamina=0.7, secondary_positions=('SG',)),
 
         Player("JaVale McGee", "C",
                0.01, 0.05, 0.44, 0.50, 0.70, 0.202,

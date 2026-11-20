@@ -9451,6 +9451,22 @@ def _initialize_minute_targets_core(team: Team):
             p.target_minutes = random.randint(low, high)
         return
 
+    if team.name == "2020 Los Angeles Lakers":
+        # LeBron at the point. Real 2019-20 regular-season minutes per game (Basketball-Reference), scaled to 240: "intended" is the
+        # target, "steer" what the pacing is asked for (tuned until the games average the intended minutes).
+        intended = {
+            "LeBron James": 34.6, "Anthony Davis": 34.4, "Kentavious Caldwell-Pope": 25.6, "Kyle Kuzma": 25.1, "Danny Green": 24.9,
+            "Rajon Rondo": 20.6, "Markieff Morris": 19.7, "Dwight Howard": 19.0, "Alex Caruso": 18.5, "JaVale McGee": 16.7,
+        }
+        steer = {
+            "LeBron James": 32.4, "Anthony Davis": 32.7, "Kentavious Caldwell-Pope": 24.1, "Kyle Kuzma": 25.3, "Danny Green": 24.0,
+            "Rajon Rondo": 20.1, "Markieff Morris": 20.4, "Dwight Howard": 21.7, "Alex Caruso": 18.8, "JaVale McGee": 17.2,
+        }
+        for p in team.roster:
+            p.target_minutes = intended.get(p.name, 4.0)
+            p.gui_target_minutes_override = steer.get(p.name, 4.0)
+        return
+
     if team.name == "2027 Dallas Mavericks":
         # Minutes the 2027 Mavericks should play, following the ESPN depth chart (Kyrie, Caleb Martin, Flagg, P.J., Gafford start; Lively
         # is off the roster) with the real 2026-27 minutes of the newcomers (Martin 21.5, Clayton 17.8, Cisse 3.6). The rotation rules alone
