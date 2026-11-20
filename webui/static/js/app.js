@@ -2892,7 +2892,7 @@ function renderStatsInto(root, data, opts = {}) {
     for (const [team, list] of by) {
       const id = identOf(team);
       body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length - 1 }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "yr" }, id.year || ""), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${new Set(list.map((x) => x.r[1])).size} players`)))));
-      list.sort((a, b) => numOf(b.r[defaultCol]) - numOf(a.r[defaultCol])).forEach((x) => body.push(rowEl(x, null)));
+      (cols.length > 2 ? list.sort((a, b) => numOf(b.r[defaultCol]) - numOf(a.r[defaultCol])) : list).forEach((x) => body.push(rowEl(x, null)));   // a names-only table keeps the server's order
     }
   }
   const prev = root.querySelector(".stx-wrap");

@@ -87,7 +87,7 @@ def play_type_breakdown(mine, pool):
 
 ANALYTICS = {
     "onoff": "Team offense and defense per 100 possessions with him on the floor and on the bench. Possessions are the team's, split by his share of the minutes.",
-    "playtypes": "How each player gets his shots: his total, points per shot (free throws not included), his most-used play, and what share of his shots comes from each play type. Click a player for his full breakdown.",
+    "playtypes": "Click a player to see his full play-type breakdown: how often he runs each play, how well, and how that compares with the league.",
     "clutch": "Last five minutes of the 4th quarter or overtime with the score within five. Season totals, not per game: clutch samples are small.",
     "xfg": "Every shot carries the make chance the engine rolled. Expected points add those up; the gap to the points he really scored is shot-making above or below expected.",
     "assists": "Who his assists went to: one row per passer and teammate.",
@@ -105,7 +105,7 @@ def analytics_table(kind, players, teams, team_filter, result):
     result["note"] = ANALYTICS[kind]
     cols = {
         "onoff": ["GP", "MIN", "ON ORtg", "ON DRtg", "ON NET", "OFF ORtg", "OFF DRtg", "OFF NET", "NET SWING", "+/-"],
-        "playtypes": ["FGA", "PTS", "PPS", "Top play"] + [f"{s}%" for s in PLAY_SHORT],
+        "playtypes": [],   # just the players: every number is in his pop-up's Play types tab
         "clutch": ["GP", "MIN", "PTS", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "TS%", "AST", "TOV", "+/-"],
         "xfg": ["Shots", "xPTS", "PTS", "PTS vs exp", "per 100 shots", "xeFG%", "eFG%"],
         "assists": ["To", "AST", "Share%"],
@@ -113,11 +113,14 @@ def analytics_table(kind, players, teams, team_filter, result):
     result["columns"] = ["Team", "Player"] + cols
     # whole-number totals (not per-game averages): shown without a decimal
     result["open_tab"] = "playtypes" if kind == "playtypes" else None   # clicking a player opens his pop-up on this tab
-    result["counts"] = {"onoff": [], "playtypes": ["FGA", "PTS"], "xfg": ["Shots", "PTS"], "assists": ["AST"],
+    result["counts"] = {"onoff": [], "playtypes": [], "xfg": ["Shots", "PTS"], "assists": ["AST"],
                         "clutch": ["PTS", "FG", "FGA", "3P", "3PA", "FT", "FTA", "AST", "TOV", "+/-"]}[kind]
+    shots = lambda st: sum(v.get("fga", 0) for v in ((st.get("analytics") or {}).get("pt") or {}).values())
     for tn, pp in players.items():
         if team_filter not in ("All teams", tn):
             continue
+        if kind == "playtypes":
+            pp = dict(sorted(pp.items(), key=lambda kv: -shots(kv[1])))
         tt = teams.get(tn, {}) or {}
         other = next((v for k, v in teams.items() if k != tn), {}) or {}
         team_min = sum((x.get("minutes", 0) or 0) for x in pp.values()) / 60.0
@@ -142,14 +145,9 @@ def analytics_table(kind, players, teams, team_filter, result):
                 off_n = off_o - off_d if off_o is not None and off_d is not None else None
                 add([gp, r1(mins / max(1, gp)), r1(on_o), r1(on_d), r1(on_n), r1(off_o), r1(off_d), r1(off_n),
                      r1(on_n - off_n) if on_n is not None and off_n is not None else None, r1((st.get("plus_minus", 0) or 0) / max(1, gp))])
-            elif kind == "playtypes":   # one row per player; the per-type detail is in his pop-up
-                pt = a.get("pt") or {}
-                total = sum(v.get("fga", 0) for v in pt.values())
-                if not total:
-                    continue
-                pts = sum(v.get("pts", 0) for v in pt.values())
-                top = max(PLAY_LABELS, key=lambda kl: (pt.get(kl[0]) or {}).get("fga", 0))[1]
-                add([total, pts, round(pts / total, 2), top] + [pct((pt.get(k) or {}).get("fga", 0), total) or 0.0 for k, _ in PLAY_LABELS])
+            elif kind == "playtypes":   # one row per player who took a shot; the detail is in his pop-up
+                if sum(v.get("fga", 0) for v in (a.get("pt") or {}).values()):
+                    add([])
             elif kind == "clutch":
                 c = a.get("clutch") or {}
                 if not c.get("sec") and not c.get("fga") and not c.get("fta"):
