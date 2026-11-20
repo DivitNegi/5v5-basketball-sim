@@ -2566,22 +2566,22 @@ async function openStatsPlayer(team, name, source) {
   paint();
   const statsView = h("div", {}, tiles,
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
-  const gamesView = h("div", { class: "pp-games" });
-  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["games", "Games"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
-  const show = (v) => {
-    statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; seg.hidden = v !== "stats";
+  const gamesView = h("div", { class: "pp-games" }), highsView = h("div", { class: "pp-games" });
+  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["highs", "Highs"], ["games", "Game log"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
+  const show = (v, openItem = null) => {
+    statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; highsView.hidden = v !== "highs"; seg.hidden = v !== "stats";
     tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
-    if (v === "games" && !gamesView.childElementCount) ppGameLog(gamesView, team, d.name);
+    if (v === "games" && (openItem || !gamesView.childElementCount)) ppGameLog(gamesView, team, d.name, openItem);
+    if (v === "highs" && !highsView.childElementCount) ppHighs(highsView, team, d.name, (it) => show("games", it));
   };
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
-    tabs, statsView, gamesView);
+    tabs, statsView, highsView, gamesView);
   show("stats");
 }
 // The player pop-up's Games tab: every game he played (playoff series from the bracket, the regular season from the season log, any other game
 // this page watched), newest first. Clicking one shows his player card for that game.
-async function ppGameLog(root, team, name) {
-  root.replaceChildren(h("div", { class: "empty" }, "Loading games…"));
+async function ppCollectGames(team, name) {
   let season = [];
   try { BR.data = await api.get("/api/bracket"); } catch { BR.data = BR.data || {}; }
   try { season = (await api.get(`/api/season/player_games?team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}`)).games || []; } catch { season = []; }
@@ -2609,18 +2609,24 @@ async function ppGameLog(root, team, name) {
   if (other.length) groups.push(["Watched games", other.map((n) => ({ label: `Game ${n}`, snap: S.gameSnapshots.get(n), shots: S.gameShots.get(n) || [] }))]);
   if (season.length) groups.push(["Regular season", season.map((g) => ({ label: `Game ${g.game}`,
     snap: { teams: [{ ...identOf(g.team), name: g.team, score: g.mine, box: [{ ...g.row, listed: g.row.pos || "" }] }, { ...identOf(g.opp), name: g.opp, score: g.theirs, box: [] }] }, shots: [] }))]);
+  return groups;
+}
+async function ppGameLog(root, team, name, openItem = null) {
+  root.replaceChildren(h("div", { class: "empty" }, "Loading games…"));
+  const groups = await ppCollectGames(team, name);
+  const shortOf = (nm) => identOf(nm || "").short || nm || "";
   if (!groups.length) { root.replaceChildren(h("div", { class: "empty" }, "No games for this player yet.")); return; }
   const row = (it) => {
     const mine = it.snap.teams.find((t) => t.name === team), opp = it.snap.teams.find((t) => t.name !== team), r = mine.box.find((x) => x.name === name);
     const dnp = !((r.min || 0) > 0 || (r.fga || 0) > 0 || (r.pts || 0) > 0), win = mine.score > (opp?.score ?? 0);
-    const cells = dnp ? [h("td", { class: "muted", colspan: 9 }, "DNP")]
-      : [h("td", {}, Number(r.min || 0).toFixed(1)), h("td", { class: "pts" }, r.pts), h("td", {}, r.reb), h("td", {}, r.ast), h("td", {}, r.stl), h("td", {}, r.blk),
-         h("td", {}, `${r.fgm}/${r.fga}`), h("td", {}, `${r.tpm}/${r.tpa}`), h("td", {}, r.pm > 0 ? `+${r.pm}` : String(r.pm ?? ""))];
+    const cells = dnp ? [h("td", { class: "muted", colspan: 11 }, "DNP")]
+      : [h("td", {}, Number(r.min || 0).toFixed(1)), h("td", { class: "pts" }, r.pts), h("td", {}, r.reb), h("td", {}, r.ast), h("td", {}, r.stl), h("td", {}, r.blk), h("td", {}, r.tov ?? 0),
+         h("td", {}, `${r.fgm}/${r.fga}`), h("td", {}, `${r.tpm}/${r.tpa}`), h("td", {}, `${r.ftm ?? 0}/${r.fta ?? 0}`), h("td", {}, r.pm > 0 ? `+${r.pm}` : String(r.pm ?? ""))];
     return h("tr", { class: "pl-row", title: "Open his card for this game", onclick: () => card(it) },
       h("td", { class: "l" }, it.label), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(opp?.name || "")), shortOf(opp?.name))),
       h("td", { class: win ? "pm-pos" : "pm-neg" }, `${win ? "W" : "L"} ${mine.score}-${opp?.score ?? 0}`), ...cells);
   };
-  const head = h("tr", {}, ["Game", "Opponent", "Result", "MIN", "PTS", "REB", "AST", "STL", "BLK", "FG", "3P", "+/-"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)));
+  const head = h("tr", {}, ["Game", "Opponent", "Result", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3P", "FT", "+/-"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)));
   const list = () => root.replaceChildren(...groups.map(([title, items]) => h("div", { class: "pp-group" }, h("h4", {}, title),
     h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head.cloneNode(true)), h("tbody", {}, items.map(row)))))));
   const card = (it) => {
@@ -2640,7 +2646,45 @@ async function ppGameLog(root, team, name) {
       hasShots ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${it.label}`), pcShotMap(name, team, "all", it.shots))
         : h("div", { class: "muted", style: { marginTop: "10px" } }, "The shot map is only kept for games this page watched."));
   };
-  list();
+  if (openItem) card(openItem); else list();
+}
+// The player pop-up's Highs tab: his best game in every stat, regular season and playoffs separately. Click a high to open that game.
+async function ppHighs(root, team, name, openGame) {
+  root.replaceChildren(h("div", { class: "empty" }, "Loading highs…"));
+  const groups = await ppCollectGames(team, name);
+  const shortOf = (nm) => identOf(nm || "").short || nm || "";
+  const STATS = [["Points", (r) => r.pts], ["Rebounds", (r) => r.reb], ["Assists", (r) => r.ast], ["Steals", (r) => r.stl], ["Blocks", (r) => r.blk],
+    ["Offensive rebounds", (r) => r.oreb], ["Field goals made", (r) => r.fgm], ["Field-goal attempts", (r) => r.fga], ["Threes made", (r) => r.tpm],
+    ["Three attempts", (r) => r.tpa], ["Free throws made", (r) => r.ftm], ["Minutes", (r) => Number(r.min || 0)], ["Plus / minus", (r) => r.pm],
+    ["Turnovers", (r) => r.tov]];
+  const buckets = [["Regular season", []], ["Playoffs", []], ["Other games", []]];
+  for (const [title, items] of groups) {
+    const b = title.startsWith("Regular") ? buckets[0][1] : title.startsWith("Playoffs") ? buckets[1][1] : buckets[2][1];
+    for (const it of items) {
+      const r = it.snap.teams.find((t) => t.name === team)?.box.find((x) => x.name === name);
+      if (r && ((r.min || 0) > 0 || (r.fga || 0) > 0)) b.push({ it, r });
+    }
+  }
+  const panels = buckets.filter(([, list]) => list.length).map(([title, list]) => {
+    const rows = STATS.map(([label, fn]) => {
+      let best = null;
+      for (const g of list) { const v = fn(g.r); if (v != null && (best == null || v > best.v)) best = { v, g }; }
+      if (!best) return null;
+      const ties = list.filter((g) => fn(g.r) === best.v).length;
+      const mine = best.g.it.snap.teams.find((t) => t.name === team), opp = best.g.it.snap.teams.find((t) => t.name !== team);
+      const won = mine.score > (opp?.score ?? 0);
+      const val = label === "Minutes" ? best.v.toFixed(1) : label === "Plus / minus" && best.v > 0 ? `+${best.v}` : best.v;
+      return h("tr", { class: "pl-row", title: "Open this game", onclick: () => openGame(best.g.it) },
+        h("td", { class: "l" }, label), h("td", { class: "pts" }, val),
+        h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(opp?.name || "")), `${best.g.it.label} vs ${shortOf(opp?.name)}`)),
+        h("td", { class: won ? "pm-pos" : "pm-neg" }, `${won ? "W" : "L"} ${mine.score}-${opp?.score ?? 0}`),
+        h("td", { class: "muted" }, ties > 1 ? `${ties} times` : ""));
+    }).filter(Boolean);
+    return h("div", { class: "pp-group" }, h("h4", {}, `${title} highs · ${list.length} game${list.length === 1 ? "" : "s"}`),
+      h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+        h("thead", {}, h("tr", {}, ["Stat", "High", "Game", "Result", ""].map((c, i) => h("th", { class: i === 0 || i === 2 ? "l" : "" }, c)))), h("tbody", {}, rows))));
+  });
+  root.replaceChildren(...(panels.length ? panels : [h("div", { class: "empty" }, "No games for this player yet.")]));
 }
 
 // averages keep one decimal even when they land on a whole number (JSON turns 12.0 into 12); counts such as games played stay whole
