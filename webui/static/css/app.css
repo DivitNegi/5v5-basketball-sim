@@ -1076,3 +1076,11 @@ select.bld-in { min-width: 0; }
 .pbp-float .pf-body.rawlog { flex: 1; height: auto; border: 0; border-radius: 0; font-size: 13px; }
 .pbp-float.min { height: auto !important; min-height: 0; resize: none; }
 .pbp-float.min .pf-body { display: none; }
+
+/* badge chips by tier */
+.badge.tier-1 { background: rgba(180, 120, 70, .16); color: #e0a878; border: 1px solid rgba(205, 127, 50, .35); }
+.badge.tier-2 { background: rgba(170, 180, 195, .14); color: #d6dde8; border: 1px solid rgba(192, 200, 212, .35); }
+.badge.tier-3 { background: rgba(234, 179, 8, .14); color: #facc15; border: 1px solid rgba(234, 179, 8, .4); }
+.badge.tier-4 { background: linear-gradient(90deg, rgba(168, 85, 247, .22), rgba(236, 72, 153, .22)); color: #f0abfc; border: 1px solid rgba(217, 70, 239, .45); }
+.re-badges .badges { margin-top: 6px; }
+.tc-badges td { vertical-align: top; }

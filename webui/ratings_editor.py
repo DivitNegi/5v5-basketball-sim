@@ -123,6 +123,16 @@ def _with_fallbacks(team, values):
     return out, filled, archetypes.archetype_label(p)
 
 
+def _earned(team, values):
+    """Every badge he plays with at these ratings (file badges plus the ones the engine gives from his ratings)."""
+    try:
+        p = _played(team, values)
+        sim_engine.assign_player_badges(sim_engine.Team(team, [p]))
+        return list(p.badges)
+    except Exception:
+        return []
+
+
 def read(runner, team, name):
     fn = _factory(runner, team)
     path, _text, call = _locate(fn, name)
@@ -136,7 +146,7 @@ def read(runner, team, name):
     if orig is not None:
         orig = _with_fallbacks(team, orig)[0]
     return {"team": team, "name": name, "file": rel, "function": fn.__name__, "values": shown, "original": orig, "overall": _overall(team, vals),
-            "fallbacks": filled, "archetype": arch,
+            "fallbacks": filled, "archetype": arch, "earned": _earned(team, vals),
             "groups": [{"title": t, "fields": [{"label": l, "key": k, "kind": kind} for l, k, kind in fs]} for t, fs in GROUPS]}
 
 
@@ -174,7 +184,7 @@ def preview(runner, team, name, changes):
     _path, _text, call = _locate(fn, name)
     vals = _values(call)
     vals.update(_clean(changes))
-    return {"overall": _overall(team, vals), "archetype": archetypes.archetype_label(_played(team, vals))}
+    return {"overall": _overall(team, vals), "archetype": archetypes.archetype_label(_played(team, vals)), "earned": _earned(team, vals)}
 
 
 def _source(value):

@@ -515,7 +515,8 @@ def team_card_payload(runner, team):
     per.update(fgp=pct("fgm", "fga"), tpp=pct("tpm", "tpa"), ftp=pct("ftm", "fta"))
     games = schedule_payload(runner, team)["games"]
     played = [x for x in games if x.get("mine") is not None]
-    return {"team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
+    from .badges import team_badges
+    return {"badges": team_badges(runner, team), "team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
             "recent": list(reversed(played[-8:])), "upcoming": schedule_payload(runner, team)["upcoming"][:5], "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"]),
             "insights": _team_insights(runner, team)}
 

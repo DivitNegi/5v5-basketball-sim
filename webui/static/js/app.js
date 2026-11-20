@@ -93,6 +93,35 @@ const S = {
   gameNo: 1, gameSnapshots: new Map(), gameShots: new Map(), goodPlays: [], lastScoreClock: null,
 };
 
+// badges with their level: one chip per badge (highest level kept), coloured by tier, with what the badge does on hover
+const BADGE_INFO = {
+  acrobat: "Tough layups (contested, over a rim protector, floaters in traffic) go in more",
+  deadeye: "Contested jumpers go in more", midrange_maestro: "Every midrange jumper goes in more", post_maestro: "Post-ups, hooks and fadeaways go in more",
+  bully: "Draws more shooting fouls going inside", ice_veins: "Free throws in the last five minutes of a close game go in more",
+  interceptor: "Picks off more passes and pokes more balls loose", unpluckable: "Gets stripped and picked off less",
+  hands_up: "Jumpers he contests go in less", post_wall: "Post-ups against him go in less",
+  verticality: "Layups at him go in less, and he is called for fewer fouls going straight up",
+  limitless_range: "Takes and makes threes from far beyond the line", catch_shoot: "Cashes open catch-and-shoot looks", ankle_breaker: "Shakes defenders loose off the dribble",
+  posterizer: "Dunks through contact", clutch: "Better late in close games", closer: "Takes over late", lockdown: "Gets the toughest defensive assignment",
+  rim_protector: "Protects the paint", chasedown: "Chase-down blocks in transition", lob_threat: "Finishes lobs",
+};
+const TIER_ORDER = { bronze: 1, silver: 2, gold: 3, plat: 4, platinum: 4, hof: 4 };
+function badgeList(values) {
+  const best = new Map();
+  for (const raw of values || []) {
+    const m = String(raw).trim().toLowerCase().match(/^(.*?)(?:_(bronze|silver|gold|plat|platinum|hof))?$/);
+    const base = m[1], lvl = m[2] || "bronze", t = TIER_ORDER[lvl] || 1;
+    if (!base) continue;
+    const cur = best.get(base);
+    if (!cur || t > cur.t || (!m[2] && false)) best.set(base, { base, t, lvl: m[2] ? lvl : (cur?.lvl || "bronze") });
+  }
+  return [...best.values()].sort((a, b) => b.t - a.t || a.base.localeCompare(b.base));
+}
+function badgeChips(values, extra = []) {
+  const label = { 1: "Bronze", 2: "Silver", 3: "Gold", 4: "HOF" };
+  return h("div", { class: "badges" }, badgeList(values).map((b) => h("span", { class: `badge tier-${b.t}`, title: BADGE_INFO[b.base] || "" },
+    `${b.base.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())} · ${b.base === "limitless_range" && b.t === 4 ? "Plat" : label[b.t]}`)), ...extra);
+}
 function cleanBadges(values) {
   const seen = new Set();
   return (values || []).map((value) => String(value).replace(/_/g, " ").trim().toLowerCase()
@@ -1354,7 +1383,7 @@ function renderPlayerCard() {
   root.replaceChildren(
     h("div", { class: "pcard-head" }, face,
       h("div", {}, h("div", { class: "pcard-name" }, p.name), h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.pos}${p.height ? ` · ${ft}'${inch}"` : ""}${p.archetype ? ` · ${p.archetype}` : ""}`),
-        h("div", { class: "badges" }, cleanBadges(p.badges).map((b) => h("span", { class: "badge" }, b)), p.rookie ? h("span", { class: "badge", style: { background: "rgba(167,139,250,.15)", color: "#c4b5fd", borderColor: "rgba(167,139,250,.35)" } }, "Rookie") : null)),
+        badgeChips(p.badges, [p.rookie ? h("span", { class: "badge", style: { background: "rgba(167,139,250,.15)", color: "#c4b5fd", borderColor: "rgba(167,139,250,.35)" } }, "Rookie") : null])),
       h("div", { class: "pcard-ovr" }, h("div", { class: "n" }, p.ovr ?? "–"), h("small", {}, "Overall"))),
     h("div", { class: "rating-groups" }, p.groups.map((g) => h("div", {}, h("h3", {}, g.title), g.items.map((it) => h("div", { class: "rbar" },
       h("span", {}, it.label), h("div", { class: "track" }, h("div", { class: "fill", style: { width: `${it.value}%`, background: ratingColor(it.value) } })), h("span", { class: "val" }, it.value)))))));
@@ -1634,7 +1663,7 @@ async function loadPlayerCard() {
     h("div", { class: "pcard-head", style: { "--c": d.team.color } }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null,
       form ? h("span", { class: `form ${form}`, style: { fontSize: "18px" } }, form === "hot" ? "🔥" : "🧊") : null),
       h("div", { class: "pcard-sub" }, `${d.team.short} · ${p.listed}${d.archetype ? ` · ${d.archetype}` : ""} · ${p.on ? "on the floor" : "bench"}`),
-      h("div", { class: "badges" }, cleanBadges(d.badges).map((b) => h("span", { class: "badge" }, b)))),
+      badgeChips(d.badges)),
       h("div", { class: "pcard-ovr" }, h("div", { class: "scope" }, qLabel), h("div", { class: "n" }, `${p.pts}`), h("div", { class: "unit" }, "PTS"),
         h("div", { class: "line2" }, h("span", {}, h("b", {}, p.reb), " REB"), h("span", {}, h("b", {}, p.ast), " AST"), h("span", {}, h("b", {}, p.stl), " STL"), h("span", {}, h("b", {}, p.blk), " BLK")))),
     qNote || [],
@@ -1953,7 +1982,7 @@ const RATE_GROUPS = [["Scoring", ["3PT", "MID", "RIM", "DUNK", "FT"]], ["Playmak
 const fmtHt = (n) => (n ? `${Math.floor(n / 12)}'${n % 12}"` : "");
 function ratingDetail(p) {
   return h("div", { class: "pl-detail" },
-    h("div", { class: "pl-meta" }, [fmtHt(p.ht), p.arch, p.team].filter(Boolean).join(" · "), (p.badges || []).length ? h("div", { class: "badges" }, p.badges.map((b) => h("span", { class: "badge" }, b.replace(/_/g, " ")))) : null),
+    h("div", { class: "pl-meta" }, [fmtHt(p.ht), p.arch, p.team].filter(Boolean).join(" · "), (p.badges || []).length ? badgeChips(p.badges) : null),
     h("div", { class: "rating-groups" }, RATE_GROUPS.map(([title, keys]) => h("div", {}, h("h3", {}, title), keys.map((k) => h("div", { class: "rbar" },
       h("span", {}, k), h("div", { class: "track" }, h("div", { class: "fill", style: { width: `${p.r[k]}%`, background: ratingColor(p.r[k]) } })), h("span", { class: "val" }, p.r[k])))))));
 }
@@ -2200,7 +2229,12 @@ async function openTeamCard(team) {
         h("div", { class: "pc-panel" }, h("h4", {}, "Compared to the league"), h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Per game, ranked among the ${d.pool} teams (1st = best). A longer spoke is always better: for defense (points allowed) and turnovers, fewer is a longer spoke.`), percentileRadar(d.ranks, chartColor())),
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
           d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)),
-      ...(d.insights ? teamInsights(d.insights, id, team) : []));
+      ...(d.insights ? teamInsights(d.insights, id, team) : []),
+      h("div", { class: "pc-panel tc-badges-panel", style: { marginTop: "12px" } }, h("h4", {}, "Badges"),
+        Object.keys(d.badges || {}).length ? h("div", { class: "table-wrap" }, h("table", { class: "stats tc-badges" }, h("tbody", {},
+          Object.entries(d.badges).filter(([, b]) => (b || []).length).sort((a, b) => badgeList(b[1]).reduce((t, x) => t + x.t, 0) - badgeList(a[1]).reduce((t, x) => t + x.t, 0))
+            .map(([nm, b]) => h("tr", {}, h("td", { class: "l", style: { whiteSpace: "nowrap" } }, h("div", { class: "pcell" }, faceEl ? faceEl(nm) : "", nm)), h("td", { class: "l" }, badgeChips(b)))))))
+          : h("div", { class: "muted" }, "No badges.")));
   };
   render();
 }
@@ -2478,6 +2512,7 @@ async function openRatingsEditor(team, name) {
   const status = h("div", { class: "re-status muted" }, `Saves to ${d.file} (${d.function})`);
   let base = d.overall, timer = null;
   const archEl = h("div", { class: "re-arch", title: "Worked out from his ratings; it changes as the ratings do" }, d.archetype || "");
+  const earnedEl = h("div", { class: "re-badges", title: "Every badge he plays with at these ratings; they change as the ratings do" }, badgeChips(d.earned || []));
   const changes = () => Object.fromEntries(Object.keys(cur).filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(orig[k])).map((k) => [k, cur[k]]));
   const refreshCount = () => { const n = Object.keys(changes()).length; saveBtn.disabled = !n; saveBtn.textContent = n ? `Save ${n} change${n === 1 ? "" : "s"}` : "Save"; };
   const preview = () => {
@@ -2486,7 +2521,7 @@ async function openRatingsEditor(team, name) {
       try {
         const r = await api.post("/api/ratings/preview", { team, name, changes: changes() });
         if (r.error) { status.textContent = r.error; return; }
-        ovr.textContent = r.overall; if (r.archetype) archEl.textContent = r.archetype;
+        ovr.textContent = r.overall; if (r.archetype) archEl.textContent = r.archetype; if (r.earned) earnedEl.replaceChildren(badgeChips(r.earned));
         const dv = r.overall - base; delta.textContent = dv ? `${dv > 0 ? "+" : ""}${dv} from ${base}` : "";
         delta.className = `re-delta ${dv > 0 ? "up" : dv < 0 ? "down" : "muted"}`;
       } catch (err) { status.textContent = err.message; }
@@ -2561,7 +2596,7 @@ async function openRatingsEditor(team, name) {
     try {
       const r = await api.post("/api/ratings/save", { team, name, changes: changes() });
       if (r.error) { status.textContent = r.error; refreshCount(); return; }
-      Object.assign(orig, r.values); Object.assign(cur, r.values); base = r.overall; ovr.textContent = r.overall; delta.textContent = ""; if (r.archetype) archEl.textContent = r.archetype;
+      Object.assign(orig, r.values); Object.assign(cur, r.values); base = r.overall; ovr.textContent = r.overall; delta.textContent = ""; if (r.archetype) archEl.textContent = r.archetype; if (r.earned) earnedEl.replaceChildren(badgeChips(r.earned));
       body.querySelectorAll(".re-row.changed").forEach((x) => x.classList.remove("changed"));
       status.textContent = r.message; toast(r.message, "ok"); refreshCount();
       const row = RE.roster.find((p) => p.name === name && p.team === team); if (row) { row.ovr = r.overall; renderReRoster(); }
@@ -2582,7 +2617,7 @@ async function openRatingsEditor(team, name) {
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": id.color || "#64748b" } }, face,
-      h("div", {}, h("div", { class: "pcard-name" }, name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ratings editor`), archEl),
+      h("div", {}, h("div", { class: "pcard-name" }, name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ratings editor`), archEl, earnedEl),
       h("div", { class: "re-ovr-box" }, h("div", { class: "muted", style: { fontSize: "11px", letterSpacing: ".1em" } }, "OVERALL"), ovr, delta)),
     h("div", { class: "re-groups" }, d.groups.map((g) => h("div", { class: "pc-panel re-group" }, h("h4", {}, g.title), g.fields.map(field)))),
     h("div", { class: "re-actions" }, backBtn, resetBtn, originalBtn, h("div", { style: { flex: "1" } }), status, saveBtn));
@@ -2632,7 +2667,7 @@ async function openStatsPlayer(team, name, source) {
     if (v === "highs" && !highsView.childElementCount) ppHighs(highsView, team, d.name, (it) => show("games", it));
   };
   body.replaceChildren(
-    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
+    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg, (d.badges || []).length ? badgeChips(d.badges) : null), h("div", { style: { marginLeft: "auto" } }, seg)),
     tabs, statsView, highsView, gamesView);
   show("stats");
 }
