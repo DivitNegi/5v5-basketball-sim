@@ -1061,3 +1061,18 @@ select.bld-in { min-width: 0; }
 .bld-row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
 .bld-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
 .bld-more { padding: 8px 10px; font-size: 12px; text-align: center; }
+
+/* pop-out play-by-play: stays on screen on every tab */
+.pbp-float { position: fixed; right: 20px; bottom: 20px; width: min(400px, calc(100vw - 32px)); height: 440px; min-width: 260px; min-height: 140px;
+  max-height: calc(100vh - 24px); z-index: 85; display: flex; flex-direction: column; overflow: hidden; resize: both;
+  background: var(--panel-solid); border: 1px solid var(--line-strong, rgba(148,163,184,.22)); border-radius: 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, .55); }
+.pbp-float .pf-head { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 12px; border-bottom: 1px solid var(--line); cursor: move; user-select: none; touch-action: none; }
+.pbp-float .pf-title { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #f87171; }
+.pbp-float .pf-title::before { content: "●"; margin-right: 5px; }
+.pbp-float .pf-score { flex: 1; min-width: 0; overflow: hidden; font-size: 12.5px; }
+.pbp-float .pf-score .pbp-score { margin: 0; padding: 0; background: none; border: 0; }
+.pbp-float .pf-btn { background: none; border: 0; color: var(--muted); font-size: 15px; width: 26px; height: 26px; border-radius: 7px; cursor: pointer; }
+.pbp-float .pf-btn:hover { background: rgba(148, 163, 184, .12); color: #e2e8f0; }
+.pbp-float .pf-body.rawlog { flex: 1; height: auto; border: 0; border-radius: 0; font-size: 13px; }
+.pbp-float.min { height: auto !important; min-height: 0; resize: none; }
+.pbp-float.min .pf-body { display: none; }

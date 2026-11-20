@@ -503,10 +503,67 @@ function rawLine(line, shot) {
   }
   root.append(el);
   while (root.children.length > 5000) root.firstChild.remove();
+  if (PF.open) pbpFloatAdd(el);
   // the "N new" button is refreshed once per batch (drainEvents): it reads the log's scroll height, and reading it after every line
   // made the browser lay out all 5,000 lines per line -- a jump while scrolled up crawled at ~15 lines a second
   if (!root._stick && el.className !== "pbp-sys") { root._behind = (root._behind || 0) + 1; root._wantSync = true; }
   if (root._stick) root._wantPin = true;   // the batch scrolls once, after all its lines are in
+}
+
+// ---- the pop-out play-by-play: a small window that stays on screen on every tab (Game, Coach, Stats...). Drag it by its top bar, resize
+// it from the corner, minimise it to just the score. Where it sits and whether it is open are remembered in this browser.
+const PF = { open: false, el: null, body: null, score: null, stick: true, pinQueued: false };
+function pbpFloatSave() {
+  if (!PF.el) return;
+  try { localStorage.setItem("pbpFloat", JSON.stringify({ open: PF.open, min: PF.el.classList.contains("min"), left: PF.el.style.left, top: PF.el.style.top, w: PF.el.style.width, h: PF.el.style.height })); } catch {}
+}
+function pbpFloatAdd(el) {
+  if (!PF.body) return;
+  const c = el.cloneNode(true);
+  if (c.classList.contains("pbp-score")) PF.score.replaceChildren(el.cloneNode(true));
+  PF.body.append(c);
+  while (PF.body.children.length > 400) PF.body.firstChild.remove();
+  if (PF.stick && !PF.pinQueued) { PF.pinQueued = true; requestAnimationFrame(() => { PF.pinQueued = false; PF.body.scrollTop = PF.body.scrollHeight; }); }
+}
+function pbpFloatOpen(on) {
+  PF.open = on;
+  if (!on) { PF.el?.remove(); PF.el = PF.body = PF.score = null; try { const st = JSON.parse(localStorage.getItem("pbpFloat") || "{}"); st.open = false; localStorage.setItem("pbpFloat", JSON.stringify(st)); } catch {} return; }
+  if (PF.el) return;
+  let st = {};
+  try { st = JSON.parse(localStorage.getItem("pbpFloat") || "{}"); } catch {}
+  PF.score = h("div", { class: "pf-score" });
+  const minBtn = h("button", { class: "pf-btn", title: "Minimise / restore" }, "–");
+  const closeBtn = h("button", { class: "pf-btn", title: "Close (the play-by-play stays on the Game tab)" }, "✕");
+  const head = h("div", { class: "pf-head" }, h("span", { class: "pf-title" }, "Live"), PF.score, minBtn, closeBtn);
+  PF.body = h("div", { class: "rawlog pf-body" });
+  PF.el = h("div", { class: `pbp-float${st.min ? " min" : ""}` }, head, PF.body);
+  if (st.left && st.top) Object.assign(PF.el.style, { left: st.left, top: st.top, right: "auto", bottom: "auto" });
+  if (st.w) PF.el.style.width = st.w;
+  if (st.h) PF.el.style.height = st.h;
+  document.body.append(PF.el);
+  // what is already in the game log, so the window does not open empty
+  const log = $("#rawlog"), have = [...log.children].filter((x) => !x.classList.contains("empty")).slice(-200);
+  have.forEach((x) => PF.body.append(x.cloneNode(true)));
+  const lastScore = [...log.querySelectorAll(".pbp-score")].pop();
+  if (lastScore) PF.score.replaceChildren(lastScore.cloneNode(true));
+  PF.body.scrollTop = PF.body.scrollHeight;
+  PF.body.addEventListener("scroll", () => { PF.stick = PF.body.scrollHeight - PF.body.scrollTop - PF.body.clientHeight < 40; }, { passive: true });
+  minBtn.addEventListener("click", () => { PF.el.classList.toggle("min"); pbpFloatSave(); });
+  closeBtn.addEventListener("click", () => pbpFloatOpen(false));
+  // drag by the top bar (not the buttons); kept inside the window
+  head.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".pf-btn")) return;
+    const r = PF.el.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+    head.setPointerCapture(e.pointerId);
+    const move = (ev) => {
+      const x = Math.max(0, Math.min(window.innerWidth - 120, ev.clientX - dx)), y = Math.max(0, Math.min(window.innerHeight - 40, ev.clientY - dy));
+      Object.assign(PF.el.style, { left: `${x}px`, top: `${y}px`, right: "auto", bottom: "auto" });
+    };
+    const up = () => { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up); pbpFloatSave(); };
+    head.addEventListener("pointermove", move); head.addEventListener("pointerup", up);
+  });
+  new ResizeObserver(() => pbpFloatSave()).observe(PF.el);
+  pbpFloatSave();
 }
 
 function addFeedLine(line, shot) {
@@ -3431,6 +3488,8 @@ async function boot() {
   $("#faster").addEventListener("click", () => stepSpeed(1));
   $$("[data-jump]").forEach((b) => b.addEventListener("click", () => api.post("/api/control", { action: "jump", value: b.dataset.jump }).catch((e) => toast(e.message, "err"))));
   $("#simPlayoffs").addEventListener("click", () => api.post("/api/control", { action: "simPlayoffs" }).catch((e) => toast(e.message, "err")));
+  $("#pbpPop").addEventListener("click", () => pbpFloatOpen(!PF.open));
+  try { if (JSON.parse(localStorage.getItem("pbpFloat") || "{}").open) pbpFloatOpen(true); } catch {}
   $("#simSeries").addEventListener("click", () => api.post("/api/control", { action: "simSeries" }).catch((e) => toast(e.message, "err")));
   $$('[data-coach]').forEach((b)=>b.addEventListener('click',async()=>{try{await api.post('/api/coach',{action:b.dataset.coach,team:CO.team});await loadCoach();}catch(e){toast(e.message,'err');}}));
   $("#lineupReload")?.addEventListener("click", () => loadLineup(true).catch((e) => toast(e.message, "err")));
