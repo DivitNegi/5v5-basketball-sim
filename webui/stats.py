@@ -62,8 +62,10 @@ PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("drive", "Drive"),
 PLAY_SHORT = ["ISO", "P&R", "DRIVE", "PULL-UP", "POST", "SPOT", "SCREEN", "CUT", "TRANS", "PUTB", "LATE/SET"]   # column labels, same order as PLAY_LABELS
 
 
-FINISH_LABELS = [("drive", "Drive"), ("off_pass", "Finish off a pass"), ("pullup", "Pull-up"), ("catch_shoot", "Catch & shoot"),
-                 ("post", "Post move"), ("putback", "Putback")]
+FINISH_LABELS = [("pullup_three", "Pull-up 3"), ("pullup_mid", "Pull-up midrange"), ("cs_three", "Catch & shoot 3"), ("cs_mid", "Catch & shoot midrange"),
+                 ("drive_layup", "Driving layup"), ("drive_floater", "Driving floater"), ("drive_dunk", "Driving dunk"),
+                 ("pass_layup", "Layup off a pass"), ("pass_dunk", "Dunk off a pass"),
+                 ("post_up", "Post-up / hook"), ("post_fade", "Post fadeaway"), ("putback", "Putback")]
 
 
 def play_type_breakdown(mine, pool, key="pt", labels=None):

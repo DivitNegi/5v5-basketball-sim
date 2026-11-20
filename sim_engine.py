@@ -12922,19 +12922,23 @@ OFF_PASS_FINISH_TAGS = {"roller", "alley_oop", "dump_off", "dump_off_elite_help"
 
 
 def finish_type_of(shot_type: str, context: str, play: str) -> str:
+    """The specific finish: pull-up / catch-and-shoot three or midrange, a drive's layup / floater / dunk, a layup or dunk off a pass,
+    a post-up or post fadeaway, or a putback."""
     tags = set(str(context or "").split("|")) - {""}
     if play == "putback" or "putback" in tags or "late_putback" in tags:
         return "putback"
-    if shot_type in ("post", "post_fade"):
-        return "post"
+    if shot_type == "post_fade":
+        return "post_fade"
+    if shot_type == "post":
+        return "post_up"
     if shot_type in ("three", "mid"):
-        if tags & CATCH_SHOOT_TAGS or play in ("spot_up", "off_screen"):
-            return "catch_shoot"
-        return "pullup"
+        how = "cs" if tags & CATCH_SHOOT_TAGS or play in ("spot_up", "off_screen") else "pullup"
+        return f"{how}_{'three' if shot_type == 'three' else 'mid'}"
     # layups and dunks
+    dunk = shot_type == "dunk"
     if tags & OFF_PASS_FINISH_TAGS or play == "cut" or any(t.endswith("_cut") for t in tags):
-        return "off_pass"
-    return "drive"
+        return "pass_dunk" if dunk else "pass_layup"
+    return "drive_dunk" if dunk else "drive_floater" if "rim_float" in tags else "drive_layup"
 
 
 def pbp_play_type(shot_type: str, text: str) -> str:
