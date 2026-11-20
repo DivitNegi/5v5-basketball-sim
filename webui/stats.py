@@ -59,9 +59,35 @@ def on_off(st, tt, other, team_minutes):
 # ---- analytics tables, built from the "analytics" counts the engine keeps for every player (see analytics_shot in sim_engine)
 PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("post", "Post-up"), ("spot_up", "Spot-up"), ("off_screen", "Off screen"),
                ("cut", "Cut"), ("transition", "Transition"), ("putback", "Putback"), ("other", "Other half-court")]
+PLAY_SHORT = ["ISO", "P&R", "POST", "SPOT", "SCREEN", "CUT", "TRANS", "PUTB", "OTHER"]   # column labels, same order as PLAY_LABELS
+
+
+def play_type_breakdown(mine, pool):
+    """His field goals by play type next to the league's points per shot and share on the same play (pool = every player's stats in this source)."""
+    league = {}
+    for st in pool:
+        for k, v in ((st.get("analytics") or {}).get("pt") or {}).items():
+            lg = league.setdefault(k, [0, 0])
+            lg[0] += v.get("fga", 0)
+            lg[1] += v.get("pts", 0)
+    lt = sum(x[0] for x in league.values())
+    pt = (mine.get("analytics") or {}).get("pt") or {}
+    total = sum(v.get("fga", 0) for v in pt.values())
+    rows = []
+    for key, label in PLAY_LABELS:
+        v = pt.get(key) or {}
+        fga, fgm, pts = v.get("fga", 0), v.get("fgm", 0), v.get("pts", 0)
+        lf, lp = league.get(key, [0, 0])
+        rows.append({"key": key, "label": label, "fga": fga, "fgm": fgm, "pts": pts,
+                     "fgp": round(100 * fgm / fga, 1) if fga else None, "pps": round(pts / fga, 2) if fga else None,
+                     "freq": round(100 * fga / total, 1) if total else None, "league_pps": round(lp / lf, 2) if lf else None,
+                     "league_freq": round(100 * lf / lt, 1) if lt else None})
+    return {"rows": rows, "total": total}
+
+
 ANALYTICS = {
     "onoff": "Team offense and defense per 100 possessions with him on the floor and on the bench. Possessions are the team's, split by his share of the minutes.",
-    "playtypes": "Field goals by how the shot came: frequency is his share of his own shots, PPS is points per shot (free throws not included).",
+    "playtypes": "How each player gets his shots: his total, points per shot (free throws not included), his most-used play, and what share of his shots comes from each play type. Click a player for his full breakdown.",
     "clutch": "Last five minutes of the 4th quarter or overtime with the score within five. Season totals, not per game: clutch samples are small.",
     "xfg": "Every shot carries the make chance the engine rolled. Expected points add those up; the gap to the points he really scored is shot-making above or below expected.",
     "assists": "Who his assists went to: one row per passer and teammate.",
@@ -79,14 +105,15 @@ def analytics_table(kind, players, teams, team_filter, result):
     result["note"] = ANALYTICS[kind]
     cols = {
         "onoff": ["GP", "MIN", "ON ORtg", "ON DRtg", "ON NET", "OFF ORtg", "OFF DRtg", "OFF NET", "NET SWING", "+/-"],
-        "playtypes": ["Play type", "FGA", "FGM", "FG%", "PTS", "PPS", "FREQ%"],
+        "playtypes": ["FGA", "PTS", "PPS", "Top play"] + [f"{s}%" for s in PLAY_SHORT],
         "clutch": ["GP", "MIN", "PTS", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "TS%", "AST", "TOV", "+/-"],
         "xfg": ["Shots", "xPTS", "PTS", "PTS vs exp", "per 100 shots", "xeFG%", "eFG%"],
         "assists": ["To", "AST", "Share%"],
     }[kind]
     result["columns"] = ["Team", "Player"] + cols
     # whole-number totals (not per-game averages): shown without a decimal
-    result["counts"] = {"onoff": [], "playtypes": ["FGA", "FGM", "PTS"], "xfg": ["Shots", "PTS"], "assists": ["AST"],
+    result["open_tab"] = "playtypes" if kind == "playtypes" else None   # clicking a player opens his pop-up on this tab
+    result["counts"] = {"onoff": [], "playtypes": ["FGA", "PTS"], "xfg": ["Shots", "PTS"], "assists": ["AST"],
                         "clutch": ["PTS", "FG", "FGA", "3P", "3PA", "FT", "FTA", "AST", "TOV", "+/-"]}[kind]
     for tn, pp in players.items():
         if team_filter not in ("All teams", tn):
@@ -115,14 +142,14 @@ def analytics_table(kind, players, teams, team_filter, result):
                 off_n = off_o - off_d if off_o is not None and off_d is not None else None
                 add([gp, r1(mins / max(1, gp)), r1(on_o), r1(on_d), r1(on_n), r1(off_o), r1(off_d), r1(off_n),
                      r1(on_n - off_n) if on_n is not None and off_n is not None else None, r1((st.get("plus_minus", 0) or 0) / max(1, gp))])
-            elif kind == "playtypes":
+            elif kind == "playtypes":   # one row per player; the per-type detail is in his pop-up
                 pt = a.get("pt") or {}
                 total = sum(v.get("fga", 0) for v in pt.values())
-                for key, label in PLAY_LABELS:
-                    v = pt.get(key) or {}
-                    fga, fgm, pts = v.get("fga", 0), v.get("fgm", 0), v.get("pts", 0)
-                    if fga:
-                        add([label, fga, fgm, pct(fgm, fga), pts, round(pts / fga, 2), pct(fga, total)])
+                if not total:
+                    continue
+                pts = sum(v.get("pts", 0) for v in pt.values())
+                top = max(PLAY_LABELS, key=lambda kl: (pt.get(kl[0]) or {}).get("fga", 0))[1]
+                add([total, pts, round(pts / total, 2), top] + [pct((pt.get(k) or {}).get("fga", 0), total) or 0.0 for k, _ in PLAY_LABELS])
             elif kind == "clutch":
                 c = a.get("clutch") or {}
                 if not c.get("sec") and not c.get("fga") and not c.get("fta"):
@@ -409,7 +436,8 @@ def player_detail(runner, source, team, name, group="all"):
             "mid_split": {"base": zone("mid_base"), "elbow": zone("mid_elbow"), "wing": zone("mid_wing"),
                           "base_L": zone("mid_base_L"), "base_R": zone("mid_base_R"), "wing_L": zone("mid_wing_L"), "wing_R": zone("mid_wing_R")},
             "dist_split": {"rim_float": zone("rim_float"), "mid_long": zone("mid_long")},
-            "fine": fine_me, "fine_avg": fine_avg}
+            "fine": fine_me, "fine_avg": fine_avg,
+            "play_types": play_type_breakdown(mine, [s for _, _, s in pool])}
 
 
 

@@ -2644,7 +2644,7 @@ async function openRatingsEditor(team, name) {
     h("div", { class: "re-actions" }, backBtn, resetBtn, originalBtn, h("div", { style: { flex: "1" } }), status, saveBtn));
   refreshCount();
 }
-async function openStatsPlayer(team, name, source) {
+async function openStatsPlayer(team, name, source, startTab = "stats") {
   window.__ppAt = performance.now();
   document.querySelector(".pp-back")?.remove();
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
@@ -2659,7 +2659,7 @@ async function openStatsPlayer(team, name, source) {
   const id = identOf(team), color = chartColor(id);
   let mode = "pg";
   // Season / Playoffs / Series / Live: every set of stats this player has
-  const srcSeg = (d.sources || []).length > 1 ? h("div", { class: "seg small", style: { marginTop: "8px" } }, d.sources.map((s2) => h("button", { class: s2 === d.source ? "on" : "", onclick: () => openStatsPlayer(team, name, s2) }, s2))) : null;
+  const srcSeg = (d.sources || []).length > 1 ? h("div", { class: "seg small", style: { marginTop: "8px" } }, d.sources.map((s2) => h("button", { class: s2 === d.source ? "on" : "", onclick: () => openStatsPlayer(team, name, s2, startTab) }, s2))) : null;
   const tiles = h("div", {});
   const pct1v = (m, a) => (a ? (100 * m / a).toFixed(1) : "–");
   const paint = () => {
@@ -2679,18 +2679,41 @@ async function openStatsPlayer(team, name, source) {
   paint();
   const statsView = h("div", {}, tiles,
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
-  const gamesView = h("div", { class: "pp-games" }), highsView = h("div", { class: "pp-games" });
-  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["highs", "Highs"], ["games", "Game log"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
+  const gamesView = h("div", { class: "pp-games" }), highsView = h("div", { class: "pp-games" }), playsView = ppPlayTypes(d);
+  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["plays", "Play types"], ["highs", "Highs"], ["games", "Game log"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
   const show = (v, openItem = null) => {
-    statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; highsView.hidden = v !== "highs"; seg.hidden = v !== "stats";
+    statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; highsView.hidden = v !== "highs"; playsView.hidden = v !== "plays"; seg.hidden = v !== "stats";
     tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
     if (v === "games" && (openItem || !gamesView.childElementCount)) ppGameLog(gamesView, team, d.name, openItem);
     if (v === "highs" && !highsView.childElementCount) ppHighs(highsView, team, d.name, (it) => show("games", it));
   };
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
-    tabs, statsView, highsView, gamesView);
-  show("stats");
+    tabs, statsView, playsView, highsView, gamesView);
+  show(startTab === "playtypes" ? "plays" : "stats");
+}
+// The player pop-up's Play types tab: every play type he uses, how often and how well, next to the league on the same play
+function ppPlayTypes(d) {
+  const pt = d.play_types;
+  if (!pt || !pt.total) return h("div", { class: "pp-games" }, h("div", { class: "empty" }, "No play-type data for these games. It is recorded for games played since the analytics update."));
+  const used = pt.rows.filter((r) => r.fga).sort((a, b) => b.fga - a.fga);
+  const maxFreq = Math.max(...used.map((r) => r.freq || 0), 1);
+  const diff = (r) => (r.pps != null && r.league_pps != null ? r.pps - r.league_pps : null);
+  const row = (r) => {
+    const dv = diff(r);
+    return h("tr", {}, h("td", { class: "l" }, r.label),
+      h("td", { class: "l" }, h("div", { class: "pt-bar" }, h("span", { style: { width: `${(100 * (r.freq || 0) / maxFreq).toFixed(0)}%` } }), h("b", {}, `${(r.freq ?? 0).toFixed(1)}%`))),
+      h("td", {}, r.fga), h("td", {}, r.fgm), h("td", {}, r.fgp == null ? "–" : r.fgp.toFixed(1)), h("td", {}, r.pts),
+      h("td", { class: "pts" }, r.pps == null ? "–" : r.pps.toFixed(2)), h("td", { class: "muted" }, r.league_pps == null ? "–" : r.league_pps.toFixed(2)),
+      h("td", { class: dv == null ? "" : dv >= 0.05 ? "pm-pos" : dv <= -0.05 ? "pm-neg" : "" }, dv == null ? "–" : `${dv >= 0 ? "+" : "−"}${Math.abs(dv).toFixed(2)}`),
+      h("td", { class: "muted" }, r.league_freq == null ? "–" : `${r.league_freq.toFixed(1)}%`));
+  };
+  const totPts = used.reduce((a, r) => a + r.pts, 0);
+  return h("div", { class: "pp-games" },
+    h("div", { class: "muted", style: { margin: "2px 2px 10px", fontSize: "12.5px" } }, `${pt.total} shots · ${(totPts / pt.total).toFixed(2)} points per shot · most-used play first. PPS is points per shot (free throws not included); green / red = better / worse than the league on that play.`),
+    h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+      h("thead", {}, h("tr", {}, ["Play type", "Share of his shots", "FGA", "FGM", "FG%", "PTS", "PPS", "League PPS", "vs league", "League share"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)))),
+      h("tbody", {}, used.map(row)))));
 }
 // The player pop-up's Games tab: every game he played (playoff series from the bracket, the regular season from the season log, any other game
 // this page watched), newest first. Clicking one shows his player card for that game.
@@ -2837,7 +2860,7 @@ function renderStatsInto(root, data, opts = {}) {
     return;
   }
   const rerender = () => renderStatsInto(root, data, opts);
-  const LABEL_COLS = ["Opponent", "Play type", "To"];   // text columns: never a "rank by" choice
+  const LABEL_COLS = ["Opponent", "Play type", "To", "Top play"];   // text columns: never a "rank by" choice
   const rankCols = cols.slice(2).filter((c) => !LABEL_COLS.includes(c));
   const maxGp = Math.max(1, ...(data.gp || [1]));
   const controls = h("div", { class: "stx-controls" },
@@ -2856,7 +2879,7 @@ function renderStatsInto(root, data, opts = {}) {
   const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;
   const showCol = (i) => i !== 0 || flat;
   const head = h("tr", {}, cols.map((label, i) => !showCol(i) ? null : h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
-  const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => !showCol(i) ? null : h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v))
+  const rowEl = (x, rank) => h("tr", { class: "clickable", title: data.open_tab ? "Click for his full breakdown" : "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source, data.open_tab || "stats") }, x.r.map((v, i) => !showCol(i) ? null : h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v))
     : i === 0 ? h("div", { class: "tcell" }, logoEl(identOf(v)), h("span", {}, identOf(v).short || v)) : (data.counts || []).includes(cols[i]) ? (v ?? "—") : avgCell(v, cols[i]))));
   const body = [];
   if (flat) {
