@@ -2703,7 +2703,7 @@ function ppPlayTypes(d) {
     const dv = diff(r);
     return h("tr", {}, h("td", { class: "l" }, r.label),
       h("td", { class: "l" }, h("div", { class: "pt-bar" }, h("span", { style: { width: `${(100 * (r.freq || 0) / maxFreq).toFixed(0)}%` } }), h("b", {}, `${(r.freq ?? 0).toFixed(1)}%`))),
-      h("td", {}, r.fga), h("td", {}, r.fgm), h("td", {}, r.fgp == null ? "–" : r.fgp.toFixed(1)), h("td", {}, r.pts),
+      h("td", {}, r.fgm), h("td", {}, r.fga), h("td", {}, r.fgp == null ? "–" : r.fgp.toFixed(1)), h("td", {}, r.pts),
       h("td", { class: "pts" }, r.pps == null ? "–" : r.pps.toFixed(2)), h("td", { class: "muted" }, r.league_pps == null ? "–" : r.league_pps.toFixed(2)),
       h("td", { class: dv == null ? "" : dv >= 0.05 ? "pm-pos" : dv <= -0.05 ? "pm-neg" : "" }, dv == null ? "–" : `${dv >= 0 ? "+" : "−"}${Math.abs(dv).toFixed(2)}`),
       h("td", { class: "muted" }, r.league_freq == null ? "–" : `${r.league_freq.toFixed(1)}%`));
@@ -2712,7 +2712,7 @@ function ppPlayTypes(d) {
   return h("div", { class: "pp-games" },
     h("div", { class: "muted", style: { margin: "2px 2px 10px", fontSize: "12.5px" } }, `${pt.total} shots · ${(totPts / pt.total).toFixed(2)} points per shot · most-used play first. PPS is points per shot (free throws not included); green / red = better / worse than the league on that play.`),
     h("div", { class: "table-wrap" }, h("table", { class: "stats" },
-      h("thead", {}, h("tr", {}, ["Play type", "Share of his shots", "FGA", "FGM", "FG%", "PTS", "PPS", "League PPS", "vs league", "League share"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)))),
+      h("thead", {}, h("tr", {}, ["Play type", "Share of his shots", "FGM", "FGA", "FG%", "PTS", "PPS", "League PPS", "vs league", "League share"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)))),
       h("tbody", {}, used.map(row)))));
 }
 // The player pop-up's Games tab: every game he played (playoff series from the bracket, the regular season from the season log, any other game
