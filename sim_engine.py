@@ -5224,6 +5224,9 @@ def assign_newer_badges(p: "Player"):
             p.badges = tuple(b for b in p.badges if badge_parts(b)[0] != badge)
 
 
+# legendary isolation scorers: every version gets at least this Iso Scorer level (prime Kyrie / Harden seasons are in SEASON_BADGES)
+ISO_LEGENDS = {"Michael Jordan": "hof", "Kobe Bryant": "hof", "Kevin Durant": "hof", "Allen Iverson": "hof", "Carmelo Anthony": "hof",
+               "Tracy McGrady": "hof", "Kyrie Irving": "gold"}
 # badges for specific seasons of a player (his prime), not every version of him
 SEASON_BADGES = [
     ("iso_scorer", "hof", {("James Harden", y) for y in ("2018", "2019")} | {("Kyrie Irving", str(y)) for y in range(2018, 2025)}),
@@ -5285,8 +5288,8 @@ def assign_player_badges(team: Team):
         for badge, level, versions in SEASON_BADGES:
             if (p.name, season) in versions:
                 add_badge(p, badge, level)
-        if p.name == "Michael Jordan":   # every version of Jordan is a Hall of Fame isolation scorer
-            add_badge(p, "iso_scorer", "hof")
+        if p.name in ISO_LEGENDS:   # every version of the legendary isolation scorers
+            add_badge(p, "iso_scorer", ISO_LEGENDS[p.name])
         assign_newer_badges(p)
 
         poster_score = p.dunk_rating * 0.62 + p.dunk_tendency * 0.28 + p.rim_rating * 0.10
