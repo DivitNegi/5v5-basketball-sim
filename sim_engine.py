@@ -5235,6 +5235,27 @@ ISO_PRIME_SEASONS = {
     "James Harden": {"2018", "2019"},
     "Kyrie Irving": {str(y) for y in range(2018, 2025)},
 }
+def _seasons(a, z):
+    return {str(y) for y in range(a, z + 1)}
+
+
+# Posterizer by prime season: the famous in-traffic dunkers get Hall of Fame in their athletic primes, a second tier gets gold
+POSTERIZER_PRIMES = {
+    "hof": {"Michael Jordan": _seasons(1985, 1998), "Julius Erving": _seasons(1972, 1986), "Dominique Wilkins": _seasons(1983, 1994),
+            "Shaquille O'Neal": _seasons(1993, 2006), "Vince Carter": _seasons(1999, 2005), "Shawn Kemp": _seasons(1991, 1998),
+            "LeBron James": _seasons(2006, 2018), "Dwight Howard": _seasons(2007, 2012), "Blake Griffin": _seasons(2011, 2015),
+            "Giannis Antetokounmpo": _seasons(2017, 2027), "Ja Morant": _seasons(2021, 2023), "Zion Williamson": _seasons(2020, 2024),
+            "Anthony Edwards": _seasons(2022, 2027), "Russell Westbrook": _seasons(2011, 2019), "Derrick Rose": _seasons(2010, 2012),
+            "Amar'e Stoudemire": _seasons(2005, 2010), "Kobe Bryant": _seasons(1999, 2003), "Dwyane Wade": _seasons(2006, 2011),
+            "Clyde Drexler": _seasons(1986, 1995), "Charles Barkley": _seasons(1986, 1995), "Wilt Chamberlain": _seasons(1960, 1970)},
+    "gold": {"Aaron Gordon": _seasons(2016, 2025), "DeAndre Jordan": _seasons(2012, 2018), "Jaylen Brown": _seasons(2020, 2027),
+             "Donovan Mitchell": _seasons(2018, 2023), "Victor Wembanyama": _seasons(2024, 2027), "Josh Smith": _seasons(2006, 2014),
+             "Shawn Marion": _seasons(2001, 2008), "Kevin Garnett": _seasons(2000, 2008), "Scottie Pippen": _seasons(1990, 1998),
+             "Paul George": _seasons(2013, 2019), "John Collins": _seasons(2019, 2024), "Ja Morant": _seasons(2024, 2027),
+             "Zion Williamson": _seasons(2025, 2027), "Kawhi Leonard": _seasons(2016, 2021)},
+}
+
+
 # badges for specific seasons of a player (his prime), not every version of him
 SEASON_BADGES = [
 ]
@@ -5295,6 +5316,9 @@ def assign_player_badges(team: Team):
         for badge, level, versions in SEASON_BADGES:
             if (p.name, season) in versions:
                 add_badge(p, badge, level)
+        for level in ("hof", "gold"):
+            if season in POSTERIZER_PRIMES[level].get(p.name, ()):
+                add_badge(p, "posterizer", level)
         if season in ISO_PRIME_SEASONS.get(p.name, ()):   # a legendary isolation scorer in his prime
             add_badge(p, "iso_scorer", "hof")
         elif p.name == "Kyrie Irving":   # every other Kyrie is still gold
