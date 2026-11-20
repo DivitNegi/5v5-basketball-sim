@@ -9865,7 +9865,7 @@ def _initialize_minute_targets_core(team: Team):
             "De'Andre Hunter": (24, 30), "Keegan Murray": (26, 31),
             "Domantas Sabonis": (28, 33), "Malik Monk": (16, 22),
             "Maxime Raynaud": (12, 18), "Precious Achiuwa": (10, 16),
-            "Nique Clifford": (10, 16),
+            "Nique Clifford": (10, 16), "Emanuel Sharp": (18, 24),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))

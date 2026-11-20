@@ -2723,6 +2723,17 @@ def make_kings_2027() -> Team:
                0.600, 0.450,
                clutchness=0.850, secondary_positions=('PG',), height=75, speed=0.800,
                shot_iq=0.750, stamina=0.76),
+        # added to fill the roster spot Ben Simmons left: rookie SG, Basketball-Reference 2026-27 to Nov 18 (14 G, 17.3 MPG, 242 min);
+        # a small sample, so every rating is pulled toward league average
+        Player('Emanuel Sharp', 'SG',
+               0.640, 0.140, 0.100, 0.010, 0.050, 0.220,
+               0.780, 0.720, 0.780, 0.550, 0.800,
+               0.090, 0.300, 0.550,
+               0.68, 0.35, 0.18, 0.35, 0.250, 0.930,
+               0.74, 0.40,
+               clutchness=0.500,
+               secondary_positions=("SF",),
+               height=75, speed=0.78, shot_iq=0.68, iso_tendency=0.08, stamina=0.80),
         Player('Maxime Raynaud', 'C',
                0.32, 0.22, 0.12, 0.22, 0.26, 0.20,
                0.720, 0.850, 0.980, 0.750, 0.790,
