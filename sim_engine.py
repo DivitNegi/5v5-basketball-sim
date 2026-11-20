@@ -5224,6 +5224,12 @@ def assign_newer_badges(p: "Player"):
             p.badges = tuple(b for b in p.badges if badge_parts(b)[0] != badge)
 
 
+# badges for specific seasons of a player (his prime), not every version of him
+SEASON_BADGES = [
+    ("iso_scorer", "hof", {("James Harden", y) for y in ("2018", "2019")} | {("Kyrie Irving", str(y)) for y in range(2018, 2025)}),
+]
+
+
 def assign_player_badges(team: Team):
     for p in team.roster:
         # Normalize any manually entered badges first so old raw strings like
@@ -5275,6 +5281,10 @@ def assign_player_badges(team: Team):
             add_badge(p, "acrobat", acro_level)
         if p.name in ACROBAT_FINISHERS:   # the famous tough-shot finishers: at least this level
             add_badge(p, "acrobat", ACROBAT_FINISHERS[p.name])
+        season = str(getattr(p, "source_team", "") or getattr(team, "name", ""))[:4]   # the version's season (a drafted player keeps his)
+        for badge, level, versions in SEASON_BADGES:
+            if (p.name, season) in versions:
+                add_badge(p, badge, level)
         assign_newer_badges(p)
 
         poster_score = p.dunk_rating * 0.62 + p.dunk_tendency * 0.28 + p.rim_rating * 0.10
