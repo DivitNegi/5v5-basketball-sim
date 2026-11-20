@@ -6175,6 +6175,7 @@ def add_player_to_series_totals(series_totals: Dict, team: Team):
         for key, value in getattr(p, "defended_diet", {}).items():
             s["defended_diet"][key] = s["defended_diet"].get(key, 0) + value
         merge_nested_diet(s["defended_matchup_diet"], getattr(p, "defended_matchup_diet", {}))
+        merge_stat_totals(s.setdefault("analytics", {}), getattr(p, "analytics", {}) or {})
         for row in getattr(team, "quarter_player_stats", {}).get(player_key, []):
             period = row.get("period")
             if period is None:
@@ -6318,6 +6319,7 @@ def snapshot_team_box(team: Team) -> Dict:
                 "ts": ts_percentage(p),
                 "shot_diet": dict(getattr(p, "shot_diet", {})),
                 "clutch_shot_diet": dict(getattr(p, "clutch_shot_diet", {})),
+                "analytics": copy.deepcopy(getattr(p, "analytics", {}) or {}),
                 "quarter_shot_diet": {q: dict(d) for q, d in (getattr(p, "quarter_shot_diet", {}) or {}).items()},
                 "defended_diet": dict(getattr(p, "defended_diet", {})),
                 "defended_matchup_diet": {name: dict(diet) for name, diet in (getattr(p, "defended_matchup_diet", {}) or {}).items()},
@@ -10312,6 +10314,7 @@ def initialize_game_flow(teamA: Team, teamB: Team):
         assign_player_badges(t)
         for p in t.roster:
             p.plus_minus = 0
+            p.analytics = {}
             p.oreb_stat = 0
             p.dreb_stat = 0
             p.fouls_drawn = 0
@@ -11000,6 +11003,9 @@ def record_lineup_plus_minus(scoring_team: Team, defending_team: Team, points: i
 
 
 def record_lineup_minutes(team: Team, seconds: int):
+    if seconds > 0 and in_clutch_window():
+        for p in getattr(team, "on_floor", []) or []:
+            _bump(analytics_of(p).setdefault("clutch", {}), "sec", seconds)
     if seconds <= 0 or len(getattr(team, "on_floor", []) or []) < 5:
         return
     row = ensure_lineup_row(team)
@@ -11016,10 +11022,17 @@ def record_score_event(scoring_team: Team, defending_team: Team, points: int,
     if scoring_team.current_run >= 10:
         scoring_team.last_turning_point = f"{scoring_team.name} built a {scoring_team.current_run}-0 run in the {period_label(period)}."
 
+    clutch = in_clutch_window()
     for p in scoring_team.on_floor:
         p.plus_minus += points
+        _bump(analytics_of(p), "on_pf", points)
+        if clutch:
+            _bump(analytics_of(p).setdefault("clutch", {}), "pm", points)
     for p in defending_team.on_floor:
         p.plus_minus -= points
+        _bump(analytics_of(p), "on_pa", points)
+        if clutch:
+            _bump(analytics_of(p).setdefault("clutch", {}), "pm", -points)
     record_lineup_plus_minus(scoring_team, defending_team, points)
 
     scoring_team.momentum = min(12.0, getattr(scoring_team, "momentum", 0.0) + points * 0.8)
@@ -12292,6 +12305,10 @@ def record_assist(passer: Player, team: Team, points_created: int):
     emit_broadcast("assist", passer=passer)
     passer.ast += 1
     passer.assist_pts_created = getattr(passer, "assist_pts_created", 0) + points_created
+    scorer = getattr(team, "_last_fg_scorer", None)
+    if scorer is not None and scorer is not passer:
+        _bump(analytics_of(passer).setdefault("ast_to", {}), scorer.name)
+    analytics_simple(passer, "ast")
     team.team_ast += 1
 
 
@@ -12729,6 +12746,7 @@ def print_box_score(teamA: Team, teamB: Team, label: str):
 def commit_turnover(player: Player, team: Team):
     emit_broadcast("turnover", player=player)
     player.tov += 1
+    analytics_simple(player, "tov")
     team.team_tov += 1
 
 
@@ -12868,6 +12886,97 @@ def reuse_shot_distance(player, shot_type: str, context: str) -> str:
     return f"{context}|{used[1]}" if context else used[1]
 
 
+# ---- analytics: one nested dict per player ("analytics") that the series / season totals add up like every other count.
+#   on_pf / on_pa      team points scored and allowed while he was on the floor
+#   pt[play]           field-goal attempts, makes and points by play type
+#   clutch             last five minutes of the 4th or overtime with the score within five
+#   xp                 shots, expected points (the engine's make chance x the shot's value) and real points, for shot-making vs expected
+#   ast_to[name]       how many of his assists went to each teammate
+PLAY_TYPE_TAGS = (   # first match wins
+    ("transition", {"fastbreak", "fastbreak_catch_shoot"}),
+    ("putback", {"putback", "late_putback"}),
+    ("post", {"post_split"}),
+    ("pnr", {"high_pnr", "spain_pnr", "empty_corner_pnr", "roller", "popper", "handler", "alley_oop"}),
+    ("iso", {"iso", "iso_forced", "handle_combo_three", "handle_combo_mid", "handle_combo_drive", "mismatch_hunt", "ankle_breaker", "pressure_pullup", "pressure_drive"}),
+    ("cut", {"backdoor", "dump_off"}),
+    ("off_screen", {"floppy", "elevator", "handoff"}),
+    ("spot_up", {"extra_pass_open", "extra_pass", "drive_kick", "double_kick", "pnr_catch_shoot", "late_catch_shoot", "double_wide_open", "handle_combo_pass", "late_oreb_kickout"}),
+)
+
+
+def play_type_of(shot_type: str, context: str) -> str:
+    tags = set(str(context or "").split("|")) - {""}
+    for play, keys in PLAY_TYPE_TAGS:
+        if play == "post" and shot_type in ("post", "post_fade"):
+            return "post"
+        if tags & keys or (play == "cut" and any(t.endswith("_cut") for t in tags)):
+            return play
+    return "other"
+
+
+def analytics_of(player: Player) -> Dict:
+    d = getattr(player, "analytics", None)
+    if d is None:
+        d = player.analytics = {}
+    return d
+
+
+def _bump(d: Dict, key: str, by: float = 1):
+    d[key] = d.get(key, 0) + by
+
+
+def in_clutch_window() -> bool:
+    ctx = globals().get("SIM_CONTEXT")
+    if not isinstance(ctx, dict):
+        return False
+    period, period_time, a, b = ctx.get("period"), ctx.get("period_time"), ctx.get("teamA"), ctx.get("teamB")
+    return (isinstance(period, int) and period >= 4 and isinstance(period_time, int) and period_time <= 5 * 60
+            and a is not None and b is not None and abs(a.score - b.score) <= 5)
+
+
+def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
+    if player is None:
+        return
+    a, value = analytics_of(player), 3 if shot_type == "three" else 2
+    pt = a.setdefault("pt", {}).setdefault(play_type_of(shot_type, context), {})
+    xp = a.setdefault("xp", {})
+    clutch = a.setdefault("clutch", {}) if in_clutch_window() else None
+    if made:
+        _bump(pt, "fgm"); _bump(pt, "pts", value)
+        if getattr(player, "_xfg_pending", None) == shot_type:   # only shots that carried a make chance count toward actual vs expected
+            _bump(xp, "pts", value)
+        player._xfg_pending = None
+        if clutch is not None:
+            _bump(clutch, "fgm"); _bump(clutch, "pts", value)
+            if value == 3:
+                _bump(clutch, "tpm")
+        return
+    _bump(pt, "fga")
+    stash = getattr(player, "_xfg", None)
+    player._xfg = None
+    player._xfg_pending = None
+    if stash and stash[0] == shot_type:   # the make chance the engine just rolled for this very shot
+        _bump(xp, "n"); _bump(xp, "exp", stash[1] * value)
+        player._xfg_pending = shot_type
+    if clutch is not None:
+        _bump(clutch, "fga")
+        if value == 3:
+            _bump(clutch, "tpa")
+
+
+def analytics_free_throw(player: Player, made: bool):
+    if player is not None and in_clutch_window():
+        clutch = analytics_of(player).setdefault("clutch", {})
+        _bump(clutch, "fta")
+        if made:
+            _bump(clutch, "ftm"); _bump(clutch, "pts")
+
+
+def analytics_simple(player: Player, key: str):
+    if player is not None and in_clutch_window():
+        _bump(analytics_of(player).setdefault("clutch", {}), key)
+
+
 def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Player = None,
                      defender: Player = None, quality_mult: float | None = None):
     if shot_type == "three":
@@ -12881,6 +12990,7 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
         context = tag_shot_distance(player, "rim", context)
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("attempt", team=team, player=player, shot_type=shot_type, context=context)
+    analytics_shot(player, shot_type, context, False)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 
@@ -12939,6 +13049,8 @@ def record_shot_make(team: Team, shot_type: str, context: str = "", player: Play
         context = reuse_shot_distance(player, "rim", context)
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("make", team=team, player=player, shot_type=shot_type, context=context)
+    analytics_shot(player, shot_type, context, True)
+    team._last_fg_scorer = player   # every assist is credited right after the make it set up
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 
@@ -13416,6 +13528,15 @@ RIM_PUTBACK_SHARE = 0.10
 def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
                    team: Team = None, opponent: Team = None,
                    period: int = 1, period_time: int = 720) -> float:
+    p = _shot_make_prob_rolled(shooter, defender, shot_type, team, opponent, period, period_time)
+    if shooter is not None:
+        shooter._xfg = (shot_type, p)   # kept for shot-making vs expected; the attempt that follows picks it up
+    return p
+
+
+def _shot_make_prob_rolled(shooter: Player, defender: Player, shot_type: str,
+                           team: Team = None, opponent: Team = None,
+                           period: int = 1, period_time: int = 720) -> float:
     """The make chance, with a rim attempt's distance decided here: right at the rim or a floater (from the player's real splits), and the
     chance adjusted for the distance (a floater is harder), normalised so his overall finishing % is unchanged."""
     p = _shot_make_prob_base(shooter, defender, shot_type, team, opponent, period, period_time)
@@ -14308,6 +14429,7 @@ def process_steal(defender: Player, team_def: Team, handler: Player, team_off: T
     team_def.team_stl += 1
     team_def.last_stealer = defender
     handler.tov += 1
+    analytics_simple(handler, "tov")
     team_off.team_tov += 1
     record_defensive_turnover(defender, handler)
 
@@ -15147,6 +15269,7 @@ def shoot_free_throws(shooter: Player, team: Team, n: int, period: int, period_t
         shooter.fta += 1
         ft_rating = effective_ft_rating(shooter, team, defense, period, period_time)
         made = False if intentional_miss else random.random() < ft_rating
+        analytics_free_throw(shooter, made)
 
         if made:
             shooter.ftm += 1
@@ -15206,6 +15329,7 @@ def shoot_retained_free_throw(shooter: Player, team: Team, period: int, period_t
 
     shooter.fta += 1
     made = random.random() < effective_ft_rating(shooter, team, defense, period, period_time)
+    analytics_free_throw(shooter, made)
 
     emit_broadcast("ft", player=shooter, made=made)
     if made:
@@ -23076,6 +23200,7 @@ def fantasy_player_clone(player: Player, team_name: str) -> Player:
     clone.double_teams_faced = 0
     clone.is_starter = False
     clone.shot_diet = {}
+    clone.analytics = {}
     clone.quarter_shot_diet = {}
     clone.defended_diet = {}
     clone.quarter_stats = {}

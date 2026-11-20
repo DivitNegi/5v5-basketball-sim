@@ -1039,13 +1039,23 @@ const AVG_RANKS = ["Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL",
 // [key, header, sort key, formatter]
 const f1 = (v) => (v == null ? "–" : v.toFixed(1));
 const PCOLS = [["gp", "GP", "gp", (v) => v], ["min", "MIN", "min", f1], ["pts", "PTS", "pts", f1], ["reb", "REB", "reb", f1], ["orb", "ORB", "orb", f1], ["ast", "AST", "ast", f1],
-  ["stl", "STL", "stl", f1], ["blk", "BLK", "blk", f1], ["tov", "TOV", "tov", f1], ["fg", "FG", "fgm", null], ["fgp", "FG%", "fgp", f1], ["tp", "3P", "tpm", null], ["tpp", "3P%", "tpp", f1],
-  ["ft", "FT", "ftm", null], ["ftp", "FT%", "ftp", f1], ["ts", "TS%", "ts", f1], ["pm", "+/-", "pm", (v) => (v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1))]];
-const madeAtt = (r, m, a) => `${r[m].toFixed(1)}/${r[a].toFixed(1)}`;
+  ["stl", "STL", "stl", f1], ["blk", "BLK", "blk", f1], ["tov", "TOV", "tov", f1],
+  // shooting laid out like Basketball-Reference: makes, attempts and % each in their own column, twos split out, then eFG%
+  ["fgm", "FG", "fgm", f1], ["fga", "FGA", "fga", f1], ["fgp", "FG%", "fgp", f1], ["tpm", "3P", "tpm", f1], ["tpa", "3PA", "tpa", f1], ["tpp", "3P%", "tpp", f1],
+  ["twm", "2P", "twm", f1], ["twa", "2PA", "twa", f1], ["twp", "2P%", "twp", f1], ["efg", "eFG%", "efg", f1],
+  ["ftm", "FT", "ftm", f1], ["fta", "FTA", "fta", f1], ["ftp", "FT%", "ftp", f1], ["ts", "TS%", "ts", f1], ["pm", "+/-", "pm", (v) => (v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1))]];
+const withTwos = (r) => {   // 2P / 2PA / 2P% and eFG% come straight from the made and attempted counts already on the row
+  if (r.fga == null) return r;
+  r.twm = r.fgm - r.tpm; r.twa = r.fga - r.tpa;
+  r.twp = r.twa > 0 ? 100 * r.twm / r.twa : null;
+  r.efg = r.fga > 0 ? 100 * (r.fgm + 0.5 * r.tpm) / r.fga : null;
+  return r;
+};
 
 async function loadAvg() {
   const q = new URLSearchParams({ team: AV.team, quarter: AV.quarter, rank: AV.rank, source: AV.source });
   AV.data = await api.get(`/api/season/avg?${q}`);
+  (AV.data.rows || []).forEach(withTwos);
   if (AV.data.source && AV.data.sources.length && !AV.data.sources.includes(AV.source)) AV.source = AV.data.source;
   renderSeasonBody();
 }
@@ -1075,8 +1085,7 @@ function renderPlayers() {
     ...PCOLS.map(([k, l, sk]) => h("th", { class: `sortable ${AV.sort === sk && !d.flat ? "sorted" : ""}`, onclick: sortBy(sk) }, l, AV.sort === sk && !d.flat ? (AV.dir < 0 ? " ▾" : " ▴") : "")));
   const cells = (r) => PCOLS.map(([k, , sk, fmt]) => {
     let v;
-    if (k === "fg") v = madeAtt(r, "fgm", "fga"); else if (k === "tp") v = madeAtt(r, "tpm", "tpa"); else if (k === "ft") v = madeAtt(r, "ftm", "fta");
-    else if (k === "min" && r.kind === "team") v = "--"; else v = fmt(r[sk]);
+    if (k === "min" && r.kind === "team") v = "--"; else v = fmt(r[sk]);
     return h("td", { class: k === "pts" ? "pts" : k === "pm" ? (r.pm > 0 ? "pm-pos" : r.pm < 0 ? "pm-neg" : "") : "" }, v);
   });
   const body = rows.map((r) => {
@@ -1159,7 +1168,10 @@ async function openGameBox(gid, focusPlayer, focusTeam) {
 function fullBox(d, focus = {}) {
   const pct = (m, a) => (a ? (100 * m / a).toFixed(1) : "0.0");
   const ts = (pts, fga, fta) => { const dn = 2 * (fga + 0.44 * fta); return dn ? (100 * pts / dn).toFixed(1) : "0.0"; };
-  const head = ["Player", "POS", "ST", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "ORB", "DRB", "PF", "+/-", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%"];
+  const head = ["Player", "POS", "ST", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "ORB", "DRB", "PF", "+/-", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "2P", "2PA", "2P%", "eFG%", "FT", "FTA", "FT%", "TS%"];
+  // makes, attempts and % in their own columns (Basketball-Reference layout), twos split out, then eFG%
+  const shoot = (x) => [x.fgm, x.fga, pct(x.fgm, x.fga), x.tpm, x.tpa, pct(x.tpm, x.tpa), x.fgm - x.tpm, x.fga - x.tpa, pct(x.fgm - x.tpm, x.fga - x.tpa),
+    x.fga ? (100 * (x.fgm + 0.5 * x.tpm) / x.fga).toFixed(1) : "0.0", x.ftm, x.fta, pct(x.ftm, x.fta)].map((v) => h("td", {}, v));
   return h("div", { class: "fullbox" }, d.teams.map((t) => {
     const T = { pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0, oreb: 0, dreb: 0, pf: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, min: 0 };
     const body = t.players.map((p) => {
@@ -1167,10 +1179,10 @@ function fullBox(d, focus = {}) {
       const hot = focus.player === p.name && focus.team === t.name;
       return h("tr", { class: hot ? "focus" : "" }, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(p.name), h("span", { class: "pname" }, p.name))), h("td", {}, p.pos), h("td", {}, p.st ? "★" : ""), h("td", {}, p.min.toFixed(1)), h("td", { class: "pts" }, p.pts), h("td", {}, p.reb), h("td", {}, p.ast),
         h("td", {}, p.stl), h("td", {}, p.blk), h("td", {}, p.tov), h("td", {}, p.oreb), h("td", {}, p.dreb), h("td", {}, p.pf), h("td", {}, p.pm > 0 ? `+${p.pm}` : p.pm),
-        h("td", {}, `${p.fgm}-${p.fga}`), h("td", {}, pct(p.fgm, p.fga)), h("td", {}, `${p.tpm}-${p.tpa}`), h("td", {}, pct(p.tpm, p.tpa)), h("td", {}, `${p.ftm}-${p.fta}`), h("td", {}, pct(p.ftm, p.fta)), h("td", {}, ts(p.pts, p.fga, p.fta)));
+        ...shoot(p), h("td", {}, ts(p.pts, p.fga, p.fta)));
     });
     body.push(h("tr", { class: "totals" }, h("td", { class: "l" }, "TEAM TOTALS"), h("td", {}), h("td", {}), h("td", {}, T.min.toFixed(0)), h("td", {}, T.pts), h("td", {}, T.reb), h("td", {}, T.ast), h("td", {}, T.stl), h("td", {}, T.blk), h("td", {}, T.tov), h("td", {}, T.oreb), h("td", {}, T.dreb), h("td", {}, T.pf), h("td", {}),
-      h("td", {}, `${T.fgm}-${T.fga}`), h("td", {}, pct(T.fgm, T.fga)), h("td", {}, `${T.tpm}-${T.tpa}`), h("td", {}, pct(T.tpm, T.tpa)), h("td", {}, `${T.ftm}-${T.fta}`), h("td", {}, pct(T.ftm, T.fta)), h("td", {}, ts(T.pts, T.fga, T.fta))));
+      ...shoot(T), h("td", {}, ts(T.pts, T.fga, T.fta))));
     const extras = Object.entries(t.extras || {});
     return h("div", { class: "fullbox-team" }, h("div", { class: "court-team-head", style: { "--c": t.color } }, logoEl(t), t.short, h("span", { class: "tot" }, `${t.score}`)),
       h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, head.map((x, i) => h("th", { class: i === 0 ? "l" : "" }, x)))), h("tbody", {}, body))),
@@ -1307,14 +1319,15 @@ function bracketBoxTables(boxes) {
 function seriesAverages(sr) {
   const f1 = (v) => (v || 0).toFixed(1);
   const pct = (m, a) => (a ? (100 * m / a).toFixed(1) : "0.0");
-  const cols = ["GP", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-"];
+  const cols = ["GP", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "2P", "2PA", "2P%", "eFG%", "FT", "FTA", "FT%", "TS%", "+/-"];
   return h("div", { class: "conf-grid" }, Object.entries(sr.totals || {}).map(([team, players]) => {
     const rows = Object.entries(players).filter(([, s]) => s.games).sort((x, y) => (y[1].pts / y[1].games) - (x[1].pts / x[1].games));
     const body = rows.map(([name, s]) => {
       const g = s.games, ts = 2 * (s.fga + 0.44 * s.fta);
       return h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(name), h("span", { class: "pname" }, name))), h("td", {}, g), h("td", {}, f1(s.minutes / 60 / g)), h("td", { class: "pts" }, f1(s.pts / g)), h("td", {}, f1(s.reb / g)), h("td", {}, f1(s.ast / g)),
-        h("td", {}, f1(s.stl / g)), h("td", {}, f1(s.blk / g)), h("td", {}, f1(s.tov / g)), h("td", {}, `${f1(s.fgm / g)}/${f1(s.fga / g)}`), h("td", {}, pct(s.fgm, s.fga)),
-        h("td", {}, `${f1(s.tpm / g)}/${f1(s.tpa / g)}`), h("td", {}, pct(s.tpm, s.tpa)), h("td", {}, `${f1(s.ftm / g)}/${f1(s.fta / g)}`), h("td", {}, pct(s.ftm, s.fta)),
+        h("td", {}, f1(s.stl / g)), h("td", {}, f1(s.blk / g)), h("td", {}, f1(s.tov / g)), ...[f1(s.fgm / g), f1(s.fga / g), pct(s.fgm, s.fga), f1(s.tpm / g), f1(s.tpa / g), pct(s.tpm, s.tpa),
+          f1((s.fgm - s.tpm) / g), f1((s.fga - s.tpa) / g), pct(s.fgm - s.tpm, s.fga - s.tpa), s.fga ? (100 * (s.fgm + 0.5 * s.tpm) / s.fga).toFixed(1) : "0.0",
+          f1(s.ftm / g), f1(s.fta / g), pct(s.ftm, s.fta)].map((v) => h("td", {}, v)),
         h("td", {}, ts ? (100 * s.pts / ts).toFixed(1) : "0.0"), h("td", {}, (s.plus_minus / g >= 0 ? "+" : "") + f1(s.plus_minus / g)));
     });
     return h("div", { "data-pteam": team }, h("h3", {}, `${identOf(team).short} · series averages`),
@@ -1419,13 +1432,16 @@ async function loadQuarters() {
     if (!per) return h("div", {}, h("h3", {}, t.short), h("div", { class: "muted" }, "Not played yet."));
     const tm = per.team;
     const rows = t.roster.map((p) => ({ p, r: per.players[p.name] })).filter((x) => x.r && (x.r.minutes > 0 || x.r.pts || x.r.reb || x.r.ast || x.r.fga || x.r.tov));
-    const head = ["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "OREB", "DREB", "PF", "+/-", "FG", "3PT", "FT", "FG%", "TS%"];
+    const head = ["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "OREB", "DREB", "PF", "+/-", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "2P", "2PA", "2P%", "eFG%", "FT", "FTA", "FT%", "TS%"];
+    const pc = (m, a) => (a ? (100 * m / a).toFixed(1) : "–");
     const row = ({ p, r }) => {
       const tsd = 2 * (r.fga + 0.44 * r.fta);
       return h("tr", {}, h("td", { class: "l" }, h("div", { class: "pcell" }, h("span", { class: "slot" }, p.pos), h("span", { class: "pname" }, p.name))),
         h("td", {}, (r.minutes / 60).toFixed(1)), h("td", { class: "pts" }, r.pts), h("td", {}, r.reb), h("td", {}, r.ast), h("td", {}, r.stl), h("td", {}, r.blk), h("td", {}, r.tov),
         h("td", {}, r.oreb), h("td", {}, r.dreb), h("td", {}, r.pf), h("td", {}, r.plus_minus > 0 ? `+${r.plus_minus}` : r.plus_minus),
-        h("td", {}, `${r.fgm}-${r.fga}`), h("td", {}, `${r.tpm}-${r.tpa}`), h("td", {}, `${r.ftm}-${r.fta}`), h("td", {}, pct1(r.fgm, r.fga)), h("td", {}, tsd ? (100 * r.pts / tsd).toFixed(1) : "–"));
+        ...[r.fgm, r.fga, pc(r.fgm, r.fga), r.tpm, r.tpa, pc(r.tpm, r.tpa), r.fgm - r.tpm, r.fga - r.tpa, pc(r.fgm - r.tpm, r.fga - r.tpa),
+          r.fga ? (100 * (r.fgm + 0.5 * r.tpm) / r.fga).toFixed(1) : "–", r.ftm, r.fta, pc(r.ftm, r.fta)].map((v) => h("td", {}, v)),
+        h("td", {}, tsd ? (100 * r.pts / tsd).toFixed(1) : "–"));
     };
     return h("div", {}, h("div", { class: "court-team-head", style: { "--c": t.color, borderRadius: "10px" } }, logoEl(t), t.short,
       h("span", { class: "tot" }, `${tm.score} pts · ${tm.reb} reb · ${tm.ast} ast · FG ${tm.fgm}-${tm.fga} · 3PT ${tm.tpm}-${tm.tpa} · paint ${tm.points_paint} · fast break ${tm.fastbreak_pts}`)),
