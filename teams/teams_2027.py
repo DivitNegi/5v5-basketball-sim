@@ -2723,14 +2723,6 @@ def make_kings_2027() -> Team:
                0.600, 0.450,
                clutchness=0.850, secondary_positions=('PG',), height=75, speed=0.800,
                shot_iq=0.750, stamina=0.76),
-       Player('Ben Simmons', 'PG',
-               0.02, 0.10, 0.36, 0.20, 0.42, 0.22,
-               0.500, 0.460, 0.910, 0.850, 0.730,
-               0.20, 0.93, 0.860,
-               0.490, 0.600, 0.470, 0.770, 0.600, 0.533,
-               0.840, 0.730,
-               clutchness=0.750, secondary_positions=('C',), height=82, speed=0.800,
-               shot_iq=0.500, stamina=0.62),
         Player('Maxime Raynaud', 'C',
                0.32, 0.22, 0.12, 0.22, 0.26, 0.20,
                0.720, 0.850, 0.980, 0.750, 0.790,
@@ -2757,10 +2749,7 @@ def make_kings_2027() -> Team:
                shot_iq=0.600, stamina=0.79),
 
     ]
-    # Starting five: Acuff, LaVine, Keegan Murray, Ben Simmons, Domantas Sabonis.
-    _hunter_i = next(i for i, p in enumerate(players) if p.name == "De'Andre Hunter")
-    _simmons_i = next(i for i, p in enumerate(players) if p.name == 'Ben Simmons')
-    players[_hunter_i], players[_simmons_i] = players[_simmons_i], players[_hunter_i]
+    # Starting five: Acuff, LaVine, De'Andre Hunter, Keegan Murray, Domantas Sabonis (Ben Simmons is off the roster).
     t = Team('2027 Sacramento Kings', players)
     t.init_lineup()
     return t

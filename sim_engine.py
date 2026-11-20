@@ -9858,10 +9858,10 @@ def _initialize_minute_targets_core(team: Team):
     if team.name == "2027 Sacramento Kings":
         target_ranges = {
             "Darius Acuff Jr.": (30, 34), "Zach LaVine": (26, 31),
-            "De'Andre Hunter": (12, 18), "Keegan Murray": (26, 31),
+            "De'Andre Hunter": (24, 30), "Keegan Murray": (26, 31),
             "Domantas Sabonis": (28, 33), "Malik Monk": (16, 22),
             "Maxime Raynaud": (12, 18), "Precious Achiuwa": (10, 16),
-            "Nique Clifford": (10, 16), "Ben Simmons": (24, 30),
+            "Nique Clifford": (10, 16),
         }
         for p in team.roster:
             low, high = target_ranges.get(p.name, (6, 14))
@@ -18757,7 +18757,6 @@ def isolation_shot_creation(shooter: Player, defender: Player) -> Tuple[str, flo
 SYSTEM_PLAYMAKERS = {
     "2027 Washington Wizards": "Trae Young",
     "2027 Miami Heat": "Davion Mitchell",
-    "2027 Sacramento Kings": "Ben Simmons",
     "2027 Philadelphia 76ers": "LeBron James",
     "2021 Philadelphia 76ers": "Ben Simmons",
 }
@@ -18924,20 +18923,14 @@ def choose_ballhandler(team: Team) -> Player:
             return random.choices(preferred, weights=weights, k=1)[0]
 
     if team.name == "2027 Sacramento Kings":
-        simmons = player_by_name(team.on_floor, ("Ben Simmons",))
-        # Ben Simmons is Sacramento's point forward: he brings the ball up and
-        # runs the offense for Acuff, LaVine, Murray and Sabonis rather than
-        # scoring himself.
-        if simmons is not None and not simmons.fouled_out and random.random() < 0.58:
-            return simmons
-        preferred = [p for p in team.on_floor if p.name in ("Ben Simmons", "Darius Acuff Jr.", "Zach LaVine", "Domantas Sabonis")]
+        # Acuff, LaVine and Sabonis share the ball-handling (Ben Simmons is off the roster)
+        preferred = [p for p in team.on_floor if p.name in ("Darius Acuff Jr.", "Zach LaVine", "Domantas Sabonis")]
         if preferred:
             weights = [
                 max(0.01, playmaking_hub_score(p) ** 1.50)
                 * assist_load_factor(p, team)
                 * coach_handler_multiplier(team, p)
                 * fatigue_touch_multiplier(p)
-                * (1.8 if p.name == "Ben Simmons" else 1.0)
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
