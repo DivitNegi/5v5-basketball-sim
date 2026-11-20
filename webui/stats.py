@@ -32,6 +32,7 @@ def datasets(sections):
             row.update(games=1, oreb=getattr(p, "oreb_stat", 0), dreb=getattr(p, "dreb_stat", 0), blk=getattr(p, "blk_stat", 0))
             for key in ("shot_diet", "quarter_shot_diet", "defended_diet", "defended_matchup_diet"):
                 row[key] = getattr(p, key, {}) or {}
+            row["analytics"] = getattr(p, "analytics", {}) or {}
             ps[team.name][p.name] = row
         ts[team.name] = dict(engine.accumulate_team_totals(team), games=1)
     if ps:
@@ -53,6 +54,94 @@ def on_off(st, tt, other, team_minutes):
     off_min = team_minutes - mins
     off = 48.0 * (net_total - pm) / off_min if off_min >= 5 else None
     return on, off, (on - off if on is not None and off is not None else None)
+
+
+# ---- analytics tables, built from the "analytics" counts the engine keeps for every player (see analytics_shot in sim_engine)
+PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("post", "Post-up"), ("spot_up", "Spot-up"), ("off_screen", "Off screen"),
+               ("cut", "Cut"), ("transition", "Transition"), ("putback", "Putback"), ("other", "Other half-court")]
+ANALYTICS = {
+    "onoff": "Team offense and defense per 100 possessions with him on the floor and on the bench. Possessions are the team's, split by his share of the minutes.",
+    "playtypes": "Field goals by how the shot came: frequency is his share of his own shots, PPS is points per shot (free throws not included).",
+    "clutch": "Last five minutes of the 4th quarter or overtime with the score within five. Season totals, not per game: clutch samples are small.",
+    "xfg": "Every shot carries the make chance the engine rolled. Expected points add those up; the gap to the points he really scored is shot-making above or below expected.",
+    "assists": "Who his assists went to: one row per passer and teammate.",
+}
+
+
+def _poss(t, prefix=""):
+    t = t or {}
+    return (t.get(prefix + "fga", 0) or 0) + 0.44 * (t.get(prefix + "fta", 0) or 0) - (t.get(prefix + "oreb", 0) or 0) + (t.get(prefix + "tov", 0) or 0)
+
+
+def analytics_table(kind, players, teams, team_filter, result):
+    r1 = lambda v: None if v is None else round(v, 1)
+    pct = lambda m, a: round(100 * m / a, 1) if a else None
+    result["note"] = ANALYTICS[kind]
+    cols = {
+        "onoff": ["GP", "MIN", "ON ORtg", "ON DRtg", "ON NET", "OFF ORtg", "OFF DRtg", "OFF NET", "NET SWING", "+/-"],
+        "playtypes": ["Play type", "FGA", "FGM", "FG%", "PTS", "PPS", "FREQ%"],
+        "clutch": ["GP", "MIN", "PTS", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "TS%", "AST", "TOV", "+/-"],
+        "xfg": ["Shots", "xPTS", "PTS", "PTS vs exp", "per 100 shots", "xeFG%", "eFG%"],
+        "assists": ["To", "AST", "Share%"],
+    }[kind]
+    result["columns"] = ["Team", "Player"] + cols
+    # whole-number totals (not per-game averages): shown without a decimal
+    result["counts"] = {"onoff": [], "playtypes": ["FGA", "FGM", "PTS"], "xfg": ["Shots", "PTS"], "assists": ["AST"],
+                        "clutch": ["PTS", "FG", "FGA", "3P", "3PA", "FT", "FTA", "AST", "TOV", "+/-"]}[kind]
+    for tn, pp in players.items():
+        if team_filter not in ("All teams", tn):
+            continue
+        tt = teams.get(tn, {}) or {}
+        other = next((v for k, v in teams.items() if k != tn), {}) or {}
+        team_min = sum((x.get("minutes", 0) or 0) for x in pp.values()) / 60.0
+        team_pts = tt.get("pts", 0) or 0
+        opp_pts = tt.get("opp_pts", other.get("pts", 0)) or 0
+        poss_f = _poss(tt)
+        poss_a = _poss(tt, "opp_") if tt.get("opp_fga") else _poss(other)
+        for pn, st in pp.items():
+            a = st.get("analytics") or {}
+            gp = st.get("games", 0) or 0
+            add = lambda row: (result["rows"].append([tn, pn] + row), result["gp"].append(gp))
+            if kind == "onoff":
+                mins = (st.get("minutes", 0) or 0) / 60.0
+                if not a or mins <= 0 or team_min <= 0:
+                    continue
+                share = min(1.0, 5 * mins / team_min)
+                on_f, on_a = a.get("on_pf", 0), a.get("on_pa", 0)
+                rt = lambda pts, poss: 100 * pts / poss if poss > 1 else None
+                on_o, on_d = rt(on_f, poss_f * share), rt(on_a, poss_a * share)
+                off_o, off_d = (rt(team_pts - on_f, poss_f * (1 - share)), rt(opp_pts - on_a, poss_a * (1 - share))) if share < 0.97 else (None, None)
+                on_n = on_o - on_d if on_o is not None and on_d is not None else None
+                off_n = off_o - off_d if off_o is not None and off_d is not None else None
+                add([gp, r1(mins / max(1, gp)), r1(on_o), r1(on_d), r1(on_n), r1(off_o), r1(off_d), r1(off_n),
+                     r1(on_n - off_n) if on_n is not None and off_n is not None else None, r1((st.get("plus_minus", 0) or 0) / max(1, gp))])
+            elif kind == "playtypes":
+                pt = a.get("pt") or {}
+                total = sum(v.get("fga", 0) for v in pt.values())
+                for key, label in PLAY_LABELS:
+                    v = pt.get(key) or {}
+                    fga, fgm, pts = v.get("fga", 0), v.get("fgm", 0), v.get("pts", 0)
+                    if fga:
+                        add([label, fga, fgm, pct(fgm, fga), pts, round(pts / fga, 2), pct(fga, total)])
+            elif kind == "clutch":
+                c = a.get("clutch") or {}
+                if not c.get("sec") and not c.get("fga") and not c.get("fta"):
+                    continue
+                g = lambda k: c.get(k, 0) or 0
+                ts_d = 2 * (g("fga") + 0.44 * g("fta"))
+                add([gp, r1(g("sec") / 60), g("pts"), g("fgm"), g("fga"), pct(g("fgm"), g("fga")), g("tpm"), g("tpa"), pct(g("tpm"), g("tpa")),
+                     g("ftm"), g("fta"), pct(g("ftm"), g("fta")), round(100 * g("pts") / ts_d, 1) if ts_d else None, g("ast"), g("tov"), g("pm")])
+            elif kind == "xfg":
+                x = a.get("xp") or {}
+                n, exp, pts = x.get("n", 0), x.get("exp", 0.0), x.get("pts", 0)
+                if n:
+                    add([n, r1(exp), pts, r1(pts - exp), r1(100 * (pts - exp) / n), round(50 * exp / n, 1), round(50 * pts / n, 1)])
+            elif kind == "assists":
+                to = a.get("ast_to") or {}
+                total = sum(to.values())
+                for mate, cnt in sorted(to.items(), key=lambda kv: -kv[1]):
+                    add([mate, cnt, pct(cnt, total)])
+    return result
 
 
 def payload(runner, source="Live", kind="averages", team_filter="All teams", quarter="All"):
@@ -81,6 +170,8 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
                 rows.append([title, n, f"{t} · {score((t,n,s)):.1f} {unit}"])
         result["rows"] = rows
         return result
+    if kind in ANALYTICS:
+        return analytics_table(kind, players, teams, team_filter, result)
     if kind in ("shots", "defense", "matchups"):
         result["columns"] = ["Team", "Player"] + (["Opponent"] if kind == "matchups" else []) + [label for _, label in ZONES] + ["TOTAL"]
     elif kind == "advanced":

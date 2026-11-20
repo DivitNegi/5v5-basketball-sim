@@ -2837,7 +2837,8 @@ function renderStatsInto(root, data, opts = {}) {
     return;
   }
   const rerender = () => renderStatsInto(root, data, opts);
-  const rankCols = cols.slice(2).filter((c) => !["Opponent"].includes(c));
+  const LABEL_COLS = ["Opponent", "Play type", "To"];   // text columns: never a "rank by" choice
+  const rankCols = cols.slice(2).filter((c) => !LABEL_COLS.includes(c));
   const maxGp = Math.max(1, ...(data.gp || [1]));
   const controls = h("div", { class: "stx-controls" },
     h("label", {}, h("span", {}, "Find"), h("input", { type: "search", placeholder: "Player name", value: st.search, oninput: (e) => { st.search = e.target.value.toLowerCase(); const pos = e.target.selectionStart; rerender(); const i = $(`#${root.id} .stx-controls input[type=search]`); i.focus(); i.setSelectionRange(pos, pos); } })),
@@ -2850,12 +2851,13 @@ function renderStatsInto(root, data, opts = {}) {
   const colIdx = st.sort.column >= 0 ? st.sort.column : (st.rank !== "Team order" ? cols.indexOf(st.rank) : -1);
   const dirn = st.sort.column >= 0 ? st.sort.direction : -1;
   const byCol = (a, b) => dirn * (numOf(a.r[colIdx]) - numOf(b.r[colIdx]));
-  const defaultCol = Math.max(2, cols.findIndex((c) => ["MPG", "MIN"].includes(c)) >= 0 ? cols.findIndex((c) => ["MPG", "MIN"].includes(c)) : (cols.indexOf("TOTAL") >= 0 ? cols.indexOf("TOTAL") : 2));
+  // team groups sort by minutes when there are minutes, else by the table's main count (TOTAL, FGA, AST, Shots)
+  const defaultCol = Math.max(2, ["MPG", "MIN", "TOTAL", "FGA", "AST", "Shots"].map((c) => cols.indexOf(c)).find((i) => i >= 0) ?? 2);
   const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;
   const showCol = (i) => i !== 0 || flat;
   const head = h("tr", {}, cols.map((label, i) => !showCol(i) ? null : h("th", { class: `sortable ${st.sort.column === i ? "sorted" : ""} ${i < 2 ? "l" : ""}`, onclick: () => { if (i === 0) { st.sort = { column: -1, direction: -1 }; st.rank = "Team order"; st.flat = false; } else st.sort = { column: i, direction: st.sort.column === i ? -st.sort.direction : (i === 1 ? 1 : -1) }; rerender(); } }, label, st.sort.column === i ? (st.sort.direction < 0 ? " ▾" : " ▴") : "")));
   const rowEl = (x, rank) => h("tr", { class: "clickable", title: "Click for full stats", onclick: () => openStatsPlayer(x.r[0], x.r[1], data.source) }, x.r.map((v, i) => !showCol(i) ? null : h("td", { class: i < 2 ? "l" : "" }, i === 1 ? h("div", { class: "pcell" }, faceEl(v), h("span", { class: "pname" }, rank ? `${rank}. ${v}` : v))
-    : i === 0 ? h("div", { class: "tcell" }, logoEl(identOf(v)), h("span", {}, identOf(v).short || v)) : avgCell(v, cols[i]))));
+    : i === 0 ? h("div", { class: "tcell" }, logoEl(identOf(v)), h("span", {}, identOf(v).short || v)) : (data.counts || []).includes(cols[i]) ? (v ?? "—") : avgCell(v, cols[i]))));
   const body = [];
   if (flat) {
     let list = [...items];
@@ -2866,14 +2868,14 @@ function renderStatsInto(root, data, opts = {}) {
     items.forEach((x) => { (by.get(x.r[0]) || by.set(x.r[0], []).get(x.r[0])).push(x); });
     for (const [team, list] of by) {
       const id = identOf(team);
-      body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length - 1 }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "yr" }, id.year || ""), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${list.length} players`)))));
+      body.push(h("tr", { class: "team-row" }, h("td", { colspan: cols.length - 1 }, h("div", { class: "tcell" }, logoEl(id), h("span", { class: "yr" }, id.year || ""), h("span", { class: "pname" }, id.short || team), h("span", { class: "muted" }, `${new Set(list.map((x) => x.r[1])).size} players`)))));
       list.sort((a, b) => numOf(b.r[defaultCol]) - numOf(a.r[defaultCol])).forEach((x) => body.push(rowEl(x, null)));
     }
   }
   const prev = root.querySelector(".stx-wrap");
   const left = prev ? prev.scrollLeft : 0, top = prev ? prev.scrollTop : 0;
   const wrap = h("div", { class: "table-wrap tall stx-wrap" }, body.length ? h("table", { class: "stats avg" }, h("thead", {}, head), h("tbody", {}, body)) : h("div", { class: "empty" }, "No stats for this selection yet. Start a game or choose another source."));
-  root.replaceChildren(controls, wrap);
+  root.replaceChildren(controls, ...(data.note ? [h("div", { class: "muted stx-note", style: { margin: "0 2px 8px", fontSize: "12.5px" } }, data.note)] : []), wrap);
   wrap.scrollLeft = left; wrap.scrollTop = top;
 }
 function renderStats() {
