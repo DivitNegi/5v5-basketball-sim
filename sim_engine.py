@@ -12915,6 +12915,28 @@ def play_type_of(shot_type: str, context: str) -> str:
     return "other"
 
 
+# How a shot finished, whatever play set it up: an iso can end in a drive or a pull-up, a pick and roll in a pull-up or a roller's dunk.
+CATCH_SHOOT_TAGS = {"pnr_catch_shoot", "extra_pass_open", "extra_pass", "drive_kick", "double_kick", "late_catch_shoot", "fastbreak_catch_shoot",
+                    "double_wide_open", "handle_combo_pass", "late_oreb_kickout", "popper", "floppy", "elevator", "handoff", "inbound"}
+OFF_PASS_FINISH_TAGS = {"roller", "alley_oop", "dump_off", "dump_off_elite_help", "backdoor", "deep_paint_touch", "inbound", "ato"}
+
+
+def finish_type_of(shot_type: str, context: str, play: str) -> str:
+    tags = set(str(context or "").split("|")) - {""}
+    if play == "putback" or "putback" in tags or "late_putback" in tags:
+        return "putback"
+    if shot_type in ("post", "post_fade"):
+        return "post"
+    if shot_type in ("three", "mid"):
+        if tags & CATCH_SHOOT_TAGS or play in ("spot_up", "off_screen"):
+            return "catch_shoot"
+        return "pullup"
+    # layups and dunks
+    if tags & OFF_PASS_FINISH_TAGS or play == "cut" or any(t.endswith("_cut") for t in tags):
+        return "off_pass"
+    return "drive"
+
+
 def pbp_play_type(shot_type: str, text: str) -> str:
     """The play the printed play-by-play lines describe, so a shot with no play tag of its own is filed under what the reader saw."""
     t = text.lower()
@@ -12958,15 +12980,21 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
         return
     a, value = analytics_of(player), 3 if shot_type == "three" else 2
     if made and getattr(player, "_pt_last", None) and player._pt_last[0] == shot_type:
-        play = player._pt_last[1]   # the make goes to the same play as its attempt
+        play, fin = player._pt_last[1], player._pt_last[2]   # the make goes to the same play and finish as its attempt
     else:
         play = play_type_of(shot_type, context)
         pbp = getattr(player, "_pbp_play", None)
         if play == "other" and pbp and pbp[0] == shot_type:
             play = pbp[1]
+        fin = finish_type_of(shot_type, context, play)
         if not made:
             player._pbp_play = None
-            player._pt_last = (shot_type, play)
+            player._pt_last = (shot_type, play, fin)
+    fn = a.setdefault("fin", {}).setdefault(fin, {})
+    if made:
+        _bump(fn, "fgm"); _bump(fn, "pts", value)
+    else:
+        _bump(fn, "fga")
     pt = a.setdefault("pt", {}).setdefault(play, {})
     xp = a.setdefault("xp", {})
     clutch = a.setdefault("clutch", {}) if in_clutch_window() else None

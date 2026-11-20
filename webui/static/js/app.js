@@ -2696,6 +2696,15 @@ async function openStatsPlayer(team, name, source, startTab = "stats") {
 function ppPlayTypes(d) {
   const pt = d.play_types;
   if (!pt || !pt.total) return h("div", { class: "pp-games" }, h("div", { class: "empty" }, "No play-type data for these games. It is recorded for games played since the analytics update."));
+  const fin = d.finish_types;
+  return h("div", { class: "pp-games" },
+    h("h4", { class: "pp-sub" }, "Play types · what play set the shot up"),
+    ppBreakdownTable(pt, "Play type", "most-used play first. An isolation that ends in a drive counts here as Isolation."),
+    fin && fin.total ? h("h4", { class: "pp-sub", style: { marginTop: "18px" } }, "How his shots finished · whatever the play") : null,
+    fin && fin.total ? ppBreakdownTable(fin, "Finish", "every shot once, by how it ended: the same iso drive counts here as Drive.") : h("div", { class: "muted", style: { marginTop: "14px" } }, "Shot finishes are recorded for games played from now on."));
+}
+// one breakdown table (play types or finishes): share bar, makes / attempts, points per shot and the league on the same row
+function ppBreakdownTable(pt, firstCol, blurb) {
   const used = pt.rows.filter((r) => r.fga).sort((a, b) => b.fga - a.fga);
   const maxFreq = Math.max(...used.map((r) => r.freq || 0), 1);
   const diff = (r) => (r.pps != null && r.league_pps != null ? r.pps - r.league_pps : null);
@@ -2709,10 +2718,10 @@ function ppPlayTypes(d) {
       h("td", { class: "muted" }, r.league_freq == null ? "–" : `${r.league_freq.toFixed(1)}%`));
   };
   const totPts = used.reduce((a, r) => a + r.pts, 0);
-  return h("div", { class: "pp-games" },
-    h("div", { class: "muted", style: { margin: "2px 2px 10px", fontSize: "12.5px" } }, `${pt.total} shots · ${(totPts / pt.total).toFixed(2)} points per shot · most-used play first. PPS is points per shot (free throws not included); green / red = better / worse than the league on that play.`),
+  return h("div", {},
+    h("div", { class: "muted", style: { margin: "2px 2px 10px", fontSize: "12.5px" } }, `${pt.total} shots · ${(totPts / pt.total).toFixed(2)} points per shot · ${blurb} PPS is points per shot (free throws not included); green / red = better / worse than the league.`),
     h("div", { class: "table-wrap" }, h("table", { class: "stats" },
-      h("thead", {}, h("tr", {}, ["Play type", "Share of his shots", "FGM", "FGA", "FG%", "PTS", "PPS", "League PPS", "vs league", "League share"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)))),
+      h("thead", {}, h("tr", {}, [firstCol, "Share of his shots", "FGM", "FGA", "FG%", "PTS", "PPS", "League PPS", "vs league", "League share"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)))),
       h("tbody", {}, used.map(row)))));
 }
 // The player pop-up's Games tab: every game he played (playoff series from the bracket, the regular season from the season log, any other game

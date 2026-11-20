@@ -62,23 +62,29 @@ PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("drive", "Drive"),
 PLAY_SHORT = ["ISO", "P&R", "DRIVE", "PULL-UP", "POST", "SPOT", "SCREEN", "CUT", "TRANS", "PUTB", "OTHER"]   # column labels, same order as PLAY_LABELS
 
 
-def play_type_breakdown(mine, pool):
-    """His field goals by play type next to the league's points per shot and share on the same play (pool = every player's stats in this source)."""
+FINISH_LABELS = [("drive", "Drive"), ("off_pass", "Finish off a pass"), ("pullup", "Pull-up"), ("catch_shoot", "Catch & shoot"),
+                 ("post", "Post move"), ("putback", "Putback")]
+
+
+def play_type_breakdown(mine, pool, key="pt", labels=None):
+    """His field goals by play type (or, with key "fin", by how the shot finished) next to the league's points per shot and share on the
+    same play (pool = every player's stats in this source)."""
+    labels = labels or PLAY_LABELS
     league = {}
     for st in pool:
-        for k, v in ((st.get("analytics") or {}).get("pt") or {}).items():
+        for k, v in ((st.get("analytics") or {}).get(key) or {}).items():
             lg = league.setdefault(k, [0, 0])
             lg[0] += v.get("fga", 0)
             lg[1] += v.get("pts", 0)
     lt = sum(x[0] for x in league.values())
-    pt = (mine.get("analytics") or {}).get("pt") or {}
+    pt = (mine.get("analytics") or {}).get(key) or {}
     total = sum(v.get("fga", 0) for v in pt.values())
     rows = []
-    for key, label in PLAY_LABELS:
-        v = pt.get(key) or {}
+    for k, label in labels:
+        v = pt.get(k) or {}
         fga, fgm, pts = v.get("fga", 0), v.get("fgm", 0), v.get("pts", 0)
-        lf, lp = league.get(key, [0, 0])
-        rows.append({"key": key, "label": label, "fga": fga, "fgm": fgm, "pts": pts,
+        lf, lp = league.get(k, [0, 0])
+        rows.append({"key": k, "label": label, "fga": fga, "fgm": fgm, "pts": pts,
                      "fgp": round(100 * fgm / fga, 1) if fga else None, "pps": round(pts / fga, 2) if fga else None,
                      "freq": round(100 * fga / total, 1) if total else None, "league_pps": round(lp / lf, 2) if lf else None,
                      "league_freq": round(100 * lf / lt, 1) if lt else None})
@@ -435,7 +441,8 @@ def player_detail(runner, source, team, name, group="all"):
                           "base_L": zone("mid_base_L"), "base_R": zone("mid_base_R"), "wing_L": zone("mid_wing_L"), "wing_R": zone("mid_wing_R")},
             "dist_split": {"rim_float": zone("rim_float"), "mid_long": zone("mid_long")},
             "fine": fine_me, "fine_avg": fine_avg,
-            "play_types": play_type_breakdown(mine, [s for _, _, s in pool])}
+            "play_types": play_type_breakdown(mine, [s for _, _, s in pool]),
+            "finish_types": play_type_breakdown(mine, [s for _, _, s in pool], "fin", FINISH_LABELS)}
 
 
 
