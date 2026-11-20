@@ -2399,7 +2399,8 @@ function seasonShotChart(name, zones, avg, vs, split) {
       return g;
     };
     const labels = [label(250, 66, "ra", 14), label(250, 138, "paint", 15), label(250, 238, "elbow", 16), label(250, 325, "top3", 17)];
-    for (const s of S) labels.push(label(250 + s * 110, 183, `mid_wing_${sd(s)}`, 16), label(250 + s * 133, 78, `baseline_${sd(s)}`, 15), label(250 + s * 190, 238, `wing3_${sd(s)}`, 16), label(250 + s * 235, 72, `corner3_${sd(s)}`, 10, true, true));
+    // mid wing sits at the middle of its wedge (~0.97 rad, r 175) and the baseline readout up in the corner pocket, both well clear of the zone lines
+    for (const s of S) labels.push(label(250 + s * 144, 152, `mid_wing_${sd(s)}`, 16), label(250 + s * 150, 42, `baseline_${sd(s)}`, 15), label(250 + s * 190, 238, `wing3_${sd(s)}`, 16), label(250 + s * 235, 72, `corner3_${sd(s)}`, 10, true, true));
     const arc = svgEl("path", { d: "M30 0 V142.1 A237.5 237.5 0 0 0 470 142.1 V0", fill: "none", stroke: "#fff", "stroke-width": 3, "stroke-linejoin": "round" });   // the three-point line, the same white and weight as every other line
     zsvg.append(...out, ft, arc, frame, ...labels);
   };
