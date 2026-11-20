@@ -703,8 +703,9 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 .shot .x { stroke: var(--red); stroke-width: 3; stroke-linecap: round; fill: none; }
 .shot.miss { opacity: .55; }
 .shot .pulse { fill: none; stroke: var(--green); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: shotPulse .9s ease-out forwards; }
-.shot.fresh { animation: shotPop .45s cubic-bezier(.2, 1.6, .4, 1); transform-box: fill-box; transform-origin: center; }
-.shot.fresh.miss { opacity: 1; animation: shotPop .45s cubic-bezier(.2, 1.6, .4, 1), shotFade 1.6s ease-out forwards; }
+.shot.fresh .mark { animation: shotPop .45s cubic-bezier(.2, 1.6, .4, 1); transform-box: fill-box; transform-origin: center; }
+.shot.fresh.miss { opacity: 1; }
+.shot.fresh.miss .mark { animation: shotPop .45s cubic-bezier(.2, 1.6, .4, 1), shotFade 1.6s ease-out forwards; }
 .shot .floater { fill: #86efac; font-size: 17px; font-weight: 800; animation: shotFloat 1.4s ease-out forwards; }
 @keyframes shotPop { 0% { transform: scale(.2); } 60% { transform: scale(1.55); } 100% { transform: scale(1); } }
 @keyframes shotPulse { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(3.2); opacity: 0; } }
@@ -717,7 +718,7 @@ table.stats.avg td, table.stats.avg th { white-space: nowrap; }
 @media (max-width: 640px) { .sc-foot { grid-template-columns: 1fr 1fr; } .sc-foot .sc-legend { grid-column: 1 / -1; justify-content: center; order: 3; } }
 .sc-legend { display: flex; gap: 14px; }
 .sc-legend .make { color: var(--green); } .sc-legend .miss { color: var(--red); }
-@media (prefers-reduced-motion: reduce) { .shot.fresh, .shot .pulse, .shot .floater { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .shot.fresh .mark, .shot .pulse, .shot .floater { animation: none; } }
 
 /* on the floor */
 .pstack { display: flex; flex-direction: column; gap: 3px; min-width: 0; }

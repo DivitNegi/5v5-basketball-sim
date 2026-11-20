@@ -3068,10 +3068,14 @@ function mountShotChart(host, { big = false } = {}) {
     && (st.quarter === "all" || (st.quarter === "OT" ? ev.period >= 5 : ev.period === Number(st.quarter))) && (st.result === "all" || (st.result === "make") === ev.made);
   function dot(ev, animate) {
     const [x, y] = shotSpot(ev, sideOf(ev.team));
+    // the outer group holds the spot; the pop animation runs on the inner one (a CSS transform on the outer group would replace its
+    // translate, drawing every new shot at the court's top-left corner until the animation ended)
     const g = svgEl("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})`, class: `shot ${ev.made ? "make" : "miss"}${animate ? " fresh" : ""}` });
-    g.append(svgEl("circle", { r: 11, class: "hit" }));   // the whole marker answers the hover, not just its outline
-    if (ev.made) { g.append(svgEl("circle", { r: 8, class: "ring" })); if (animate) g.append(svgEl("circle", { r: 8, class: "pulse" })); }
-    else g.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
+    const mk = svgEl("g", { class: "mark" });
+    g.append(mk);
+    mk.append(svgEl("circle", { r: 11, class: "hit" }));   // the whole marker answers the hover, not just its outline
+    if (ev.made) { mk.append(svgEl("circle", { r: 8, class: "ring" })); if (animate) mk.append(svgEl("circle", { r: 8, class: "pulse" })); }
+    else mk.append(svgEl("path", { d: "M-6 -6 L6 6 M6 -6 L-6 6", class: "x" }));
     if (animate) {
       const pts = ev.made ? (ev.zone === "three" ? "+3" : "+2") : "";
       if (pts) { const t = svgEl("text", { class: "floater", y: -12, "text-anchor": "middle" }); t.textContent = pts; g.append(t); setTimeout(() => t.remove(), 1500); }
