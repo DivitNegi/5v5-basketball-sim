@@ -8891,7 +8891,7 @@ def is_priority_reserve(player: Player, team: Team) -> bool:
         return True
     if player.name == "Dereck Lively II" and team.name == "2026 Dallas Mavericks":
         return True
-    if player.name in ("Max Christie", "Dereck Lively II", "Daniel Gafford", "Naji Marshall") and team.name == "2027 Dallas Mavericks":
+    if player.name in ("Marcus Sasser", "Max Christie", "Zaccharie Risacher", "Naji Marshall") and team.name == "2027 Dallas Mavericks":   # the depth chart's second unit
         return True
     if player.name == "Kentavious Caldwell-Pope" and team.name == "2027 Philadelphia 76ers":
         return True
@@ -9065,7 +9065,6 @@ SEASON_STAR_MINUTES_CAP = None
 # starter's spot at those quarter tip-offs so he gets real minutes instead of
 # only the stints the starter sits.
 QUARTER_STARTER_SWAPS = {
-    "2027 Dallas Mavericks": ("Dereck Lively II", "Daniel Gafford", (2, 3, 4)),
     "2027 New York Knicks": ("Karl-Anthony Towns", "Andre Drummond", (2, 4)),
     "2027 Denver Nuggets": ("Christian Braun", "DeMar DeRozan", (2, 4)),
     "2027 Boston Celtics": (
@@ -9449,19 +9448,15 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2027 Dallas Mavericks":
-        # Minutes the 2027 Mavericks should play (Basketball-Reference's shape, scaled to this 11-man roster's 240; Flagg 32-35, Kyrie
-        # 31-32 and Lively keeps his). The rotation rules alone do not land them, so they are the pinned minutes the pacing steers
-        # to: the numbers below are what is asked for, tuned until the games average the intended minutes.
+        # Minutes the 2027 Mavericks should play, following the ESPN depth chart (Kyrie, Caleb Martin, Flagg, P.J., Gafford start; Lively
+        # is off the roster) with the real 2026-27 minutes of the newcomers (Martin 21.5, Clayton 17.8, Cisse 3.6). The rotation rules alone
+        # do not land them, so they are the pinned minutes the pacing steers to: "intended" is the target, "steer" what is asked for.
         intended = {
-            "Cooper Flagg": 33.5, "Kyrie Irving": 31.5, "P.J. Washington": 30.1, "Zaccharie Risacher": 25.8, "Max Christie": 25.3,
-            "Naji Marshall": 23.8, "Daniel Gafford": 18.3, "Marcus Sasser": 18.3, "Dereck Lively II": 17.0,
-            "Morez Johnson Jr.": 12.5, "Santi Aldama": 4.0,
+            "Cooper Flagg": 33.5, "Kyrie Irving": 31.5, "P.J. Washington": 29.0, "Daniel Gafford": 22.0, "Caleb Martin": 21.5,
+            "Max Christie": 21.0, "Zaccharie Risacher": 20.0, "Naji Marshall": 18.0, "Walter Clayton Jr.": 15.0, "Marcus Sasser": 12.0,
+            "Morez Johnson Jr.": 9.0, "Santi Aldama": 4.0, "Moussa Cisse": 3.5,
         }
-        steer = {
-            "P.J. Washington": 27.9, "Cooper Flagg": 30.3, "Zaccharie Risacher": 28.0, "Max Christie": 21.5, "Naji Marshall": 21.9,
-            "Daniel Gafford": 17.1, "Marcus Sasser": 19.7, "Morez Johnson Jr.": 13.3, "Kyrie Irving": 27.4, "Dereck Lively II": 18.6,
-            "Santi Aldama": 3.6,
-        }
+        steer = dict(intended)
         for p in team.roster:
             p.target_minutes = intended.get(p.name, 4.0)
             p.gui_target_minutes_override = steer.get(p.name, 4.0)
