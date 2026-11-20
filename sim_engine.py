@@ -17393,6 +17393,13 @@ def dribble_combo_action(shooter: Player, defender: Player, team: Team, opponent
         mid_weight *= 1.12
         pass_weight *= 0.80
 
+    # The flat parts above (base and shot_tendency) gave a jumper the same head start whether he likes it or not, so a 0.25-three /
+    # 0.55-drive slasher like 2013 LeBron still pulled up ~60% of the time. Each option now shrinks when his tendency for it is below
+    # a normal guard's (three 0.50, mid 0.25, drive 0.30); players at or above those keep exactly the old weights.
+    three_weight *= min(1.0, three_attempt_tendency_curve(shooter.three_tendency) / 0.50)
+    mid_weight *= min(1.0, shooter.mid_tendency / 0.25)
+    drive_weight *= min(1.0, shooter.drive_tendency / 0.30)
+
     if shooter.three_tendency <= 0 or shooter.three_rating < 0.66:
         three_weight *= 0.15
     if shooter.mid_tendency <= 0 or shooter.mid_rating < 0.66:
@@ -21306,7 +21313,8 @@ def simulate_possession(off: Team, dff: Team,
         elif (
             shooter.three_rating >= 0.80
             and shooter.three_tendency >= 0.25
-            and random.random() < min(0.86, (0.25 + 0.36 * three_pref) * THREE_ATTEMPT_SCALE)
+            # scaled by how much he shoots threes: a 0.25 three tendency used to get the same ~60% as a pure shooter
+            and random.random() < min(0.86, (0.25 + 0.36 * three_pref) * THREE_ATTEMPT_SCALE) * min(1.0, shooter.three_tendency / 0.45)
         ):
             shot_type = "three"
         elif shooter.rim_rating >= 0.86 and random.random() < 0.35:
