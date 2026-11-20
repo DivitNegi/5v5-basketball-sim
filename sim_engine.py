@@ -5224,12 +5224,19 @@ def assign_newer_badges(p: "Player"):
             p.badges = tuple(b for b in p.badges if badge_parts(b)[0] != badge)
 
 
-# legendary isolation scorers: every version gets at least this Iso Scorer level (prime Kyrie / Harden seasons are in SEASON_BADGES)
-ISO_LEGENDS = {"Michael Jordan": "hof", "Kobe Bryant": "hof", "Kevin Durant": "hof", "Allen Iverson": "hof", "Carmelo Anthony": "hof",
-               "Tracy McGrady": "hof", "Kyrie Irving": "gold"}
+# legendary isolation scorers: Hall of Fame Iso Scorer in their prime seasons only (other versions get what their ratings earn)
+ISO_PRIME_SEASONS = {
+    "Michael Jordan": {"1988", "1989", "1990", "1991", "1992", "1993", "1996", "1997", "1998"},
+    "Kobe Bryant": {str(y) for y in range(2001, 2014)},
+    "Kevin Durant": {str(y) for y in range(2012, 2023)},
+    "Allen Iverson": {str(y) for y in range(1999, 2008)},
+    "Carmelo Anthony": {str(y) for y in range(2007, 2015)},
+    "Tracy McGrady": {str(y) for y in range(2001, 2006)},
+    "James Harden": {"2018", "2019"},
+    "Kyrie Irving": {str(y) for y in range(2018, 2025)},
+}
 # badges for specific seasons of a player (his prime), not every version of him
 SEASON_BADGES = [
-    ("iso_scorer", "hof", {("James Harden", y) for y in ("2018", "2019")} | {("Kyrie Irving", str(y)) for y in range(2018, 2025)}),
 ]
 
 
@@ -5288,8 +5295,10 @@ def assign_player_badges(team: Team):
         for badge, level, versions in SEASON_BADGES:
             if (p.name, season) in versions:
                 add_badge(p, badge, level)
-        if p.name in ISO_LEGENDS:   # every version of the legendary isolation scorers
-            add_badge(p, "iso_scorer", ISO_LEGENDS[p.name])
+        if season in ISO_PRIME_SEASONS.get(p.name, ()):   # a legendary isolation scorer in his prime
+            add_badge(p, "iso_scorer", "hof")
+        elif p.name == "Kyrie Irving":   # every other Kyrie is still gold
+            add_badge(p, "iso_scorer", "gold")
         assign_newer_badges(p)
 
         poster_score = p.dunk_rating * 0.62 + p.dunk_tendency * 0.28 + p.rim_rating * 0.10
