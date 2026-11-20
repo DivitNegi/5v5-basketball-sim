@@ -5285,6 +5285,8 @@ def assign_player_badges(team: Team):
         for badge, level, versions in SEASON_BADGES:
             if (p.name, season) in versions:
                 add_badge(p, badge, level)
+        if p.name == "Michael Jordan":   # every version of Jordan is a Hall of Fame isolation scorer
+            add_badge(p, "iso_scorer", "hof")
         assign_newer_badges(p)
 
         poster_score = p.dunk_rating * 0.62 + p.dunk_tendency * 0.28 + p.rim_rating * 0.10
