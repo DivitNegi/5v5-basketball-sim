@@ -2700,7 +2700,9 @@ def print_shot_attempt_sequence(shooter, shot_type: str, context: str | None = N
     key = shot_type
     if key == "dunk":
         return False
+    shooter._pbp_play = None
     if context == "iso_forced" and key in ("three", "mid"):
+        shooter._pbp_play = (shot_type, "iso")
         forced_sequences = {
             "three": [
                 ("keeps the dribble alive but cannot turn the corner", "has to rise into a difficult three"),
@@ -2721,6 +2723,7 @@ def print_shot_attempt_sequence(shooter, shot_type: str, context: str | None = N
             time.sleep(SLEEP * 0.42)
         return True
     if should_print_dribble_chain(shooter, key, context):
+        shooter._pbp_play = (shot_type, "drive" if key == "rim" else "pullup")   # a chain of his own dribble moves
         return print_dribble_chain_attempt(shooter, key, context)
     sequence = go_to_shot_sequence(shooter, key, context)
     if not sequence and key == "rim":
@@ -2728,6 +2731,7 @@ def print_shot_attempt_sequence(shooter, shot_type: str, context: str | None = N
         sequence = (setup, layup_finish_line(shooter).rstrip("."))
     elif not sequence:
         sequence = random.choice(shot_sequence_lines.get(key, shot_sequence_lines["rim"]))
+    shooter._pbp_play = (shot_type, pbp_play_type(shot_type, " ".join(sequence)))
     for line in sequence:
         print(f"{shooter.name} {line}.")
         time.sleep(SLEEP * 0.42)
@@ -12895,6 +12899,8 @@ PLAY_TYPE_TAGS = (   # first match wins
     ("iso", {"iso", "iso_forced", "handle_combo_three", "handle_combo_mid", "handle_combo_drive", "mismatch_hunt", "ankle_breaker", "pressure_pullup", "pressure_drive"}),
     ("cut", {"backdoor", "dump_off"}),
     ("off_screen", {"floppy", "elevator", "handoff"}),
+    ("drive", set()),     # no context tag of their own: filled from the play-by-play line (pbp_play_type)
+    ("pullup", set()),
     ("spot_up", {"extra_pass_open", "extra_pass", "drive_kick", "double_kick", "pnr_catch_shoot", "late_catch_shoot", "double_wide_open", "handle_combo_pass", "late_oreb_kickout"}),
 )
 
@@ -12907,6 +12913,24 @@ def play_type_of(shot_type: str, context: str) -> str:
         if tags & keys or (play == "cut" and any(t.endswith("_cut") for t in tags)):
             return play
     return "other"
+
+
+def pbp_play_type(shot_type: str, text: str) -> str:
+    """The play the printed play-by-play lines describe, so a shot with no play tag of its own is filed under what the reader saw."""
+    t = text.lower()
+    if shot_type in ("post", "post_fade"):
+        return "post"
+    if any(k in t for k in ("comes off the screen", "handoff", "curls", "off the pin")):
+        return "off_screen"
+    if any(k in t for k in ("screen", "pick-and-roll", "pick and roll", "the switch", "drop coverage", "the big", "roller", "duck under", "under the action")):
+        return "pnr"
+    if any(k in t for k in ("closeout", "pass arrives", "relocat", "catches it", "late rotation", "catch-and", "kick-out")):
+        return "spot_up"
+    if any(k in t for k in ("sealed", "on his back", "backs down", "drop-step", "drop step")):
+        return "post"
+    if any(k in t for k in (" cut", "backdoor")):
+        return "cut"
+    return "drive" if shot_type in ("rim", "dunk") else "pullup"   # any other dribble move: he made the shot himself
 
 
 def analytics_of(player: Player) -> Dict:
@@ -12933,7 +12957,17 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
     if player is None:
         return
     a, value = analytics_of(player), 3 if shot_type == "three" else 2
-    pt = a.setdefault("pt", {}).setdefault(play_type_of(shot_type, context), {})
+    if made and getattr(player, "_pt_last", None) and player._pt_last[0] == shot_type:
+        play = player._pt_last[1]   # the make goes to the same play as its attempt
+    else:
+        play = play_type_of(shot_type, context)
+        pbp = getattr(player, "_pbp_play", None)
+        if play == "other" and pbp and pbp[0] == shot_type:
+            play = pbp[1]
+        if not made:
+            player._pbp_play = None
+            player._pt_last = (shot_type, play)
+    pt = a.setdefault("pt", {}).setdefault(play, {})
     xp = a.setdefault("xp", {})
     clutch = a.setdefault("clutch", {}) if in_clutch_window() else None
     if made:
@@ -21576,6 +21610,7 @@ def simulate_possession(off: Team, dff: Team,
             ]
             print(f"{shooter.name} {random.choice(roll_finish_lines)}")
         elif play_context == "deep_paint_touch":
+            shooter._pbp_play = (shot_type, "post")
             deep_dunk_lines = [
                 "catches, gathers, and goes straight up strong.",
                 "takes the entry pass and powers up at the rim.",
@@ -21584,6 +21619,7 @@ def simulate_possession(off: Team, dff: Team,
             ]
             print(f"{shooter.name} {random.choice(deep_dunk_lines)}")
         elif not iso_already_described:
+            shooter._pbp_play = (shot_type, "drive")
             print(f"{shooter.name} {drive}")
             time.sleep(SLEEP * 0.5)
             print(f"{shooter.name} {gather}")

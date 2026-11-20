@@ -57,9 +57,9 @@ def on_off(st, tt, other, team_minutes):
 
 
 # ---- analytics tables, built from the "analytics" counts the engine keeps for every player (see analytics_shot in sim_engine)
-PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("post", "Post-up"), ("spot_up", "Spot-up"), ("off_screen", "Off screen"),
+PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("drive", "Drive"), ("pullup", "Pull-up"), ("post", "Post-up"), ("spot_up", "Spot-up"), ("off_screen", "Off screen"),
                ("cut", "Cut"), ("transition", "Transition"), ("putback", "Putback"), ("other", "Other half-court")]
-PLAY_SHORT = ["ISO", "P&R", "POST", "SPOT", "SCREEN", "CUT", "TRANS", "PUTB", "OTHER"]   # column labels, same order as PLAY_LABELS
+PLAY_SHORT = ["ISO", "P&R", "DRIVE", "PULL-UP", "POST", "SPOT", "SCREEN", "CUT", "TRANS", "PUTB", "OTHER"]   # column labels, same order as PLAY_LABELS
 
 
 def play_type_breakdown(mine, pool):
