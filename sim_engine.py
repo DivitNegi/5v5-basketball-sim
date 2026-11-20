@@ -13286,7 +13286,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     return max(0.0, min(0.97, p))
 
 
-ACROBAT_TOUGH_BONUS = {1: 0.05, 2: 0.08, 3: 0.11, 4: 0.15}   # make-chance boost on a fully tough layup, by badge tier
+ACROBAT_TOUGH_BONUS = {1: 0.05, 2: 0.08, 3: 0.11, 4: 0.20}   # make-chance boost on a fully tough layup, by badge tier
 
 
 def acrobat_finish_multiplier(shooter: Player, defender: Player, rim_tok: str) -> float:
