@@ -2230,11 +2230,15 @@ async function openTeamCard(team) {
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
           d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)),
       ...(d.insights ? teamInsights(d.insights, id, team) : []),
-      h("div", { class: "pc-panel tc-badges-panel", style: { marginTop: "12px" } }, h("h4", {}, "Badges"),
-        Object.keys(d.badges || {}).length ? h("div", { class: "table-wrap" }, h("table", { class: "stats tc-badges" }, h("tbody", {},
-          Object.entries(d.badges).filter(([, b]) => (b || []).length).sort((a, b) => badgeList(b[1]).reduce((t, x) => t + x.t, 0) - badgeList(a[1]).reduce((t, x) => t + x.t, 0))
-            .map(([nm, b]) => h("tr", {}, h("td", { class: "l", style: { whiteSpace: "nowrap" } }, h("div", { class: "pcell" }, faceEl ? faceEl(nm) : "", nm)), h("td", { class: "l" }, badgeChips(b)))))))
-          : h("div", { class: "muted" }, "No badges.")));
+      h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Roster"),
+        (d.roster || []).length ? h("div", { class: "table-wrap" }, h("table", { class: "stats tc-roster" },
+          h("thead", {}, h("tr", {}, ["Player", "Pos", "OVR", "Ht", "Archetype", "GP", "MIN", "PTS", "REB", "AST"].map((c, i) => h("th", { class: i === 0 || i === 4 ? "l" : "" }, c)))),
+          h("tbody", {}, d.roster.map((p) => h("tr", { class: "pl-row", title: "Open his stats", onclick: () => openStatsPlayer(team, p.name, d.roster.some((x) => x.games) ? "Season" : "Live") },
+            h("td", { class: "l", style: { whiteSpace: "nowrap" } }, h("div", { class: "pcell" }, faceEl(p.name), p.name, p.rookie ? h("span", { class: "muted", style: { fontSize: "11px", marginLeft: "6px" } }, "R") : null)),
+            h("td", {}, p.pos), h("td", { style: { color: ratingColor(p.ovr || 0), fontWeight: 700 } }, p.ovr ?? "–"), h("td", {}, fmtHt(p.height)),
+            h("td", { class: "l muted" }, p.archetype || ""), h("td", {}, p.games || "–"),
+            ...(p.per ? [p.per.minutes, p.per.pts, p.per.reb, p.per.ast].map((v, i) => h("td", { class: i === 1 ? "pts" : "" }, Number(v).toFixed(1))) : [h("td", { colspan: 4, class: "muted" }, "–")]))))))
+          : h("div", { class: "muted" }, "No roster.")));
   };
   render();
 }
@@ -2667,7 +2671,7 @@ async function openStatsPlayer(team, name, source) {
     if (v === "highs" && !highsView.childElementCount) ppHighs(highsView, team, d.name, (it) => show("games", it));
   };
   body.replaceChildren(
-    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg, (d.badges || []).length ? badgeChips(d.badges) : null), h("div", { style: { marginLeft: "auto" } }, seg)),
+    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
     tabs, statsView, highsView, gamesView);
   show("stats");
 }

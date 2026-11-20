@@ -475,6 +475,26 @@ def _team_insights(runner, team):
         return None
 
 
+def team_card_roster(runner, team):
+    """The team pop-up's roster: every player with position, overall, height, archetype and his per-game line (season totals when there are some)."""
+    try:
+        cards = roster_payload(runner, team).get("players") or []
+    except Exception:
+        return []
+    sec = runner.sections or {}
+    totals = (sec.get("_season_player_totals") or sec.get("_playoff_player_totals") or {}).get(team, {})
+    out = []
+    for c in cards:
+        st = totals.get(c["name"]) or {}
+        g = st.get("games", 0) or 0
+        per = {k: round(st.get(k, 0) / g, 1) for k in ("minutes", "pts", "reb", "ast")} if g else None
+        if per:
+            per["minutes"] = round(st.get("minutes", 0) / g / (60 if st.get("minutes", 0) / g > 60 else 1), 1)
+        out.append({"name": c["name"], "pos": c["pos"], "ovr": c["ovr"], "height": c["height"], "archetype": c["archetype"], "rookie": c.get("rookie"),
+                    "games": g, "per": per})
+    return out
+
+
 def team_card_payload(runner, team):
     sec = runner.sections or {}
     teams = sec.get("_season_team_totals") or sec.get("_playoff_team_totals") or sec.get("_series_team_totals") or {}
@@ -515,8 +535,7 @@ def team_card_payload(runner, team):
     per.update(fgp=pct("fgm", "fga"), tpp=pct("tpm", "tpa"), ftp=pct("ftm", "fta"))
     games = schedule_payload(runner, team)["games"]
     played = [x for x in games if x.get("mine") is not None]
-    from .badges import team_badges
-    return {"badges": team_badges(runner, team), "team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
+    return {"roster": team_card_roster(runner, team), "team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
             "recent": list(reversed(played[-8:])), "upcoming": schedule_payload(runner, team)["upcoming"][:5], "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"]),
             "insights": _team_insights(runner, team)}
 
