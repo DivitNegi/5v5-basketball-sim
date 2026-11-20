@@ -4875,6 +4875,13 @@ BADGE_TIER_LABEL = {
 
 BADGE_DEFAULT_LEVELS = {
     "acrobat": "bronze",
+    "bully": "bronze",
+    "deadeye": "bronze",
+    "ice_veins": "bronze",
+    "interceptor": "bronze",
+    "midrange_maestro": "bronze",
+    "post_maestro": "bronze",
+    "unpluckable": "bronze",
     "ankle_breaker": "bronze",
     "catch_shoot": "bronze",
     "chasedown": "bronze",
@@ -5134,6 +5141,59 @@ ACROBAT_FINISHERS = {
 }
 
 
+# Famous players get at least this level of the newer badges (the ratings formula below can still give a higher one)
+BADGE_LEGENDS = {
+    "deadeye": {"Kobe Bryant": "hof", "Michael Jordan": "hof", "Kevin Durant": "hof", "Dirk Nowitzki": "hof", "Stephen Curry": "hof",
+                "Kawhi Leonard": "gold", "Klay Thompson": "gold", "Devin Booker": "gold", "DeMar DeRozan": "gold", "Larry Bird": "hof",
+                "Damian Lillard": "gold", "Jayson Tatum": "silver", "Kyrie Irving": "gold", "Shai Gilgeous-Alexander": "gold", "Shai G-Alexander": "gold"},
+    "midrange_maestro": {"Dirk Nowitzki": "hof", "Kevin Durant": "hof", "Michael Jordan": "hof", "Kobe Bryant": "hof", "DeMar DeRozan": "hof",
+                         "Chris Paul": "gold", "Kawhi Leonard": "gold", "Shai Gilgeous-Alexander": "gold", "Shai G-Alexander": "gold",
+                         "Devin Booker": "gold", "Carmelo Anthony": "gold", "Larry Bird": "gold", "Kyrie Irving": "silver"},
+    "post_maestro": {"Hakeem Olajuwon": "hof", "Kareem Abdul-Jabbar": "hof", "Joel Embiid": "hof", "Nikola Jokić": "hof", "Tim Duncan": "gold",
+                     "Kobe Bryant": "gold", "Michael Jordan": "gold", "Dirk Nowitzki": "gold", "Shaquille O'Neal": "gold", "Kevin McHale": "hof",
+                     "Pau Gasol": "silver", "Alperen Şengün": "silver", "Alperen Sengun": "silver", "Larry Bird": "silver"},
+    "bully": {"Shaquille O'Neal": "hof", "Giannis Antetokounmpo": "hof", "Zion Williamson": "gold", "Joel Embiid": "gold", "LeBron James": "gold",
+              "Charles Barkley": "gold", "Karl Malone": "gold", "Dwight Howard": "silver", "Russell Westbrook": "silver"},
+    "ice_veins": {"Stephen Curry": "hof", "Steve Nash": "hof", "Dirk Nowitzki": "hof", "Kevin Durant": "gold", "Shai Gilgeous-Alexander": "gold",
+                  "Shai G-Alexander": "gold", "Damian Lillard": "gold", "Chris Paul": "gold", "Kyrie Irving": "gold", "Michael Jordan": "gold",
+                  "Larry Bird": "gold", "Ray Allen": "gold", "Kobe Bryant": "silver", "Jalen Brunson": "silver"},
+    "interceptor": {"Chris Paul": "hof", "Gary Payton": "hof", "Kawhi Leonard": "gold", "Scottie Pippen": "gold", "Michael Jordan": "gold",
+                    "Jrue Holiday": "gold", "Draymond Green": "silver", "Alex Caruso": "gold", "Dyson Daniels": "gold", "Marcus Smart": "silver",
+                    "Shai Gilgeous-Alexander": "silver", "Shai G-Alexander": "silver", "Andre Iguodala": "silver"},
+    "unpluckable": {"Chris Paul": "hof", "Kyrie Irving": "hof", "Stephen Curry": "gold", "Steve Nash": "gold", "Jalen Brunson": "gold",
+                    "Nikola Jokić": "gold", "Tyrese Haliburton": "gold", "Shai Gilgeous-Alexander": "gold", "Shai G-Alexander": "gold",
+                    "Allen Iverson": "silver", "Luka Dončić": "silver"},
+}
+
+
+def assign_newer_badges(p: "Player"):
+    jumper = max(p.three_rating, p.mid_rating)
+    dead = badge_level_from_rating(0.55 * jumper + 0.25 * p.clutchness + 0.20 * p.shot_iq, 0.86, 0.89, 0.92, 0.95)
+    if dead and p.usage >= 0.24 and jumper >= 0.88:
+        add_badge(p, "deadeye", dead)
+    mid = badge_level_from_rating(0.75 * p.mid_rating + 0.25 * p.mid_tendency, 0.78, 0.81, 0.84, 0.87)
+    if mid and p.mid_rating >= 0.90 and p.mid_tendency >= 0.30 and p.usage >= 0.18:
+        add_badge(p, "midrange_maestro", mid)
+    post = badge_level_from_rating(0.55 * p.rim_rating + 0.30 * p.mid_rating + 0.15 * p.shot_iq, 0.86, 0.89, 0.92, 0.95)
+    if post and p.post_tendency >= 0.25 and (p.height >= 79 or p.position.upper() in ("PF", "C")):
+        add_badge(p, "post_maestro", post)
+    bully = badge_level_from_rating(0.6 * p.foul_draw + 0.4 * min(1.0, p.usage / 0.32), 0.86, 0.90, 0.94, 0.97)
+    if bully and p.foul_draw >= 0.88 and p.usage >= 0.22 and (p.height >= 79 or p.dunk_tendency >= 0.35) and p.drive_tendency + p.post_tendency + p.dunk_tendency >= 0.45:
+        add_badge(p, "bully", bully)
+    ice = badge_level_from_rating(p.ft_rating, 0.88, 0.90, 0.92, 0.94)
+    if ice and p.clutchness >= 0.70:
+        add_badge(p, "ice_veins", ice)
+    steal = badge_level_from_rating(0.75 * p.steal + 0.25 * p.perimeter_def, 0.83, 0.88, 0.92, 0.96)
+    if steal and p.position.upper() != "C":
+        add_badge(p, "interceptor", steal)
+    secure = badge_level_from_rating(0.6 * p.ball_handle + 0.4 * p.playmaking, 0.86, 0.90, 0.93, 0.96)
+    if secure and p.ball_handle >= 0.86 and p.playmaking >= 0.82 and p.usage <= 0.29:   # a careful handler, not a high-usage gambler
+        add_badge(p, "unpluckable", secure)
+    for badge, names in BADGE_LEGENDS.items():
+        if p.name in names:
+            add_badge(p, badge, names[p.name])
+
+
 def assign_player_badges(team: Team):
     for p in team.roster:
         # Normalize any manually entered badges first so old raw strings like
@@ -5185,6 +5245,7 @@ def assign_player_badges(team: Team):
             add_badge(p, "acrobat", acro_level)
         if p.name in ACROBAT_FINISHERS:   # the famous tough-shot finishers: at least this level
             add_badge(p, "acrobat", ACROBAT_FINISHERS[p.name])
+        assign_newer_badges(p)
 
         poster_score = p.dunk_rating * 0.62 + p.dunk_tendency * 0.28 + p.rim_rating * 0.10
         poster_level = badge_level_from_rating(poster_score, 0.66, 0.76, 0.86, 0.94)
@@ -10423,6 +10484,8 @@ def effective_ft_rating(player: Player, team: Team, opponent: Team,
         rating *= 1.0 + pressure * (clutch_delta * 0.16 + badge_tier(player, "clutch") * 0.032)
     elif clutch_eligible and period >= 4 and period_time <= 2 * 60 and abs(team.score - opponent.score) <= 5:
         rating *= 1.0 + (player.clutchness - 0.60) * 0.05 + badge_tier(player, "clutch") * 0.024
+    if period >= 4 and period_time <= 5 * 60 and abs(team.score - opponent.score) <= 8:
+        rating *= 1.0 + ICE_VEINS_BONUS.get(badge_tier(player, "ice_veins"), 0.0)
     return max(0.35, min(0.97, rating))
 
 
@@ -13002,7 +13065,9 @@ def pass_interception_chance(passer: Player, receiver: Player, defender: Player)
     receiver_pressure = 1.0 - 0.25 * receiver.ball_handle
     risk = max(0.70, min(2.20, getattr(passer, "turnover_risk", 1.0)))
     chance = (0.006 + lane_read * receiver_pressure * 0.054 - passer_security * 0.014) * risk
-    return max(0.0035, min(0.085, chance))
+    chance *= 1.0 + INTERCEPTOR_BONUS.get(badge_tier(defender, "interceptor"), 0.0)
+    chance *= 1.0 - UNPLUCKABLE_CUT.get(badge_tier(passer, "unpluckable"), 0.0)
+    return max(0.0035, min(0.095, chance))
 
 
 def call_foul(team: Team, player: Player, label: str):
@@ -13021,6 +13086,8 @@ def attempt_on_ball_steal(handler: Player, defender: Player) -> bool:
     risk = max(0.70, min(2.20, getattr(handler, "turnover_risk", 1.0)))
     p = base * norm_steal / (0.5 + 0.5 * ball_sec) * risk
     p *= max(0.75, 1.0 - max(0.0, (defender.minutes / 60 - 36) * 0.006))
+    p *= 1.0 + 0.5 * INTERCEPTOR_BONUS.get(badge_tier(defender, "interceptor"), 0.0)
+    p *= 1.0 - UNPLUCKABLE_CUT.get(badge_tier(handler, "unpluckable"), 0.0)
     return random.random() < p
 
 
@@ -13272,8 +13339,10 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     """The make chance, with a rim attempt's distance decided here: right at the rim or a floater (from the player's real splits), and the
     chance adjusted for the distance (a floater is harder), normalised so his overall finishing % is unchanged."""
     p = _shot_make_prob_base(shooter, defender, shot_type, team, opponent, period, period_time)
-    if shot_type != "rim" or shooter is None:
+    if shooter is None:
         return p
+    if shot_type != "rim":
+        return max(0.0, min(0.97, p * badge_shot_multiplier(shooter, shot_type)))
     prof = getattr(shooter, "shot_profile", None) or {}
     close, near = prof.get("r", 0.0), prof.get("s", 0.0)
     share = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
@@ -13284,6 +13353,33 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     p = p * (FLOATER_RELATIVE_MAKE if tok == "rim_float" else 1.0) / avg
     p *= acrobat_finish_multiplier(shooter, defender, tok)
     return max(0.0, min(0.97, p))
+
+
+DEADEYE_BONUS = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.10}         # contested jumpers
+MIDRANGE_MAESTRO_BONUS = {1: 0.02, 2: 0.035, 3: 0.05, 4: 0.07}   # every midrange jumper
+POST_MAESTRO_BONUS = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.10}     # post-ups, hooks and fadeaways
+BULLY_FOUL_BONUS = {1: 0.10, 2: 0.18, 3: 0.27, 4: 0.38}       # more shooting fouls drawn going inside
+ICE_VEINS_BONUS = {1: 0.02, 2: 0.035, 3: 0.05, 4: 0.07}       # free throws in the last five minutes of a close game
+INTERCEPTOR_BONUS = {1: 0.12, 2: 0.22, 3: 0.33, 4: 0.45}      # more passes picked off
+UNPLUCKABLE_CUT = {1: 0.10, 2: 0.18, 3: 0.26, 4: 0.35}        # fewer steals and picked-off passes against him
+
+
+def badge_shot_multiplier(shooter: Player, shot_type: str) -> float:
+    q = getattr(shooter, "shot_quality_mult", 1.0)
+    mult = 1.0
+    if shot_type in ("three", "mid", "post_fade") and q < 0.97:
+        mult *= 1.0 + DEADEYE_BONUS.get(badge_tier(shooter, "deadeye"), 0.0)
+    if shot_type in ("mid", "post_fade"):
+        mult *= 1.0 + MIDRANGE_MAESTRO_BONUS.get(badge_tier(shooter, "midrange_maestro"), 0.0)
+    if shot_type in ("post", "post_fade"):
+        mult *= 1.0 + POST_MAESTRO_BONUS.get(badge_tier(shooter, "post_maestro"), 0.0)
+    return mult
+
+
+def bully_foul_multiplier(shooter: Player, shot_type: str) -> float:
+    if shooter is None or shot_type not in ("rim", "dunk", "post"):
+        return 1.0
+    return 1.0 + BULLY_FOUL_BONUS.get(badge_tier(shooter, "bully"), 0.0)
 
 
 ACROBAT_TOUGH_BONUS = {1: 0.05, 2: 0.08, 3: 0.11, 4: 0.20}   # make-chance boost on a fully tough layup, by badge tier
@@ -15249,7 +15345,7 @@ def run_late_game_last_shot_possession(off: Team, dff: Team, period: int, period
     time.sleep(SLEEP * 0.8)
 
     foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE
-    foul_chance *= shooting_foul_type_multiplier(shot_type) * 0.82
+    foul_chance *= shooting_foul_type_multiplier(shot_type) * bully_foul_multiplier(shooter, shot_type) * 0.82
     if random.random() < foul_chance:
         fouler = choose_fouling_defender(dff, defender, shooter, shot_type, "last_shot")
         register_foul(dff, fouler)
@@ -15436,7 +15532,7 @@ def run_late_game_quick_possession(off: Team, dff: Team, period: int, period_tim
         print_shot_attempt_sequence(shooter, shot_type, "late_quick")
 
     foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE
-    foul_chance *= shooting_foul_type_multiplier(shot_type)
+    foul_chance *= shooting_foul_type_multiplier(shot_type) * bully_foul_multiplier(shooter, shot_type)
     if random.random() < foul_chance:
         fouler = choose_fouling_defender(dff, defender, shooter, shot_type, "late_quick")
         register_foul(dff, fouler)
@@ -21339,7 +21435,7 @@ def simulate_possession(off: Team, dff: Team,
     foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE * foul_trouble_foul_factor(defender)
     offensive_foul_plan = getattr(off, "game_plan", {}).get("foul_strategy", "normal")
     defensive_foul_plan = getattr(dff, "game_plan", {}).get("foul_strategy", "normal")
-    foul_chance *= shooting_foul_type_multiplier(shot_type)
+    foul_chance *= shooting_foul_type_multiplier(shot_type) * bully_foul_multiplier(shooter, shot_type)
     if offensive_foul_plan == "attack_foul_trouble" and defender.pf >= 3:
         foul_chance *= 1.18
         shooter.shot_quality_mult = getattr(shooter, "shot_quality_mult", 1.0) * 1.04
@@ -22384,7 +22480,7 @@ def simulate_1v1_game(player_a: Player, player_b: Player, target_score: int = 11
         # Street-ball "make it count" foul rule -- a real foul call, not
         # just flavor text. On a miss it's a do-over (shooter keeps the
         # ball instead of losing it); on a make it's a genuine and-one.
-        foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE * foul_trouble_foul_factor(defender) * shooting_foul_type_multiplier(shot_type)
+        foul_chance = foul_draw_sim(shooter) * usage_foul_weight(shooter) * FOUL_SCALE * foul_trouble_foul_factor(defender) * shooting_foul_type_multiplier(shot_type) * bully_foul_multiplier(shooter, shot_type)
         fouled = random.random() < foul_chance
 
         if not fouled and random.random() < block_prob(defender, shot_type, shooter):
