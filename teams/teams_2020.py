@@ -5,7 +5,7 @@ from sim_engine import *
 def make_lakers_2020() -> Team:
     players = [
         Player("LeBron James", 'PG',
-               0.30, 0.30, 0.80, 0.60, 0.35, 0.75,
+               0.30, 0.30, 0.80, 0.60, 0.35, 0.87,
                0.83, 0.88, 0.99, 0.92, 0.74,
                0.50, 0.99, 0.84,
                0.60, 0.57, 0.50, 0.80, 0.867, 0.733,
@@ -82,7 +82,7 @@ def make_lakers_2020() -> Team:
 def make_celtics_2020() -> Team:
     players = [
         Player("Kemba Walker", "PG",
-               0.46, 0.30, 0.20, 0.04, 0.05, 0.62,
+               0.46, 0.30, 0.20, 0.04, 0.05, 0.83,
                0.86, 0.88, 0.84, 0.60, 0.86,
                0.28, 0.78, 0.86,
                0.49, 0.50, 0.34, 0.54, 0.800, 0.667,
@@ -90,7 +90,7 @@ def make_celtics_2020() -> Team:
                clutchness=0.84, secondary_positions=("SG",), badges=("shot_creator",), height=72, speed=0.80, shot_iq=0.82, iso_tendency=0.36, stamina=0.72),
 
         Player("Jaylen Brown", "SG",
-               0.34, 0.30, 0.28, 0.08, 0.46, 0.60,
+               0.34, 0.30, 0.28, 0.08, 0.46, 0.69,
                0.84, 0.84, 0.90, 0.88, 0.74,
                0.24, 0.54, 0.70,
                0.43, 0.51, 0.43, 0.70, 0.800, 0.767,
@@ -122,7 +122,7 @@ def make_celtics_2020() -> Team:
                clutchness=0.68, secondary_positions=("PF",), badges=("connector",), height=80, speed=0.62, shot_iq=0.78, iso_tendency=0.04, stamina=0.71),
 
         Player("Marcus Smart", "SG",
-               0.42, 0.22, 0.26, 0.10, 0.16, 0.44,
+               0.42, 0.22, 0.26, 0.10, 0.16, 0.65,
                0.78, 0.76, 0.82, 0.72, 0.80,
                0.18, 0.74, 0.78,
                0.80, 0.51, 0.37, 0.46, 0.600, 0.867,

@@ -11,7 +11,7 @@ def make_rockets_1994() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player("Kenny Smith", "PG",
-               0.46, 0.30, 0.18, 0.06, 0.08, 0.34,
+               0.46, 0.30, 0.18, 0.06, 0.08, 0.49,
                0.86, 0.82, 0.78, 0.60, 0.82,
                0.16, 0.70, 0.74,
                0.62, 0.34, 0.30, 0.44, 0.467, 0.600,

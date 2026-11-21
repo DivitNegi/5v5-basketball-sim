@@ -91,7 +91,7 @@ def make_magic_2009() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player("Rafer Alston", "PG",
-               0.46, 0.26, 0.22, 0.06,   0.08, 0.39,
+               0.46, 0.26, 0.22, 0.06,   0.08, 0.55,
                0.80, 0.78, 0.78, 0.62, 0.75,
                0.18, 0.76, 0.82,
                0.78, 0.38, 0.32, 0.48, 0.467, 0.667,
@@ -141,7 +141,7 @@ def make_magic_2009() -> Team:
                height=82, speed=0.76, shot_iq=0.78, iso_tendency=0.10, stamina=0.8),
 
         Player("Jameer Nelson", "PG",
-               0.42, 0.30, 0.22, 0.06,   0.08, 0.48,
+               0.42, 0.30, 0.22, 0.06,   0.08, 0.59,
                0.88, 0.84, 0.80, 0.62, 0.84,
                0.20, 0.78, 0.82,
                0.68, 0.30, 0.31, 0.54, 0.533, 0.600,

@@ -22,7 +22,7 @@ def make_rockets_1995() -> Team:
                clutchness=0.80, height=78, speed=0.82, shot_iq=0.72,
                secondary_positions=('SF',), stamina=0.76),
         Player('Kenny Smith', 'PG',
-               0.30, 0.30, 0.25, 0.02, 0.05, 0.27,
+               0.30, 0.30, 0.25, 0.02, 0.05, 0.42,
                0.69, 0.78, 0.82, 0.68, 0.84,
                0.19, 0.65, 0.72,
                0.53, 0.43, 0.18, 0.42, 0.250, 0.250,

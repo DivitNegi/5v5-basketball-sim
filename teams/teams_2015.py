@@ -11,7 +11,7 @@ def make_clippers_2015() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player("Chris Paul", "PG",
-               0.34, 0.38, 0.20, 0.08, 0.04, 0.55,
+               0.34, 0.38, 0.20, 0.08, 0.04, 0.65,
                0.90, 0.98, 0.92, 0.66, 0.90,
                0.30, 0.99, 0.96,
                0.78, 0.45, 0.34, 0.58, 0.800, 0.733,

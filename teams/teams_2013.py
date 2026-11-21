@@ -164,7 +164,7 @@ def make_knicks_2013() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player("Raymond Felton", "PG",
-               0.38, 0.30, 0.24, 0.08, 0.10, 0.50,
+               0.38, 0.30, 0.24, 0.08, 0.10, 0.74,
                0.80, 0.80, 0.82, 0.62, 0.78,
                0.22, 0.72, 0.76,
                0.87, 0.29, 0.32, 0.43, 0.600, 0.667,
