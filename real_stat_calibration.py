@@ -33,12 +33,9 @@ OVERRIDES = {
         "Luka Dončić": {"target_fga_soft_cap": 25.0, "target_fga_per_game": 22.6, "target_fga_precision": 1.0, "keep_pace_shots": True},
     },
     "2027 Philadelphia 76ers": {
-        # Scoring order: Maxey (~26), Jaylen Brown (~20), Embiid (~18), LeBron (~17, pass-first), VJ Edgecombe (~9-10 shots).
-        "Tyrese Maxey": {"target_fga_soft_cap": 29.0, "target_fga_per_game": 27.0, "target_fga_precision": 0.7, "keep_pace_shots": True},
-        "Jaylen Brown": {"target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 0.9, "keep_pace_shots": True},
-        "Joel Embiid": {"target_fga_soft_cap": 14.0, "target_fga_per_game": 12.0, "target_fga_precision": 0.6},
-        "LeBron James": {"extra_pass_scale": 0.6, "target_fga_soft_cap": 24.0, "target_fga_per_game": 21.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
-        "VJ Edgecombe": {"target_fga_soft_cap": 16.0, "target_fga_per_game": 14.0, "target_fga_precision": 1.0, "keep_pace_shots": True},
+        # no shot targets: shot volume comes from each player's tendencies (tuned to Basketball-Reference 2026-27). LeBron keeps a
+        # pass tendency so his 0.99 playmaking does not make him swing away most of his own looks.
+        "LeBron James": {"extra_pass_scale": 0.6, "score_first_bias": 0.5},   # keeps more of the possessions he brings up
     },
 }
 

@@ -9065,6 +9065,14 @@ def rotation_star_players(team: Team) -> List[Player]:
 SEASON_STAR_MINUTES_CAP = None
 
 
+# what the 2027 76ers' minute pacing is asked for, tuned so their games land on the intended minutes above
+PHI_2027_STEER = {
+    "Tyrese Maxey": 33.8, "Jaylen Brown": 30.8, "VJ Edgecombe": 34.2, "LeBron James": 28.6, "Joel Embiid": 28.2,
+    "Dean Wade": 22.8, "Kentavious Caldwell-Pope": 15.6, "Anfernee Simons": 18.9, "Adem Bona": 11.7, "Labaron Philon Jr.": 4.9,
+    "Justin Edwards": 2.4, "Ariel Hukporti": 0.1,
+}
+
+
 # (starter, backup, quarters the backup opens): the backup big takes the
 # starter's spot at those quarter tip-offs so he gets real minutes instead of
 # only the stints the starter sits.
@@ -9584,18 +9592,17 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2027 Philadelphia 76ers":
-        target_ranges = {
-            "Labaron Philon Jr.": (8, 14),
-            "Tyrese Maxey": (36, 40), "VJ Edgecombe": (28, 34),
-            "Jaylen Brown": (36, 40), "LeBron James": (34, 38),
-            "Joel Embiid": (36, 40), "Anfernee Simons": (27, 32),
-            "Dean Wade": (10, 16), "Ariel Hukporti": (10, 16),
-            "Kentavious Caldwell-Pope": (20, 26), "Justin Edwards": (14, 20),
-            "Adem Bona": (8, 14),
+        # Basketball-Reference 2026-27: the five regulars play their real minutes per game; the bench shares what is left in
+        # proportion to its real minutes (their real per-game minutes add up to more than 240 because players missed different games).
+        intended = {
+            "Tyrese Maxey": 36.1, "Jaylen Brown": 34.6, "VJ Edgecombe": 34.1, "LeBron James": 32.5, "Joel Embiid": 31.9,
+            "Dean Wade": 19.4, "Kentavious Caldwell-Pope": 16.9, "Anfernee Simons": 16.5, "Adem Bona": 10.4,
+            "Labaron Philon Jr.": 4.6, "Justin Edwards": 2.9, "Ariel Hukporti": 0.1,
         }
+        steer = dict(PHI_2027_STEER)
         for p in team.roster:
-            low, high = target_ranges.get(p.name, (6, 14))
-            p.target_minutes = random.randint(low, high)
+            p.target_minutes = intended.get(p.name, 2.0)
+            p.gui_target_minutes_override = steer.get(p.name, intended.get(p.name, 2.0))
         return
 
     if team.name == "2027 Toronto Raptors":
