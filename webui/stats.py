@@ -305,6 +305,61 @@ def _positions(runner, team_name):
 POSITION_GROUPS = {"PG": "guards", "SG": "guards", "G": "guards", "SF": "forwards", "PF": "forwards", "F": "forwards", "C": "centers"}
 
 
+DEF_ZONES = [("Rim", ("rim", "dunk")), ("Post", ("post", "post_fade")), ("Midrange", ("mid",)), ("Three", ("three",))]
+
+
+def _def_zone(diet, keys):
+    return sum(int(diet.get(k + "_made", 0) or 0) for k in keys), sum(int(diet.get(k, 0) or 0) for k in keys)
+
+
+def _def_points(diet):
+    made3 = int(diet.get("three_made", 0) or 0)
+    made2 = sum(int(diet.get(k + "_made", 0) or 0) for k in ("rim", "dunk", "post", "post_fade", "mid"))
+    return 2 * made2 + 3 * made3
+
+
+def _defense_block(mine, pool, games):
+    """Shots he defended (the man he guarded, or the help defender who contested): FG% allowed by zone against the league,
+    forced turnovers, and the players he guarded most."""
+    dd = mine.get("defended_diet") or {}
+    zones, tot_m, tot_a = [], 0, 0
+    for label, keys in DEF_ZONES:
+        m, a = _def_zone(dd, keys)
+        lm = la = 0
+        for _, _, s in pool:
+            x, y = _def_zone(s.get("defended_diet") or {}, keys)
+            lm += x; la += y
+        tot_m += m; tot_a += a
+        zones.append({"zone": label, "made": m, "att": a, "pct": round(100 * m / a, 1) if a else None,
+                      "league": round(100 * lm / la, 1) if la else None, "per_game": round(a / games, 1)})
+    lm = la = 0
+    for _, _, s in pool:
+        d2 = s.get("defended_diet") or {}
+        for _, keys in DEF_ZONES:
+            x, y = _def_zone(d2, keys); lm += x; la += y
+    # where his overall FG% allowed ranks among regular defenders (lower is better; 1 = best)
+    rates = []
+    for _, _, s in pool:
+        d2 = s.get("defended_diet") or {}
+        mm = sum(_def_zone(d2, k)[0] for _, k in DEF_ZONES); aa = sum(_def_zone(d2, k)[1] for _, k in DEF_ZONES)
+        if aa >= 3 * max(1, s.get("games", 1)):
+            rates.append(mm / aa)
+    mine_rate = tot_m / tot_a if tot_a else None
+    rank = (1 + sum(1 for r in rates if r < mine_rate - 1e-9)) if mine_rate is not None and tot_a >= 3 * games else None
+    matchups = []
+    for opp, d in (mine.get("defended_matchup_diet") or {}).items():
+        m = sum(_def_zone(d, k)[0] for _, k in DEF_ZONES); a = sum(_def_zone(d, k)[1] for _, k in DEF_ZONES)
+        if a:
+            matchups.append({"name": opp, "made": m, "att": a, "pct": round(100 * m / a, 1), "pts": _def_points(d),
+                             "tov": int(d.get("turnover", 0) or 0)})
+    matchups.sort(key=lambda r: -r["att"])
+    return {"made": tot_m, "att": tot_a, "pct": round(100 * mine_rate, 1) if mine_rate is not None else None,
+            "league": round(100 * lm / la, 1) if la else None, "per_game": round(tot_a / games, 1),
+            "pts_allowed": round(_def_points(dd) / games, 1), "forced_tov": int(dd.get("turnover", 0) or 0),
+            "forced_tov_pg": round((dd.get("turnover", 0) or 0) / games, 1), "rank": rank, "of": len(rates),
+            "zones": zones, "matchups": matchups[:10]}
+
+
 def player_detail(runner, source, team, name, group="all"):
     sec = runner.sections or {}
     data = datasets(sec)
@@ -451,7 +506,8 @@ def player_detail(runner, source, team, name, group="all"):
     per_game = {k: round(st[k] / g / (60 if k == "minutes" else 1), 1) for k in keys}
     diet = st.get("shot_diet") or {}
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
-    return {"name": name, "team": team, "source": source, "sources": main, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
+    defense = _defense_block(mine, pool, g)
+    return {"defense": defense, "name": name, "team": team, "source": source, "sources": main, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
             "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")},
             "three_split": {"corner": zone("corner3"), "above_break": zone("atb3"), "deep": zone("deep3"), "wing": zone("wing3"), "top": zone("top3"), "heave": zone("heave3"), "heatcheck": zone("heatcheck3"), "logo": zone("logo3"),
                             "corner_L": zone("corner3_L"), "corner_R": zone("corner3_R"), "wing_L": zone("wing3_L"), "wing_R": zone("wing3_R")},

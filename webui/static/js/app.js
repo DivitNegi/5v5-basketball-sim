@@ -2644,6 +2644,37 @@ async function openRatingsEditor(team, name) {
     h("div", { class: "re-actions" }, backBtn, resetBtn, originalBtn, h("div", { style: { flex: "1" } }), status, saveBtn));
   refreshCount();
 }
+// the player pop-up's defense panel: the shots he defended (his man, or the help he gave), FG% allowed by zone against the league,
+// forced turnovers, and the players he guarded most
+function defenseBox(d) {
+  const df = d.defense;
+  if (!df || !df.att) return null;
+  const tile = (k, v, sub) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v), sub ? h("div", { class: "muted", style: { fontSize: "11px", marginTop: "2px" } }, sub) : null);
+  const vsLg = (p, lg) => (p == null || lg == null ? "" : `${p <= lg ? "" : "+"}${(p - lg).toFixed(1)} vs league ${lg}%`);
+  const cls = (p, lg) => (p == null || lg == null ? "" : p <= lg - 1 ? "pm-pos" : p >= lg + 1 ? "pm-neg" : "");
+  const pg = d.per_game || {};
+  return h("div", { class: "pc-panel", style: { marginTop: "12px" } },
+    h("h4", {}, "Defense"),
+    h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 8px" } }, "Shots he defended: the man he guarded, or as the help defender who contested. Lower FG% allowed is better."),
+    h("div", { class: "stat-tiles" },
+      tile("DEFENDED", `${df.made}/${df.att}`, `${df.per_game} shots a game`),
+      tile("FG% ALLOWED", df.pct != null ? `${df.pct}%` : "–", vsLg(df.pct, df.league)),
+      tile("RANK", df.rank ? `${df.rank} of ${df.of}` : "–", "FG% allowed, 1 = best"),
+      tile("PTS ALLOWED", df.pts_allowed, "a game, on shots he defended"),
+      tile("FORCED TO", df.forced_tov, `${df.forced_tov_pg} a game`),
+      tile("STL", Number(pg.stl || 0).toFixed(1), "a game"), tile("BLK", Number(pg.blk || 0).toFixed(1), "a game")),
+    h("div", { class: "table-wrap", style: { marginTop: "10px" } }, h("table", { class: "stats" },
+      h("thead", {}, h("tr", {}, ["Zone", "Defended", "A game", "FG% allowed", "League"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+      h("tbody", {}, df.zones.filter((z) => z.att).map((z) => h("tr", {},
+        h("td", { class: "l" }, z.zone), h("td", {}, `${z.made}/${z.att}`), h("td", {}, z.per_game),
+        h("td", { class: cls(z.pct, z.league) }, z.pct != null ? `${z.pct}%` : "–"), h("td", { class: "muted" }, z.league != null ? `${z.league}%` : "–")))))),
+    df.matchups.length ? h("div", { style: { marginTop: "10px" } }, h("div", { class: "muted", style: { fontSize: "12px", margin: "0 0 4px" } }, "Players he guarded most"),
+      h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+        h("thead", {}, h("tr", {}, ["Player", "Shots", "FG%", "Points", "Forced TO"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+        h("tbody", {}, df.matchups.map((m) => h("tr", {},
+          h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(m.name), m.name)), h("td", {}, `${m.made}/${m.att}`),
+          h("td", { class: cls(m.pct, df.league) }, `${m.pct}%`), h("td", {}, m.pts), h("td", {}, m.tov))))))) : null);
+}
 async function openStatsPlayer(team, name, source, startTab = "stats") {
   window.__ppAt = performance.now();
   document.querySelector(".pp-back")?.remove();
@@ -2677,7 +2708,7 @@ async function openStatsPlayer(team, name, source, startTab = "stats") {
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
   const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
   paint();
-  const statsView = h("div", {}, tiles,
+  const statsView = h("div", {}, tiles, defenseBox(d),
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
   const gamesView = h("div", { class: "pp-games" }), highsView = h("div", { class: "pp-games" }), playsView = ppPlayTypes(d);
   const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["plays", "Play types"], ["highs", "Highs"], ["games", "Game log"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
