@@ -3444,6 +3444,31 @@ ROOKIE_SHOT_IQ_FLOOR = 0.66
 ROOKIE_SHOT_IQ_CEILING = 0.85
 
 
+# shot_tendency in the team files is a shot-volume number (22+ real shots a game ~ 0.85-0.99, 10 ~ 0.38, 5 ~ 0.18). The engine was tuned
+# on an older, flatter scale; this curve (the median old value at each volume, fitted over every player) turns the file number into
+# the engine's value, so the league as a whole plays the same.
+SHOT_VOLUME_CURVE = [(0.0, 0.0), (0.05, 0.17), (0.15, 0.175), (0.25, 0.195), (0.35, 0.24), (0.45, 0.305), (0.55, 0.37), (0.65, 0.46),
+                     (0.75, 0.565), (0.85, 0.60), (0.95, 0.70), (1.0, 0.74)]
+
+
+def shot_volume_to_engine(v: float) -> float:
+    pts = SHOT_VOLUME_CURVE
+    v = max(0.0, min(1.0, float(v)))
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if v <= x1:
+            return y0 + (y1 - y0) * (v - x0) / (x1 - x0)
+    return pts[-1][1]
+
+
+def engine_to_shot_volume(e: float) -> float:
+    pts = SHOT_VOLUME_CURVE
+    e = max(0.0, min(pts[-1][1], float(e)))
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if e <= y1:
+            return x0 + (x1 - x0) * (e - y0) / (y1 - y0)
+    return 1.0
+
+
 @dataclass(eq=True, unsafe_hash=True)
 class Player:
     name: str
@@ -3530,10 +3555,12 @@ class Player:
     defended_matchup_diet: Dict[str, Dict[str, int]] = field(default_factory=dict, compare=False, hash=False)
 
     def __post_init__(self):
-        self.shot_tendency_display = self.shot_tendency   # the file's volume-scale number
-        if self.shot_scale and self.shot_scale != 1.0:
-            self.shot_tendency = round(self.shot_tendency * self.shot_scale, 6)   # rounded so the product is exactly the old number
-            self.shot_scale = 1.0   # applied: a copy built from this player's fields must not scale it again
+        self.shot_tendency_display = self.shot_tendency   # the file's number: shot volume (22+ real shots a game ~ 0.85-0.99)
+        if self.shot_scale and self.shot_scale != 1.0:   # an explicit per-player factor (none of the team files use one now)
+            self.shot_tendency = round(self.shot_tendency * self.shot_scale, 6)
+        else:
+            self.shot_tendency = round(shot_volume_to_engine(self.shot_tendency), 6)
+        self.shot_scale = 1.0   # applied: a copy built from this player's fields must not convert it again
         valid_positions = {"PG", "SG", "SF", "PF", "C"}
         secondary = self.secondary_positions
         if isinstance(secondary, str):

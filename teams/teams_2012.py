@@ -10,7 +10,7 @@ def make_thunder_2012() -> Team:
                0.34, 0.82, 0.92,
                0.69, 0.40, 0.51, 0.70, 0.990, 0.867,
                0.77, 0.45,
-               clutchness=0.86, stamina=0.93, shot_scale=0.67866667),
+               clutchness=0.86, stamina=0.93),
 
 
         Player("Kevin Durant", "SF",
@@ -19,21 +19,21 @@ def make_thunder_2012() -> Team:
                0.26, 0.50, 0.90,
                0.80, 0.85, 0.33, 0.80, 0.700, 0.733,
                0.77, 0.70,
-               clutchness=0.93, shot_iq = 0.99, stamina=0.85, shot_scale=0.69480519),
+               clutchness=0.93, shot_iq = 0.99, stamina=0.85),
 
         Player("Serge Ibaka", "PF",
                0.22, 0.38, 0.18, 0.22,   0.40, 0.28,
                0.74, 0.84, 0.86, 0.86, 0.76,
                0.15, 0.32, 0.34,
                0.68, 0.78, 0.81, 0.96, 0.600, 0.800,
-               0.69, 0.90, stamina=0.86, shot_scale=0.95357143),
+               0.69, 0.90, stamina=0.86),
 
         Player("Kendrick Perkins", "C",
                0.00, 0.06, 0.34, 0.60,   0.35, 0.14,
                0.05, 0.58, 0.76, 0.72, 0.55,
                0.08, 0.22, 0.22,
                0.57, 0.84, 0.74, 0.79, 0.400, 0.990,
-               0.37, 0.84, stamina=0.68, shot_scale=1.34285714),
+               0.37, 0.84, stamina=0.68),
 
         Player("James Harden", "SG",
                0.44, 0.28, 0.22, 0.06,   0.28, 0.38,
@@ -41,14 +41,14 @@ def make_thunder_2012() -> Team:
                0.30, 0.82, 0.82,
                0.39, 0.44, 0.27, 0.53, 0.990, 0.733,
                0.63, 0.55,
-               clutchness=0.40, stamina=0.88, shot_scale=1.05263158),
+               clutchness=0.40, stamina=0.88),
 
         Player("Thabo Sefolosha", "SG",
                0.38, 0.20, 0.24, 0.18,   0.25, 0.13,
                0.74, 0.72, 0.78, 0.72, 0.70,
                0.08, 0.38, 0.42,
                0.90, 0.31, 0.33, 0.45, 0.333, 0.667,
-               0.95, 0.40, stamina=0.82, shot_scale=1.31538462),
+               0.95, 0.40, stamina=0.82),
 
         Player("Derek Fisher", "PG",
                0.50, 0.28, 0.14, 0.08,   0.05, 0.20,
@@ -56,28 +56,28 @@ def make_thunder_2012() -> Team:
                0.10, 0.55, 0.55,
                0.58, 0.30, 0.40, 0.55, 0.400, 0.600,
                0.68, 0.47,
-               clutchness=0.78, stamina=0.62, shot_scale=1.01),
+               clutchness=0.78, stamina=0.62),
 
         Player("Nick Collison", "PF",
                0.10, 0.28, 0.28, 0.34,   0.20, 0.11,
                0.30, 0.74, 0.80, 0.70, 0.70,
                0.08, 0.45, 0.40,
                0.58, 0.56, 0.82, 0.66, 0.467, 0.990,
-               0.30, 0.75, stamina=0.72, shot_scale=1.52727273),
+               0.30, 0.75, stamina=0.72),
 
         Player("Daequan Cook", "SG",
                0.62, 0.18, 0.12, 0.08,   0.05, 0.19,
                0.84, 0.76, 0.72, 0.55, 0.78,
                0.10, 0.30, 0.32,
                0.50, 0.25, 0.30, 0.30, 0.333, 0.533,
-               0.55, 0.30, stamina=0.7, shot_scale=1.11052632),
+               0.55, 0.30, stamina=0.7),
 
         Player("Nazr Mohammed", "C",
                0.00, 0.10, 0.34, 0.56,   0.25, 0.09,
                0.05, 0.62, 0.78, 0.72, 0.65,
                0.08, 0.22, 0.22,
                0.64, 0.83, 0.84, 0.99, 0.400, 0.933,
-               0.65, 0.76, stamina=0.58, shot_scale=2.05555556),
+               0.65, 0.76, stamina=0.58),
     ]
     t = Team("2012 Oklahoma City Thunder", players)
     t.init_lineup()
@@ -98,7 +98,7 @@ def make_celtics_2012() -> Team:
                0.35, 0.99, 0.92,
                0.95, 0.37, 0.46, 0.54, 0.800, 0.733,
                0.92, 0.36,
-               clutchness=0.78, badges=("transition_engine",), stamina=0.83, shot_scale=0.12195122),
+               clutchness=0.78, badges=("transition_engine",), stamina=0.83),
 
         Player("Ray Allen", "SG",
                0.62, 0.24, 0.10, 0.04, 0.04, 0.41,
@@ -106,7 +106,7 @@ def make_celtics_2012() -> Team:
                0.18, 0.48, 0.54,
                0.60, 0.37, 0.49, 0.58, 0.533, 0.600,
                0.84, 0.45,
-               clutchness=0.88, badges=("movement_shooter", "catch_shoot"), stamina=0.62, shot_scale=0.5),
+               clutchness=0.88, badges=("movement_shooter", "catch_shoot"), stamina=0.62),
 
         Player("Paul Pierce", "SF",
                0.36, 0.38, 0.18, 0.08, 0.18, 0.56,
@@ -114,7 +114,7 @@ def make_celtics_2012() -> Team:
                0.28, 0.62, 0.70,
                0.64, 0.50, 0.49, 0.69, 0.933, 0.733,
                0.87, 0.69,
-               clutchness=0.88, badges=("clutch_silver", "closer_silver", "iso_scorer"), stamina=0.76, shot_scale=0.5),
+               clutchness=0.88, badges=("clutch_silver", "closer_silver", "iso_scorer"), stamina=0.76),
 
         Player("Kevin Garnett", "PF",
                0.04, 0.48, 0.18, 0.30, 0.28, 0.50,
@@ -122,14 +122,14 @@ def make_celtics_2012() -> Team:
                0.24, 0.60, 0.56,
                0.65, 0.80, 0.93, 0.94, 0.733, 0.800,
                0.61, 0.97,
-               clutchness=0.82, badges=("defensive_anchor", "post_hub"), stamina=0.68, shot_scale=0.5),
+               clutchness=0.82, badges=("defensive_anchor", "post_hub"), stamina=0.68),
 
         Player("Brandon Bass", "PF",
                0.04, 0.46, 0.22, 0.28, 0.26, 0.41,
                0.20, 0.82, 0.82, 0.76, 0.78,
                0.18, 0.32, 0.36,
                0.67, 0.77, 0.79, 0.93, 0.600, 0.800,
-               0.68, 0.97, stamina=0.74, shot_scale=0.45121951),
+               0.68, 0.97, stamina=0.74),
 
         Player("Avery Bradley", "SG",
                0.38, 0.30, 0.24, 0.08, 0.18, 0.23,
@@ -137,35 +137,35 @@ def make_celtics_2012() -> Team:
                0.14, 0.38, 0.58,
                0.90, 0.29, 0.32, 0.43, 0.400, 0.667,
                0.95, 0.38,
-               badges=("lockdown",), stamina=0.85, shot_scale=0.7173913),
+               badges=("lockdown",), stamina=0.85),
 
         Player("Mickael Pietrus", "SF",
                0.58, 0.20, 0.16, 0.06, 0.18, 0.24,
                0.82, 0.74, 0.78, 0.72, 0.66,
                0.12, 0.32, 0.42,
                0.70, 0.55, 0.57, 0.63, 0.400, 0.667,
-               0.75, 0.58, stamina=0.77, shot_scale=0.625),
+               0.75, 0.58, stamina=0.77),
 
         Player("Keyon Dooling", "PG",
                0.48, 0.26, 0.20, 0.06, 0.08, 0.12,
                0.80, 0.76, 0.76, 0.58, 0.78,
                0.10, 0.58, 0.64,
                0.47, 0.30, 0.38, 0.45, 0.400, 0.600,
-               0.60, 0.45, stamina=0.7, shot_scale=1.08333333),
+               0.60, 0.45, stamina=0.7),
 
         Player("Greg Stiemsma", "C",
                0.00, 0.12, 0.30, 0.58, 0.38, 0.07,
                0.05, 0.62, 0.78, 0.76, 0.66,
                0.08, 0.22, 0.22,
                0.64, 0.84, 0.85, 0.99, 0.400, 0.933,
-               0.65, 0.78, stamina=0.72, shot_scale=1.42857143),
+               0.65, 0.78, stamina=0.72),
 
         Player("Ryan Hollins", "C",
                0.00, 0.08, 0.34, 0.58, 0.56, 0.06,
                0.05, 0.58, 0.80, 0.82, 0.60,
                0.08, 0.18, 0.20,
                0.55, 0.80, 0.84, 0.70, 0.400, 0.990,
-               0.42, 0.83, stamina=0.75, shot_scale=1.58333333),
+               0.42, 0.83, stamina=0.75),
     ]
     t = Team("2012 Boston Celtics", players)
     t.init_lineup()

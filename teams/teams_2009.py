@@ -10,7 +10,7 @@ def make_cavs_2009() -> Team:
                0.18, 0.72, 0.76,
                0.51, 0.43, 0.46, 0.44, 0.600, 0.667,
                0.71, 0.32,
-               clutchness=0.78, stamina=0.75, shot_scale=0.54814815),
+               clutchness=0.78, stamina=0.75),
 
         Player("Delonte West", "SG",
                0.34, 0.32, 0.24, 0.10,   0.12, 0.37,
@@ -18,7 +18,7 @@ def make_cavs_2009() -> Team:
                0.18, 0.62, 0.66,
                0.89, 0.30, 0.32, 0.44, 0.600, 0.733,
                0.94, 0.39,
-               clutchness=0.72, stamina=0.78, shot_scale=0.8),
+               clutchness=0.72, stamina=0.78),
 
         Player("LeBron James", "SF",
                0.23, 0.18, 0.70, 0.10,   0.70, 0.77,
@@ -26,56 +26,56 @@ def make_cavs_2009() -> Team:
                0.38, 0.90, 0.90,
                0.85, 0.85, 0.50, 0.80, 0.92, 0.800,
                0.95, 0.80,
-               clutchness=0.94, stamina=0.92, shot_scale=0.96753247),
+               clutchness=0.94, stamina=0.92),
 
         Player("Anderson Varejao", "PF",
                0.02, 0.18, 0.36, 0.44,   0.35, 0.23,
                0.08, 0.68, 0.84, 0.78, 0.66,
                0.12, 0.42, 0.38,
                0.67, 0.61, 0.76, 0.80, 0.733, 0.990,
-               0.41, 0.73, stamina=0.88, shot_scale=1.3),
+               0.41, 0.73, stamina=0.88),
 
         Player("Zydrunas Ilgauskas", "C",
                0.10, 0.38, 0.18, 0.34,   0.12, 0.42,
                0.46, 0.82, 0.80, 0.62, 0.80,
                0.18, 0.35, 0.32,
                0.59, 0.75, 0.84, 0.76, 0.667, 0.867,
-               0.25, 0.83, stamina=0.66, shot_scale=0.71190476),
+               0.25, 0.83, stamina=0.66),
 
         Player("Daniel Gibson", "PG",
                0.62, 0.22, 0.10, 0.06,   0.05, 0.26,
                0.86, 0.78, 0.74, 0.55, 0.82,
                0.18, 0.48, 0.52,
                0.59, 0.40, 0.41, 0.44, 0.400, 0.600,
-               0.78, 0.54, stamina=0.74, shot_scale=1.09615385),
+               0.78, 0.54, stamina=0.74),
 
         Player("Wally Szczerbiak", "SF",
                0.48, 0.32, 0.12, 0.08,   0.04, 0.20,
                0.84, 0.82, 0.74, 0.50, 0.86,
                0.17, 0.40, 0.42,
                0.58, 0.27, 0.48, 0.52, 0.400, 0.600,
-               0.63, 0.35, stamina=0.68, shot_scale=4.95),
+               0.63, 0.35, stamina=0.68),
 
         Player("Ben Wallace", "C",
                0.00, 0.05, 0.36, 0.59,   0.45, 0.09,
                0.05, 0.48, 0.78, 0.78, 0.42,
                0.08, 0.30, 0.25,
                0.65, 0.85, 0.85, 0.99, 0.467, 0.990,
-               0.65, 0.85, stamina=0.8, shot_scale=2.08888889),
+               0.65, 0.85, stamina=0.8),
 
         Player("Joe Smith", "PF",
                0.16, 0.40, 0.20, 0.24,   0.18, 0.20,
                0.68, 0.78, 0.78, 0.66, 0.78,
                0.18, 0.35, 0.35,
                0.66, 0.77, 0.79, 0.93, 0.467, 0.800,
-               0.67, 0.97, stamina=0.65, shot_scale=1.275),
+               0.67, 0.97, stamina=0.65),
 
         Player("Sasha Pavlovic", "SG",
                0.42, 0.28, 0.20, 0.10,   0.15, 0.15,
                0.78, 0.76, 0.78, 0.66, 0.74,
                0.10, 0.35, 0.42,
                0.42, 0.37, 0.42, 0.52, 0.400, 0.667,
-               0.66, 0.45, stamina=0.72, shot_scale=1.30666667),
+               0.66, 0.45, stamina=0.72),
     ]
     t = Team("2009 Cleveland Cavaliers", players)
     t.init_lineup()
@@ -98,7 +98,7 @@ def make_magic_2009() -> Team:
                0.76, 0.42,
                clutchness=0.74, secondary_positions=("SG",),
                badges=("floor_general_bronze",), height=74, speed=0.78,
-               shot_iq=0.72, iso_tendency=0.12, stamina=0.72, shot_scale=0.66666667),
+               shot_iq=0.72, iso_tendency=0.12, stamina=0.72),
 
         Player("Courtney Lee", "SG",
                0.42, 0.24, 0.24, 0.10,   0.20, 0.26,
@@ -108,7 +108,7 @@ def make_magic_2009() -> Team:
                0.82, 0.50,
                clutchness=0.72, secondary_positions=("SF",),
                badges=("catch_and_shoot_bronze", "pest"), height=77, speed=0.76,
-               shot_iq=0.76, iso_tendency=0.06, stamina=0.8, shot_scale=0.80769231),
+               shot_iq=0.76, iso_tendency=0.06, stamina=0.8),
 
         Player("Hedo Turkoglu", "SF",
                0.36, 0.32, 0.18, 0.14,   0.12, 0.51,
@@ -118,7 +118,7 @@ def make_magic_2009() -> Team:
                0.60, 0.58,
                clutchness=0.86, secondary_positions=("PF", "SG"),
                badges=("shot_creator_silver", "catch_and_shoot_gold", "connector"),
-               height=82, speed=0.62, shot_iq=0.84, iso_tendency=0.24, stamina=0.82, shot_scale=0.76470588),
+               height=82, speed=0.62, shot_iq=0.84, iso_tendency=0.24, stamina=0.82),
 
         Player("Rashard Lewis", "PF",
                0.52, 0.26, 0.10, 0.12,   0.12, 0.53,
@@ -128,7 +128,7 @@ def make_magic_2009() -> Team:
                0.58, 0.62,
                clutchness=0.88, secondary_positions=("SF",),
                badges=("catch_and_shoot_gold", "movement_shooter", "clutch_silver"),
-               height=82, speed=0.64, shot_iq=0.84, iso_tendency=0.16, stamina=0.7, shot_scale=0.77358491),
+               height=82, speed=0.64, shot_iq=0.84, iso_tendency=0.16, stamina=0.7),
 
         Player("Dwight Howard", "C",
                0.00, 0.05, 0.34, 0.61,   0.88, 0.48,
@@ -138,7 +138,7 @@ def make_magic_2009() -> Team:
                0.46, 0.98,
                clutchness=0.78, secondary_positions=("PF",),
                badges=("rim_protector_hof", "posterizer_hof", "lob_threat", "rebounder_hof"),
-               height=82, speed=0.76, shot_iq=0.78, iso_tendency=0.10, stamina=0.8, shot_scale=0.89583333),
+               height=82, speed=0.76, shot_iq=0.78, iso_tendency=0.10, stamina=0.8),
 
         Player("Jameer Nelson", "PG",
                0.42, 0.30, 0.22, 0.06,   0.08, 0.48,
@@ -148,7 +148,7 @@ def make_magic_2009() -> Team:
                0.66, 0.38,
                clutchness=0.82, secondary_positions=("SG",),
                badges=("floor_general_silver", "catch_and_shoot_silver", "clutch_bronze"),
-               height=72, speed=0.78, shot_iq=0.82, iso_tendency=0.16, stamina=0.75, shot_scale=0.625),
+               height=72, speed=0.78, shot_iq=0.82, iso_tendency=0.16, stamina=0.75),
 
         Player("Mickael Pietrus", "SF",
                0.54, 0.18, 0.18, 0.10,   0.28, 0.30,
@@ -158,7 +158,7 @@ def make_magic_2009() -> Team:
                0.82, 0.58,
                clutchness=0.78, secondary_positions=("SG",),
                badges=("catch_and_shoot_silver", "lockdown_bronze"),
-               height=78, speed=0.74, shot_iq=0.74, iso_tendency=0.06, stamina=0.83, shot_scale=0.76666667),
+               height=78, speed=0.74, shot_iq=0.74, iso_tendency=0.06, stamina=0.83),
 
         Player("JJ Redick", "SG",
                0.66, 0.22, 0.08, 0.04,   0.02, 0.17,
@@ -168,7 +168,7 @@ def make_magic_2009() -> Team:
                0.55, 0.36,
                clutchness=0.76, secondary_positions=("PG",),
                badges=("catch_and_shoot_gold", "movement_shooter"),
-               height=75, speed=0.66, shot_iq=0.84, iso_tendency=0.04, stamina=0.73, shot_scale=0.94117647),
+               height=75, speed=0.66, shot_iq=0.84, iso_tendency=0.04, stamina=0.73),
 
         Player("Marcin Gortat", "C",
                0.00, 0.08, 0.38, 0.54,   0.55, 0.10,
@@ -178,7 +178,7 @@ def make_magic_2009() -> Team:
                0.42, 0.82,
                clutchness=0.62, secondary_positions=("PF",),
                badges=("lob_threat", "rebounder_silver", "rim_protector_silver"),
-               height=83, speed=0.62, shot_iq=0.72, iso_tendency=0.02, stamina=0.68, shot_scale=1.4),
+               height=83, speed=0.62, shot_iq=0.72, iso_tendency=0.02, stamina=0.68),
 
         Player("Tony Battie", "PF",
                0.08, 0.36, 0.22, 0.34,   0.20, 0.15,
@@ -188,7 +188,7 @@ def make_magic_2009() -> Team:
                0.46, 0.74,
                clutchness=0.58, secondary_positions=("C",),
                badges=("rebounder_bronze",), height=83, speed=0.54,
-               shot_iq=0.70, iso_tendency=0.02, stamina=0.62, shot_scale=0.8),
+               shot_iq=0.70, iso_tendency=0.02, stamina=0.62),
     ]
     t = Team("2009 Orlando Magic", players)
     t.init_lineup()

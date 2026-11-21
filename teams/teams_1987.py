@@ -10,7 +10,7 @@ def make_lakers_1987() -> Team:
                0.40, 0.99, 0.92,
                0.89, 0.31, 0.40, 0.80, 0.750, 0.733,
                0.89, 0.75,
-               clutchness=0.94, stamina=0.92, shot_scale=1.484375),
+               clutchness=0.94, stamina=0.92),
 
         Player("Byron Scott", "SG",
                0.05, 0.48, 0.20, 0.08, 0.24, 0.53,
@@ -18,7 +18,7 @@ def make_lakers_1987() -> Team:
                0.22, 0.54, 0.64,
                0.69, 0.35, 0.38, 0.47, 0.600, 0.667,
                0.74, 0.49,
-               clutchness=0.80, stamina=0.78, shot_scale=1.66981132),
+               clutchness=0.80, stamina=0.78),
 
         Player("James Worthy", "SF",
                0.08, 0.36, 0.34, 0.22, 0.55, 0.57,
@@ -26,14 +26,14 @@ def make_lakers_1987() -> Team:
                0.26, 0.52, 0.68,
                0.78, 0.57, 0.55, 0.71, 0.867, 0.733,
                0.83, 0.72,
-               clutchness=0.88, stamina=0.85, shot_scale=1.57894737),
+               clutchness=0.88, stamina=0.85),
 
         Player("A.C. Green", "PF",
                0.02, 0.24, 0.30, 0.44, 0.45, 0.28,
                0.12, 0.76, 0.88, 0.84, 0.74,
                0.14, 0.34, 0.38,
                0.61, 0.60, 0.86, 0.84, 0.667, 0.800,
-               0.50, 0.85, stamina=0.83, shot_scale=2.10714286),
+               0.50, 0.85, stamina=0.83),
 
         Player("Kareem Abdul-Jabbar", "C",
                0.02, 0.34, 0.20, 0.34, 0.30, 0.49,
@@ -41,7 +41,7 @@ def make_lakers_1987() -> Team:
                0.18, 0.48, 0.42,
                0.56, 0.95, 0.95, 0.96, 0.800, 0.733,
                0.37, 0.96,
-               clutchness=0.88, stamina=0.8, shot_scale=1.02040816),
+               clutchness=0.88, stamina=0.8),
 
         Player("Michael Cooper", "SG",
                0.18, 0.34, 0.24, 0.12, 0.25, 0.34,
@@ -49,35 +49,35 @@ def make_lakers_1987() -> Team:
                0.14, 0.62, 0.64,
                0.91, 0.31, 0.33, 0.49, 0.467, 0.667,
                0.96, 0.40,
-               clutchness=0.78, stamina=0.86, shot_scale=2.0),
+               clutchness=0.78, stamina=0.86),
 
         Player("Mychal Thompson", "PF",
                0.04, 0.30, 0.24, 0.42, 0.35, 0.31,
                0.16, 0.82, 0.88, 0.82, 0.72,
                0.16, 0.42, 0.42,
                0.58, 0.61, 0.52, 0.63, 0.667, 0.867,
-               0.45, 0.79, stamina=0.7, shot_scale=1.96774194),
+               0.45, 0.79, stamina=0.7),
 
         Player("Kurt Rambis", "PF",
                0.00, 0.18, 0.28, 0.54, 0.32, 0.14,
                0.05, 0.68, 0.82, 0.76, 0.66,
                0.08, 0.30, 0.30,
                0.71, 0.55, 0.83, 0.81, 0.467, 0.933,
-               0.34, 0.82, stamina=0.74, shot_scale=2.85714286),
+               0.34, 0.82, stamina=0.74),
 
         Player("Mike Smrek", "C",
                0.00, 0.16, 0.24, 0.60, 0.26, 0.07,
                0.05, 0.64, 0.78, 0.72, 0.62,
                0.06, 0.22, 0.22,
                0.64, 0.83, 0.84, 0.99, 0.333, 0.867,
-               0.65, 0.72, stamina=0.6, shot_scale=8.28571429),
+               0.65, 0.72, stamina=0.6),
 
         Player("Wes Matthews", "PG",
                0.03, 0.40, 0.32, 0.12, 0.18, 0.13,
                0.70, 0.76, 0.80, 0.70, 0.76,
                0.10, 0.56, 0.58,
                0.87, 0.29, 0.32, 0.43, 0.467, 0.667,
-               0.92, 0.38, stamina=0.65, shot_scale=4.61538462),
+               0.92, 0.38, stamina=0.65),
     ]
     # 1986-87 (Basketball-Reference regular season): minutes are the real per-game averages scaled to one 240-minute game (Billy Thompson,
     # Brickowski and Branch are not on this roster). Attempt roles = (paced FGA target, real FGA as the soft cap), tuned until the games
@@ -115,7 +115,7 @@ def make_celtics_1987() -> Team:
                0.20, 0.85, 0.76,
                0.64, 0.42, 0.19, 0.45, 0.733, 0.800,
                0.96, 0.66,
-               clutchness=0.84, stamina=0.86, shot_scale=0.58695652),
+               clutchness=0.84, stamina=0.86),
 
         Player("Danny Ainge", "SG",
                0.38, 0.34, 0.20, 0.08, 0.08, 0.46,
@@ -123,7 +123,7 @@ def make_celtics_1987() -> Team:
                0.18, 0.66, 0.66,
                0.64, 0.30, 0.21, 0.46, 0.533, 0.667,
                0.64, 0.43,
-               clutchness=0.76, stamina=0.8, shot_scale=0.5326087),
+               clutchness=0.76, stamina=0.8),
 
         Player("Larry Bird", "SF",
                0.20, 0.42, 0.16, 0.08, 0.18, 0.78,
@@ -131,7 +131,7 @@ def make_celtics_1987() -> Team:
                0.40, 0.54, 0.78,
                0.80, 0.58, 0.56, 0.80, 0.500, 0.733,
                0.86, 0.73,
-               clutchness=0.96, stamina=0.89, shot_scale=0.67948718),
+               clutchness=0.96, stamina=0.89),
 
         Player("Kevin McHale", "PF",
                0.02, 0.38, 0.22, 0.38, 0.28, 0.66,
@@ -139,7 +139,7 @@ def make_celtics_1987() -> Team:
                0.15, 0.52, 0.54,
                0.68, 0.78, 0.81, 0.96, 0.500, 0.800,
                0.70, 0.90,
-               clutchness=0.86, stamina=0.78, shot_scale=0.63636364),
+               clutchness=0.86, stamina=0.78),
 
         Player("Robert Parish", "C",
                0.01, 0.30, 0.26, 0.43, 0.32, 0.51,
@@ -147,7 +147,7 @@ def make_celtics_1987() -> Team:
                0.20, 0.42, 0.42,
                0.65, 0.85, 0.86, 0.99, 0.800, 0.867,
                0.67, 0.88,
-               clutchness=0.80, stamina=0.75, shot_scale=0.64705882),
+               clutchness=0.80, stamina=0.75),
 
         Player("Bill Walton", "C",
                0.01, 0.26, 0.28, 0.45, 0.25, 0.08,
@@ -155,35 +155,35 @@ def make_celtics_1987() -> Team:
                0.12, 0.72, 0.56,
                0.66, 0.85, 0.86, 0.99, 0.533, 0.867,
                0.67, 0.89,
-               clutchness=0.76, stamina=0.58, shot_scale=2.5625),
+               clutchness=0.76, stamina=0.58),
 
         Player("Scott Wedman", "SF",
                0.34, 0.36, 0.18, 0.12, 0.12, 0.16,
                0.84, 0.84, 0.78, 0.66, 0.82,
                0.12, 0.42, 0.44,
                0.60, 0.47, 0.52, 0.48, 0.467, 0.600,
-               0.83, 0.55, stamina=0.7, shot_scale=1.34375),
+               0.83, 0.55, stamina=0.7),
 
         Player("Jerry Sichting", "PG",
                0.32, 0.36, 0.22, 0.10, 0.04, 0.18,
                0.82, 0.84, 0.78, 0.55, 0.88,
                0.10, 0.64, 0.66,
                0.61, 0.25, 0.35, 0.37, 0.467, 0.667,
-               0.79, 0.25, stamina=0.68, shot_scale=1.13888889),
+               0.79, 0.25, stamina=0.68),
 
         Player("Fred Roberts", "PF",
                0.08, 0.32, 0.28, 0.32, 0.26, 0.13,
                0.40, 0.76, 0.82, 0.76, 0.74,
                0.10, 0.34, 0.34,
                0.66, 0.77, 0.40, 0.61, 0.533, 0.800,
-               0.67, 0.97, stamina=0.65, shot_scale=1.38461538),
+               0.67, 0.97, stamina=0.65),
 
         Player("Greg Kite", "C",
                0.00, 0.08, 0.34, 0.58, 0.30, 0.05,
                0.05, 0.58, 0.76, 0.72, 0.56,
                0.06, 0.20, 0.20,
                0.28, 0.52, 0.59, 0.67, 0.333, 0.990,
-               0.33, 0.66, stamina=0.62, shot_scale=2.2),
+               0.33, 0.66, stamina=0.62),
     ]
     t = Team("1987 Boston Celtics", players)
     t.init_lineup()
