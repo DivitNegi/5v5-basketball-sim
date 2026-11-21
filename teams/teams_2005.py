@@ -124,7 +124,7 @@ def make_rockets_2005() -> Team:
                0.16, 0.66, 0.66,
                0.47, 0.33, 0.24, 0.57, 0.27, 0.49,
                0.77, 0.58,
-               height=78, stamina=0.89, secondary_positions=('PF',), iso_tendency=0.26),
+               height=78, stamina=0.89, secondary_positions=('SG',), iso_tendency=0.26),
         Player('Mike James', 'PG',
                0.37, 0.31, 0.3, 0.03, 0.02, 0.4,
                0.86, 0.82, 0.82, 0.4, 0.76,
