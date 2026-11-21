@@ -11,7 +11,7 @@ def make_heat_2013() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player("LeBron James", "SF",
-               0.25, 0.15, 0.55, 0.60,   0.60, 0.849,
+               0.25, 0.15, 0.85, 0.60,   0.60, 0.849,
                0.88, 0.89, 0.99, 0.99, 0.80,
                0.36, 0.92, 0.90,
                0.85, 0.79, 0.60, 0.80, 0.867, 0.733,
