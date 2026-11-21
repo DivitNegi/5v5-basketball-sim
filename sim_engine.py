@@ -16254,7 +16254,7 @@ TEAM_PLAYBOOKS = {
     "2019 Philadelphia 76ers": ["sixers_embiid_elbow", "sixers_redick_chase", "sixers_butler_slot", "sixers_simmons_dunker"],
     "2027 Philadelphia 76ers": [
         "sixers_lebron_create", "sixers_lebron_create",
-        "sixers_maxey_slot", "sixers_maxey_slot", "sixers_embiid_elbow",
+        "sixers_maxey_slot", "sixers_maxey_slot", "sixers_embiid_elbow", "sixers_embiid_elbow",
     ],
     "2013 Indiana Pacers": ["pacers_pg_wing", "pacers_hibbert_duckin", "pacers_west_elbow"],
     "2025 Indiana Pacers": ["pacers_hali_drag", "pacers_siakam_delay", "pacers_turner_pop"],
@@ -16689,14 +16689,22 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
     if play_type in ("sixers_lebron_create", "sixers_maxey_slot"):
         lebron = player_by_name(off.on_floor, ("LeBron James",))
         if lebron is not None:
+            # LeBron's own set: he keeps it and attacks his man on part of them (it used to always end in a pass, which handed his
+            # looks to the spot-up bench shooters and left him well under his real 13 shots a night)
+            if (play_type == "sixers_lebron_create" and can_be_designed_shooter(lebron) and has_shot_volume_left(lebron)
+                    and random.random() < SIXERS_2027_LEBRON_KEEP):
+                print(f"{lebron.name} controls the matchup, sees the help stay home, and attacks it himself.")
+                return lebron, None, "iso"
             options = designed_shooter_options([p for p in off.on_floor if p is not lebron], current_shooter)
             maxey = player_by_name(off.on_floor, ("Tyrese Maxey",))
             if play_type == "sixers_maxey_slot" and maxey is not None and can_be_designed_shooter(maxey):
                 target = maxey
             else:
+                # the kick-out goes to the players the offense runs through (shot tendency and usage) more than to whoever
+                # rates best as a spot-up shooter, so Embiid / Brown / Maxey get these looks ahead of the bench
                 target = weighted_target(
                     options,
-                    lambda p: 0.34 * p.three_rating + 0.30 * p.rim_rating + 0.21 * p.shot_tendency + 0.15 * p.usage,
+                    lambda p: 0.18 * p.three_rating + 0.17 * p.rim_rating + 0.35 * p.shot_tendency + 0.30 * p.usage,
                     current_shooter,
                 )
             print(f"{lebron.name} controls the matchup, draws the help, and creates the opening for {target.name}.")
@@ -18504,7 +18512,7 @@ def clutch_package_play(team: Team, need_three: bool = False) -> str | None:
         "2027 Los Angeles Lakers": ("lakers_luka_create", "lakers_luka_spread", "lakers_luka_iso"),
         "2027 Philadelphia 76ers": (
             "sixers_lebron_create",
-            "sixers_maxey_slot", "sixers_maxey_slot", "sixers_embiid_elbow",
+            "sixers_maxey_slot", "sixers_maxey_slot", "sixers_embiid_elbow", "sixers_embiid_elbow",
         ),
         "2018 Houston Rockets": ("rockets_harden_iso_kick", "rockets_spread_lob"),
         "2020 Houston Rockets": ("rockets_harden_iso_kick", "rockets_corner_shake"),
@@ -18867,6 +18875,7 @@ NUGGETS_2024_ASSIST_BIAS = {"Nikola Jokić": 2.0, "Jamal Murray": 0.75}
 NUGGETS_2026_ASSIST_BIAS = {"Nikola Jokić": 3.6, "Jamal Murray": 0.55}
 NUGGETS_2026_HANDLER_SHARE = 0.88     # share of possessions Jokic initiates while on the floor (he averaged 10.7 assists)
 SIXERS_2027_MAXEY_HANDLER_SHARE = 0.60   # share of possessions Maxey brings the ball up while on the floor
+SIXERS_2027_LEBRON_KEEP = 0.70           # share of his own "LeBron creates" sets he finishes himself instead of passing
 NUGGETS_2024_HANDLER_SHARE = 0.70     # share of possessions Jokic initiates while on the floor
 # 2020-21 Sixers: Simmons ran the offense at 6.9 assists a night; the generic split left him near 4.
 SIXERS_2021_ASSIST_BIAS = {"Ben Simmons": 2.4}
