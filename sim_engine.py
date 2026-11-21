@@ -2652,7 +2652,7 @@ def dribble_chain_pass_chance(handler, shot_type: str, context: str | None,
 def maybe_dribble_chain_pass(off, dff, handler, shot_type: str,
                              context: str | None, matchups,
                              period: int, period_time: int):
-    pass_chance = dribble_chain_pass_chance(handler, shot_type, context, period, period_time)
+    pass_chance = dribble_chain_pass_chance(handler, shot_type, context, period, period_time) * (1.0 - 0.6 * handler_score_first_bias(handler))
     if pass_chance <= 0.0 or random.random() >= pass_chance:
         return None
 
@@ -15980,6 +15980,18 @@ def true_primary_shot_creator(player: Player) -> bool:
     )
 
 
+def handler_score_first_bias(player: Player) -> float:
+    """How much a ball-handler keeps possessions for his own shot instead of giving the ball up (0-1). An explicit roster value wins;
+    otherwise it follows his shot-volume number: none at 0.55 or below (about 14 real shots a game), full at 0.95+ (24+)."""
+    explicit = getattr(player, "score_first_bias", None)
+    if explicit:
+        return max(0.0, min(1.0, explicit))
+    v = getattr(player, "shot_tendency_display", None)
+    if v is None or not (can_play_position(player, "PG") or can_play_position(player, "SG")):
+        return 0.0   # ball-dominant guards; forwards and bigs get their shots through their own plays
+    return max(0.0, min(1.0, (v - 0.55) / 0.40))
+
+
 def shooter_weight(player: Player) -> float:
     if player.shot_tendency <= 0:
         return 0.0
@@ -17880,8 +17892,11 @@ def maybe_pick_and_roll(off: Team, dff: Team,
             roll_chance += 0.12
         roll_chance = min(0.86, roll_chance)
         pop_chance = min(0.48, pop_chance)
+        keep = handler_score_first_bias(handler)   # a score-first lead guard keeps the ball off the screen more often
+        roll_chance *= 1.0 - 0.5 * keep
+        pop_chance *= 1.0 - 0.5 * keep
         catch_shoot_target = find_pnr_catch_shoot_target(off, handler, screener)
-        if catch_shoot_target and random.random() < catch_shoot_creation_chance(handler, catch_shoot_target, "pnr"):
+        if catch_shoot_target and random.random() < catch_shoot_creation_chance(handler, catch_shoot_target, "pnr") * (1.0 - 0.6 * keep):
             target_def = matchups.get(catch_shoot_target, random.choice(dff.on_floor))
             spray_lines = [
                 f"{handler.name} sees the low man tag the roll and sprays it to {catch_shoot_target.name}.",
@@ -19188,6 +19203,7 @@ def choose_ballhandler(team: Team) -> Player:
         * fatigue_touch_multiplier(p)
         * (0.28 if can_play_position(p, "C") else 1.0)
         * (0.55 if can_play_position(p, "PF") and not can_play_position(p, "SF") else 1.0)
+        * (1.0 + 2.5 * handler_score_first_bias(p))   # a 20+ shot-a-game creator runs more of the possessions himself
         for p in top_four
     ]
     return random.choices(top_four, weights=weights, k=1)[0]
@@ -20448,12 +20464,12 @@ def simulate_possession(off: Team, dff: Team,
         # losing the playmaking rating that controls *which* passes he sees
         # and how effectively he executes them. Team-specific roster data can
         # opt into this; ordinary players remain unchanged.
-        score_first_bias = max(0.0, min(1.0, getattr(handler, "score_first_bias", 0.0)))
+        score_first_bias = handler_score_first_bias(handler)
         pass_chance *= 1.0 - 0.45 * score_first_bias
         pass_chance = max(0.30, min(0.90, pass_chance))
         if random.random() >= pass_chance:
             shooter = handler
-    primary_creator_keep = shooter.usage >= 0.36 and shooter.shot_tendency >= 0.70
+    primary_creator_keep = shooter.usage >= 0.30 and getattr(shooter, "shot_tendency_display", 0.0) >= 0.85   # a 20+ shot-a-game creator
     if (
         not closing_star_mode
         and not primary_creator_keep
@@ -20487,6 +20503,10 @@ def simulate_possession(off: Team, dff: Team,
     else:
         play_type = real_play_type(off, handler)
     play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter, previous_handler=previous_handler)
+    if (not closing_star_mode and shooter is handler and play_shooter is not None and play_shooter is not handler
+            and random.random() < 0.70 * handler_score_first_bias(handler)):
+        # a score-first lead guard (20+ shots a game) keeps part of the possessions a set would have run for a teammate
+        play_shooter, play_passer, play_context = handler, None, None
     if play_shooter is not shooter and getattr(shooter, "keep_pace_shots", False):
         # A featured scorer with a per-game attempt role that is behind his
         # minute-by-minute pace keeps some of the possessions the play type
@@ -20613,6 +20633,7 @@ def simulate_possession(off: Team, dff: Team,
         ball_owner = shooter
 
     extra_pass_chance = (0.15 + 0.52 * shooter.playmaking) * ball_movement
+    extra_pass_chance *= 1.0 - 0.70 * handler_score_first_bias(shooter)   # a score-first creator takes his own look more often
     if shooter.usage >= 0.36 and shooter.shot_tendency >= 0.70:
         extra_pass_chance *= 0.26 if true_primary_shot_creator(shooter) else 0.42
     elif shooter.usage >= 0.30 and shooter.shot_tendency >= 0.55:
