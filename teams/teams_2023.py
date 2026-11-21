@@ -223,7 +223,7 @@ def make_nuggets_2023() -> Team:
                0.82, 0.88,
                secondary_positions=("SF",), badges=("posterizer_silver", "lob_threat"), shot_iq=0.78, stamina=0.82),
         Player("Nikola Jokić", "C",
-               0.26, 0.36, 0.18, 0.20, 0.18, 0.850,
+               0.26, 0.66, 0.40, 0.80, 0.18, 0.850,
                0.84, 0.96, 0.98, 0.72, 0.84,
                0.42, 0.99, 0.65,
                0.56, 0.58, 0.74, 0.96, 0.933, 0.800,

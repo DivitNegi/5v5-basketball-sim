@@ -57,9 +57,9 @@ def on_off(st, tt, other, team_minutes):
 
 
 # ---- analytics tables, built from the "analytics" counts the engine keeps for every player (see analytics_shot in sim_engine)
-PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("drive", "Drive"), ("pullup", "Pull-up"), ("post", "Post-up"), ("spot_up", "Spot-up"), ("off_screen", "Off screen"),
+PLAY_LABELS = [("iso", "Isolation"), ("pnr", "Pick & roll"), ("dribble", "Off the dribble"), ("post", "Post-up"), ("spot_up", "Spot-up"), ("off_screen", "Off screen"),
                ("cut", "Cut"), ("transition", "Transition"), ("putback", "Putback"), ("other", "Late clock & set plays")]   # what has no play tag: late-clock shots, inbounds, after-timeout sets
-PLAY_SHORT = ["ISO", "P&R", "DRIVE", "PULL-UP", "POST", "SPOT", "SCREEN", "CUT", "TRANS", "PUTB", "LATE/SET"]   # column labels, same order as PLAY_LABELS
+PLAY_SHORT = ["ISO", "P&R", "DRIBBLE", "POST", "SPOT", "SCREEN", "CUT", "TRANS", "PUTB", "LATE/SET"]   # column labels, same order as PLAY_LABELS
 
 
 FINISH_LABELS = [("pullup_three", "Pull-up 3"), ("pullup_mid", "Pull-up midrange"), ("cs_three", "Catch & shoot 3"), ("cs_mid", "Catch & shoot midrange"),
@@ -68,18 +68,31 @@ FINISH_LABELS = [("pullup_three", "Pull-up 3"), ("pullup_mid", "Pull-up midrange
                  ("post_up", "Post-up / hook"), ("post_fade", "Post fadeaway"), ("putback", "Putback")]
 
 
+PLAY_ALIASES = {"drive": "dribble", "pullup": "dribble"}   # games saved before the merge filed these two separately
+
+
+def _merged(d, key):
+    out = {}
+    for k, v in (((d or {}).get("analytics") or {}).get(key) or {}).items():
+        k = PLAY_ALIASES.get(k, k) if key == "pt" else k
+        o = out.setdefault(k, {})
+        for f, n in v.items():
+            o[f] = o.get(f, 0) + n
+    return out
+
+
 def play_type_breakdown(mine, pool, key="pt", labels=None):
     """His field goals by play type (or, with key "fin", by how the shot finished) next to the league's points per shot and share on the
     same play (pool = every player's stats in this source)."""
     labels = labels or PLAY_LABELS
     league = {}
     for st in pool:
-        for k, v in ((st.get("analytics") or {}).get(key) or {}).items():
+        for k, v in _merged(st, key).items():
             lg = league.setdefault(k, [0, 0])
             lg[0] += v.get("fga", 0)
             lg[1] += v.get("pts", 0)
     lt = sum(x[0] for x in league.values())
-    pt = (mine.get("analytics") or {}).get(key) or {}
+    pt = _merged(mine, key)
     total = sum(v.get("fga", 0) for v in pt.values())
     rows = []
     for k, label in labels:

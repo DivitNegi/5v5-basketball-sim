@@ -2723,7 +2723,7 @@ def print_shot_attempt_sequence(shooter, shot_type: str, context: str | None = N
             time.sleep(SLEEP * 0.42)
         return True
     if should_print_dribble_chain(shooter, key, context):
-        shooter._pbp_play = (shot_type, "drive" if key == "rim" else "pullup")   # a chain of his own dribble moves
+        shooter._pbp_play = (shot_type, "dribble")   # a chain of his own dribble moves
         return print_dribble_chain_attempt(shooter, key, context)
     sequence = go_to_shot_sequence(shooter, key, context)
     if not sequence and key == "rim":
@@ -12915,8 +12915,7 @@ PLAY_TYPE_TAGS = (   # first match wins
     ("iso", {"iso", "iso_forced", "handle_combo_three", "handle_combo_mid", "handle_combo_drive", "mismatch_hunt", "ankle_breaker", "pressure_pullup", "pressure_drive"}),
     ("cut", {"backdoor", "dump_off"}),
     ("off_screen", {"floppy", "elevator", "handoff"}),
-    ("drive", set()),     # no context tag of their own: filled from the play-by-play line (pbp_play_type)
-    ("pullup", set()),
+    ("dribble", set()),   # no context tag of its own: filled from the play-by-play line (pbp_play_type)
     ("spot_up", {"extra_pass_open", "extra_pass", "drive_kick", "double_kick", "pnr_catch_shoot", "late_catch_shoot", "double_wide_open", "handle_combo_pass", "late_oreb_kickout"}),
 )
 
@@ -12972,7 +12971,7 @@ def pbp_play_type(shot_type: str, text: str) -> str:
         return "post"
     if any(k in t for k in (" cut", "backdoor")):
         return "cut"
-    return "drive" if shot_type in ("rim", "dunk") else "pullup"   # any other dribble move: he made the shot himself
+    return "dribble"   # any other dribble move: he made the shot himself (whether it ended in a drive or a pull-up is the finish table's job)
 
 
 def analytics_of(player: Player) -> Dict:
@@ -21675,7 +21674,7 @@ def simulate_possession(off: Team, dff: Team,
             ]
             print(f"{shooter.name} {random.choice(deep_dunk_lines)}")
         elif not iso_already_described:
-            shooter._pbp_play = (shot_type, "drive")
+            shooter._pbp_play = (shot_type, "dribble")
             print(f"{shooter.name} {drive}")
             time.sleep(SLEEP * 0.5)
             print(f"{shooter.name} {gather}")
