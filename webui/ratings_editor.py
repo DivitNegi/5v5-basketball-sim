@@ -24,7 +24,7 @@ POSITIONAL = [
     "steal", "block", "oreb", "dreb", "foul_draw", "foul_rate",
     "perimeter_def", "interior_def",
 ]
-KEYWORDS = ["clutchness", "secondary_positions", "badges", "rookie", "height", "speed", "stamina", "shot_iq", "iso_tendency", "archetype", "go_to_shot"]
+KEYWORDS = ["clutchness", "secondary_positions", "badges", "rookie", "height", "speed", "stamina", "shot_iq", "iso_tendency", "archetype", "go_to_shot", "shot_scale"]
 TENDENCIES = ("three_tendency", "mid_tendency", "drive_tendency", "post_tendency", "dunk_tendency", "shot_tendency", "iso_tendency")
 EDITABLE = [k for k in POSITIONAL[1:] + KEYWORDS if k not in TENDENCIES and k not in ("archetype", "usage")]   # the archetype is worked out from the ratings   # tendencies are not shown and cannot be changed here
 POSITIONS = ("PG", "SG", "SF", "PF", "C")

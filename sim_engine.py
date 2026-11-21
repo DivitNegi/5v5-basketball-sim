@@ -3497,6 +3497,9 @@ class Player:
     iso_tendency: float = field(default=0.0, compare=False, hash=False)
     archetype: str = field(default="", compare=False, hash=False)
     go_to_shot: str = field(default="", compare=False, hash=False)
+    # shot_tendency in the team files is on a volume scale (22+ shots a game ~ 0.85-0.99). shot_scale turns it into the value the engine
+    # was calibrated with (file value x shot_scale), so rescaling the file numbers left every stat the same. Applied once, in __post_init__.
+    shot_scale: float = field(default=1.0, compare=False, hash=False)
 
 
     # box score / state
@@ -3527,6 +3530,10 @@ class Player:
     defended_matchup_diet: Dict[str, Dict[str, int]] = field(default_factory=dict, compare=False, hash=False)
 
     def __post_init__(self):
+        self.shot_tendency_display = self.shot_tendency   # the file's volume-scale number
+        if self.shot_scale and self.shot_scale != 1.0:
+            self.shot_tendency = round(self.shot_tendency * self.shot_scale, 6)   # rounded so the product is exactly the old number
+            self.shot_scale = 1.0   # applied: a copy built from this player's fields must not scale it again
         valid_positions = {"PG", "SG", "SF", "PF", "C"}
         secondary = self.secondary_positions
         if isinstance(secondary, str):
