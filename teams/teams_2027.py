@@ -873,7 +873,7 @@ def make_lakers_2027() -> Team:
         # steal, block, oreb, dreb, foul_draw, foul_rate,
         # perimeter_def, interior_def
         Player('Luka Dončić', 'PG',
-                       0.99, 0.320, 0.200, 0.040, 0.080, 0.990,
+                       0.99, 0.320, 0.200, 0.50, 0.080, 0.990,
                        0.930, 0.960, 0.990, 0.780, 0.900,
                        0.450, 0.960, 0.920,
                        0.66, 0.53, 0.55, 0.82, 0.990, 0.800,
@@ -2301,7 +2301,7 @@ def make_thunder_2027() -> Team:
     players = [
         # Cason Wallace is injured for 2027; Chet Holmgren is back for the season and starts at PF over Jaylin Williams.
         Player('Shai G-Alexander', 'PG',
-               0.36, 0.34, 0.34, 0.50, 0.20, 0.90,
+               0.36, 0.54, 0.64, 0.60, 0.20, 0.90,
                0.880, 0.990, 0.990, 0.750, 0.880,
                0.32, 0.65, 0.980,
                0.850, 0.620, 0.340, 0.650, 0.990, 0.467,

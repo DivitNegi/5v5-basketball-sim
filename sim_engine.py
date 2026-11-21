@@ -1862,7 +1862,7 @@ GO_TO_SHOT_PACKS = {
         ],
     },
     "logo_pull": {
-        "label": "Logo pull-up",
+        "label": "Logo three off the dribble",
         "types": ("three",),
         "lines": [
             ("crosses halfcourt with the defender backing up", "pulls from way beyond the arc"),
@@ -1871,7 +1871,7 @@ GO_TO_SHOT_PACKS = {
         ],
     },
     "midrange_pullup": {
-        "label": "Midrange pull-up",
+        "label": "Midrange off the dribble",
         "types": ("mid",),
         "lines": [
             ("snakes the screen and keeps the defender on his back", "stops at the elbow and rises"),
@@ -6515,6 +6515,7 @@ def print_series_game_box_scores(game_logs: List[Dict]):
 
 def plan_label(value: str) -> str:
     labels = {
+        "pullup_shooter": "off-the-dribble shooter",
         "hunt_threes": "hunt threes",
         "five_out": "five-out",
         "four_out_one_in": "4-out, 1-in",

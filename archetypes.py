@@ -66,7 +66,7 @@ _GROUP_OF = {"PG": "guard", "SG": "guard", "SF": "wing", "PF": "forward", "C": "
 # best skill -> noun, per position group
 NOUNS = {
     "shoot":  {"guard": "Sharpshooter", "wing": "Sniper", "forward": "Stretch Forward", "big": "Stretch Big"},
-    "mid":    {"guard": "Pull-Up Shooter", "wing": "Midrange Maestro", "forward": "Face-Up Scorer", "big": "Elbow Shooter"},
+    "mid":    {"guard": "Off-the-Dribble Shooter", "wing": "Midrange Maestro", "forward": "Face-Up Scorer", "big": "Elbow Shooter"},
     "finish": {"guard": "Slasher", "wing": "Slashing Wing", "forward": "Rim Attacker", "big": "Rim Runner"},
     "post":   {"guard": "Post-Up Guard", "wing": "Post Wing", "forward": "Post Scorer", "big": "Low-Post Anchor"},
     "play":   {"guard": "Floor General", "wing": "Point Wing", "forward": "Point Forward", "big": "Playmaking Big"},
