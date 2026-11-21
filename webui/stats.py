@@ -65,7 +65,10 @@ PLAY_SHORT = ["ISO", "P&R", "DRIBBLE", "POST", "SPOT", "SCREEN", "CUT", "TRANS",
 FINISH_LABELS = [("pullup_three", "Pull-up 3"), ("pullup_mid", "Pull-up midrange"), ("cs_three", "Catch & shoot 3"), ("cs_mid", "Catch & shoot midrange"),
                  ("drive_layup", "Driving layup"), ("drive_floater", "Driving floater"), ("drive_dunk", "Driving dunk"),
                  ("pass_layup", "Layup off a pass"), ("pass_dunk", "Dunk off a pass"),
-                 ("post_up", "Post-up / hook"), ("post_fade", "Post fadeaway"), ("putback", "Putback")]
+                 ("post_up", "Post-up / hook"), ("post_fade", "Post fadeaway"), ("putback", "Putback"),
+                 # games saved under the first, six-row version (not split by shot); shown only when a player has some
+                 ("pullup", "Pull-up (older games)"), ("catch_shoot", "Catch & shoot (older games)"), ("drive", "Drive (older games)"),
+                 ("off_pass", "Finish off a pass (older games)"), ("post", "Post move (older games)")]
 
 
 PLAY_ALIASES = {"drive": "dribble", "pullup": "dribble"}   # games saved before the merge filed these two separately

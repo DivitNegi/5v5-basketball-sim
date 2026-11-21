@@ -2701,7 +2701,7 @@ function ppPlayTypes(d) {
     h("h4", { class: "pp-sub" }, "Play types · what play set the shot up"),
     ppBreakdownTable(pt, "Play type", "most-used play first. An isolation that ends in a drive counts here as Isolation."),
     fin && fin.total ? h("h4", { class: "pp-sub", style: { marginTop: "18px" } }, "How his shots finished · whatever the play") : null,
-    fin && fin.total ? ppBreakdownTable(fin, "Finish", "every shot once, by how it ended: the same iso drive counts here as Drive.") : h("div", { class: "muted", style: { marginTop: "14px" } }, "Shot finishes are recorded for games played from now on."));
+    fin && fin.total ? ppBreakdownTable(fin, "Finish", `every shot once, by how it ended: the same iso drive counts here as Drive.${pt.total > fin.total ? ` ${pt.total - fin.total} of his ${pt.total} shots are from games played before finishes were recorded, so this table counts ${fin.total}.` : ""}`) : h("div", { class: "muted", style: { marginTop: "14px" } }, "Shot finishes are recorded for games played from now on."));
 }
 // one breakdown table (play types or finishes): share bar, makes / attempts, points per shot and the league on the same row
 function ppBreakdownTable(pt, firstCol, blurb) {
