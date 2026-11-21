@@ -643,3 +643,73 @@ def team_detail(runner, team):
                           "base_L": zone(diet, "mid_base_L"), "base_R": zone(diet, "mid_base_R"), "wing_L": zone(diet, "mid_wing_L"), "wing_R": zone(diet, "mid_wing_R")},
             "dist_split": {"rim_float": zone(diet, "rim_float"), "mid_long": zone(diet, "mid_long")},
             "fine": fine_of(diet), "fine_avg": fine_avg, "adv_groups": adv_groups}
+
+
+# ---- the player pop-up's Offense / Defense tabs: passing links and matchups split by region (paint, post, mid, three)
+REGIONS = (("paint", ("rim", "dunk")), ("post", ("post", "post_fade")), ("mid", ("mid",)), ("three", ("three",)))
+
+
+def _regions_of(diet):
+    diet = diet or {}
+    out = {}
+    for r, keys in REGIONS:
+        out[r] = [sum(int(diet.get(k + "_made", 0) or 0) for k in keys), sum(int(diet.get(k, 0) or 0) for k in keys)]
+    out["all"] = [sum(v[0] for v in out.values()), sum(v[1] for v in out.values())]
+    return out
+
+
+def player_links(runner, source, team, name):
+    sec = runner.sections or {}
+    data = datasets(sec)
+    if source not in data:
+        source = next(iter(data), "Live")
+    players = data.get(source, ({}, {}))[0]
+    if team not in players or name not in players[team]:
+        hits = [tn for tn, pp in players.items() if name in pp]
+        if not hits:
+            return {"error": "No stats for that player yet."}
+        team = hits[0]
+    mine = players[team][name]
+    a = mine.get("analytics") or {}
+    games = max(1, mine.get("games", 1) or 1)
+    mates = [pn for pn in players[team] if pn != name]
+    # passing: by region where recorded (games played after region tracking began); the overall counts also cover older games
+    ast_to = {m: {"all": int(c)} for m, c in (a.get("ast_to") or {}).items()}
+    for m, regs in (a.get("ast_to_r") or {}).items():
+        ast_to.setdefault(m, {"all": 0}).update({r: int(v) for r, v in regs.items()})
+    ast_by = {}
+    for m in mates:   # overall from each teammate's own assist log
+        c = ((players[team][m].get("analytics") or {}).get("ast_to") or {}).get(name)
+        if c:
+            ast_by[m] = {"all": int(c)}
+    for m, regs in (a.get("ast_by_r") or {}).items():
+        ast_by.setdefault(m, {"all": sum(regs.values())}).update({r: int(v) for r, v in regs.items()})
+    # his own shots by region and how many of his makes came off a pass
+    shots = _regions_of(mine.get("shot_diet"))
+    assisted_made = {r: sum(int(v.get(r, 0) or 0) for v in (a.get("ast_by_r") or {}).values()) for r, _ in REGIONS}
+    region_rows = []
+    for r, _ in REGIONS:
+        m, att = shots[r]
+        pts = m * (3 if r == "three" else 2)
+        region_rows.append({"region": r, "made": m, "att": att, "pct": round(100 * m / att, 1) if att else None, "per_game": round(att / games, 1),
+                            "share": round(100 * att / shots["all"][1], 1) if shots["all"][1] else None, "pts_per_shot": round(pts / att, 2) if att else None,
+                            "assisted": assisted_made[r], "assisted_pct": round(100 * assisted_made[r] / m, 1) if m and (a.get("ast_by_r")) else None})
+    # who guarded him: every opponent's matchup log entry for him
+    guarded_by = {}
+    for tn, pp in players.items():
+        if tn == team:
+            continue
+        for pn, st in pp.items():
+            d = (st.get("defended_matchup_diet") or {}).get(name)
+            if d:
+                regs = _regions_of(d)
+                if regs["all"][1]:
+                    guarded_by[pn] = dict(regs, team=tn)
+    # who he guarded
+    guarded = {}
+    for opp, d in (mine.get("defended_matchup_diet") or {}).items():
+        regs = _regions_of(d)
+        if regs["all"][1]:
+            guarded[opp] = regs
+    return {"name": name, "team": team, "source": source, "games": games, "mates": mates, "regions_tracked": bool(a.get("ast_to_r") or a.get("ast_by_r")),
+            "ast_to": ast_to, "ast_by": ast_by, "shot_regions": region_rows, "guarded_by": guarded_by, "guarded": guarded}

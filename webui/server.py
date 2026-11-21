@@ -1184,6 +1184,9 @@ def build_app():
                         return self._json({"error": "Bad player index."})
             if path == "/api/season/player_games":
                 return self._json(player_games_payload(runner, (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
+            if path == "/api/stats/player_links":
+                from .stats import player_links
+                return self._json(player_links(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
             if path == "/api/stats/player":
                 return self._json(stats_player_detail(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0], (params.get("group") or ["all"])[0]))
             if path == "/api/ratings/player":

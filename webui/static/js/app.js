@@ -2708,20 +2708,91 @@ async function openStatsPlayer(team, name, source, startTab = "stats") {
   withImage(face, `/media/headshot?name=${encodeURIComponent(name)}`);
   const seg = h("div", { class: "seg small" }, [["pg", "Per game"], ["tot", "Totals"]].map(([k, l]) => h("button", { class: mode === k ? "on" : "", onclick: (e) => { mode = k; $$(".pp-body .seg button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
   paint();
-  const statsView = h("div", {}, tiles, defenseBox(d),
+  const statsView = h("div", {}, tiles,
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
   const gamesView = h("div", { class: "pp-games" }), highsView = h("div", { class: "pp-games" }), playsView = ppPlayTypes(d);
-  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["plays", "Play types"], ["highs", "Highs"], ["games", "Game log"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
+  const offenseView = h("div", { class: "pp-games" }), defenseView = h("div", { class: "pp-games" });
+  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["offense", "Offense"], ["defense", "Defense"], ["plays", "Play types"], ["highs", "Highs"], ["games", "Game log"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
   const show = (v, openItem = null) => {
     statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; highsView.hidden = v !== "highs"; playsView.hidden = v !== "plays"; seg.hidden = v !== "stats";
+    offenseView.hidden = v !== "offense"; defenseView.hidden = v !== "defense";
+    if ((v === "offense" && !offenseView.childElementCount) || (v === "defense" && !defenseView.childElementCount)) ppLinks(offenseView, defenseView, d, d.source || source);
     tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
     if (v === "games" && (openItem || !gamesView.childElementCount)) ppGameLog(gamesView, team, d.name, openItem);
     if (v === "highs" && !highsView.childElementCount) ppHighs(highsView, team, d.name, (it) => show("games", it));
   };
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
-    tabs, statsView, playsView, highsView, gamesView);
+    tabs, statsView, offenseView, defenseView, playsView, highsView, gamesView);
   show(startTab === "playtypes" ? "plays" : "stats");
+}
+// The player pop-up's Offense and Defense tabs: who he set up and who set him up, who guarded him and whom he guarded -- each overall and by
+// region (paint, post, mid, three) -- plus a name search that shows one teammate's or opponent's whole split with him
+const PP_REGIONS = [["all", "All"], ["paint", "Paint"], ["post", "Post"], ["mid", "Mid"], ["three", "3PT"]];
+async function ppLinks(offView, defView, d, source) {
+  [offView, defView].forEach((v) => v.replaceChildren(h("div", { class: "empty" }, "Loading…")));
+  let L;
+  try { L = await api.get(`/api/stats/player_links?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(d.team)}&name=${encodeURIComponent(d.name)}`); } catch { L = { error: "Could not load." }; }
+  if (L.error) { [offView, defView].forEach((v) => v.replaceChildren(h("div", { class: "empty" }, L.error))); return; }
+  const sub = (t) => h("h4", { class: "pp-sub", style: { marginTop: "16px" } }, t);
+  const note = (t) => h("div", { class: "muted", style: { fontSize: "12px", margin: "-2px 0 6px" } }, t);
+  const pct = (m, a) => (a ? `${(100 * m / a).toFixed(1)}%` : "–");
+  const person = (nm) => h("div", { class: "pcell" }, faceEl(nm), nm);
+  // a top list with region chips: rows(region) -> [[name, ...cells]]
+  const regionList = (title, blurb, heads, rows) => {
+    let reg = "all";
+    const body = h("div", {});
+    const paint = () => {
+      const r = rows(reg).slice(0, 10);
+      body.replaceChildren(r.length ? h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, heads.map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+        h("tbody", {}, r.map(([nm, ...cells]) => h("tr", {}, h("td", { class: "l" }, person(nm)), ...cells.map((c) => h("td", {}, c))))))) : h("div", { class: "muted" }, "None in this region."));
+    };
+    const chips = h("div", { class: "seg small", style: { margin: "4px 0 6px" } }, PP_REGIONS.map(([k, l]) => h("button", { class: k === reg ? "on" : "", onclick: (e) => { reg = k; chips.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.currentTarget)); paint(); } }, l)));
+    paint();
+    return h("div", {}, sub(title), blurb ? note(blurb) : null, chips, body);
+  };
+  const count = (map, reg) => Object.entries(map).map(([nm, v]) => [nm, v[reg] || 0]).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1]);
+  const shotsIn = (map, reg) => Object.entries(map).map(([nm, v]) => [nm, v[reg] || [0, 0]]).filter(([, x]) => x[1] > 0).sort((a, b) => b[1][1] - a[1][1]);
+  const regNote = L.regions_tracked ? "" : "Splits by region are recorded for games played from now on; the All column also covers earlier games.";
+  // search: a teammate shows the passing between them by region, an opponent shows the defense between them by region
+  const searchBox = (mode) => {
+    const names = mode === "off" ? [...new Set([...L.mates, ...Object.keys(L.guarded_by)])] : Object.keys(L.guarded);
+    const listId = `pp-names-${mode}-${Math.random().toString(36).slice(2, 7)}`;
+    const out = h("div", {});
+    const input = h("input", { class: "bld-in", list: listId, placeholder: mode === "off" ? "Type a teammate or a defender…" : "Type a player he guarded…", style: { width: "100%", maxWidth: "340px" } });
+    const render = () => {
+      const q = input.value.trim().toLowerCase();
+      const nm = names.find((n) => n.toLowerCase() === q) || names.find((n) => n.toLowerCase().includes(q));
+      if (!q || !nm) { out.replaceChildren(q ? h("div", { class: "muted" }, "No one by that name in his games.") : ""); return; }
+      const rows = [];
+      if (mode === "off" && L.mates.includes(nm)) {
+        rows.push(["He assisted " + nm, ...PP_REGIONS.map(([k]) => (L.ast_to[nm] || {})[k] || 0)]);
+        rows.push([nm + " assisted him", ...PP_REGIONS.map(([k]) => (L.ast_by[nm] || {})[k] || 0)]);
+      }
+      const g = mode === "off" ? L.guarded_by[nm] : L.guarded[nm];
+      if (g) rows.push([mode === "off" ? `${nm} guarding him` : `Him guarding ${nm}`, ...PP_REGIONS.map(([k]) => (g[k] && g[k][1] ? `${g[k][0]}/${g[k][1]} · ${pct(g[k][0], g[k][1])}` : "–"))]);
+      out.replaceChildren(h("div", { style: { marginTop: "8px" } }, person(nm)), rows.length ? h("div", { class: "table-wrap", style: { marginTop: "6px" } }, h("table", { class: "stats" },
+        h("thead", {}, h("tr", {}, ["", ...PP_REGIONS.map(([, l]) => l)].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+        h("tbody", {}, rows.map(([lab, ...cells]) => h("tr", {}, h("td", { class: "l" }, lab), ...cells.map((c) => h("td", {}, c))))))) : h("div", { class: "muted" }, "Nothing between them yet."));
+    };
+    input.addEventListener("input", render);
+    return h("div", {}, sub("Search a player"), note(mode === "off" ? "A teammate: the assists between them by region. A defender: how he did guarding him (made / shots)." : "Anyone he guarded: made / shots by region."),
+      input, h("datalist", { id: listId }, names.map((n) => h("option", { value: n }))), out);
+  };
+  const regLabel = { paint: "Paint", post: "Post", mid: "Mid", three: "3PT" };
+  offView.replaceChildren(
+    h("h4", { class: "pp-sub" }, "His shots by region"),
+    h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+      h("thead", {}, h("tr", {}, ["Region", "FG", "FG%", "A game", "Share", "Pts / shot", "Assisted"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+      h("tbody", {}, L.shot_regions.map((r) => h("tr", {}, h("td", { class: "l" }, regLabel[r.region]), h("td", {}, `${r.made}/${r.att}`), h("td", {}, r.pct != null ? `${r.pct}%` : "–"),
+        h("td", {}, r.per_game), h("td", {}, r.share != null ? `${r.share}%` : "–"), h("td", {}, r.pts_per_shot ?? "–"), h("td", {}, r.assisted_pct != null ? `${r.assisted_pct}%` : "–")))))),
+    regionList("Who he assisted the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_to, reg)),
+    regionList("Who assisted him the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_by, reg)),
+    regionList("Who guarded him the most", "Shots he took with that player defending.", ["Defender", "Shots", "Made", "FG%"], (reg) => shotsIn(L.guarded_by, reg).map(([nm, x]) => [nm, x[1], x[0], pct(x[0], x[1])])),
+    searchBox("off"));
+  defView.replaceChildren(defenseBox(d) || h("div", { class: "muted" }, "No defensive shots recorded yet."),
+    regionList("Who he guarded the most", "Shots taken by the player he was defending.", ["Player", "Shots", "Made", "FG% allowed"], (reg) => shotsIn(L.guarded, reg).map(([nm, x]) => [nm, x[1], x[0], pct(x[0], x[1])])),
+    searchBox("def"));
 }
 // The player pop-up's Play types tab: every play type he uses, how often and how well, next to the league on the same play
 function ppPlayTypes(d) {

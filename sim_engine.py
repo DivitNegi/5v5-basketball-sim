@@ -12324,6 +12324,11 @@ def safe_pct(made: int, att: int) -> float:
     return 0.0 if att == 0 else round(100 * made / att, 1)
 
 
+def shot_region(shot_type: str) -> str:
+    """The four regions the player pop-up splits passing and defense into."""
+    return {"rim": "paint", "dunk": "paint", "post": "post", "post_fade": "post", "mid": "mid", "three": "three"}.get(shot_type, "paint")
+
+
 def record_assist(passer: Player, team: Team, points_created: int):
     emit_broadcast("assist", passer=passer)
     passer.ast += 1
@@ -12331,6 +12336,12 @@ def record_assist(passer: Player, team: Team, points_created: int):
     scorer = getattr(team, "_last_fg_scorer", None)
     if scorer is not None and scorer is not passer:
         _bump(analytics_of(passer).setdefault("ast_to", {}), scorer.name)
+        region = getattr(team, "_last_fg_region", None) or "paint"
+        # who he set up and who set him up, by the region of the shot (paint / post / mid / three)
+        analytics_of(passer).setdefault("ast_to_r", {}).setdefault(scorer.name, {})
+        _bump(analytics_of(passer)["ast_to_r"][scorer.name], region)
+        analytics_of(scorer).setdefault("ast_by_r", {}).setdefault(passer.name, {})
+        _bump(analytics_of(scorer)["ast_by_r"][passer.name], region)
     analytics_simple(passer, "ast")
     team.team_ast += 1
 
@@ -13135,6 +13146,7 @@ def record_shot_make(team: Team, shot_type: str, context: str = "", player: Play
         SHOT_RESULT_HOOK("make", team=team, player=player, shot_type=shot_type, context=context)
     analytics_shot(player, shot_type, context, True)
     team._last_fg_scorer = player   # every assist is credited right after the make it set up
+    team._last_fg_region = shot_region(shot_type)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 
