@@ -2652,7 +2652,7 @@ def dribble_chain_pass_chance(handler, shot_type: str, context: str | None,
 def maybe_dribble_chain_pass(off, dff, handler, shot_type: str,
                              context: str | None, matchups,
                              period: int, period_time: int):
-    pass_chance = dribble_chain_pass_chance(handler, shot_type, context, period, period_time) * (1.0 - 0.6 * handler_score_first_bias(handler))
+    pass_chance = dribble_chain_pass_chance(handler, shot_type, context, period, period_time)
     if pass_chance <= 0.0 or random.random() >= pass_chance:
         return None
 
@@ -3444,31 +3444,6 @@ ROOKIE_SHOT_IQ_FLOOR = 0.66
 ROOKIE_SHOT_IQ_CEILING = 0.85
 
 
-# shot_tendency in the team files is a shot-volume number (22+ real shots a game ~ 0.85-0.99, 10 ~ 0.38, 5 ~ 0.18). The engine was tuned
-# on an older, flatter scale; this curve (the median old value at each volume, fitted over every player) turns the file number into
-# the engine's value, so the league as a whole plays the same.
-SHOT_VOLUME_CURVE = [(0.0, 0.0), (0.05, 0.17), (0.15, 0.175), (0.25, 0.195), (0.35, 0.24), (0.45, 0.305), (0.55, 0.37), (0.65, 0.46),
-                     (0.75, 0.565), (0.85, 0.60), (0.95, 0.70), (1.0, 0.74)]
-
-
-def shot_volume_to_engine(v: float) -> float:
-    pts = SHOT_VOLUME_CURVE
-    v = max(0.0, min(1.0, float(v)))
-    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
-        if v <= x1:
-            return y0 + (y1 - y0) * (v - x0) / (x1 - x0)
-    return pts[-1][1]
-
-
-def engine_to_shot_volume(e: float) -> float:
-    pts = SHOT_VOLUME_CURVE
-    e = max(0.0, min(pts[-1][1], float(e)))
-    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
-        if e <= y1:
-            return x0 + (x1 - x0) * (e - y0) / (y1 - y0)
-    return 1.0
-
-
 @dataclass(eq=True, unsafe_hash=True)
 class Player:
     name: str
@@ -3522,9 +3497,6 @@ class Player:
     iso_tendency: float = field(default=0.0, compare=False, hash=False)
     archetype: str = field(default="", compare=False, hash=False)
     go_to_shot: str = field(default="", compare=False, hash=False)
-    # shot_tendency in the team files is on a volume scale (22+ shots a game ~ 0.85-0.99). shot_scale turns it into the value the engine
-    # was calibrated with (file value x shot_scale), so rescaling the file numbers left every stat the same. Applied once, in __post_init__.
-    shot_scale: float = field(default=1.0, compare=False, hash=False)
 
 
     # box score / state
@@ -3555,12 +3527,6 @@ class Player:
     defended_matchup_diet: Dict[str, Dict[str, int]] = field(default_factory=dict, compare=False, hash=False)
 
     def __post_init__(self):
-        self.shot_tendency_display = self.shot_tendency   # the file's number: shot volume (22+ real shots a game ~ 0.85-0.99)
-        if self.shot_scale and self.shot_scale != 1.0:   # an explicit per-player factor (none of the team files use one now)
-            self.shot_tendency = round(self.shot_tendency * self.shot_scale, 6)
-        else:
-            self.shot_tendency = round(shot_volume_to_engine(self.shot_tendency), 6)
-        self.shot_scale = 1.0   # applied: a copy built from this player's fields must not convert it again
         valid_positions = {"PG", "SG", "SF", "PF", "C"}
         secondary = self.secondary_positions
         if isinstance(secondary, str):
@@ -15980,18 +15946,6 @@ def true_primary_shot_creator(player: Player) -> bool:
     )
 
 
-def handler_score_first_bias(player: Player) -> float:
-    """How much a ball-handler keeps possessions for his own shot instead of giving the ball up (0-1). An explicit roster value wins;
-    otherwise it follows his shot-volume number: none at 0.55 or below (about 14 real shots a game), full at 0.95+ (24+)."""
-    explicit = getattr(player, "score_first_bias", None)
-    if explicit:
-        return max(0.0, min(1.0, explicit))
-    v = getattr(player, "shot_tendency_display", None)
-    if v is None or not (can_play_position(player, "PG") or can_play_position(player, "SG")):
-        return 0.0   # ball-dominant guards; forwards and bigs get their shots through their own plays
-    return max(0.0, min(1.0, (v - 0.55) / 0.40))
-
-
 def shooter_weight(player: Player) -> float:
     if player.shot_tendency <= 0:
         return 0.0
@@ -17892,11 +17846,8 @@ def maybe_pick_and_roll(off: Team, dff: Team,
             roll_chance += 0.12
         roll_chance = min(0.86, roll_chance)
         pop_chance = min(0.48, pop_chance)
-        keep = handler_score_first_bias(handler)   # a score-first lead guard keeps the ball off the screen more often
-        roll_chance *= 1.0 - 0.5 * keep
-        pop_chance *= 1.0 - 0.5 * keep
         catch_shoot_target = find_pnr_catch_shoot_target(off, handler, screener)
-        if catch_shoot_target and random.random() < catch_shoot_creation_chance(handler, catch_shoot_target, "pnr") * (1.0 - 0.6 * keep):
+        if catch_shoot_target and random.random() < catch_shoot_creation_chance(handler, catch_shoot_target, "pnr"):
             target_def = matchups.get(catch_shoot_target, random.choice(dff.on_floor))
             spray_lines = [
                 f"{handler.name} sees the low man tag the roll and sprays it to {catch_shoot_target.name}.",
@@ -19203,7 +19154,6 @@ def choose_ballhandler(team: Team) -> Player:
         * fatigue_touch_multiplier(p)
         * (0.28 if can_play_position(p, "C") else 1.0)
         * (0.55 if can_play_position(p, "PF") and not can_play_position(p, "SF") else 1.0)
-        * (1.0 + 2.5 * handler_score_first_bias(p))   # a 20+ shot-a-game creator runs more of the possessions himself
         for p in top_four
     ]
     return random.choices(top_four, weights=weights, k=1)[0]
@@ -20464,12 +20414,12 @@ def simulate_possession(off: Team, dff: Team,
         # losing the playmaking rating that controls *which* passes he sees
         # and how effectively he executes them. Team-specific roster data can
         # opt into this; ordinary players remain unchanged.
-        score_first_bias = handler_score_first_bias(handler)
+        score_first_bias = max(0.0, min(1.0, getattr(handler, "score_first_bias", 0.0)))
         pass_chance *= 1.0 - 0.45 * score_first_bias
         pass_chance = max(0.30, min(0.90, pass_chance))
         if random.random() >= pass_chance:
             shooter = handler
-    primary_creator_keep = shooter.usage >= 0.30 and getattr(shooter, "shot_tendency_display", 0.0) >= 0.85   # a 20+ shot-a-game creator
+    primary_creator_keep = shooter.usage >= 0.36 and shooter.shot_tendency >= 0.70
     if (
         not closing_star_mode
         and not primary_creator_keep
@@ -20503,10 +20453,6 @@ def simulate_possession(off: Team, dff: Team,
     else:
         play_type = real_play_type(off, handler)
     play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter, previous_handler=previous_handler)
-    if (not closing_star_mode and shooter is handler and play_shooter is not None and play_shooter is not handler
-            and random.random() < 0.70 * handler_score_first_bias(handler)):
-        # a score-first lead guard (20+ shots a game) keeps part of the possessions a set would have run for a teammate
-        play_shooter, play_passer, play_context = handler, None, None
     if play_shooter is not shooter and getattr(shooter, "keep_pace_shots", False):
         # A featured scorer with a per-game attempt role that is behind his
         # minute-by-minute pace keeps some of the possessions the play type
@@ -20633,7 +20579,6 @@ def simulate_possession(off: Team, dff: Team,
         ball_owner = shooter
 
     extra_pass_chance = (0.15 + 0.52 * shooter.playmaking) * ball_movement
-    extra_pass_chance *= 1.0 - 0.70 * handler_score_first_bias(shooter)   # a score-first creator takes his own look more often
     if shooter.usage >= 0.36 and shooter.shot_tendency >= 0.70:
         extra_pass_chance *= 0.26 if true_primary_shot_creator(shooter) else 0.42
     elif shooter.usage >= 0.30 and shooter.shot_tendency >= 0.55:
