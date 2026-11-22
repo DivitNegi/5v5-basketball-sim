@@ -12939,8 +12939,18 @@ PLAY_TYPE_TAGS = (   # first match wins
 )
 
 
+OFF_SCREEN_SET_RE = re.compile(r"(pindown|_pin$|chase|relocate|_split$|floppy|curl|stagger|ghost_screen|elevator|handoff|_dho$|flare|zipper)")
+
+
+def is_movement_shooter(p) -> bool:
+    return p is not None and ("movement_shooter" in getattr(p, "badges", ()) or (p.three_rating >= 0.88 and p.three_tendency >= 0.40))
+
+
 def play_type_of(shot_type: str, context: str) -> str:
     tags = set(str(context or "").split("|")) - {""}
+    if shot_type not in ("post", "post_fade") and not tags & {"fastbreak", "fastbreak_catch_shoot", "putback", "late_putback", "post_split"} \
+            and any(OFF_SCREEN_SET_RE.search(t) for t in tags):
+        return "off_screen"
     for play, keys in PLAY_TYPE_TAGS:
         if play == "post" and shot_type in ("post", "post_fade"):
             return "post"
@@ -16371,8 +16381,8 @@ def real_play_type(off: Team, handler: Player) -> str:
         (0.9 + handler.playmaking * 0.8) * pnr_frequency,
         (1.0 + (0.6 if has_big_hub else 0.0)) * ball_movement,
         (0.9 + (0.4 if has_big_hub else 0.0)) * ball_movement,
-        (0.7 + (1.0 if has_movement or three_pref > 1.0 else 0.0)) * ball_movement * three_pref,
-        (0.55 + (1.0 if has_movement or three_pref > 1.0 else 0.0)) * ball_movement * three_pref,
+        (0.7 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (1.5 if has_movement else 0.0)) * ball_movement * three_pref,
+        (0.55 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (1.1 if has_movement else 0.0)) * ball_movement * three_pref,
         (0.55 + handler.playmaking * 0.7) * ball_movement,
         (0.75 + handler.playmaking) * (0.85 + ball_movement * 0.25),
         (0.7 + (0.8 if has_big_hub else 0.0)) * (1.0 + max(0.0, ball_movement - 1.0) * 0.40),
@@ -17011,17 +17021,28 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
         print(f"{passer.name} pulls the defense one way as {target.name} breaks into the open space.")
         return target, passer, play_type
 
-    if play_type == "floppy":
-        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and (p.three_rating >= 0.82 or "movement_shooter" in p.badges)], current_shooter)
-        target = best_play_target(options, lambda p: p.three_rating, current_shooter)
-        print(f"{target.name} works across two screens and pops free on the wing.")
-        return target, handler, "floppy"
-
-    if play_type == "elevator":
-        options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and p.three_rating >= 0.80], current_shooter)
-        target = best_play_target(options, lambda p: 0.75 * p.three_rating + 0.25 * shooter_weight(p), current_shooter)
+    if play_type in ("floppy", "elevator"):
+        # a movement shooter bringing the ball up can give it to another creator and run off the screens himself
+        relay = None
+        if is_movement_shooter(handler) and random.random() < 0.40:
+            relay = max((p for p in off.on_floor if p is not handler and p is not previous_handler and p.playmaking >= 0.55),
+                        key=lambda p: p.playmaking, default=None)
+        pool = [p for p in off.on_floor if p is not previous_handler and (p is not handler or relay is not None)]
+        if play_type == "floppy":
+            options = designed_shooter_options([p for p in pool if p is not relay and (p.three_rating >= 0.82 or "movement_shooter" in p.badges)], current_shooter)
+            target = best_play_target(options, lambda p: p.three_rating + (0.06 if is_movement_shooter(p) else 0.0), current_shooter)
+            passer = (relay or handler) if target is handler else handler
+            if target is handler and relay is not None:
+                print(f"{handler.name} gives it up to {relay.name} and runs off two screens.")
+            print(f"{target.name} works across two screens and pops free on the wing.")
+            return target, passer, "floppy"
+        options = designed_shooter_options([p for p in pool if p is not relay and p.three_rating >= 0.80], current_shooter)
+        target = best_play_target(options, lambda p: 0.75 * p.three_rating + 0.25 * shooter_weight(p) + (0.05 if is_movement_shooter(p) else 0.0), current_shooter)
+        passer = (relay or handler) if target is handler else handler
+        if target is handler and relay is not None:
+            print(f"{handler.name} swings it to {relay.name} and loops into the elevator doors.")
         print(f"{target.name} curls between two screeners and flashes to the top.")
-        return target, handler, "elevator"
+        return target, passer, "elevator"
 
     if play_type == "backdoor":
         options = designed_shooter_options([p for p in off.on_floor if p is not handler and p is not previous_handler and (p.rim_rating >= 0.80 or p.dunk_tendency >= 0.25)], current_shooter)
@@ -20473,7 +20494,8 @@ def simulate_possession(off: Team, dff: Team,
         if pace_gap > 0.75 and random.random() < pace_keep_chance(pace_gap):
             play_shooter, play_passer, play_context = shooter, None, None
     off.current_play_initiator = None
-    if play_passer and play_passer is not play_shooter and play_shooter is handler:
+    if play_passer and play_passer is not play_shooter and play_shooter is handler and play_context not in ("floppy", "elevator"):
+        # (floppy / elevator: the handler gave it up and ran off the screens, so the relay's pass is real)
         # the designed shooter already has the ball (he just got it from the first handler): nobody passes it to him a second time
         play_passer = previous_handler if previous_handler is not play_shooter else None
         if play_passer is not None:
