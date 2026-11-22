@@ -2812,16 +2812,17 @@ async function ppLinks(offView, defView, d, source) {
   };
   const regLabel = { paint: "Paint", post: "Post", mid: "Mid", three: "3PT" };
   // one row per position (PG ... C): share of the shots, then made / shots and FG% overall and in each region
-  const positionTable = (title, blurb, byPos) => {
+  const positionTable = (title, blurb, byPos, lgPos = {}) => {
     const rows = Object.entries(byPos || {});
     if (!rows.length) return h("div", {}, sub(title), h("div", { class: "muted" }, "No matchups recorded yet."));
     const total = rows.reduce((t, [, v]) => t + (v.all?.[1] || 0), 0);
-    const cell = (x) => (x && x[1] ? h("td", { style: { whiteSpace: "nowrap" } }, `${x[0]}/${x[1]} `, h("span", { class: "muted" }, `(${pct(x[0], x[1])})`)) : h("td", { class: "muted" }, "–"));
+    const cell = (x, lg) => (x && x[1] ? h("td", { style: { whiteSpace: "nowrap" } }, `${x[0]}/${x[1]} `, h("span", { class: "muted" }, `(${pct(x[0], x[1])})`),
+      lg && lg[1] ? h("div", { class: "muted", style: { fontSize: "11px" } }, `lg ${pct(lg[0], lg[1])}`) : null) : h("td", { class: "muted" }, "–"));
     return h("div", {}, sub(title), note(blurb), h("div", { class: "table-wrap" }, h("table", { class: "stats" },
       h("thead", {}, h("tr", {}, ["Position", "Share", "All", "Paint", "Post", "Mid", "3PT"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
       h("tbody", {}, rows.map(([pos, v]) => h("tr", {}, h("td", { class: "l" }, h("b", {}, pos)),
         h("td", {}, total ? `${(100 * (v.all?.[1] || 0) / total).toFixed(1)}%` : "–"),
-        cell(v.all), cell(v.paint), cell(v.post), cell(v.mid), cell(v.three)))))));
+        ...["all", "paint", "post", "mid", "three"].map((r) => cell(v[r], (lgPos[pos] || {})[r]))))))));
   };
   // a value with the league average under it; higherBetter: true colours it (null = style only, no colour)
   const vsLeague = (v, lgv, unit, higherBetter) => {
@@ -2840,11 +2841,11 @@ async function ppLinks(offView, defView, d, source) {
     note("Small line under each number: the league average on the same shots. Green = better than the league, red = worse (share and assisted are just style). Makes assisted: the share of his made shots in that region that came off a teammate's assist; the rest he created himself."),
     regionList("Who he assisted the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_to, reg)),
     regionList("Who assisted him the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_by, reg)),
-    positionTable("Which positions guarded him", "His shots with a defender of each position on him: made / shots and FG% in each region; share = how much of his shots that position defended.", L.guarded_by_pos),
+    positionTable("Which positions guarded him", "His shots with a defender of each position on him: made / shots and FG% in each region; share = how much of his shots that position defended. Small line: how the whole league shot against that position there.", L.guarded_by_pos, L.lg_def_pos),
     regionList("Who guarded him the most", "Shots he took with that player defending.", ["Defender", "Made", "Shots", "FG%"], (reg) => shotsIn(L.guarded_by, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
     searchBox("off"));
   defView.replaceChildren(defenseBox(d) || h("div", { class: "muted" }, "No defensive shots recorded yet."),
-    positionTable("Which positions he guarded", "Shots by the players he defended, grouped by their position: made / shots and FG% allowed in each region; share = how much of his defended shots came against that position.", L.guarded_pos),
+    positionTable("Which positions he guarded", "Shots by the players he defended, grouped by their position: made / shots and FG% allowed in each region; share = how much of his defended shots came against that position. Small line: how that position shot league-wide there.", L.guarded_pos, L.lg_shooter_pos),
     regionList("Who he guarded the most", "Shots taken by the player he was defending.", ["Player", "Made", "Shots", "FG% allowed"], (reg) => shotsIn(L.guarded, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
     searchBox("def"));
 }

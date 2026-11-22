@@ -746,8 +746,24 @@ def player_links(runner, source, team, name):
         order = {"PG": 0, "SG": 1, "SF": 2, "PF": 3, "C": 4}
         return dict(sorted(out.items(), key=lambda kv: order.get(kv[0], 9)))
 
+    # league on the same rows: every matchup in these games, by the defender's position and by the shooter's position
+    lg_def_pos, lg_shooter_pos = {}, {}
+    owner_any = {}
+    for tn, pp in players.items():
+        for pn in pp:
+            owner_any.setdefault(pn, tn)
+    for tn, pp in players.items():
+        for pn, stx in pp.items():
+            dpos = pos_of(tn, pn)
+            for opp, d in (stx.get("defended_matchup_diet") or {}).items():
+                regs = _regions_of(d)
+                spos = pos_of(owner_any.get(opp, ""), opp)
+                for bucket, key in ((lg_def_pos, dpos), (lg_shooter_pos, spos)):
+                    slot = bucket.setdefault(key, {r: [0, 0] for r in ("all", "paint", "post", "mid", "three")})
+                    for r in slot:
+                        slot[r][0] += regs[r][0]; slot[r][1] += regs[r][1]
     guarded_by_pos = by_position(guarded_by, lambda nm: guarded_by[nm].get("team", owner.get(nm, "")))
     guarded_pos = by_position(guarded, lambda nm: owner.get(nm, ""))
     return {"name": name, "team": team, "source": source, "games": games, "mates": mates, "regions_tracked": bool(a.get("ast_to_r") or a.get("ast_by_r")),
             "ast_to": ast_to, "ast_by": ast_by, "shot_regions": region_rows, "guarded_by": guarded_by, "guarded": guarded,
-            "guarded_by_pos": guarded_by_pos, "guarded_pos": guarded_pos}
+            "guarded_by_pos": guarded_by_pos, "guarded_pos": guarded_pos, "lg_def_pos": lg_def_pos, "lg_shooter_pos": lg_shooter_pos}
