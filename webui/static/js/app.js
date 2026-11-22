@@ -2821,11 +2821,11 @@ async function ppLinks(offView, defView, d, source) {
   offView.replaceChildren(
     h("h4", { class: "pp-sub" }, "His shots by region"),
     h("div", { class: "table-wrap" }, h("table", { class: "stats" },
-      h("thead", {}, h("tr", {}, ["Region", "FG", "FG%", "A game", "Share", "Pts / shot", "Assisted"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+      h("thead", {}, h("tr", {}, ["Region", "FG", "FG%", "A game", "Share", "Pts / shot", "Makes assisted"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
       h("tbody", {}, L.shot_regions.map((r) => h("tr", {}, h("td", { class: "l" }, regLabel[r.region]), h("td", {}, `${r.made}/${r.att}`),
         vsLeague(r.pct, r.lg_pct, "%", true), h("td", {}, r.per_game), vsLeague(r.share, r.lg_share, "%", null),
         vsLeague(r.pts_per_shot, r.lg_pts_per_shot, "", true), vsLeague(r.assisted_pct, r.lg_assisted_pct, "%", null)))))),
-    note("Small line under each number: the league average on the same shots. Green = better than the league, red = worse (share and assisted are just style)."),
+    note("Small line under each number: the league average on the same shots. Green = better than the league, red = worse (share and assisted are just style). Makes assisted: the share of his made shots in that region that came off a teammate's assist; the rest he created himself."),
     regionList("Who he assisted the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_to, reg)),
     regionList("Who assisted him the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_by, reg)),
     regionList("Who guarded him the most", "Shots he took with that player defending.", ["Defender", "Made", "Shots", "FG%"], (reg) => shotsIn(L.guarded_by, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
