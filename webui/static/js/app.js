@@ -2788,10 +2788,10 @@ async function ppLinks(offView, defView, d, source) {
         h("td", {}, r.per_game), h("td", {}, r.share != null ? `${r.share}%` : "–"), h("td", {}, r.pts_per_shot ?? "–"), h("td", {}, r.assisted_pct != null ? `${r.assisted_pct}%` : "–")))))),
     regionList("Who he assisted the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_to, reg)),
     regionList("Who assisted him the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_by, reg)),
-    regionList("Who guarded him the most", "Shots he took with that player defending.", ["Defender", "Shots", "Made", "FG%"], (reg) => shotsIn(L.guarded_by, reg).map(([nm, x]) => [nm, x[1], x[0], pct(x[0], x[1])])),
+    regionList("Who guarded him the most", "Shots he took with that player defending.", ["Defender", "Made", "Shots", "FG%"], (reg) => shotsIn(L.guarded_by, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
     searchBox("off"));
   defView.replaceChildren(defenseBox(d) || h("div", { class: "muted" }, "No defensive shots recorded yet."),
-    regionList("Who he guarded the most", "Shots taken by the player he was defending.", ["Player", "Shots", "Made", "FG% allowed"], (reg) => shotsIn(L.guarded, reg).map(([nm, x]) => [nm, x[1], x[0], pct(x[0], x[1])])),
+    regionList("Who he guarded the most", "Shots taken by the player he was defending.", ["Player", "Made", "Shots", "FG% allowed"], (reg) => shotsIn(L.guarded, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
     searchBox("def"));
 }
 // The player pop-up's Play types tab: every play type he uses, how often and how well, next to the league on the same play
