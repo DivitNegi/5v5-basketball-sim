@@ -26155,7 +26155,10 @@ def build_season_sections(entries: List[Dict],
                     "ppg": pts / games, "ts": ts, "mpg": q4.get("minutes", 0) / 60 / games}
 
         clutch_rows = []
-        for item in all_players:
+        # the Clutch Player award began in 2022-23: a season made only of teams from before 2023 does not give one
+        team_years = [int(str(row.get("team", ""))[:4]) for row in standings if str(row.get("team", ""))[:4].isdigit()]
+        pre_clutch_award_era = bool(team_years) and len(team_years) == len(standings) and max(team_years) < 2023
+        for item in ([] if pre_clutch_award_era else all_players):
             line = fourth_quarter_line(item[2])
             if line and line["games"] >= 30 and line["mpg"] >= 5.0 and line["ts"] >= 0.54:
                 clutch_rows.append((line["ppg"] * (1.0 + (line["ts"] - 0.56)), line, item))
@@ -26298,8 +26301,13 @@ def build_season_sections(entries: List[Dict],
         all_rookie_rows = []  # listed last, below the All-NBA / All-Defensive teams
         if rookies:
             roy = max(rookies, key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05)
-            awards.append(("Rookie of the Year", roy[1], f"{roy[0]} | {roy[2].get('pts', 0) / max(1, roy[2].get('games', 1)):.1f} PPG, {roy[2].get('reb', 0) / max(1, roy[2].get('games', 1)):.1f} RPG, {roy[2].get('ast', 0) / max(1, roy[2].get('games', 1)):.1f} APG"))
-            awards_table.append({"award": "Rookie of the Year", "player": roy[1], "team": roy[0], "stats": stat_line(roy[0], roy[2])})
+            # listed at the top, right below DPOY
+            roy_award = ("Rookie of the Year", roy[1], f"{roy[0]} | {roy[2].get('pts', 0) / max(1, roy[2].get('games', 1)):.1f} PPG, {roy[2].get('reb', 0) / max(1, roy[2].get('games', 1)):.1f} RPG, {roy[2].get('ast', 0) / max(1, roy[2].get('games', 1)):.1f} APG")
+            roy_row = {"award": "Rookie of the Year", "player": roy[1], "team": roy[0], "stats": stat_line(roy[0], roy[2])}
+            at = next((i + 1 for i, a in enumerate(awards) if a[0] == "DPOY"), len(awards))
+            awards.insert(at, roy_award)
+            at = next((i + 1 for i, a in enumerate(awards_table) if a.get("award") == "DPOY"), len(awards_table))
+            awards_table.insert(at, roy_row)
             ranked_rookies = sorted(
                 rookies,
                 key=lambda item: award_score(item) + item[2].get("plus_minus", 0) / max(1, item[2].get("games", 1)) * 0.05,
