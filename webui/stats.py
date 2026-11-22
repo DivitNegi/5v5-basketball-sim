@@ -726,5 +726,28 @@ def player_links(runner, source, team, name):
         regs = _regions_of(d)
         if regs["all"][1]:
             guarded[opp] = regs
+    # the same matchups grouped by position: which positions guarded him, and which positions he guarded
+    def pos_of(team_name, player_name):
+        st_ = (players.get(team_name) or {}).get(player_name) or {}
+        return (st_.get("position") or _positions(runner, team_name).get(player_name) or "?").upper()[:2]
+    owner = {}   # opponent name -> his team (first team that has him, other than ours)
+    for tn, pp in players.items():
+        if tn != team:
+            for pn in pp:
+                owner.setdefault(pn, tn)
+
+    def by_position(entries, team_of):
+        out = {}
+        for nm, regs in entries.items():
+            pos = pos_of(team_of(nm), nm)
+            slot = out.setdefault(pos, {r: [0, 0] for r in ("all", "paint", "post", "mid", "three")})
+            for r in slot:
+                slot[r][0] += regs[r][0]; slot[r][1] += regs[r][1]
+        order = {"PG": 0, "SG": 1, "SF": 2, "PF": 3, "C": 4}
+        return dict(sorted(out.items(), key=lambda kv: order.get(kv[0], 9)))
+
+    guarded_by_pos = by_position(guarded_by, lambda nm: guarded_by[nm].get("team", owner.get(nm, "")))
+    guarded_pos = by_position(guarded, lambda nm: owner.get(nm, ""))
     return {"name": name, "team": team, "source": source, "games": games, "mates": mates, "regions_tracked": bool(a.get("ast_to_r") or a.get("ast_by_r")),
-            "ast_to": ast_to, "ast_by": ast_by, "shot_regions": region_rows, "guarded_by": guarded_by, "guarded": guarded}
+            "ast_to": ast_to, "ast_by": ast_by, "shot_regions": region_rows, "guarded_by": guarded_by, "guarded": guarded,
+            "guarded_by_pos": guarded_by_pos, "guarded_pos": guarded_pos}
