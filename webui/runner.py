@@ -320,7 +320,12 @@ class SimRunner:
         for index, player in enumerate(players):
             key = f"{index}:{getattr(player, 'fantasy_base_name', player.name)}"
             by_key[key] = player
-            rows.append({**rating_summary(player), "key": key})
+            versions = list(getattr(player, "fantasy_versions", None) or [player])
+            vrows = []
+            for j, version in enumerate(versions):
+                by_key[f"{key}|v{j}"] = version
+                vrows.append({**rating_summary(version), "vkey": f"{key}|v{j}"})
+            rows.append({**rating_summary(player), "key": key, "versions": vrows if len(vrows) > 1 else []})
         value = self._wait_draft_choice({"kind": "player", "title": "You are on the clock", "players": rows})
         if value == "__auto__":
             return sim_engine.FANTASY_DRAFT_AUTO
@@ -577,6 +582,7 @@ class SimRunner:
             elif mode in FANTASY_SEASON_MODES:
                 year_prefix = "2027 " if "2027" in mode else None
                 names, factories, user_team = sim_engine.run_fantasy_season_draft(year_prefix)
+                self.fantasy_factories = dict(factories or {})   # the drafted teams, for the team pop-up's roster
                 if names and factories:
                     self.set_status("Fantasy season running")
                     self._season_speed_on(1.0)   # as in Tk, a fantasy season starts slow so you can follow your team: + speeds it up

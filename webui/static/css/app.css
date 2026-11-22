@@ -1091,3 +1091,15 @@ select.bld-in { min-width: 0; }
 .badge.tier-4 { background: linear-gradient(90deg, rgba(168, 85, 247, .22), rgba(236, 72, 153, .22)); color: #f0abfc; border: 1px solid rgba(217, 70, 239, .45); }
 .re-badges .badges { margin-top: 6px; }
 .tc-badges td { vertical-align: top; }
+
+/* draft: recent picks and the version picker */
+.pick-row { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+.pick-row:last-child { border-bottom: 0; }
+.pick-row.mine { background: rgba(245, 165, 36, .08); border-radius: 10px; }
+.pick-row .pick-no { color: var(--muted); font-weight: 700; font-size: 13px; }
+.pick-row .pick-main { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.pick-row .pick-main b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-row .pick-main span, .pick-row .pick-main small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-row > :last-child:not(.pick-main) { font-weight: 800; font-size: 16px; }
+.draft-act { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.draft-act .draft-ver { max-width: 210px; padding: 6px 8px; font-size: 12.5px; }

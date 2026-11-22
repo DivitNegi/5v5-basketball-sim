@@ -2034,19 +2034,50 @@ function lineupPanel(roster, title = "Your lineup") {
     !roster.length ? h("div", { class: "empty" }, "No players yet.") : null);
 }
 
-async function loadDraft() {
+// The Draft tab polls once a second; it only redraws when something changed (a pick, a new prompt, a version choice), and keeps the
+// scroll position when it does -- redrawing the whole board every second made clicks miss and threw the player list back to the top.
+let DRAFT_SIG = "";
+function draftScrollers() {
+  return [document.scrollingElement, ...document.querySelectorAll("#view-draft, #view-draft .table-wrap, #view-draft .stx-wrap, main, .main, .content")].filter(Boolean);
+}
+async function loadDraft(force = false) {
   const d = await api.get("/api/draft"), root = $("#draftBoard");
+  const pl = d.prompt?.players || [];
+  const sig = JSON.stringify([d.active, d.prompt?.kind, d.prompt?.title, d.prompt?.message, pl.length, pl.slice(0, 5).map((x) => x.key), d.state?.log?.length,
+    d.state?.on_clock, d.state?.round, (d.roster || []).length, DRAFT_VER]);
+  if (!force && sig === DRAFT_SIG && root.childElementCount) return;
+  DRAFT_SIG = sig;
+  const keep = draftScrollers().map((el) => [el, el.scrollTop]);
+  requestAnimationFrame(() => keep.forEach(([el, y]) => { if (el.isConnected) el.scrollTop = y; }));
   const mine = d.roster || [];
   const picks = d.state?.log ? d.state.log.slice(-10).reverse() : [];
   const side = h("div", { class: "draft-side" }, lineupPanel(mine, `Your roster (${mine.length})`),
-    picks.length ? h("div", { class: "lineup-panel" }, h("h3", {}, "Recent picks"), picks.map((x) => h("div", { class: `lu-row ${x.user ? "mine" : ""}` }, h("span", { class: "pos" }, `#${x.overall}`), h("div", { class: "lu-name" }, h("b", {}, x.player), h("span", { class: "muted" }, `${x.team.replace(/^\d{4} /, "")} · ${x.pos}`)), h("b", {}, x.ovr)))) : null);
+    picks.length ? h("div", { class: "lineup-panel" }, h("h3", {}, "Recent picks"), picks.map((x) => h("div", { class: `pick-row ${x.user ? "mine" : ""}` }, h("span", { class: "pick-no" }, `#${x.overall}`), h("div", { class: "pick-main" }, h("b", {}, x.player), h("span", { class: "muted" }, `${x.team.replace(/^\d{4} /, "")} · ${x.pos}`)), h("b", {}, x.ovr)))) : null);
   if (!d.active) { root.replaceChildren(h("div", { class: "draft-layout" }, h("div", {}, h("div", { class: "empty" }, d.state?.on_clock ? `${d.state.on_clock} are picking…` : "Start a draft to open the board.")), mine.length ? side : null)); return; }
   const p = d.prompt;
   if (p.kind === "option") { root.replaceChildren(h("div", { class: "draft-layout" }, h("div", {}, h("h3", {}, p.title), p.message ? h("p", { class: "muted" }, p.message) : null, h("div", { class: "action-row" }, p.options.map((x) => h("button", { class: "btn", onclick: () => chooseDraft(x) }, x)))), side)); return; }
   const st = d.state || {};
   root.replaceChildren(h("div", { class: "draft-layout" }, h("div", {},
     h("div", { class: "panel-head" }, h("h3", {}, `${p.title}${st.round ? ` · round ${st.round} of ${st.rounds}, pick ${st.pick_in_round}` : ""}`), h("button", { class: "btn", onclick: () => chooseDraft("__auto__") }, "Auto-draft the rest")),
-    playerTable(p.players, { id: "draftPool", action: (pl) => h("button", { class: "btn", onclick: () => chooseDraft(pl.key) }, "Draft") })), side));
+    playerTable(p.players.map(draftRowWithVersion), { id: "draftPool", action: (pl) => h("div", { class: "draft-act" },
+      pl.versions && pl.versions.length ? draftVersionSelect(pl) : null,
+      h("button", { class: "btn", onclick: () => chooseDraft(pl._vkey || pl.key) }, "Draft")) })), side));
+}
+// a player with several seasons in the pool: pick which one; the row (overall, ratings, team) shows the chosen season
+const DRAFT_VER = {};   // player key -> chosen version key
+function draftRowWithVersion(pl) {
+  if (!pl.versions || !pl.versions.length) return pl;
+  const vk = DRAFT_VER[pl.key];
+  const v = vk && pl.versions.find((x) => x.vkey === vk);
+  return v ? { ...pl, ...v, key: pl.key, versions: pl.versions, _vkey: v.vkey } : pl;
+}
+function draftVersionSelect(pl) {
+  const sel = h("select", { class: "bld-in draft-ver", title: "Which season of him to draft", onclick: (e) => e.stopPropagation() },
+    pl.versions.map((v) => h("option", { value: v.vkey }, `${v.team || "?"} · ${v.ovr}`)));
+  sel.value = pl._vkey || pl.versions.reduce((best, v) => (v.ovr > best.ovr ? v : best), pl.versions[0]).vkey;
+  if (!pl._vkey) { const shown = pl.versions.find((v) => v.team === pl.team && v.ovr === pl.ovr); if (shown) sel.value = shown.vkey; }
+  sel.addEventListener("change", () => { DRAFT_VER[pl.key] = sel.value; loadDraft(); });
+  return sel;
 }
 async function chooseDraft(value) { try { await api.post("/api/draft", { value }); setTimeout(loadDraft, 250); } catch (e) { toast(e.message, "err"); } }
 
@@ -3752,6 +3783,7 @@ async function boot() {
   $$("#nav .nav-item[data-view]").forEach((b) => b.addEventListener("click", () => {
     $$("#nav .nav-item").forEach((x) => x.classList.toggle("active", x === b));
     $$(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${b.dataset.view}`));
+    if (PF.el) PF.el.style.display = b.dataset.view === "draft" ? "none" : "";   // the pop-out play-by-play stays out of the way while drafting
     if (b.dataset.view === "box") { renderBox(); refreshBoxSeries(); }
     if (b.dataset.view === "flow") renderFlow("#flowBig", 420);
     if (b.dataset.view === "season") refreshSeason();

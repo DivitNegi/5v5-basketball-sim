@@ -480,9 +480,27 @@ def team_card_roster(runner, team):
     try:
         cards = roster_payload(runner, team).get("players") or []
     except Exception:
-        return []
+        cards = []
     sec = runner.sections or {}
-    totals = (sec.get("_season_player_totals") or sec.get("_playoff_player_totals") or {}).get(team, {})
+    totals = dict((sec.get("_season_player_totals") or sec.get("_playoff_player_totals") or {}).get(team, {}))   # a copy: never add to the season data
+    if not cards:
+        # a fantasy / custom team is not in the team files: its roster is whoever played for it, from the season totals,
+        # rated from the players the draft handed out when the engine still has them
+        built = {}
+        fac = (getattr(runner, "fantasy_factories", None) or {}).get(team) or ((getattr(runner, "post", None) or {}).get("factories") or {}).get(team)
+        if fac:
+            try:
+                t = fac()
+                sim_engine.assign_player_badges(t)
+                built = {p.name: p for p in t.roster}
+                for nm in built:
+                    totals.setdefault(nm, {})
+            except Exception:
+                built = {}
+        for nm, st in totals.items():
+            p = built.get(nm)
+            cards.append(_player_card(p) if p is not None else {"name": nm, "pos": st.get("position", ""), "ovr": None, "height": 0, "archetype": "", "rookie": False})
+        cards.sort(key=lambda c: (-(c.get("ovr") or 0), -(totals.get(c["name"], {}).get("minutes", 0) or 0)))
     out = []
     for c in cards:
         st = totals.get(c["name"]) or {}
