@@ -2816,7 +2816,7 @@ async function ppLinks(offView, defView, d, source) {
     const rows = Object.entries(byPos || {});
     if (!rows.length) return h("div", {}, sub(title), h("div", { class: "muted" }, "No matchups recorded yet."));
     const total = rows.reduce((t, [, v]) => t + (v.all?.[1] || 0), 0);
-    const cell = (x) => (x && x[1] ? h("td", {}, `${x[0]}/${x[1]}`, h("div", { class: "muted", style: { fontSize: "11px" } }, pct(x[0], x[1]))) : h("td", { class: "muted" }, "–"));
+    const cell = (x) => (x && x[1] ? h("td", { style: { whiteSpace: "nowrap" } }, `${x[0]}/${x[1]} `, h("span", { class: "muted" }, `(${pct(x[0], x[1])})`)) : h("td", { class: "muted" }, "–"));
     return h("div", {}, sub(title), note(blurb), h("div", { class: "table-wrap" }, h("table", { class: "stats" },
       h("thead", {}, h("tr", {}, ["Position", "Share", "All", "Paint", "Post", "Mid", "3PT"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
       h("tbody", {}, rows.map(([pos, v]) => h("tr", {}, h("td", { class: "l" }, h("b", {}, pos)),
