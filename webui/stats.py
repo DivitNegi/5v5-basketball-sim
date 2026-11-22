@@ -687,13 +687,28 @@ def player_links(runner, source, team, name):
     # his own shots by region and how many of his makes came off a pass
     shots = _regions_of(mine.get("shot_diet"))
     assisted_made = {r: sum(int(v.get(r, 0) or 0) for v in (a.get("ast_by_r") or {}).values()) for r, _ in REGIONS}
+    # league on the same rows: every player in these games
+    lg = {r: [0, 0, 0] for r, _ in REGIONS}   # made, attempts, assisted makes
+    for tn, pp in players.items():
+        for pn, stx in pp.items():
+            rr = _regions_of(stx.get("shot_diet"))
+            ab = (stx.get("analytics") or {}).get("ast_by_r") or {}
+            for r, _ in REGIONS:
+                lg[r][0] += rr[r][0]; lg[r][1] += rr[r][1]
+                lg[r][2] += sum(int(v.get(r, 0) or 0) for v in ab.values())
+    lg_att = sum(v[1] for v in lg.values())
+    lg_tracked = any(v[2] for v in lg.values())
     region_rows = []
     for r, _ in REGIONS:
         m, att = shots[r]
         pts = m * (3 if r == "three" else 2)
         region_rows.append({"region": r, "made": m, "att": att, "pct": round(100 * m / att, 1) if att else None, "per_game": round(att / games, 1),
                             "share": round(100 * att / shots["all"][1], 1) if shots["all"][1] else None, "pts_per_shot": round(pts / att, 2) if att else None,
-                            "assisted": assisted_made[r], "assisted_pct": round(100 * assisted_made[r] / m, 1) if m and (a.get("ast_by_r")) else None})
+                            "assisted": assisted_made[r], "assisted_pct": round(100 * assisted_made[r] / m, 1) if m and (a.get("ast_by_r")) else None,
+                            "lg_pct": round(100 * lg[r][0] / lg[r][1], 1) if lg[r][1] else None,
+                            "lg_share": round(100 * lg[r][1] / lg_att, 1) if lg_att else None,
+                            "lg_pts_per_shot": round(lg[r][0] * (3 if r == "three" else 2) / lg[r][1], 2) if lg[r][1] else None,
+                            "lg_assisted_pct": round(100 * lg[r][2] / lg[r][0], 1) if lg[r][0] and lg_tracked else None})
     # who guarded him: every opponent's matchup log entry for him
     guarded_by = {}
     for tn, pp in players.items():

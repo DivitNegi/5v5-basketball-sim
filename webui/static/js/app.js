@@ -2780,12 +2780,21 @@ async function ppLinks(offView, defView, d, source) {
       input, h("datalist", { id: listId }, names.map((n) => h("option", { value: n }))), out);
   };
   const regLabel = { paint: "Paint", post: "Post", mid: "Mid", three: "3PT" };
+  // a value with the league average under it; higherBetter: true colours it (null = style only, no colour)
+  const vsLeague = (v, lgv, unit, higherBetter) => {
+    if (v == null) return h("td", {}, "–");
+    const diff = lgv == null ? null : v - lgv;
+    const cls = higherBetter == null || diff == null ? "" : Math.abs(diff) < (unit === "%" ? 1 : 0.03) ? "" : (diff > 0) === higherBetter ? "pm-pos" : "pm-neg";
+    return h("td", { class: cls }, `${v}${unit}`, lgv != null ? h("div", { class: "muted", style: { fontSize: "11px", fontWeight: 400 } }, `lg ${lgv}${unit}`) : null);
+  };
   offView.replaceChildren(
     h("h4", { class: "pp-sub" }, "His shots by region"),
     h("div", { class: "table-wrap" }, h("table", { class: "stats" },
       h("thead", {}, h("tr", {}, ["Region", "FG", "FG%", "A game", "Share", "Pts / shot", "Assisted"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
-      h("tbody", {}, L.shot_regions.map((r) => h("tr", {}, h("td", { class: "l" }, regLabel[r.region]), h("td", {}, `${r.made}/${r.att}`), h("td", {}, r.pct != null ? `${r.pct}%` : "–"),
-        h("td", {}, r.per_game), h("td", {}, r.share != null ? `${r.share}%` : "–"), h("td", {}, r.pts_per_shot ?? "–"), h("td", {}, r.assisted_pct != null ? `${r.assisted_pct}%` : "–")))))),
+      h("tbody", {}, L.shot_regions.map((r) => h("tr", {}, h("td", { class: "l" }, regLabel[r.region]), h("td", {}, `${r.made}/${r.att}`),
+        vsLeague(r.pct, r.lg_pct, "%", true), h("td", {}, r.per_game), vsLeague(r.share, r.lg_share, "%", null),
+        vsLeague(r.pts_per_shot, r.lg_pts_per_shot, "", true), vsLeague(r.assisted_pct, r.lg_assisted_pct, "%", null)))))),
+    note("Small line under each number: the league average on the same shots. Green = better than the league, red = worse (share and assisted are just style)."),
     regionList("Who he assisted the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_to, reg)),
     regionList("Who assisted him the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_by, reg)),
     regionList("Who guarded him the most", "Shots he took with that player defending.", ["Defender", "Made", "Shots", "FG%"], (reg) => shotsIn(L.guarded_by, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
