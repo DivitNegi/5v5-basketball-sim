@@ -2277,6 +2277,15 @@ async function openTeamCard(team) {
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
           d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)),
       ...(d.insights ? teamInsights(d.insights, id, team) : []),
+      d.assist_net ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Assist network"),
+        h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "Row = the passer, column = the scorer: how many times he assisted him this season."),
+        h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+          h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Passer \\ scorer"), d.assist_net.names.map((n) => h("th", { title: n }, n.split(" ").slice(-1)[0])))),
+          h("tbody", {}, d.assist_net.names.map((p) => {
+            const row = d.assist_net.grid[p] || {}, mx = Math.max(1, ...Object.values(d.assist_net.grid).flatMap((r) => Object.values(r)));
+            return h("tr", {}, h("td", { class: "l", style: { whiteSpace: "nowrap" } }, p), d.assist_net.names.map((s2) => s2 === p ? h("td", { class: "muted" }, "·")
+              : h("td", { style: { background: row[s2] ? `rgba(245,165,36,${(0.08 + 0.5 * row[s2] / mx).toFixed(2)})` : "" } }, row[s2] || "")));
+          }))))) : null,
       h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Roster"),
         (d.roster || []).length ? h("div", { class: "table-wrap" }, h("table", { class: "stats tc-roster" },
           h("thead", {}, h("tr", {}, ["Player", "Pos", "OVR", "Ht", "Archetype", "GP", "MIN", "PTS", "REB", "AST"].map((c, i) => h("th", { class: i === 0 || i === 4 ? "l" : "" }, c)))),
@@ -2843,11 +2852,90 @@ async function ppLinks(offView, defView, d, source) {
     regionList("Who assisted him the most", regNote, ["Teammate", "Assists"], (reg) => count(L.ast_by, reg)),
     positionTable("Which positions guarded him", "His shots with a defender of each position on him: made / shots and FG% in each region; share = how much of his shots that position defended. Small line: how the whole league shot against that position there.", L.guarded_by_pos, L.lg_def_pos),
     regionList("Who guarded him the most", "Shots he took with that player defending.", ["Defender", "Made", "Shots", "FG%"], (reg) => shotsIn(L.guarded_by, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
-    searchBox("off"));
+    searchBox("off"), ...offenseExtras(L.extras || {}, L.games || 1, { sub, note, pct, person, regLabel }));
   defView.replaceChildren(defenseBox(d) || h("div", { class: "muted" }, "No defensive shots recorded yet."),
     positionTable("Which positions he guarded", "Shots by the players he defended, grouped by their position: made / shots and FG% allowed in each region; share = how much of his defended shots came against that position. Small line: how that position shot league-wide there.", L.guarded_pos, L.lg_shooter_pos),
     regionList("Who he guarded the most", "Shots taken by the player he was defending.", ["Player", "Made", "Shots", "FG% allowed"], (reg) => shotsIn(L.guarded, reg).map(([nm, x]) => [nm, x[0], x[1], pct(x[0], x[1])])),
-    searchBox("def"));
+    searchBox("def"), ...defenseExtras(L.extras || {}, L.games || 1, { sub, note, pct, person, regLabel }));
+}
+const PP_R4 = ["paint", "post", "mid", "three"];
+const ppTable = (heads, rows) => h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+  h("thead", {}, h("tr", {}, heads.map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+  h("tbody", {}, rows.map((r) => h("tr", {}, r.map((c, i) => (c instanceof Node ? (c.tagName === "TD" ? c : h("td", { class: i === 0 ? "l" : "" }, c)) : h("td", { class: i === 0 ? "l" : "" }, c ?? "–"))))))));
+const ppNameList = (map, cols, U, limit = 8) => {
+  const rows = Object.entries(map || {}).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  return rows.length ? ppTable(cols, rows.map(([nm, c]) => [U.person(nm), c])) : h("div", { class: "muted" }, "None yet.");
+};
+const ppVs = (v, lg, unit, higher) => {   // a number with the league under it, green / red when it is clearly better / worse
+  if (v == null) return h("td", {}, "–");
+  const d = lg == null ? null : v - lg;
+  const cls = higher == null || d == null || Math.abs(d) < (unit === "%" ? 1 : 0.03) ? "" : (d > 0) === higher ? "pm-pos" : "pm-neg";
+  return h("td", { class: cls }, `${v}${unit}`, lg != null ? h("div", { class: "muted", style: { fontSize: "11px", fontWeight: 400 } }, `lg ${lg}${unit}`) : null);
+};
+const ppRate = (m, a) => (a ? +(100 * m / a).toFixed(1) : null);
+function offenseExtras(X, games, U) {
+  const out = [];
+  const none = (t) => h("div", { class: "muted" }, t || "Recorded for games played from now on.");
+  // open vs contested
+  const sq = X.sq_r || {}, lsq = X.lg_sq_r || {};
+  out.push(U.sub("Open vs contested shooting"), U.note("Open = a clean look; contested = a hand in his face. FG% with the league on the same shots."));
+  out.push(Object.keys(sq).length ? ppTable(["Region", "Open", "Open FG%", "Contested", "Contested FG%"], PP_R4.filter((r) => sq[r]).map((r) => {
+    const x = sq[r], l = lsq[r] || {};
+    return [U.regLabel[r], `${x.open_m || 0}/${x.open_a || 0}`, ppVs(ppRate(x.open_m || 0, x.open_a || 0), ppRate(l.open_m || 0, l.open_a || 0), "%", true),
+      `${x.contested_m || 0}/${x.contested_a || 0}`, ppVs(ppRate(x.contested_m || 0, x.contested_a || 0), ppRate(l.contested_m || 0, l.contested_a || 0), "%", true)];
+  })) : none());
+  // shot-making vs expected
+  const xp = X.xp_r || {}, lxp = X.lg_xp_r || {};
+  const per100 = (z) => (z && z.n ? +((100 * ((z.pts || 0) - (z.exp || 0))) / z.n).toFixed(1) : null);
+  out.push(U.sub("Shot-making vs expected"), U.note("Expected = what his shots were worth from how hard they were (the engine's make chance x the shot's value). +/- per 100 shots above zero = he made tougher shots than expected."));
+  out.push(Object.keys(xp).length ? ppTable(["Region", "Shots", "Expected pts / shot", "Actual pts / shot", "+/- per 100 shots"], PP_R4.filter((r) => xp[r] && xp[r].n).map((r) => {
+    const z = xp[r];
+    return [U.regLabel[r], z.n, (z.exp / z.n).toFixed(2), ((z.pts || 0) / z.n).toFixed(2), ppVs(per100(z), per100(lxp[r]), "", true)];
+  })) : none());
+  // creation
+  const c = X.creation || {};
+  const tile = (k, v, sub) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: "v" }, v), sub ? h("div", { class: "muted", style: { fontSize: "11px" } }, sub) : null);
+  out.push(U.sub("Points created"), U.note("His own points plus the points his assists set up."),
+    h("div", { class: "stat-tiles" }, tile("PTS", (c.pts / games).toFixed(1), "a game"), tile("AST", (c.ast / games).toFixed(1), "a game"),
+      tile("PTS FROM AST", c.ast_pts ? (c.ast_pts / games).toFixed(1) : "–", c.ast_pts ? "a game" : "new games only"),
+      tile("TOTAL CREATED", c.ast_pts ? ((c.pts + c.ast_pts) / games).toFixed(1) : "–", "a game")));
+  // clutch vs overall
+  const cl = X.clutch || {}, ov = X.overall || {};
+  const per36 = (v, sec) => (sec ? (36 * 60 * v / sec).toFixed(1) : "–");
+  out.push(U.sub("Clutch vs overall"), U.note("Clutch = last five minutes of the 4th or overtime with the score within five. Per 36 minutes so the two compare."));
+  out.push(cl.sec ? ppTable(["", "Minutes", "PTS / 36", "FG%", "3P%", "FT%", "AST / 36", "TOV / 36", "+/- / 36"], [
+    ["Overall", (ov.minutes / 60).toFixed(0), per36(ov.pts, ov.minutes), `${ppRate(ov.fgm, ov.fga) ?? "–"}%`, `${ppRate(ov.tpm, ov.tpa) ?? "–"}%`, `${ppRate(ov.ftm, ov.fta) ?? "–"}%`, per36(ov.ast, ov.minutes), per36(ov.tov, ov.minutes), per36(ov.plus_minus, ov.minutes)],
+    ["Clutch", (cl.sec / 60).toFixed(0), per36(cl.pts || 0, cl.sec), `${ppRate(cl.fgm || 0, cl.fga || 0) ?? "–"}%`, `${ppRate(cl.tpm || 0, cl.tpa || 0) ?? "–"}%`, `${ppRate(cl.ftm || 0, cl.fta || 0) ?? "–"}%`, per36(cl.ast || 0, cl.sec), per36(cl.tov || 0, cl.sec), per36(cl.pm || 0, cl.sec)],
+  ]) : none("No clutch minutes yet."));
+  // turnovers
+  out.push(U.sub("Turnovers"), U.note("How he lost it, and who took it from him."));
+  const tk = Object.entries(X.tov_kind || {}).sort((a, b) => b[1] - a[1]);
+  out.push(tk.length ? ppTable(["Type", "Total", "A game"], tk.map(([k, v]) => [k, v, (v / games).toFixed(1)])) : none());
+  out.push(h("div", { class: "muted", style: { fontSize: "12px", margin: "8px 0 4px" } }, "Who stole it from him"), ppNameList(X.stolen_by, ["Defender", "Steals"], U));
+  // fouls drawn
+  const fd = X.fd_r || {}, a1 = X.and1_r || {};
+  out.push(U.sub("Fouls drawn"), U.note("Shooting fouls he drew and and-ones, by region, and who fouled him most."));
+  out.push(Object.keys(fd).length ? ppTable(["Region", "Fouls drawn", "A game", "And-ones"], PP_R4.filter((r) => fd[r] || a1[r]).map((r) => [U.regLabel[r], fd[r] || 0, ((fd[r] || 0) / games).toFixed(1), a1[r] || 0])) : none());
+  out.push(h("div", { class: "muted", style: { fontSize: "12px", margin: "8px 0 4px" } }, "Who fouled him most"), ppNameList(X.fouled_by, ["Defender", "Fouls"], U));
+  out.push(h("div", { class: "muted", style: { fontSize: "12px", margin: "8px 0 4px" } }, "Who blocked him most"), ppNameList(X.blocked_by, ["Defender", "Blocks"], U));
+  return out;
+}
+function defenseExtras(X, games, U) {
+  const out = [];
+  const none = (t) => h("div", { class: "muted" }, t || "Recorded for games played from now on.");
+  const hd = X.help_def || {}, lh = X.lg_help_def || {};
+  out.push(U.sub("On his man vs as the help"), U.note("Primary = shots by the player he was assigned to; help = shots he contested off someone else. FG% allowed, league under it."));
+  out.push(Object.keys(hd).length ? ppTable(["Role", "Made / shots", "FG% allowed"], ["primary", "help"].filter((k) => hd[k]).map((k) =>
+    [k === "primary" ? "On his man" : "As the help", `${hd[k].m || 0}/${hd[k].a || 0}`, ppVs(ppRate(hd[k].m || 0, hd[k].a || 0), ppRate((lh[k] || {}).m || 0, (lh[k] || {}).a || 0), "%", false)])) : none());
+  const mp = X.matchup_poss || {};
+  out.push(U.sub("Matchup possessions"), U.note("Every time a player he defended shot or turned it over: points allowed per one of those possessions (lower is better)."));
+  out.push(mp.poss ? ppTable(["Possessions", "Points allowed", "Forced turnovers", "Points / possession"], [[mp.poss, mp.pts, mp.tov, ppVs(mp.ppp, mp.lg_ppp, "", false)]]) : none("No matchups yet."));
+  out.push(U.sub("Steals: who he picked off"), ppNameList(X.stl_on, ["Player", "Steals"], U));
+  const br = X.blk_r || {};
+  out.push(U.sub("Blocks"), U.note("Who he blocked most, and where."), Object.keys(br).length ? ppTable(["Region", "Blocks", "A game"], PP_R4.filter((r) => br[r]).map((r) => [U.regLabel[r], br[r], (br[r] / games).toFixed(1)])) : none(),
+    h("div", { style: { marginTop: "6px" } }), ppNameList(X.blk_on, ["Player", "Blocks"], U));
+  out.push(U.sub("Shooting fouls he committed, on whom"), ppNameList(X.fouls_on, ["Player", "Fouls"], U));
+  return out;
 }
 // The player pop-up's Play types tab: every play type he uses, how often and how well, next to the league on the same play
 function ppPlayTypes(d) {

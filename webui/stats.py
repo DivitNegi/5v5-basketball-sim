@@ -766,4 +766,54 @@ def player_links(runner, source, team, name):
     guarded_pos = by_position(guarded, lambda nm: owner.get(nm, ""))
     return {"name": name, "team": team, "source": source, "games": games, "mates": mates, "regions_tracked": bool(a.get("ast_to_r") or a.get("ast_by_r")),
             "ast_to": ast_to, "ast_by": ast_by, "shot_regions": region_rows, "guarded_by": guarded_by, "guarded": guarded,
-            "guarded_by_pos": guarded_by_pos, "guarded_pos": guarded_pos, "lg_def_pos": lg_def_pos, "lg_shooter_pos": lg_shooter_pos}
+            "guarded_by_pos": guarded_by_pos, "guarded_pos": guarded_pos, "lg_def_pos": lg_def_pos, "lg_shooter_pos": lg_shooter_pos,
+            "extras": player_extras(players, team, name)}
+
+
+# ---- the extra analytics on the Offense / Defense tabs (games played since this tracking began; older games simply have none)
+def _sum_maps(players, key2):
+    out = {}
+    for tn, pp in players.items():
+        for pn, st in pp.items():
+            merge_counts(out, ((st.get("analytics") or {}).get(key2) or {}))
+    return out
+
+
+def merge_counts(dst, src):
+    for k, v in (src or {}).items():
+        if isinstance(v, dict):
+            merge_counts(dst.setdefault(k, {}), v)
+        elif isinstance(v, (int, float)):
+            dst[k] = dst.get(k, 0) + v
+
+
+def player_extras(players, team, name):
+    mine = players[team][name]
+    a = mine.get("analytics") or {}
+    games = max(1, mine.get("games", 1) or 1)
+    lg_sq, lg_xp, lg_help = _sum_maps(players, "sq_r"), _sum_maps(players, "xp_r"), _sum_maps(players, "help_def")
+    # matchup possessions: shots defended + turnovers forced by the players he guarded
+    def poss_line(dd):
+        made3 = int(dd.get("three_made", 0) or 0)
+        made2 = sum(int(dd.get(k + "_made", 0) or 0) for k in ("rim", "dunk", "post", "post_fade", "mid"))
+        att = sum(int(dd.get(k, 0) or 0) for k in ("rim", "dunk", "post", "post_fade", "mid", "three"))
+        tov = int(dd.get("turnover", 0) or 0)
+        return 2 * made2 + 3 * made3, att + tov, tov
+    pts, poss, tov = poss_line(mine.get("defended_diet") or {})
+    lp = lpo = 0
+    for tn, pp in players.items():
+        for pn, st in pp.items():
+            x, y, _ = poss_line(st.get("defended_diet") or {})
+            lp += x; lpo += y
+    tot_pts = mine.get("pts", 0) or 0
+    return {
+        "sq_r": a.get("sq_r") or {}, "lg_sq_r": lg_sq,
+        "xp_r": a.get("xp_r") or {}, "lg_xp_r": lg_xp,
+        "creation": {"pts": tot_pts, "ast": mine.get("ast", 0) or 0, "ast_pts": a.get("ast_pts", 0) or 0, "games": games},
+        "clutch": a.get("clutch") or {}, "overall": {k: mine.get(k, 0) or 0 for k in ("minutes", "pts", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "ast", "tov", "plus_minus")},
+        "tov_kind": a.get("tov_kind") or {}, "stolen_by": a.get("stolen_by") or {}, "blocked_by": a.get("blocked_by") or {},
+        "fd_r": a.get("fd_r") or {}, "and1_r": a.get("and1_r") or {}, "fouled_by": a.get("fouled_by") or {},
+        "help_def": a.get("help_def") or {}, "lg_help_def": lg_help,
+        "stl_on": a.get("stl_on") or {}, "blk_on": a.get("blk_on") or {}, "blk_r": a.get("blk_r") or {}, "fouls_on": a.get("fouls_on") or {},
+        "matchup_poss": {"pts": pts, "poss": poss, "tov": tov, "ppp": round(pts / poss, 2) if poss else None, "lg_ppp": round(lp / lpo, 2) if lpo else None},
+    }

@@ -475,6 +475,15 @@ def _team_insights(runner, team):
         return None
 
 
+def team_assist_network(runner, team):
+    """Who assisted whom on this team: one row per passer, one column per scorer (season totals)."""
+    sec = runner.sections or {}
+    totals = (sec.get("_season_player_totals") or sec.get("_playoff_player_totals") or {}).get(team, {})
+    names = sorted(totals, key=lambda n: -(totals[n].get("minutes", 0) or 0))[:10]
+    grid = {p: {s: int((((totals[p].get("analytics") or {}).get("ast_to") or {}).get(s, 0)) or 0) for s in names if s != p} for p in names}
+    return {"names": names, "grid": grid} if any(v for row in grid.values() for v in row.values()) else None
+
+
 def team_card_roster(runner, team):
     """The team pop-up's roster: every player with position, overall, height, archetype and his per-game line (season totals when there are some)."""
     try:
@@ -553,7 +562,7 @@ def team_card_payload(runner, team):
     per.update(fgp=pct("fgm", "fga"), tpp=pct("tpm", "tpa"), ftp=pct("ftm", "fta"))
     games = schedule_payload(runner, team)["games"]
     played = [x for x in games if x.get("mine") is not None]
-    return {"roster": team_card_roster(runner, team), "team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
+    return {"assist_net": team_assist_network(runner, team), "roster": team_card_roster(runner, team), "team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
             "recent": list(reversed(played[-8:])), "upcoming": schedule_payload(runner, team)["upcoming"][:5], "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"]),
             "insights": _team_insights(runner, team)}
 

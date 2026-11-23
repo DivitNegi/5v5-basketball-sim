@@ -12333,6 +12333,7 @@ def record_assist(passer: Player, team: Team, points_created: int):
     emit_broadcast("assist", passer=passer)
     passer.ast += 1
     passer.assist_pts_created = getattr(passer, "assist_pts_created", 0) + points_created
+    _bump(analytics_of(passer), "ast_pts", points_created)
     scorer = getattr(team, "_last_fg_scorer", None)
     if scorer is not None and scorer is not passer:
         _bump(analytics_of(passer).setdefault("ast_to", {}), scorer.name)
@@ -12777,7 +12778,16 @@ def print_box_score(teamA: Team, teamB: Team, label: str):
 # ============================================================
 # PLAY LOGIC: STEALS, BLOCKS, REBOUNDS, SHOTS
 # ============================================================
-def commit_turnover(player: Player, team: Team):
+def record_turnover_kind(player: Player, kind: str, stolen_by: Player = None):
+    a = analytics_of(player)
+    _bump(a.setdefault("tov_kind", {}), kind)
+    if stolen_by is not None:
+        _bump(a.setdefault("stolen_by", {}), stolen_by.name)
+        _bump(analytics_of(stolen_by).setdefault("stl_on", {}), player.name)
+
+
+def commit_turnover(player: Player, team: Team, kind: str = "other", stolen_by: Player = None):
+    record_turnover_kind(player, kind, stolen_by)
     emit_broadcast("turnover", player=player)
     player.tov += 1
     analytics_simple(player, "tov")
@@ -13045,11 +13055,24 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
         _bump(fn, "fga")
     pt = a.setdefault("pt", {}).setdefault(play, {})
     xp = a.setdefault("xp", {})
+    region = shot_region(shot_type)
+    xpr = a.setdefault("xp_r", {}).setdefault(region, {})
+    # open / contested: decided from the shot's quality at the attempt; the make reuses it
+    if made and getattr(player, "_sq_last", None) and player._sq_last[0] == shot_type:
+        sq = player._sq_last[1]
+    else:
+        q = getattr(player, "_sq_quality", None)
+        sq = "open" if q is not None and q >= 1.08 else "contested" if q is not None and q < 0.97 else "normal"
+        if not made:
+            player._sq_last = (shot_type, sq)
+    sqr = a.setdefault("sq_r", {}).setdefault(region, {})
+    _bump(sqr, f"{sq}_m" if made else f"{sq}_a")
     clutch = a.setdefault("clutch", {}) if in_clutch_window() else None
     if made:
         _bump(pt, "fgm"); _bump(pt, "pts", value)
         if getattr(player, "_xfg_pending", None) == shot_type:   # only shots that carried a make chance count toward actual vs expected
             _bump(xp, "pts", value)
+            _bump(xpr, "pts", value)
         player._xfg_pending = None
         if clutch is not None:
             _bump(clutch, "fgm"); _bump(clutch, "pts", value)
@@ -13062,6 +13085,7 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
     player._xfg_pending = None
     if stash and stash[0] == shot_type:   # the make chance the engine just rolled for this very shot
         _bump(xp, "n"); _bump(xp, "exp", stash[1] * value)
+        _bump(xpr, "n"); _bump(xpr, "exp", stash[1] * value)
         player._xfg_pending = shot_type
     if clutch is not None:
         _bump(clutch, "fga")
@@ -13095,7 +13119,14 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
         context = tag_shot_distance(player, "rim", context)
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("attempt", team=team, player=player, shot_type=shot_type, context=context)
+    if player is not None:
+        player._sq_quality = quality_mult
     analytics_shot(player, shot_type, context, False)
+    # 8: the defender on the shot was his own man (primary) or a helper
+    if defender is not None and player is not None:
+        own = (SIM_CONTEXT.get("matchups") or {}).get(player) if isinstance(globals().get("SIM_CONTEXT"), dict) else None
+        defender._help_role = "primary" if own is defender or own is None else "help"
+        _bump(analytics_of(defender).setdefault("help_def", {}).setdefault(defender._help_role, {}), "a")
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
         team.shot_diet = {}
 
@@ -13143,6 +13174,8 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
 
 
 def record_shot_make(team: Team, shot_type: str, context: str = "", player: Player = None, defender: Player = None):
+    if defender is not None and getattr(defender, "_help_role", None):
+        _bump(analytics_of(defender).setdefault("help_def", {}).setdefault(defender._help_role, {}), "m")
     if shot_type == "three":
         context = tag_three_location(player, context, False)
         if player is not None and getattr(player, "heat_check_attempt", False) and "heave" not in context:
@@ -14522,6 +14555,18 @@ def block_prob(defender: Player, shot_type: str, shooter: Player = None) -> floa
 
 
 def process_block(defender: Player, team_def: Team):
+    # who he blocked and where: the shooter and shot are the caller's own variables
+    try:
+        caller = sys._getframe(1).f_locals
+        victim = caller.get("shooter") or caller.get("finisher") or caller.get("rebounder")
+        stype = caller.get("shot_type") or caller.get("putback_type") or "rim"
+        if victim is not None and hasattr(victim, "name"):
+            a = analytics_of(defender)
+            _bump(a.setdefault("blk_on", {}), victim.name)
+            _bump(a.setdefault("blk_r", {}), shot_region(stype))
+            _bump(analytics_of(victim).setdefault("blocked_by", {}), defender.name)
+    except Exception:
+        pass
     emit_broadcast("block", player=defender)
     bump_event_heat(defender, "block")
     defender.blk_stat += 1
@@ -14538,6 +14583,7 @@ def process_steal(defender: Player, team_def: Team, handler: Player, team_off: T
     analytics_simple(handler, "tov")
     team_off.team_tov += 1
     record_defensive_turnover(defender, handler)
+    record_turnover_kind(handler, "lost ball (stolen)", defender)
 
 
 def block_voice_line(defender: Player, shooter: Player, shot_type: str, context: str = "") -> str:
@@ -14582,6 +14628,18 @@ def register_foul(team: Team, player: Player):
 def choose_fouling_defender(team_def: Team, primary_defender: Player,
                             shooter: Player, shot_type: str,
                             context: str = "") -> Player:
+    fouler = _choose_fouling_defender(team_def, primary_defender, shooter, shot_type, context)
+    if shooter is not None and fouler is not None:
+        a = analytics_of(shooter)
+        _bump(a.setdefault("fd_r", {}), shot_region(shot_type))
+        _bump(a.setdefault("fouled_by", {}), fouler.name)
+        _bump(analytics_of(fouler).setdefault("fouls_on", {}), shooter.name)
+    return fouler
+
+
+def _choose_fouling_defender(team_def: Team, primary_defender: Player,
+                             shooter: Player, shot_type: str,
+                             context: str = "") -> Player:
     candidates = [p for p in team_def.on_floor if not p.fouled_out]
     if not candidates:
         return primary_defender
@@ -17994,7 +18052,7 @@ def try_pass_interception(passer: Player, receiver: Player,
         defender.stl += 1
         dff.team_stl += 1
         dff.last_stealer = defender
-        commit_turnover(passer, off)
+        commit_turnover(passer, off, "bad pass (stolen)", defender)
         record_defensive_turnover(defender, passer)
 
         print(steal_voice_line(defender, passer, "pass", passer=passer, receiver=receiver))
@@ -20345,7 +20403,7 @@ def simulate_possession(off: Team, dff: Team,
         handler = choose_ballhandler(off)
         describe_shot_clock_violation(off, dff, handler, matchups)
         print("Shot clock violation. The possession expires without a shot.")
-        commit_turnover(handler, off)
+        commit_turnover(handler, off, "shot clock")
         dead_ball_subs(teamA, teamB, period, period_time - possession_time)
         return dff, possession_time
 
@@ -20354,7 +20412,7 @@ def simulate_possession(off: Team, dff: Team,
         culprit, line = dead_ball_miscue(off)
         spent = min(possession_time, random.randint(3, 10))
         print(line)
-        commit_turnover(culprit, off)
+        commit_turnover(culprit, off, "travel / violation")
         dead_ball_subs(teamA, teamB, period, period_time - spent)
         return dff, spent
 
@@ -20592,7 +20650,7 @@ def simulate_possession(off: Team, dff: Team,
 
         if random.random() < out_of_bounds_turnover_chance(passer_for_entry, shooter):
             print(f"{passer_for_entry.name}'s pass sails out of bounds. Turnover by {off.name}.")
-            commit_turnover(passer_for_entry, off)
+            commit_turnover(passer_for_entry, off, "bad pass (out of bounds)")
             dead_ball_subs(teamA, teamB, period, period_time - possession_time)
             return dff, random.randint(2, 5)
 
@@ -20652,7 +20710,7 @@ def simulate_possession(off: Team, dff: Team,
 
             if random.random() < out_of_bounds_turnover_chance(shooter, secondary):
                 print(f"{shooter.name} throws it out of bounds trying to find {secondary.name}.")
-                commit_turnover(shooter, off)
+                commit_turnover(shooter, off, "bad pass (out of bounds)")
                 dead_ball_subs(teamA, teamB, period, period_time - possession_time)
                 return dff, random.randint(2, 5)
 
@@ -20756,7 +20814,7 @@ def simulate_possession(off: Team, dff: Team,
 
             if random.random() < out_of_bounds_turnover_chance(passer, next_receiver) * 0.75:
                 print(f"{passer.name} overthrows {next_receiver.name} on the extra pass.")
-                commit_turnover(passer, off)
+                commit_turnover(passer, off, "bad pass (out of bounds)")
                 dead_ball_subs(teamA, teamB, period, period_time - possession_time)
                 return dff, random.randint(2, 5)
 
@@ -21496,7 +21554,7 @@ def simulate_possession(off: Team, dff: Team,
                 kickout_risk = max(0.01, 0.10 - doubled_player.playmaking * 0.09)
                 if random.random() < deflection_out_of_bounds_chance(doubled_player, kickout, kickout_defender) + kickout_risk:
                     print(f"{kickout_defender.name} reads the kickout and tips it away. {off.name if random.random() < 0.5 else dff.name} scrambles for it.")
-                    commit_turnover(doubled_player, off)
+                    commit_turnover(doubled_player, off, "double team", kickout_defender)
                     dead_ball_subs(teamA, teamB, period, period_time - possession_time)
                     return dff, random.randint(2, 5)
                 last_passer = doubled_player
@@ -21604,7 +21662,7 @@ def simulate_possession(off: Team, dff: Team,
         charge_line = random.choice(charge_voice_lines).format(defender=defender.name, shooter=shooter.name)
         call_foul(off, shooter, f"Offensive foul on {shooter.name}. {charge_line}")
         maybe_sit_foul_trouble(off, shooter, period)
-        commit_turnover(shooter, off)
+        commit_turnover(shooter, off, "offensive foul")
         dead_ball_subs(teamA, teamB, period, period_time - possession_time)
         return dff, possession_time
 
@@ -21958,6 +22016,7 @@ def simulate_possession(off: Team, dff: Team,
         if random.random() < and_one_chance:
             foul_context = "paint_help" if paint_helper_triggered else "double" if double_teamed else play_context or pnr_result or ""
             fouler = choose_fouling_defender(dff, defender, shooter, shot_type, foul_context)
+            _bump(analytics_of(shooter).setdefault("and1_r", {}), shot_region(shot_type))
             register_foul(dff, fouler)
             if fouler.pf >= 6:
                 foul_out_sub(dff, fouler)
@@ -23052,6 +23111,7 @@ def simulate_game(teamA: Team, teamB: Team):
             if maybe_apply_manual_timeout(off, teamA, teamB, period, q_time):
                 handle_manual_sub_request_if_needed()
             matchups = build_defensive_matchups(off, dff)
+            SIM_CONTEXT["matchups"] = matchups
 
             if should_intentionally_foul(possession, teamA, teamB, period, q_time):
                 fouling_team = teamB if possession is teamA else teamA
@@ -23188,6 +23248,7 @@ def simulate_game(teamA: Team, teamB: Team):
                 if maybe_apply_manual_timeout(off, teamA, teamB, period, q_time):
                     handle_manual_sub_request_if_needed()
                 matchups = build_defensive_matchups(off, dff)
+                SIM_CONTEXT["matchups"] = matchups
 
                 if should_intentionally_foul(possession, teamA, teamB, period, q_time):
                     fouling_team = teamB if possession is teamA else teamA
