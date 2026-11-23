@@ -9478,13 +9478,13 @@ def _initialize_minute_targets_core(team: Team):
         return
 
     if team.name == "2027 Dallas Mavericks":
-        # Minutes the 2027 Mavericks should play, following the ESPN depth chart (Kyrie, Caleb Martin, Flagg, P.J., Gafford start; Lively
+        # Basketball-Reference 2026-27 minutes (first 17 games), a 10-man rotation. Older note: minutes the 2027 Mavericks should play, following the ESPN depth chart (Kyrie, Caleb Martin, Flagg, P.J., Gafford start; Lively
         # is off the roster) with the real 2026-27 minutes of the newcomers (Martin 21.5, Clayton 17.8, Cisse 3.6). The rotation rules alone
         # do not land them, so they are the pinned minutes the pacing steers to: "intended" is the target, "steer" what is asked for.
         intended = {
-            "Cooper Flagg": 33.5, "Kyrie Irving": 31.5, "P.J. Washington": 29.0, "Daniel Gafford": 22.0, "Caleb Martin": 21.5,
-            "Max Christie": 21.0, "Zaccharie Risacher": 20.0, "Naji Marshall": 18.0, "Walter Clayton Jr.": 15.0, "Marcus Sasser": 12.0,
-            "Morez Johnson Jr.": 9.0, "Santi Aldama": 4.0, "Moussa Cisse": 3.5,
+            "Cooper Flagg": 33.0, "Kyrie Irving": 30.0, "P.J. Washington": 30.0, "Naji Marshall": 23.5, "Zaccharie Risacher": 23.0,
+            "Daniel Gafford": 21.5, "Caleb Martin": 21.0, "Walter Clayton Jr.": 17.5, "Max Christie": 17.0, "Morez Johnson Jr.": 16.0,
+            "Marcus Sasser": 4.0, "Santi Aldama": 3.0, "Moussa Cisse": 1.0,
         }
         steer = dict(intended)
         for p in team.roster:
