@@ -2202,6 +2202,12 @@ function renderCustomTeams(){ const root=$("#customTeams"); root.replaceChildren
 async function startSpecial(mode,options={}){ try{await api.post("/api/start",{mode,teamA:S.teamA,teamB:S.teamB,rules:S.rules,options});}catch(e){toast(e.message,"err");} }
 
 async function fillOnePlayers(side){ const team=$("#oneTeam"+side).value,d=await api.get(`/api/roster?team=${encodeURIComponent(team)}`),sel=$("#onePlayer"+side); sel.replaceChildren(...d.players.map((p)=>h("option",{value:p.name},`${p.name} · ${p.pos} · ${p.ovr}`))); }
+// a player's last name for tight spots: a suffix (Jr., Sr., II, III, IV) is skipped, so "Walter Clayton Jr." is "Clayton"
+function lastNameOf(n) {
+  const parts = String(n || "").trim().split(/\s+/);
+  while (parts.length > 1 && /^(jr\.?|sr\.?|ii|iii|iv|v)$/i.test(parts[parts.length - 1])) parts.pop();
+  return parts[parts.length - 1] || n;
+}
 function broadcastText(e){ const names=Object.entries(e).filter(([k])=>k!=="kind").map(([k,v])=>`${k.replaceAll("_"," ")}: ${v}`).join(" · "); return names||"Live game event"; }
 async function loadBroadcast(){ const d=await api.get("/api/broadcast"),root=$("#broadcastBody"),follow=root.scrollHeight-root.scrollTop-root.clientHeight<60; root.replaceChildren(...(d.events.length?d.events.map((e)=>h("div",{class:"broadcast-event"},h("span",{class:"kind"},e.kind),h("span",{},broadcastText(e)))):[h("div",{class:"empty"},"Broadcast events appear once a game starts.")])); if(follow)root.scrollTop=root.scrollHeight; }
 
@@ -2281,7 +2287,7 @@ async function openTeamCard(team) {
         h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Most-used five-man units (${d.lineups.min_poss}+ possessions together) and two-man pairings: points scored and allowed per 100 possessions.`),
         h("div", { class: "table-wrap" }, h("table", { class: "stats" },
           h("thead", {}, h("tr", {}, ["Five-man unit", "Poss", "Off", "Def", "Net"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
-          h("tbody", {}, d.lineups.fives.map((u) => h("tr", {}, h("td", { class: "l" }, u.players.map((n) => n.split(" ").slice(-1)[0]).join(" · ")), h("td", {}, u.poss), h("td", {}, u.off), h("td", {}, u.def),
+          h("tbody", {}, d.lineups.fives.map((u) => h("tr", {}, h("td", { class: "l" }, u.players.map(lastNameOf).join(" · ")), h("td", {}, u.poss), h("td", {}, u.off), h("td", {}, u.def),
             h("td", { class: u.net > 0 ? "pm-pos" : u.net < 0 ? "pm-neg" : "" }, u.net > 0 ? `+${u.net}` : u.net)))))),
         d.lineups.pairs.length ? h("div", { class: "table-wrap", style: { marginTop: "10px" } }, h("table", { class: "stats" },
           h("thead", {}, h("tr", {}, ["Two-man pairing", "Poss", "Off", "Def", "Net"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
@@ -2290,7 +2296,7 @@ async function openTeamCard(team) {
       d.assist_net ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Assist network"),
         h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "Row = the passer, column = the scorer: how many times he assisted him this season."),
         h("div", { class: "table-wrap" }, h("table", { class: "stats" },
-          h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Passer \\ scorer"), d.assist_net.names.map((n) => h("th", { title: n }, n.split(" ").slice(-1)[0])))),
+          h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Passer \\ scorer"), d.assist_net.names.map((n) => h("th", { title: n }, lastNameOf(n))))),
           h("tbody", {}, d.assist_net.names.map((p) => {
             const row = d.assist_net.grid[p] || {}, mx = Math.max(1, ...Object.values(d.assist_net.grid).flatMap((r) => Object.values(r)));
             return h("tr", {}, h("td", { class: "l", style: { whiteSpace: "nowrap" } }, p), d.assist_net.names.map((s2) => s2 === p ? h("td", { class: "muted" }, "·")
