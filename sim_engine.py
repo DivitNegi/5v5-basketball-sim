@@ -13072,9 +13072,11 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
         clock = player._clock_last[1]
     else:
         used = SIM_CONTEXT.get("shot_clock_used") if isinstance(globals().get("SIM_CONTEXT"), dict) else None
-        clock = "early" if used is None or used <= 7 else "middle" if used <= 15 else "late"
-        if used is None:
+        tags = set(str(context or "").split("|"))
+        if used is None or tags & {"fastbreak", "fastbreak_catch_shoot", "putback", "late_putback"}:
             clock = "transition / other"
+        else:   # a half-court possession here takes 11-22 s of clock, so early = the quick ones
+            clock = "early" if used <= 13 else "middle" if used <= 17 else "late"
         if not made:
             player._clock_last = (shot_type, clock)
     clk = a.setdefault("clock", {}).setdefault(clock, {})
@@ -13552,7 +13554,8 @@ def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player
         mine_w = rebound_weight(rebounder, miss_type, offensive=team is off)
         rival = max(other.on_floor, key=lambda p: rebound_weight(p, miss_type, offensive=team is not off), default=None)
         a = analytics_of(rebounder)
-        if rival is not None and rebound_weight(rival, miss_type, offensive=team is not off) >= 0.6 * max(1e-6, mine_w):
+        rival_w = rebound_weight(rival, miss_type, offensive=team is not off) if rival is not None else 0.0
+        if rival is not None and random.random() < rival_w / max(1e-6, rival_w + mine_w):   # the closer the rival's pull, the likelier it was a fight
             _bump(a, "reb_contested")
             _bump(a.setdefault("reb_over", {}), rival.name)
         else:
@@ -16462,17 +16465,17 @@ def real_play_type(off: Team, handler: Player) -> str:
         "floppy", "elevator", "backdoor", "drive_kick", "post_split", "iso"
     ]
     weights = [
-        (1.8 + handler.playmaking) * pnr_frequency * (1.0 + heliocentric * 0.18),
-        (1.1 + handler.ball_handle) * pnr_frequency * (1.0 + heliocentric * 0.28),
-        (0.9 + handler.playmaking * 0.8) * pnr_frequency,
+        (1.8 + handler.playmaking) * pnr_frequency * (1.0 + heliocentric * 0.18) * 1.35,
+        (1.1 + handler.ball_handle) * pnr_frequency * (1.0 + heliocentric * 0.28) * 1.35,
+        (0.9 + handler.playmaking * 0.8) * pnr_frequency * 1.35,
         (1.0 + (0.6 if has_big_hub else 0.0)) * ball_movement,
         (0.9 + (0.4 if has_big_hub else 0.0)) * ball_movement,
-        (0.7 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (1.5 if has_movement else 0.0)) * ball_movement * three_pref,
-        (0.55 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (1.1 if has_movement else 0.0)) * ball_movement * three_pref,
+        (0.7 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (2.2 if has_movement else 0.0)) * ball_movement * three_pref,
+        (0.55 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (1.6 if has_movement else 0.0)) * ball_movement * three_pref,
         (0.55 + handler.playmaking * 0.7) * ball_movement,
         (0.75 + handler.playmaking) * (0.85 + ball_movement * 0.25),
         (0.7 + (0.8 if has_big_hub else 0.0)) * (1.0 + max(0.0, ball_movement - 1.0) * 0.40),
-        (0.20 + handler.usage * 0.55 + handler.iso_tendency * 1.55 + iso_creation * 1.35) * (0.55 + heliocentric * 0.70),
+        (0.20 + handler.usage * 0.55 + handler.iso_tendency * 1.55 + iso_creation * 1.35) * (0.55 + heliocentric * 0.70) * 0.80,
     ]
     if style_name == "five-out":
         for idx in (1, 5, 6, 8):
@@ -17860,7 +17863,7 @@ def maybe_pick_and_roll(off: Team, dff: Team,
         return handler, matchups.get(handler, random.choice(dff.on_floor)), None, None
 
     # Guards run this often, wings sometimes.
-    pnr_chance = 0.28 + handler.playmaking * 0.22
+    pnr_chance = 0.38 + handler.playmaking * 0.26   # the NBA's most common action (about a quarter of possessions)
     if random.random() > pnr_chance:
         return handler, matchups.get(handler, random.choice(dff.on_floor)), None, None
 
@@ -21027,7 +21030,7 @@ def _simulate_possession(off: Team, dff: Team,
 
     # GUARD-LED PICK AND ROLL WITH SWITCHES
     pnr_bonus = 0.26 if play_context in ("high_pnr", "empty_corner_pnr", "horns", "spain_pnr") else 0.0
-    if (not star_takeover_lock) and play_context not in ("deep_paint_touch", "iso") and (can_play_position(current_handler, "PG") or can_play_position(current_handler, "SG")) and random.random() < 0.55 + pnr_bonus:
+    if (not star_takeover_lock) and play_context not in ("deep_paint_touch", "iso") and (can_play_position(current_handler, "PG") or can_play_position(current_handler, "SG")) and random.random() < 0.72 + pnr_bonus:
         pnr_shooter, pnr_defender, screener, pnr_result = maybe_pick_and_roll(off, dff, current_handler, matchups)
 
         if pnr_result:

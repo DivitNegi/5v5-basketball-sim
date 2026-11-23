@@ -2277,6 +2277,16 @@ async function openTeamCard(team) {
         h("div", { class: "pc-panel" }, h("h4", {}, "Latest games"), d.recent.length ? h("table", { class: "stats" }, h("tbody", {}, rows)) : h("div", { class: "muted" }, "No games played yet."), h("div", { class: "muted", style: { fontSize: "12px", marginTop: "8px" } }, "Click a game for its box score"),
           d.upcoming?.length ? h("div", {}, h("h4", { style: { marginTop: "14px" } }, "Next up"), h("table", { class: "stats" }, h("tbody", {}, d.upcoming.map((x, i) => h("tr", { class: i === 0 ? "upcoming next" : "upcoming" }, h("td", { class: "l" }, `${x.home ? "vs" : "@"} ${shortTeam(identOf(x.opp).short || x.opp)}`), h("td", { class: "muted" }, `Game ${x.game}`)))))) : null)),
       ...(d.insights ? teamInsights(d.insights, id, team) : []),
+      d.lineups ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Lineups"),
+        h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, `Most-used five-man units (${d.lineups.min_poss}+ possessions together) and two-man pairings: points scored and allowed per 100 possessions.`),
+        h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+          h("thead", {}, h("tr", {}, ["Five-man unit", "Poss", "Off", "Def", "Net"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+          h("tbody", {}, d.lineups.fives.map((u) => h("tr", {}, h("td", { class: "l" }, u.players.map((n) => n.split(" ").slice(-1)[0]).join(" · ")), h("td", {}, u.poss), h("td", {}, u.off), h("td", {}, u.def),
+            h("td", { class: u.net > 0 ? "pm-pos" : u.net < 0 ? "pm-neg" : "" }, u.net > 0 ? `+${u.net}` : u.net)))))),
+        d.lineups.pairs.length ? h("div", { class: "table-wrap", style: { marginTop: "10px" } }, h("table", { class: "stats" },
+          h("thead", {}, h("tr", {}, ["Two-man pairing", "Poss", "Off", "Def", "Net"].map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
+          h("tbody", {}, d.lineups.pairs.map((u) => h("tr", {}, h("td", { class: "l" }, u.players.join(" + ")), h("td", {}, u.poss), h("td", {}, u.off), h("td", {}, u.def),
+            h("td", { class: u.net > 0 ? "pm-pos" : u.net < 0 ? "pm-neg" : "" }, u.net > 0 ? `+${u.net}` : u.net)))))) : null) : null,
       d.assist_net ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Assist network"),
         h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "Row = the passer, column = the scorer: how many times he assisted him this season."),
         h("div", { class: "table-wrap" }, h("table", { class: "stats" },
@@ -2752,10 +2762,13 @@ async function openStatsPlayer(team, name, source, startTab = "stats") {
     insightsBox(d, color, (g) => api.get(`/api/stats/player?source=${encodeURIComponent(source || "Live")}&team=${encodeURIComponent(team)}&name=${encodeURIComponent(name)}&group=${g}`)));
   const gamesView = h("div", { class: "pp-games" }), highsView = h("div", { class: "pp-games" }), playsView = ppPlayTypes(d);
   const offenseView = h("div", { class: "pp-games" }), defenseView = h("div", { class: "pp-games" });
-  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["offense", "Offense"], ["defense", "Defense"], ["plays", "Play types"], ["highs", "Highs"], ["games", "Game log"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
+  const splitsView = h("div", { class: "pp-games" }), compareView = h("div", { class: "pp-games" });
+  const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["offense", "Offense"], ["defense", "Defense"], ["splits", "Splits"], ["plays", "Play types"], ["highs", "Highs"], ["games", "Game log"], ["compare", "Compare"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
   const show = (v, openItem = null) => {
     statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; highsView.hidden = v !== "highs"; playsView.hidden = v !== "plays"; seg.hidden = v !== "stats";
-    offenseView.hidden = v !== "offense"; defenseView.hidden = v !== "defense";
+    offenseView.hidden = v !== "offense"; defenseView.hidden = v !== "defense"; splitsView.hidden = v !== "splits"; compareView.hidden = v !== "compare";
+    if (v === "splits" && !splitsView.childElementCount) ppSplits(splitsView, d, d.source || source);
+    if (v === "compare" && !compareView.childElementCount) ppCompare(compareView, d, d.source || source);
     if ((v === "offense" && !offenseView.childElementCount) || (v === "defense" && !defenseView.childElementCount)) ppLinks(offenseView, defenseView, d, d.source || source);
     tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
     if (v === "games" && (openItem || !gamesView.childElementCount)) ppGameLog(gamesView, team, d.name, openItem);
@@ -2763,7 +2776,7 @@ async function openStatsPlayer(team, name, source, startTab = "stats") {
   };
   body.replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
-    tabs, statsView, offenseView, defenseView, playsView, highsView, gamesView);
+    tabs, statsView, offenseView, defenseView, splitsView, playsView, highsView, gamesView, compareView);
   show(startTab === "playtypes" ? "plays" : "stats");
 }
 // The player pop-up's Offense and Defense tabs: who he set up and who set him up, who guarded him and whom he guarded -- each overall and by
@@ -2859,6 +2872,81 @@ async function ppLinks(offView, defView, d, source) {
     searchBox("def"), ...defenseExtras(L.extras || {}, L.games || 1, { sub, note, pct, person, regLabel }));
 }
 const PP_R4 = ["paint", "post", "mid", "three"];
+// ---- Splits tab: home / away, wins / losses, by month, by opponent, streaks, milestones, the season trend, quarters, shot clock, rebounding
+async function ppSplits(root, d, source) {
+  root.replaceChildren(h("div", { class: "empty" }, "Loading…"));
+  let S2;
+  try { S2 = await api.get(`/api/stats/player_splits?source=${encodeURIComponent(source || "Season")}&team=${encodeURIComponent(d.team)}&name=${encodeURIComponent(d.name)}`); } catch { S2 = null; }
+  if (!S2) { root.replaceChildren(h("div", { class: "empty" }, "Could not load.")); return; }
+  const sub = (t) => h("h4", { class: "pp-sub", style: { marginTop: "16px" } }, t);
+  const note = (t) => h("div", { class: "muted", style: { fontSize: "12px", margin: "-2px 0 6px" } }, t);
+  const heads = ["", "GP", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FG%", "3P%", "FT%", "+/-"];
+  const lineRow = (lab, l) => [lab, l.gp, l.min, l.pts, l.reb, l.ast, l.stl, l.blk, l.tov, l.fg ?? "–", l.tp ?? "–", l.ft ?? "–", l.pm > 0 ? `+${l.pm}` : l.pm];
+  const out = [];
+  if (!S2.has_log) out.push(h("div", { class: "muted" }, "Game splits, opponents, streaks and the trend come from the regular-season game log; they appear after a season is played."));
+  if (S2.splits.length) out.push(h("h4", { class: "pp-sub" }, "Home / away and wins / losses"), ppTable(heads, S2.splits.map(([l, x]) => lineRow(l, x))));
+  if (S2.months.length) out.push(sub("By month"), ppTable(heads, S2.months.map(([l, x]) => lineRow(l, x))));
+  if (S2.trend.length > 4) {
+    const W = 680, H = 170, pad = 28, n = S2.trend.length, roll = (k) => S2.trend.map((_, i) => { const w = S2.trend.slice(Math.max(0, i - 9), i + 1); return w.reduce((t, g) => t + (g[k] || 0), 0) / w.length; });
+    const series = [["pts", "#f5a524", "PTS"], ["reb", "#60a5fa", "REB"], ["ast", "#4ade80", "AST"]];
+    const mx = Math.max(1, ...series.flatMap(([k]) => roll(k)));
+    const path = (vals) => vals.map((v, i) => `${i ? "L" : "M"}${(pad + (W - 2 * pad) * i / Math.max(1, n - 1)).toFixed(1)},${(H - pad - (H - 2 * pad) * v / mx).toFixed(1)}`).join(" ");
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, style: "width:100%;max-width:720px" });
+    svg.innerHTML = `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="rgba(148,163,184,.3)"/>` +
+      series.map(([k, c]) => `<path d="${path(roll(k))}" fill="none" stroke="${c}" stroke-width="2.4"/>`).join("") +
+      `<text x="${pad}" y="${pad - 10}" fill="#94a3b8" font-size="12">${mx.toFixed(0)}</text><text x="${pad}" y="${H - 8}" fill="#94a3b8" font-size="12">game 1</text><text x="${W - pad}" y="${H - 8}" fill="#94a3b8" font-size="12" text-anchor="end">game ${S2.trend[n - 1].game}</text>`;
+    out.push(sub("Season trend"), note("Rolling 10-game averages."), h("div", { style: { display: "flex", gap: "14px", fontSize: "12.5px", margin: "0 0 4px" } }, series.map(([, c, l]) => h("span", { style: { color: c, fontWeight: 700 } }, `— ${l}`))), svg);
+  }
+  if (S2.streaks.length && S2.has_log) out.push(sub("Longest streaks"), ppTable(["Streak", "Games in a row"], S2.streaks));
+  if (S2.milestones.length && S2.has_log) out.push(sub("Milestones"), ppTable(["Milestone", "Games"], S2.milestones));
+  if (S2.opponents.length) out.push(sub("Against each team"), ppTable(["Opponent", ...heads.slice(1)], S2.opponents.map(([o, x]) => lineRow(shortTeam(identOf(o).short || o), x))));
+  if (S2.quarters.length) out.push(sub("By quarter"), note("Per game, in the quarters he played."), ppTable(["Quarter", "GP", "MIN", "PTS", "FGA", "FG%", "REB", "AST"], S2.quarters.map(([q, x]) => [q, x.gp, x.min, x.pts, x.fga, x.fg ?? "–", x.reb, x.ast])));
+  out.push(sub("By shot clock"), note("Half-court shots by how much of the shot clock was used: early 0-7 s, middle 8-15, late 16+. Transition / other = fast breaks, putbacks and dead-ball sets."));
+  out.push(S2.clock.length ? ppTable(["Clock", "FG", "FG%", "Pts / shot"], S2.clock.map(([k, v]) => [k, `${v.fgm || 0}/${v.fga || 0}`, v.fga ? `${(100 * (v.fgm || 0) / v.fga).toFixed(1)}%` : "–", v.fga ? ((v.pts || 0) / v.fga).toFixed(2) : "–"])) : h("div", { class: "muted" }, "Recorded for games played from now on."));
+  const rb = S2.rebounding || {}, rt = (rb.contested || 0) + (rb.uncontested || 0);
+  out.push(sub("Rebounding"), note("Contested = a real rebounder on the other team was in the fight for it."));
+  out.push(rt ? ppTable(["Contested", "Uncontested", "Contested share"], [[rb.contested, rb.uncontested, `${(100 * rb.contested / rt).toFixed(1)}%`]]) : h("div", { class: "muted" }, "Recorded for games played from now on."));
+  const over = Object.entries(rb.over || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  if (over.length) out.push(h("div", { class: "muted", style: { fontSize: "12px", margin: "8px 0 4px" } }, "Who he out-rebounded most"), ppTable(["Player", "Boards won"], over.map(([n2, c]) => [h("div", { class: "pcell" }, faceEl(n2), n2), c])));
+  root.replaceChildren(...out);
+}
+// ---- Compare tab: type any player in the same games and see the two side by side
+async function ppCompare(root, d, source) {
+  root.replaceChildren(h("div", { class: "empty" }, "Loading…"));
+  let names = [];
+  try { names = (await api.get(`/api/stats/names?source=${encodeURIComponent(source || "Season")}`)).names || []; } catch { names = []; }
+  const listId = `pp-cmp-${Math.random().toString(36).slice(2, 7)}`;
+  const label = (r) => `${r.name} — ${shortTeam(identOf(r.team).short || r.team)}${/^\d{4} /.test(r.team) ? ` (${r.team.slice(0, 4)})` : ""}`;
+  const input = h("input", { class: "bld-in", list: listId, placeholder: "Type a player to compare…", style: { width: "100%", maxWidth: "380px" } });
+  const out = h("div", { style: { marginTop: "10px" } });
+  const metric = (x) => {
+    const pg = x.per_game || {}, t = x.totals || {}, tsd = 2 * ((t.fga || 0) + 0.44 * (t.fta || 0));
+    return [["Games", x.games], ["Minutes", pg.minutes], ["Points", pg.pts], ["Rebounds", pg.reb], ["Assists", pg.ast], ["Steals", pg.stl], ["Blocks", pg.blk], ["Turnovers", pg.tov],
+      ["FG%", t.fga ? +(100 * t.fgm / t.fga).toFixed(1) : null], ["3P%", t.tpa ? +(100 * t.tpm / t.tpa).toFixed(1) : null], ["FT%", t.fta ? +(100 * t.ftm / t.fta).toFixed(1) : null],
+      ["TS%", tsd ? +(100 * t.pts / tsd).toFixed(1) : null], ["3PA", pg.tpa], ["FTA", pg.fta], ["+/-", pg.plus_minus]];
+  };
+  const lowerBetter = new Set(["Turnovers"]);
+  const go = async () => {
+    const q = input.value.trim().toLowerCase();
+    const pick = names.find((r) => label(r).toLowerCase() === q) || names.find((r) => r.name.toLowerCase() === q) || names.find((r) => label(r).toLowerCase().includes(q));
+    if (!q || !pick) { out.replaceChildren(q ? h("div", { class: "muted" }, "No player by that name in these games.") : ""); return; }
+    let o;
+    try { o = await api.get(`/api/stats/player?source=${encodeURIComponent(source || "Season")}&team=${encodeURIComponent(pick.team)}&name=${encodeURIComponent(pick.name)}`); } catch { o = { error: "Could not load." }; }
+    if (o.error) { out.replaceChildren(h("div", { class: "muted" }, o.error)); return; }
+    const A = metric(d), B = metric(o);
+    out.replaceChildren(h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+      h("thead", {}, h("tr", {}, h("th", { class: "l" }, ""), h("th", {}, h("div", { class: "pcell", style: { justifyContent: "flex-end" } }, faceEl(d.name), d.name)), h("th", {}, h("div", { class: "pcell", style: { justifyContent: "flex-end" } }, faceEl(o.name), o.name)))),
+      h("tbody", {}, A.map(([k, va], i) => {
+        const vb = B[i][1], num = typeof va === "number" && typeof vb === "number" && k !== "Games" && k !== "Minutes";
+        const better = num && va !== vb ? ((va > vb) !== lowerBetter.has(k) ? 0 : 1) : -1;
+        return h("tr", {}, h("td", { class: "l" }, k), h("td", { class: better === 0 ? "pm-pos" : "" }, va ?? "–"), h("td", { class: better === 1 ? "pm-pos" : "" }, vb ?? "–"));
+      })))));
+  };
+  input.addEventListener("change", go);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  root.replaceChildren(h("h4", { class: "pp-sub" }, "Compare with another player"), h("div", { class: "muted", style: { fontSize: "12px", margin: "-2px 0 6px" } }, "Per game, same set of games (season / playoffs). Green = the better number."),
+    input, h("datalist", { id: listId }, names.filter((r) => !(r.name === d.name && r.team === d.team)).map((r) => h("option", { value: label(r) }))), out);
+}
 const ppTable = (heads, rows) => h("div", { class: "table-wrap" }, h("table", { class: "stats" },
   h("thead", {}, h("tr", {}, heads.map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
   h("tbody", {}, rows.map((r) => h("tr", {}, r.map((c, i) => (c instanceof Node ? (c.tagName === "TD" ? c : h("td", { class: i === 0 ? "l" : "" }, c)) : h("td", { class: i === 0 ? "l" : "" }, c ?? "–"))))))));

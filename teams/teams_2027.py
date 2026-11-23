@@ -753,7 +753,7 @@ def make_mavs_2027() -> Team:
                badges=("corner specialist bronze",),
                height=77, speed=0.74, shot_iq=0.72, iso_tendency=0.12, stamina=0.78),
         Player('Cooper Flagg', 'SF',
-               0.40, 0.540, 0.5500, 0.700, 0.400, 0.950,
+               0.40, 0.540, 0.800, 0.700, 0.400, 0.950,
                0.780, 0.840, 0.950, 0.880, 0.800,
                0.270, 0.700, 0.820,
                0.89, 0.75, 0.54, 0.75, 0.883, 0.733,

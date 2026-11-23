@@ -817,3 +817,97 @@ def player_extras(players, team, name):
         "stl_on": a.get("stl_on") or {}, "blk_on": a.get("blk_on") or {}, "blk_r": a.get("blk_r") or {}, "fouls_on": a.get("fouls_on") or {},
         "matchup_poss": {"pts": pts, "poss": poss, "tov": tov, "ppp": round(pts / poss, 2) if poss else None, "lg_ppp": round(lp / lpo, 2) if lpo else None},
     }
+
+
+
+# ---- the player pop-up's Splits tab: game splits, opponents, streaks, milestones, the season trend, quarters, shot clock, rebounding
+MONTHS = ((6, "Oct"), (21, "Nov"), (36, "Dec"), (51, "Jan"), (63, "Feb"), (78, "Mar"), (999, "Apr"))
+
+
+def player_splits(runner, source, team, name):
+    sec = runner.sections or {}
+    data = datasets(sec)
+    if source not in data:
+        source = next(iter(data), "Live")
+    players = data.get(source, ({}, {}))[0]
+    if team not in players or name not in players[team]:
+        hits = [tn for tn, pp in players.items() if name in pp]
+        team = hits[0] if hits else team
+    st = (players.get(team) or {}).get(name) or {}
+    a = st.get("analytics") or {}
+    rows = sec.get("_season_game_log") or []
+    fields = sec.get("_season_game_log_fields") or ()
+    idx = {f: i for i, f in enumerate(fields)}
+    games = []
+    if rows and "player" in idx:
+        for r in rows:
+            if r[idx["player"]] == name and (not team or r[idx["team"]] == team) and (r[idx["min"]] or 0) > 0:
+                res = str(r[idx["result"]])
+                games.append({"game": r[idx["game"]], "opp": r[idx["opp"]], "home": bool(r[idx["home"]]), "win": res.startswith("W"),
+                              **{k: r[idx[k]] for k in ("min", "pts", "reb", "ast", "stl", "blk", "tov", "fgm", "fga", "tpm", "tpa", "ftm", "fta", "pm") if k in idx}})
+    games.sort(key=lambda g: g["game"])
+
+    def line(gs):
+        n = len(gs)
+        if not n:
+            return None
+        s = lambda k: sum(g.get(k, 0) or 0 for g in gs)
+        return {"gp": n, "min": round(s("min") / n, 1), "pts": round(s("pts") / n, 1), "reb": round(s("reb") / n, 1), "ast": round(s("ast") / n, 1),
+                "stl": round(s("stl") / n, 1), "blk": round(s("blk") / n, 1), "tov": round(s("tov") / n, 1),
+                "fg": round(100 * s("fgm") / s("fga"), 1) if s("fga") else None, "tp": round(100 * s("tpm") / s("tpa"), 1) if s("tpa") else None,
+                "ft": round(100 * s("ftm") / s("fta"), 1) if s("fta") else None, "pm": round(s("pm") / n, 1)}
+
+    def month_of(n):
+        return next(m for cut, m in MONTHS if n <= cut)
+    splits = [[lab, l] for lab, l in (("Home", line([g for g in games if g["home"]])), ("Away", line([g for g in games if not g["home"]])),
+                                       ("Wins", line([g for g in games if g["win"]])), ("Losses", line([g for g in games if not g["win"]]))) if l]
+    months = []
+    for _, m in MONTHS:
+        l = line([g for g in games if month_of(g["game"]) == m])
+        if l:
+            months.append([m, l])
+    opps = {}
+    for g in games:
+        opps.setdefault(g["opp"], []).append(g)
+    opp_rows = sorted(([o, line(gs)] for o, gs in opps.items()), key=lambda r: -r[1]["gp"])
+
+    def longest(cond):
+        best = cur = 0
+        for g in games:
+            cur = cur + 1 if cond(g) else 0
+            best = max(best, cur)
+        return best
+
+    def dd(g):
+        return sum(1 for k in ("pts", "reb", "ast", "stl", "blk") if (g.get(k) or 0) >= 10)
+    streaks = [["20+ points", longest(lambda g: g["pts"] >= 20)], ["30+ points", longest(lambda g: g["pts"] >= 30)],
+               ["Double-doubles", longest(lambda g: dd(g) >= 2)], ["3+ threes", longest(lambda g: (g.get("tpm") or 0) >= 3)],
+               ["50%+ shooting (8+ shots)", longest(lambda g: (g.get("fga") or 0) >= 8 and g["fgm"] / g["fga"] >= 0.5)],
+               ["Team wins", longest(lambda g: g["win"])]]
+    milestones = [["30-point games", sum(1 for g in games if g["pts"] >= 30)], ["40-point games", sum(1 for g in games if g["pts"] >= 40)],
+                  ["50-point games", sum(1 for g in games if g["pts"] >= 50)], ["Double-doubles", sum(1 for g in games if dd(g) >= 2)],
+                  ["Triple-doubles", sum(1 for g in games if dd(g) >= 3)], ["10-assist games", sum(1 for g in games if g["ast"] >= 10)],
+                  ["15-rebound games", sum(1 for g in games if g["reb"] >= 15)], ["5+ three games", sum(1 for g in games if (g.get("tpm") or 0) >= 5)]]
+    trend = [{"game": g["game"], "pts": g["pts"], "reb": g["reb"], "ast": g["ast"], "min": round(g["min"], 1), "fgm": g["fgm"], "fga": g["fga"]} for g in games]
+    q = st.get("quarter_stats") or {}
+    quarters = []
+    for k in ("1", "2", "3", "4", "5"):
+        x = q.get(k) or q.get(int(k)) or {}
+        n = x.get("games", 0) or 0
+        if n:
+            quarters.append(["OT" if k == "5" else "Q" + k, {"gp": n, "min": round((x.get("minutes", 0) or 0) / 60 / n, 1), "pts": round((x.get("pts", 0) or 0) / n, 1),
+                             "fg": round(100 * x.get("fgm", 0) / x["fga"], 1) if x.get("fga") else None, "fga": round((x.get("fga", 0) or 0) / n, 1),
+                             "reb": round((x.get("reb", 0) or 0) / n, 1), "ast": round((x.get("ast", 0) or 0) / n, 1)}])
+    order = {"early": 0, "middle": 1, "late": 2, "transition / other": 3}
+    clock = sorted(([k, v] for k, v in (a.get("clock") or {}).items()), key=lambda kv: order.get(kv[0], 9))
+    reb = {"contested": a.get("reb_contested", 0) or 0, "uncontested": a.get("reb_uncontested", 0) or 0, "over": a.get("reb_over") or {}}
+    return {"name": name, "team": team, "has_log": bool(games), "splits": splits, "months": months, "opponents": opp_rows, "streaks": streaks,
+            "milestones": milestones, "trend": trend, "quarters": quarters, "clock": clock, "rebounding": reb}
+
+
+def player_names(runner, source):
+    data = datasets(runner.sections or {})
+    if source not in data:
+        source = next(iter(data), "Live")
+    players = data.get(source, ({}, {}))[0]
+    return {"names": sorted(({"name": pn, "team": tn} for tn, pp in players.items() for pn in pp), key=lambda r: r["name"])}

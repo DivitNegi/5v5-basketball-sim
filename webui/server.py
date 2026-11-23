@@ -475,6 +475,39 @@ def _team_insights(runner, team):
         return None
 
 
+def team_lineups(runner, team):
+    """Five-man units and two-man pairings: possessions together and points scored / allowed per 100 possessions."""
+    sec = runner.sections or {}
+    tt = (sec.get("_season_team_totals") or sec.get("_playoff_team_totals") or {}).get(team, {})
+    units = tt.get("lineups") or {}
+    if not units:
+        return None
+
+    def rate(r):
+        poss = ((r.get("poss", 0) or 0) + (r.get("dposs", 0) or 0)) / 2
+        return poss, (100 * r.get("pf", 0) / poss if poss else None), (100 * r.get("pa", 0) / poss if poss else None)
+    fives, pairs = [], {}
+    for key, r in units.items():
+        poss, o, d = rate(r)
+        names = key.split("|")
+        fives.append({"players": names, "poss": round(poss), "off": round(o, 1) if o is not None else None, "def": round(d, 1) if d is not None else None,
+                      "net": round(o - d, 1) if o is not None else None})
+        for i in range(len(names)):
+            for j in range(i + 1, len(names)):
+                pr = pairs.setdefault((names[i], names[j]), {"poss": 0, "dposs": 0, "pf": 0, "pa": 0})
+                for f in pr:
+                    pr[f] += r.get(f, 0) or 0
+    min_poss = max(30, 0.01 * sum(f["poss"] for f in fives))
+    fives = sorted((f for f in fives if f["poss"] >= min_poss), key=lambda f: -f["poss"])[:12]
+    pair_rows = []
+    for (x, y), r in pairs.items():
+        poss, o, d = rate(r)
+        if poss >= 100:
+            pair_rows.append({"players": [x, y], "poss": round(poss), "off": round(o, 1), "def": round(d, 1), "net": round(o - d, 1)})
+    pair_rows.sort(key=lambda r: -r["poss"])
+    return {"fives": fives, "pairs": pair_rows[:15], "min_poss": round(min_poss)}
+
+
 def team_assist_network(runner, team):
     """Who assisted whom on this team: one row per passer, one column per scorer (season totals)."""
     sec = runner.sections or {}
@@ -562,7 +595,7 @@ def team_card_payload(runner, team):
     per.update(fgp=pct("fgm", "fga"), tpp=pct("tpm", "tpa"), ftp=pct("ftm", "fta"))
     games = schedule_payload(runner, team)["games"]
     played = [x for x in games if x.get("mine") is not None]
-    return {"assist_net": team_assist_network(runner, team), "roster": team_card_roster(runner, team), "team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
+    return {"lineups": team_lineups(runner, team), "assist_net": team_assist_network(runner, team), "roster": team_card_roster(runner, team), "team": team, "games": int(g), "per_game": per, "ranks": ranks, "pool": len(teams),
             "recent": list(reversed(played[-8:])), "upcoming": schedule_payload(runner, team)["upcoming"][:5], "wins": sum(1 for x in played if x["win"]), "losses": sum(1 for x in played if not x["win"]),
             "insights": _team_insights(runner, team)}
 
@@ -1211,6 +1244,12 @@ def build_app():
                         return self._json({"error": "Bad player index."})
             if path == "/api/season/player_games":
                 return self._json(player_games_payload(runner, (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
+            if path == "/api/stats/player_splits":
+                from .stats import player_splits
+                return self._json(player_splits(runner, (params.get("source") or ["Season"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
+            if path == "/api/stats/names":
+                from .stats import player_names
+                return self._json(player_names(runner, (params.get("source") or ["Season"])[0]))
             if path == "/api/stats/player_links":
                 from .stats import player_links
                 return self._json(player_links(runner, (params.get("source") or ["Live"])[0], (params.get("team") or [""])[0], (params.get("name") or [""])[0]))
