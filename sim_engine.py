@@ -10439,6 +10439,24 @@ def three_attempt_tendency_curve(tendency: float) -> float:
     return high / max(1e-9, high + low)
 
 
+GAME_STATE_MAX = 0.16   # relative change in the make chance at a full-size lead
+
+
+def score_effect(team: Team, opponent: Team, period: int) -> float:
+    """Real score effects: a team up big relaxes (looser defense, sloppier shots) and the team down big plays harder, so real NBA
+    games stay closer than raw talent alone would keep them (about half reach the last five minutes within five). Builds from a
+    5-point margin, full by 22; light in the first half, full in the fourth. Not in a 1-on-1."""
+    if getattr(team, "is_1v1", False) or opponent is None:
+        return 0.0
+    diff = getattr(team, "score", 0) - getattr(opponent, "score", 0)
+    margin = abs(diff)
+    if margin <= 5:
+        return 0.0
+    weight = 0.45 if period <= 2 else 0.80 if period == 3 else 1.0
+    size = min(1.0, (margin - 5) / 17.0)
+    return (-1.0 if diff > 0 else 1.0) * GAME_STATE_MAX * size * weight
+
+
 def effective_rating_components(player: Player, team: Team, opponent: Team,
                                 period: int, period_time: int) -> Dict[str, float]:
     # Momentum/home used to be a flat bump applied identically to every
@@ -13699,6 +13717,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
                    team: Team = None, opponent: Team = None,
                    period: int = 1, period_time: int = 720) -> float:
     p = _shot_make_prob_rolled(shooter, defender, shot_type, team, opponent, period, period_time)
+    if team is not None and opponent is not None:
+        p = max(0.0, min(0.97, p * (1.0 + score_effect(team, opponent, period))))   # big leads relax, big deficits push
     if shooter is not None:
         shooter._xfg = (shot_type, p)   # kept for shot-making vs expected; the attempt that follows picks it up
     return p
