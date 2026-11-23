@@ -6250,6 +6250,7 @@ def add_team_to_series_totals(series_team_totals: Dict, team: Team):
     s = series_team_totals[team.name]
     s["name"] = team.name
     s["games"] += 1
+    merge_stat_totals(s.setdefault("lineups", {}), getattr(team, "lineup_stats", None) or {})
     s["pts"] += team.score
     s["reb"] += totals["reb"]
     s["oreb"] += totals["oreb"]
@@ -13066,6 +13067,20 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
         if not made:
             player._sq_last = (shot_type, sq)
     sqr = a.setdefault("sq_r", {}).setdefault(region, {})
+    # shot clock: early (0-7 s used), middle (8-15), late (16+); transition / putbacks / dead-ball sets have no half-court clock
+    if made and getattr(player, "_clock_last", None) and player._clock_last[0] == shot_type:
+        clock = player._clock_last[1]
+    else:
+        used = SIM_CONTEXT.get("shot_clock_used") if isinstance(globals().get("SIM_CONTEXT"), dict) else None
+        clock = "early" if used is None or used <= 7 else "middle" if used <= 15 else "late"
+        if used is None:
+            clock = "transition / other"
+        if not made:
+            player._clock_last = (shot_type, clock)
+    clk = a.setdefault("clock", {}).setdefault(clock, {})
+    _bump(clk, "fgm" if made else "fga")
+    if made:
+        _bump(clk, "pts", 3 if shot_type == "three" else 2)
     _bump(sqr, f"{sq}_m" if made else f"{sq}_a")
     clutch = a.setdefault("clutch", {}) if in_clutch_window() else None
     if made:
@@ -13531,6 +13546,19 @@ def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player
         rebounder.dreb_stat += 1
     team.team_reb += 1
     team.last_rebounder = rebounder
+    # contested = a real rebounder on the other side was in the fight (his pull is at least 60% of the winner's)
+    try:
+        other = dff if team is off else off
+        mine_w = rebound_weight(rebounder, miss_type, offensive=team is off)
+        rival = max(other.on_floor, key=lambda p: rebound_weight(p, miss_type, offensive=team is not off), default=None)
+        a = analytics_of(rebounder)
+        if rival is not None and rebound_weight(rival, miss_type, offensive=team is not off) >= 0.6 * max(1e-6, mine_w):
+            _bump(a, "reb_contested")
+            _bump(a.setdefault("reb_over", {}), rival.name)
+        else:
+            _bump(a, "reb_uncontested")
+    except Exception:
+        pass
     return team, rebounder
 
 def shot_skill_disparity_multiplier(rating: float, shot_type: str) -> float:
@@ -17737,7 +17765,7 @@ def maybe_low_man_help(off: Team, dff: Team, driver: Player, defender: Player,
     )
     if getattr(dff, "defensive_focus", None) == driver.name:
         help_chance += 0.035
-    if random.random() > max(0.04, min(0.22, help_chance)):
+    if random.random() > max(0.05, min(0.30, help_chance * 1.25)):
         return driver, defender, shot_type, None, None, False
 
     help_lines = [
@@ -18508,17 +18536,19 @@ def fourth_quarter_star_shot_chance(team: Team, opponent: Team, period: int, per
             chance += 0.08
         return max(0.46, min(0.92, chance))
 
-    chance = 0.46
+    # stars get more of the late touches, but not nearly all of them (the old ramp reached ~0.98 in a close finish, which put
+    # clutch scoring at ~1.5x the stars' normal rate)
+    chance = 0.40
     if period_time <= 9 * 60:
-        chance += 0.10
+        chance += 0.06
     if period_time <= 6 * 60:
-        chance += 0.18
+        chance += 0.06
     if period_time <= 3 * 60:
-        chance += 0.12
+        chance += 0.05
     if abs(margin) <= 10:
-        chance += 0.12
+        chance += 0.05
     if margin < 0:
-        chance += 0.12
+        chance += 0.06
     elif margin >= 16:
         chance -= 0.18
 
@@ -18529,7 +18559,7 @@ def fourth_quarter_star_shot_chance(team: Team, opponent: Team, period: int, per
     if not stars_available:
         chance *= 0.45
 
-    return max(0.24, min(0.92, chance))
+    return max(0.24, min(0.72, chance))
 
 
 def choose_fourth_quarter_star_scorer(team: Team, opponent: Team,
@@ -20300,7 +20330,29 @@ def run_ato_play(off: Team, dff: Team, period: int, period_time: int,
     return reb_team, spent
 
 
-def simulate_possession(off: Team, dff: Team,
+CLUTCH_STAR_TAKEOVER = 0.45
+
+
+def simulate_possession(off: Team, dff: Team, period: int, period_time: int, teamA: Team, teamB: Team, matchups):
+    """One possession, plus the bookkeeping the analytics need: the five-man units on the floor (points for / against) and the shot
+    clock used before the shot."""
+    lineup_off = tuple(sorted(p.name for p in off.on_floor))
+    lineup_def = tuple(sorted(p.name for p in dff.on_floor))
+    before = (off.score, dff.score)
+    if isinstance(globals().get("SIM_CONTEXT"), dict):
+        SIM_CONTEXT["shot_clock_used"] = None
+    result = _simulate_possession(off, dff, period, period_time, teamA, teamB, matchups)
+    d_off, d_def = off.score - before[0], dff.score - before[1]
+    for team, key, own, other, used in ((off, lineup_off, d_off, d_def, "poss"), (dff, lineup_def, d_def, d_off, "dposs")):
+        if len(key) == 5:
+            row = team.__dict__.setdefault("lineup_stats", {}).setdefault("|".join(key), {})
+            row[used] = row.get(used, 0) + 1
+            row["pf"] = row.get("pf", 0) + own
+            row["pa"] = row.get("pa", 0) + other
+    return result
+
+
+def _simulate_possession(off: Team, dff: Team,
                         period: int, period_time: int,
                         teamA: Team, teamB: Team,
                         matchups: Dict[Player, Player]) -> Tuple[Team, int]:
@@ -20397,6 +20449,8 @@ def simulate_possession(off: Team, dff: Team,
 
     if possession_time > period_time:
         possession_time = period_time
+    if isinstance(globals().get("SIM_CONTEXT"), dict):
+        SIM_CONTEXT["shot_clock_used"] = possession_time
         # RARE FULL-POSSESSION SHOT CLOCK VIOLATION
     if period_time >= 24 and random.random() < shot_clock_violation_chance(off, dff, period, period_time):
         possession_time = 24
@@ -20451,7 +20505,8 @@ def simulate_possession(off: Team, dff: Team,
     )
     # Philadelphia's LeBron remains the primary clutch decision-maker, but
     # does not get locked into being the shooter on nearly every possession.
-    star_takeover_lock = closing_star_mode and closing_star is not None and not pass_first_clutch_creator
+    # stars take roughly 35-45% of their team's clutch shots: the takeover is a per-possession chance, not every trip
+    star_takeover_lock = closing_star_mode and closing_star is not None and not pass_first_clutch_creator and random.random() < CLUTCH_STAR_TAKEOVER
     if frontcourt_after_oreb and not reset_after_oreb:
         print(f"{off.name} keep it in the frontcourt after the offensive board and have to act fast.")
     elif reset_after_oreb:
@@ -20479,7 +20534,7 @@ def simulate_possession(off: Team, dff: Team,
     off.current_play_initiator = handler
     off.ball_handler_name = handler.name   # the live view glows the player who runs this possession
     shooter = choose_shooter(off)
-    if closing_star_mode and closing_star is not None:
+    if star_takeover_lock:
         shooter = closing_star
     elif fourth_star_mode and random.random() < fourth_star_chance:
         shooter = choose_fourth_quarter_star_scorer(
