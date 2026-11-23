@@ -10498,7 +10498,10 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     if getattr(player, "injury_limited", False):
         fatigue_drag += 0.035
 
+    hot_hand = HOT_HAND_RATING if getattr(player, "hot_start", False) else 0.0
+
     return {
+        "Hot hand": hot_hand,
         "Momentum": momentum_boost,
         "Clutch": clutch_boost,
         "Series": series_boost,
@@ -11047,7 +11050,9 @@ def record_lineup_plus_minus(scoring_team: Team, defending_team: Team, points: i
 def record_lineup_minutes(team: Team, seconds: int):
     if seconds > 0 and in_clutch_window():
         for p in getattr(team, "on_floor", []) or []:
-            _bump(analytics_of(p).setdefault("clutch", {}), "sec", seconds)
+            cl = analytics_of(p).setdefault("clutch", {})
+            _bump(cl, "sec", seconds)
+            cl["games"] = 1   # this game had clutch time for him; summed over games it is his clutch games
     if seconds <= 0 or len(getattr(team, "on_floor", []) or []) < 5:
         return
     row = ensure_lineup_row(team)
@@ -13719,6 +13724,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     p = _shot_make_prob_rolled(shooter, defender, shot_type, team, opponent, period, period_time)
     if team is not None and opponent is not None:
         p = max(0.0, min(0.97, p * (1.0 + score_effect(team, opponent, period))))   # big leads relax, big deficits push
+    if shooter is not None and getattr(shooter, "hot_start", False):
+        p = min(0.97, p * HOT_HAND_MAKE)   # the hot hand: he started hot and is still rolling
     if shooter is not None:
         shooter._xfg = (shot_type, p)   # kept for shot-making vs expected; the attempt that follows picks it up
     return p
@@ -14797,6 +14804,42 @@ def is_hot_start_star(player: Player) -> bool:
     return team is not None and player.name in team_top_options(team)
 
 
+ROLE_HOT_CHANCE = 1.0         # a role player who opens 3-for-3 / 4-for-5 is on: the offense starts going to him (any player, not just stars)
+HOT_HAND_RATING = 0.05        # while a player is hot (started hot and still making half his shots) his ratings run this much higher
+HOT_HAND_MAKE = 1.04          # and his shots go in this much more often
+ROLE_HOT_TOUCH_BOOST = 2.6    # how much more often the hot role player is the one shooting (his base share is small)
+ROLE_HOT_DAMPER_SHIFT = 8     # his usual role-player shot dampers start this many shots later on his night
+ROLE_HOT_FGA_BONUS = 7.0      # and his shot-volume limit sits this much higher
+
+
+def update_role_hot(player: Player):
+    """Any non-star can catch fire: open 3-for-3 or 4-for-5 and there is a chance the offense starts running to him (ROLE_HOT_CHANCE),
+    so random role players get the occasional 20-point outburst, not every game. It ends once he cools below 45%."""
+    fga, fgm = player.fga, player.fgm
+    if getattr(player, "hot_start_done", False):
+        return
+    if getattr(player, "hot_start", False):
+        if fga and fgm / fga < 0.45:
+            player.hot_start = False
+            player.hot_start_done = True
+            print(random.choice([f"{player.name} has cooled off, and the ball starts finding the usual guys again.",
+                                 f"The hot hand has left {player.name}; the offense goes back to its stars."]))
+        return
+    if (fga == 3 and fgm == 3) or (fga in (4, 5) and fgm >= 4 and fga - fgm <= 1):
+        if random.random() < ROLE_HOT_CHANCE:
+            player.hot_start = True
+            player.role_hot = True
+            print(random.choice([
+                f"{player.name} is feeling it tonight. His teammates keep finding him.",
+                f"{player.name} has the hot hand, and the offense is looking his way.",
+                f"Nobody expected this, but {player.name} is on fire and they keep feeding him.",
+            ]))
+        else:
+            player.hot_start_done = True
+    elif fga >= 5:
+        player.hot_start_done = True
+
+
 def update_hot_start(player: Player):
     """A star who makes 3 of his first 3-4 shots (or 4 of his first 5) has started hot: his team keeps going to him. It lasts while he keeps
     making at least half his shots; once he cools below that it is over for the game."""
@@ -14804,7 +14847,11 @@ def update_hot_start(player: Player):
     if fga <= 1:
         player.hot_start = False
         player.hot_start_done = False
-    if getattr(player, "hot_start_done", False) or not is_hot_start_star(player):
+        player.role_hot = False
+    if not is_hot_start_star(player):
+        update_role_hot(player)
+        return
+    if getattr(player, "hot_start_done", False):
         return
     if getattr(player, "hot_start", False):
         if fga and fgm / fga < 0.50:
@@ -16098,10 +16145,12 @@ def shooter_weight(player: Player) -> float:
         elif confidence < 0:
             rhythm *= 1.0 + max(-0.28, confidence * 0.08)
     role_volume = 1.0
-    if player.usage < 0.18 and player.fga >= 8:
-        role_volume *= max(0.24, 1.0 - (player.fga - 7) * 0.16)
-    elif player.usage < 0.22 and player.fga >= 12:
-        role_volume *= max(0.38, 1.0 - (player.fga - 11) * 0.11)
+    role_hot = getattr(player, "role_hot", False) and getattr(player, "hot_start", False)
+    role_fga = player.fga - (ROLE_HOT_DAMPER_SHIFT if role_hot else 0)   # on his night the role-player dampers start later
+    if player.usage < 0.18 and role_fga >= 8:
+        role_volume *= max(0.24, 1.0 - (role_fga - 7) * 0.16)
+    elif player.usage < 0.22 and role_fga >= 12:
+        role_volume *= max(0.38, 1.0 - (role_fga - 11) * 0.11)
     elif player.name == "Karl-Anthony Towns" and player.fga >= 14:
         role_volume *= max(0.08, 1.0 - (player.fga - 13) * 0.20)
     elif player.name == "Jalen Brunson" and player.fga >= 22:
@@ -16115,9 +16164,9 @@ def shooter_weight(player: Player) -> float:
         role_volume *= max(0.62, 1.0 - (player.fga - (getattr(player, "volume_damper_start", 14) - 1)) * 0.06)
 
     soft_cap = shot_volume_soft_cap(player)
-    if getattr(player, "hot_start", False):   # a star who started hot gets the ball more and is readier to shoot it
-        role_volume *= HOT_START_TOUCH_BOOST
-        soft_cap += HOT_START_FGA_BONUS
+    if getattr(player, "hot_start", False):   # a player who started hot gets the ball more and is readier to shoot it
+        role_volume *= ROLE_HOT_TOUCH_BOOST if getattr(player, "role_hot", False) else HOT_START_TOUCH_BOOST
+        soft_cap += ROLE_HOT_FGA_BONUS if getattr(player, "role_hot", False) else HOT_START_FGA_BONUS
     if SEASON_STAR_MINUTES_CAP and player.pts >= 30:
         soft_cap += HOT_GAME_SEASON_FGA_BONUS  # regular season: a hot night may run past the usual volume cap
     explicit_target = getattr(player, "target_fga_soft_cap", None)
@@ -16280,7 +16329,7 @@ HOT_GAME_SEASON_FGA_BONUS = 10.0
 def has_shot_volume_left(player: Player) -> bool:
     bonus = HOT_GAME_SEASON_FGA_BONUS if (SEASON_STAR_MINUTES_CAP and player.pts >= 30) else 0.0
     if getattr(player, "hot_start", False):
-        bonus += HOT_START_FGA_BONUS
+        bonus += ROLE_HOT_FGA_BONUS if getattr(player, "role_hot", False) else HOT_START_FGA_BONUS
     if player.shot_tendency >= 0.48 or player.usage >= 0.32:
         return player.fga <= shot_volume_soft_cap(player) + 3.0 + bonus
     return player.fga <= shot_volume_soft_cap(player) + 1.0 + bonus

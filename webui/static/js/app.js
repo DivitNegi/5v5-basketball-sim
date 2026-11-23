@@ -2997,12 +2997,18 @@ function offenseExtras(X, games, U) {
   ]) : none("No clutch minutes yet."));
   // the plain clutch numbers: season totals and a game
   if (cl.sec) {
-    const pg = (v) => ((v || 0) / games).toFixed(1);
     const sh = (m, a) => `${m || 0}-${a || 0}`;
-    out.push(h("div", { class: "muted", style: { fontSize: "12px", margin: "10px 0 4px" } }, "Clutch totals (not per 36)"));
+    const avgRow = (label, n) => {
+      const pg = (v) => ((v || 0) / n).toFixed(1);
+      return [label, (cl.sec / 60 / n).toFixed(1), pg(cl.pts), `${pg(cl.fgm)}-${pg(cl.fga)}`, `${pg(cl.tpm)}-${pg(cl.tpa)}`, `${pg(cl.ftm)}-${pg(cl.fta)}`, cl.reb != null ? pg(cl.reb) : "–", pg(cl.ast), cl.stl != null ? pg(cl.stl) : "–", cl.blk != null ? pg(cl.blk) : "–", pg(cl.tov), pg(cl.pm)];
+    };
+    const cg = cl.games || 0;
+    out.push(h("div", { class: "muted", style: { fontSize: "12px", margin: "10px 0 4px" } },
+      cg ? `Clutch totals (not per 36). Clutch games: ${cg} of ${games} (${Math.round((100 * cg) / Math.max(1, games))}%)` : "Clutch totals (not per 36). Clutch-game count starts with newly simmed games."));
     out.push(ppTable(["", "Minutes", "PTS", "FGM-FGA", "3PM-3PA", "FTM-FTA", "REB", "AST", "STL", "BLK", "TOV", "+/-"], [
       ["Season total", (cl.sec / 60).toFixed(0), cl.pts || 0, sh(cl.fgm, cl.fga), sh(cl.tpm, cl.tpa), sh(cl.ftm, cl.fta), cl.reb ?? "–", cl.ast || 0, cl.stl ?? "–", cl.blk ?? "–", cl.tov || 0, cl.pm || 0],
-      ["A game", (cl.sec / 60 / games).toFixed(1), pg(cl.pts), `${pg(cl.fgm)}-${pg(cl.fga)}`, `${pg(cl.tpm)}-${pg(cl.tpa)}`, `${pg(cl.ftm)}-${pg(cl.fta)}`, cl.reb != null ? pg(cl.reb) : "–", pg(cl.ast), cl.stl != null ? pg(cl.stl) : "–", cl.blk != null ? pg(cl.blk) : "–", pg(cl.tov), pg(cl.pm)],
+      ...(cg ? [avgRow("Per clutch game", cg)] : []),
+      avgRow("Per game (all games)", games),
     ]));
   }
   // turnovers
