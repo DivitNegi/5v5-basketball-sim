@@ -1021,8 +1021,8 @@ function renderRaces() {
   }
   const groups = {};
   (SE.data?.awards || []).forEach((a) => { (groups[a.award] ||= []).push(a); });
-  // rookie awards sit above the All-Star entries
-  const order = (name) => (/all-star/i.test(name) ? 2 : /rookie|roy/i.test(name) ? 1 : 0);
+  // the All-Rookie teams sit above the All-Star entries; Rookie of the Year stays up top with the main awards (right below DPOY)
+  const order = (name) => (/all-star/i.test(name) ? 2 : /all-rookie/i.test(name) ? 1 : 0);
   const cleanName = (n) => String(n || "").replace(/^\d+\.\s*/, "").replace(/\s*\([A-Z]{1,2}\)\s*$/, "").trim();   // "1. LeBron James (G)" -> "LeBron James"
   const cards = Object.entries(groups).sort((x, y) => order(x[0]) - order(y[0])).map(([name, list]) => h("div", { class: "award-card" }, h("div", { class: "a" }, name),
     list.map((a) => {
