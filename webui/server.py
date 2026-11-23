@@ -231,7 +231,7 @@ def _p48(s, k):
 
 
 _RANK_VALUE = {
-    "GP": lambda s, g: s.get("games", 0), "MIN": lambda s, g: s.get("minutes", 0) / 60 / g, "PTS": lambda s, g: s.get("pts", 0) / g,
+    "GP": lambda s, g: s.get("games", 0), "GS": lambda s, g: s.get("starts", 0), "MIN": lambda s, g: s.get("minutes", 0) / 60 / g, "PTS": lambda s, g: s.get("pts", 0) / g,
     "REB": lambda s, g: s.get("reb", 0) / g, "ORB": lambda s, g: s.get("oreb", 0) / g, "AST": lambda s, g: s.get("ast", 0) / g,
     "STL": lambda s, g: s.get("stl", 0) / g, "BLK": lambda s, g: s.get("blk", 0) / g, "STK": lambda s, g: (s.get("stl", 0) + s.get("blk", 0)) / g,
     "TOV": lambda s, g: s.get("tov", 0) / g, "FG": lambda s, g: s.get("fgm", 0) / g, "FG%": lambda s, g: _pc(s, "fgm", "fga"),
@@ -267,7 +267,7 @@ def _avg_row(s, g, team, name, kind="player", rank=None):
     g = max(1, g)
     ident = team_identity(team)
     return {"kind": kind, "team": team, "short": ident["short"], "logo": ident["logo"], "color": ident["color"], "initials": ident["initials"],
-            "name": name, "rank": rank, "gp": s.get("games", 0) or g, "min": s.get("minutes", 0) / 60 / g,
+            "name": name, "rank": rank, "gp": s.get("games", 0) or g, "gs": (s.get("starts", 0) if kind == "player" else None), "min": s.get("minutes", 0) / 60 / g,
             "pts": s.get("pts", 0) / g, "reb": s.get("reb", 0) / g, "orb": s.get("oreb", 0) / g, "ast": s.get("ast", 0) / g,
             "stl": s.get("stl", 0) / g, "blk": s.get("blk", 0) / g, "tov": s.get("tov", 0) / g,
             "fgm": s.get("fgm", 0) / g, "fga": s.get("fga", 0) / g, "fgp": _pc(s, "fgm", "fga"),

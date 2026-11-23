@@ -226,7 +226,7 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
     elif kind == "advanced":
         result["columns"] = ["Team", "Player", "MPG", "PER", "TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "USG%", "OWS", "DWS", "WS", "WS/48", "OBPM", "DBPM", "BPM", "VORP", "OFF", "DEF", "IMPACT", "+/-", "DOUBLES/G", "ON/48", "OFF/48", "ON-OFF"]
     else:
-        result["columns"] = ["Team", "Player", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "PF", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "2P", "2PA", "2P%", "eFG%", "FT", "FTA", "FT%", "+/-"]
+        result["columns"] = ["Team", "Player", "GP", "GS", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "PF", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "2P", "2PA", "2P%", "eFG%", "FT", "FTA", "FT%", "+/-"]
     for tn, pp in players.items():
         if team_filter not in ("All teams", tn):
             continue
@@ -261,7 +261,7 @@ def payload(runner, source="Live", kind="averages", team_filter="All teams", qua
                 per = lambda k: round(st[k]/g, 1)
                 efg = round(100 * (st["fgm"] + 0.5 * st["tpm"]) / st["fga"], 1) if st["fga"] else None
                 # shooting laid out like Basketball-Reference: makes, attempts and % each in their own column, twos split out, then eFG%
-                result["rows"].append([tn, pn, st["games"], round(st["minutes"]/60/g, 1)] + [per(k) for k in ("pts", "reb", "oreb", "ast", "stl", "blk", "tov", "pf")]
+                result["rows"].append([tn, pn, st["games"], int(st["starts"]), round(st["minutes"]/60/g, 1)] + [per(k) for k in ("pts", "reb", "oreb", "ast", "stl", "blk", "tov", "pf")]
                                       + [per("fgm"), per("fga"), pct("fgm", "fga"), per("tpm"), per("tpa"), pct("tpm", "tpa"), per("twm"), per("twa"), pct("twm", "twa"), efg,
                                          per("ftm"), per("fta"), pct("ftm", "fta"), round(st["plus_minus"]/g, 1)])
                 result["gp"].append(st["games"])

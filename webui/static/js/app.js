@@ -1035,10 +1035,10 @@ function renderRaces() {
 }
 
 const AV = { team: "All Teams", quarter: "All", rank: "Team order", source: "Season", sort: null, dir: -1, filter: "", data: null };
-const AVG_RANKS = ["Team order", "GP", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-", "STK", "AST/TOV", "STL/TOV", "PTS/48", "REB/48", "AST/48", "STL/48", "BLK/48"];
+const AVG_RANKS = ["Team order", "GP", "GS", "MIN", "PTS", "REB", "ORB", "AST", "STL", "BLK", "TOV", "FG", "FG%", "3P", "3P%", "FT", "FT%", "TS%", "+/-", "STK", "AST/TOV", "STL/TOV", "PTS/48", "REB/48", "AST/48", "STL/48", "BLK/48"];
 // [key, header, sort key, formatter]
 const f1 = (v) => (v == null ? "–" : v.toFixed(1));
-const PCOLS = [["gp", "GP", "gp", (v) => v], ["min", "MIN", "min", f1], ["pts", "PTS", "pts", f1], ["reb", "REB", "reb", f1], ["orb", "ORB", "orb", f1], ["ast", "AST", "ast", f1],
+const PCOLS = [["gp", "GP", "gp", (v) => v], ["gs", "GS", "gs", (v) => (v == null ? "–" : v)], ["min", "MIN", "min", f1], ["pts", "PTS", "pts", f1], ["reb", "REB", "reb", f1], ["orb", "ORB", "orb", f1], ["ast", "AST", "ast", f1],
   ["stl", "STL", "stl", f1], ["blk", "BLK", "blk", f1], ["tov", "TOV", "tov", f1],
   // shooting laid out like Basketball-Reference: makes, attempts and % each in their own column, twos split out, then eFG%
   ["fgm", "FG", "fgm", f1], ["fga", "FGA", "fga", f1], ["fgp", "FG%", "fgp", f1], ["tpm", "3P", "tpm", f1], ["tpa", "3PA", "tpa", f1], ["tpp", "3P%", "tpp", f1],
@@ -3014,7 +3014,6 @@ function offenseExtras(X, games, U) {
     out.push(ppTable(["", "Minutes", "PTS", "FGM-FGA", "3PM-3PA", "FTM-FTA", "REB", "AST", "STL", "BLK", "TOV", "+/-"], [
       ["Season total", (cl.sec / 60).toFixed(0), cl.pts || 0, sh(cl.fgm, cl.fga), sh(cl.tpm, cl.tpa), sh(cl.ftm, cl.fta), cl.reb ?? "–", cl.ast || 0, cl.stl ?? "–", cl.blk ?? "–", cl.tov || 0, cl.pm || 0],
       ...(cg ? [avgRow("Per clutch game", cg)] : []),
-      avgRow("Per game (all games)", games),
     ]));
   }
   // turnovers

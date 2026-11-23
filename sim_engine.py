@@ -9197,6 +9197,7 @@ def initialize_minute_targets(team: Team):
         for p in team.roster:
             p.target_minutes = exact_rotation.get(p.name, p.target_minutes)
     apply_gui_minutes_overrides(team)
+    apply_slump_minutes(team)
 
 
 def apply_gui_minutes_overrides(team: Team):
@@ -10502,6 +10503,7 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
 
     return {
         "Hot hand": hot_hand,
+        "Form": getattr(player, "season_form", 0.0),
         "Momentum": momentum_boost,
         "Clutch": clutch_boost,
         "Series": series_boost,
@@ -26645,12 +26647,125 @@ def season_replay_available(order) -> bool:
     return bool(spec) and spec[0] in SEASON_REPLAY["makers"] and spec[1] in SEASON_REPLAY["makers"]
 
 
+# ---- form across games (regular season): hot and cold stretches, and season-long slumps
+# Each game, a player's shot-making is compared with what the engine expected from his shots (points above / below expected). A rolling
+# average of that (about the last 6-8 games) is his form: it moves his ratings a little, so a good run carries over into the next games and a
+# cold one does too. Over the whole season, a player well below expected (a real z-score, so a high-volume shooter needs a bigger gap) is in
+# a slump: his ratings drop further, he loses his starting spot to the best healthy player at his position, and his minutes are cut. He gets
+# it all back once his season numbers recover.
+SEASON_FORM: Dict[str, Dict[str, Dict]] = {}   # team name -> {player name: form state}, kept while a season runs
+SEASON_FORM_ACTIVE = False
+FORM_EWMA = 0.30            # weight of the latest game in the rolling form
+FORM_PER_POINT = 0.009      # rating change per point a game above / below expected in the rolling form
+FORM_MAX = 0.05             # the most rolling form moves a rating
+SLUMP_MIN_GAMES = 20        # no season-long slump before this many games
+SLUMP_ENTER_Z = -1.8        # season shot-making this far below expected (in standard deviations) is a slump
+SLUMP_EXIT_Z = -1.0         # and he is out of it once he is back above this
+SLUMP_RATING = 0.03         # extra rating drop while slumping
+SLUMP_MINUTES_CUT = 0.25    # share of his minutes a slumping player loses (they go to the player who took his spot)
+
+
+def game_shotmaking(player: Player) -> Tuple[float, float]:
+    """(points above expected, shots) for one game, from the per-shot expected points the engine logs."""
+    xr = (getattr(player, "analytics", None) or {}).get("xp_r") or {}
+    pts = sum((v or {}).get("pts", 0) or 0 for v in xr.values())
+    exp = sum((v or {}).get("exp", 0) or 0 for v in xr.values())
+    n = sum((v or {}).get("n", 0) or 0 for v in xr.values())
+    return pts - exp, n
+
+
+def update_season_form(team: Team):
+    if not SEASON_FORM_ACTIVE:
+        return
+    states = SEASON_FORM.setdefault(team.name, {})
+    for p in team.roster:
+        if (p.minutes or 0) < 60:
+            continue   # did not play
+        dev, n = game_shotmaking(p)
+        st = states.setdefault(p.name, {"roll": 0.0, "games": 0, "dev": 0.0, "shots": 0.0, "slump": False, "slump_games": 0})
+        st["roll"] = (1.0 - FORM_EWMA) * st["roll"] + FORM_EWMA * dev
+        st["games"] += 1
+        st["dev"] += dev
+        st["shots"] += n
+        z = st["dev"] / (1.15 * max(1.0, st["shots"]) ** 0.5)
+        st["z"] = z
+        if not st["slump"] and st["games"] >= SLUMP_MIN_GAMES and st["shots"] >= 60 and z <= SLUMP_ENTER_Z:
+            st["slump"] = True
+        elif st["slump"] and z >= SLUMP_EXIT_Z:
+            st["slump"] = False
+        st["slump_games"] = st["slump_games"] + 1 if st["slump"] else 0
+
+
+def form_label(st) -> str:
+    if not st:
+        return ""
+    if st.get("slump"):
+        return "slumping"
+    roll = st.get("roll", 0.0)
+    return "hot" if roll >= 2.0 else "warm" if roll >= 0.8 else "cold" if roll <= -2.0 else "cool" if roll <= -0.8 else "steady"
+
+
+def apply_season_form(team: Team):
+    """Put the season's form on a freshly built game team: rating shift, and a slumping starter moved to the bench."""
+    states = getattr(team, "season_form_state", None)
+    if states is None and SEASON_FORM_ACTIVE:
+        states = SEASON_FORM.get(team.name)
+    if not states:
+        return
+    base = getattr(team, "_form_base_order", None)
+    if base is None:
+        team._form_base_order = base = [p.name for p in team.roster]
+    by_name = {p.name: p for p in team.roster}
+    team.roster = [by_name[n] for n in base if n in by_name] + [p for p in team.roster if p.name not in base]
+    for p in team.roster:
+        st = states.get(p.name)
+        p.season_slump = bool(st and st.get("slump"))
+        p.slump_replacement_for = None
+        roll_shift = max(-FORM_MAX, min(FORM_MAX, FORM_PER_POINT * (st or {}).get("roll", 0.0)))
+        p.season_form = roll_shift - (SLUMP_RATING if p.season_slump else 0.0)
+        p.form_label = form_label(st)
+    stars = team_top_options(team)   # a team's top two options keep starting through a slump (only the rating drop applies)
+    for i in range(min(5, len(team.roster))):
+        p = team.roster[i]
+        if not p.season_slump or p.name in stars:
+            continue
+        bench = [b for b in team.roster[5:] if not getattr(b, "season_slump", False) and getattr(b, "slump_replacement_for", None) is None
+                 and (b.position == p.position or can_play_position(b, p.position))]
+        if not bench:   # nobody listed at his spot: the best healthy bench player starts, and the lineup balancer sorts out positions
+            bench = [b for b in team.roster[5:] if not getattr(b, "season_slump", False) and getattr(b, "slump_replacement_for", None) is None]
+        if not bench:
+            continue
+        sub = max(bench, key=overall_rating)
+        j = team.roster.index(sub)
+        team.roster[i], team.roster[j] = sub, p
+        sub.slump_replacement_for = p.name
+
+
+def apply_slump_minutes(team: Team):
+    for p in team.roster:
+        if not getattr(p, "season_slump", False) or not any(getattr(q, "slump_replacement_for", None) == p.name for q in team.roster):
+            continue   # only a player who lost his starting spot loses minutes
+        cut = int(round((p.target_minutes or 0) * SLUMP_MINUTES_CUT))
+        if cut <= 0:
+            continue
+        p.target_minutes -= cut
+        if getattr(p, "gui_target_minutes_override", None) is not None:
+            p.gui_target_minutes_override = max(0, p.gui_target_minutes_override - cut)
+        sub = next((q for q in team.roster if getattr(q, "slump_replacement_for", None) == p.name), None)
+        if sub is not None:
+            sub.target_minutes += cut
+            if getattr(sub, "gui_target_minutes_override", None) is not None:
+                sub.gui_target_minutes_override += cut
+
+
 def build_season_game_teams(factory_a, factory_b, seed=None) -> Tuple[Team, Team]:
     """The two teams of a season game, set up exactly as the quiet season sim sets them up."""
     if seed is not None:
         random.seed(seed)
     team_a = factory_a()
     team_b = factory_b()
+    apply_season_form(team_a)
+    apply_season_form(team_b)
     team_a.init_lineup()
     team_b.init_lineup()
     apply_star_clutchness(team_a, team_b)
@@ -27071,6 +27186,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 maybe_trade_deadline(start_index)
                 maybe_update_form(start_index)
                 maybe_offer_trade(start_index)
+                for _tn, _tmpl in templates.items():   # the workers build their teams from the templates: carry the form along
+                    _tmpl.season_form_state = {k: dict(v) for k, v in SEASON_FORM.get(_tn, {}).items()}
                 watched = [o for o in range(start_index, min(total_games, start_index + batch)) if o in SEASON_WATCH] if SEASON_LIVE_HOOK else []
                 live_results = [play_watched_game(order) for order in watched]
                 tasks = [
@@ -27102,6 +27219,9 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             yield team_a, team_b, order
 
     SEASON_STAR_MINUTES_CAP = 34
+    global SEASON_FORM_ACTIVE
+    SEASON_FORM.clear()
+    SEASON_FORM_ACTIVE = True
     races_gate = {"at": 0.0, "cost": 0.0}   # the race tables are repainted about once a second, so they are only worked out that often
     try:
         results = parallel_results() if templates is not None else sequential_results()
@@ -27110,6 +27230,8 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             entry_a, entry_b = schedule[order]
             add_player_to_series_totals(season_player_totals, team_a)
             add_player_to_series_totals(season_player_totals, team_b)
+            update_season_form(team_a)
+            update_season_form(team_b)
             if traded_to:
                 reconcile_traded_stats(season_player_totals, traded_to)   # games from before a trade still count for his new team
             add_team_to_series_totals(season_team_totals, team_a)
@@ -27149,6 +27271,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 print(f"Season sim progress: {completed_games}/{total_games} games.")
     finally:
         SEASON_STAR_MINUTES_CAP = None
+        SEASON_FORM_ACTIVE = False
         if fantasy_trades:
             FANTASY_TRADE_STATE.update(active=False, hook=None)
             fantasy_trade_process_pending(apply_trade_to_season)   # a trade agreed as the season ended still goes through
