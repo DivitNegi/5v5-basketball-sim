@@ -13058,14 +13058,9 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
     xp = a.setdefault("xp", {})
     region = shot_region(shot_type)
     xpr = a.setdefault("xp_r", {}).setdefault(region, {})
-    # open / contested: decided from the shot's quality at the attempt; the make reuses it
-    if made and getattr(player, "_sq_last", None) and player._sq_last[0] == shot_type:
-        sq = player._sq_last[1]
-    else:
-        q = getattr(player, "_sq_quality", None)
-        sq = "open" if q is not None and q >= 1.08 else "contested" if q is not None and q < 0.97 else "normal"
-        if not made:
-            player._sq_last = (shot_type, sq)
+    # open / contested: the same wide_open / contested tags the shot tables use, so the pop-up and the tables agree
+    sq_tags = set(str(context or "").split("|"))
+    sq = "open" if "wide_open" in sq_tags else "contested" if "contested" in sq_tags else "normal"
     sqr = a.setdefault("sq_r", {}).setdefault(region, {})
     # shot clock: early (0-7 s used), middle (8-15), late (16+); transition / putbacks / dead-ball sets have no half-court clock
     if made and getattr(player, "_clock_last", None) and player._clock_last[0] == shot_type:
@@ -13502,7 +13497,8 @@ def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player
     sanitize_live_lineups(off, dff)
     # Real offensive rebound rate is ~26% overall (~20% off jumpers, ~33% off
     # rim/paint misses); the old 15% / 30% bases produced a ~16% league ORB%.
-    base_off_chance = 0.25 if miss_type == "jumper" else 0.43
+    # tuned so the 2017-18 league sims land on its real 22.3% offensive rebound rate
+    base_off_chance = 0.22 if miss_type == "jumper" else 0.38
     off_reb_rating = sum(p.oreb for p in off.on_floor) / max(1, len(off.on_floor))
     def_reb_rating = sum(p.dreb for p in dff.on_floor) / max(1, len(dff.on_floor))
     off_chance = base_off_chance + (off_reb_rating - def_reb_rating) * 0.12
@@ -13548,14 +13544,18 @@ def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player
         rebounder.dreb_stat += 1
     team.team_reb += 1
     team.last_rebounder = rebounder
-    # contested = a real rebounder on the other side was in the fight (his pull is at least 60% of the winner's)
+    # contested = an opponent was in the fight for it
     try:
         other = dff if team is off else off
         mine_w = rebound_weight(rebounder, miss_type, offensive=team is off)
         rival = max(other.on_floor, key=lambda p: rebound_weight(p, miss_type, offensive=team is not off), default=None)
         a = analytics_of(rebounder)
         rival_w = rebound_weight(rival, miss_type, offensive=team is not off) if rival is not None else 0.0
-        if rival is not None and random.random() < rival_w / max(1e-6, rival_w + mine_w):   # the closer the rival's pull, the likelier it was a fight
+        # real tracking: ~20-25% of boards are contested; bigs who live in the crowd (~30-35%) far more than guards picking up long ones (~12-15%)
+        own_top = max(weights) if weights else mine_w
+        all_top = max(own_top, rival_w, 1e-6)
+        p_contested = 0.07 + 0.22 * min(1.0, mine_w / max(1e-6, own_top)) + 0.10 * (rival_w / all_top)
+        if rival is not None and random.random() < p_contested:
             _bump(a, "reb_contested")
             _bump(a.setdefault("reb_over", {}), rival.name)
         else:
@@ -16465,9 +16465,9 @@ def real_play_type(off: Team, handler: Player) -> str:
         "floppy", "elevator", "backdoor", "drive_kick", "post_split", "iso"
     ]
     weights = [
-        (1.8 + handler.playmaking) * pnr_frequency * (1.0 + heliocentric * 0.18) * 1.35,
-        (1.1 + handler.ball_handle) * pnr_frequency * (1.0 + heliocentric * 0.28) * 1.35,
-        (0.9 + handler.playmaking * 0.8) * pnr_frequency * 1.35,
+        (1.8 + handler.playmaking) * pnr_frequency * (1.0 + heliocentric * 0.18) * 2.0,
+        (1.1 + handler.ball_handle) * pnr_frequency * (1.0 + heliocentric * 0.28) * 2.0,
+        (0.9 + handler.playmaking * 0.8) * pnr_frequency * 2.0,
         (1.0 + (0.6 if has_big_hub else 0.0)) * ball_movement,
         (0.9 + (0.4 if has_big_hub else 0.0)) * ball_movement,
         (0.7 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (2.2 if has_movement else 0.0)) * ball_movement * three_pref,
@@ -17712,6 +17712,33 @@ def is_non_shooting_big(player: Player) -> bool:
         and player.three_rating < 0.45
         and player.three_tendency <= 0.08
     )
+
+
+ROTATION_CONTEXTS = {"drive_kick", "double_kick", "pnr_catch_shoot", "extra_pass_open", "handle_combo_pass", "roller", "alley_oop", "popper", "backdoor", "cut"}
+
+
+def rotation_help_defender(dff: Team, shooter: Player, defender: Player, play_context, pnr_result, shot_type: str, matchups) -> Player:
+    """Help rotations: after a kick-out or swing the closeout often comes from a rotating defender (an x-out), and on a roll or cut the
+    low man rotates to the rim. A rotation arrives a beat late, so the shooter's look is a little better than against his own man."""
+    if not ({play_context, pnr_result} & ROTATION_CONTEXTS):
+        return defender
+    own = matchups.get(shooter) if matchups else None
+    others = [p for p in dff.on_floor if p is not own and p is not defender and not p.fouled_out]
+    if not others:
+        return defender
+    if shot_type in ("rim", "dunk", "post"):
+        if random.random() >= 0.62:
+            return defender
+        helper = max(others, key=lambda p: 0.6 * p.interior_def + 0.4 * p.block)
+        print(f"{helper.name} rotates over from the weak side to meet him at the rim.")
+    else:
+        if random.random() >= 0.58:
+            return defender
+        helper = random.choices(others, weights=[0.4 + p.perimeter_def + 0.3 * p.speed for p in others], k=1)[0]
+        print(f"{helper.name} rotates out on the closeout.")
+        shooter.shot_quality_mult = getattr(shooter, "shot_quality_mult", 1.0) * 1.03
+    time.sleep(SLEEP * 0.3)
+    return helper
 
 
 def find_paint_help_defender(off: Team, dff: Team, driver: Player,
@@ -21030,7 +21057,7 @@ def _simulate_possession(off: Team, dff: Team,
 
     # GUARD-LED PICK AND ROLL WITH SWITCHES
     pnr_bonus = 0.26 if play_context in ("high_pnr", "empty_corner_pnr", "horns", "spain_pnr") else 0.0
-    if (not star_takeover_lock) and play_context not in ("deep_paint_touch", "iso") and (can_play_position(current_handler, "PG") or can_play_position(current_handler, "SG")) and random.random() < 0.72 + pnr_bonus:
+    if (not star_takeover_lock) and play_context not in ("deep_paint_touch", "iso") and (can_play_position(current_handler, "PG") or can_play_position(current_handler, "SG")) and random.random() < 0.82 + pnr_bonus:
         pnr_shooter, pnr_defender, screener, pnr_result = maybe_pick_and_roll(off, dff, current_handler, matchups)
 
         if pnr_result:
@@ -21861,6 +21888,7 @@ def _simulate_possession(off: Team, dff: Team,
             print_shot_attempt_sequence(shooter, shot_type, play_context or pnr_result)
     time.sleep(SLEEP * 0.8)
 
+    defender = rotation_help_defender(dff, shooter, defender, play_context, pnr_result, shot_type, matchups)
     shooter._support_bonus = team_support_look_bonus(shooter, off)
     quality_label, quality_mult = shot_quality(shooter, defender, shot_type, period, period_time - possession_time)
     shooter._support_bonus = 0.0

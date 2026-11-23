@@ -2990,11 +2990,21 @@ function offenseExtras(X, games, U) {
   // clutch vs overall
   const cl = X.clutch || {}, ov = X.overall || {};
   const per36 = (v, sec) => (sec ? (36 * 60 * v / sec).toFixed(1) : "–");
-  out.push(U.sub("Clutch vs overall"), U.note("Clutch = last five minutes of the 4th or overtime with the score within five. Per 36 minutes so the two compare."));
+  out.push(U.sub("Clutch vs overall"), U.note("Clutch = last five minutes of the 4th or overtime with the score within five. This table is per 36 minutes so the two compare; the plain totals are below."));
   out.push(cl.sec ? ppTable(["", "Minutes", "PTS / 36", "FG%", "3P%", "FT%", "AST / 36", "TOV / 36", "+/- / 36"], [
     ["Overall", (ov.minutes / 60).toFixed(0), per36(ov.pts, ov.minutes), `${ppRate(ov.fgm, ov.fga) ?? "–"}%`, `${ppRate(ov.tpm, ov.tpa) ?? "–"}%`, `${ppRate(ov.ftm, ov.fta) ?? "–"}%`, per36(ov.ast, ov.minutes), per36(ov.tov, ov.minutes), per36(ov.plus_minus, ov.minutes)],
     ["Clutch", (cl.sec / 60).toFixed(0), per36(cl.pts || 0, cl.sec), `${ppRate(cl.fgm || 0, cl.fga || 0) ?? "–"}%`, `${ppRate(cl.tpm || 0, cl.tpa || 0) ?? "–"}%`, `${ppRate(cl.ftm || 0, cl.fta || 0) ?? "–"}%`, per36(cl.ast || 0, cl.sec), per36(cl.tov || 0, cl.sec), per36(cl.pm || 0, cl.sec)],
   ]) : none("No clutch minutes yet."));
+  // the plain clutch numbers: season totals and a game
+  if (cl.sec) {
+    const pg = (v) => ((v || 0) / games).toFixed(1);
+    const sh = (m, a) => `${m || 0}-${a || 0}`;
+    out.push(h("div", { class: "muted", style: { fontSize: "12px", margin: "10px 0 4px" } }, "Clutch totals (not per 36)"));
+    out.push(ppTable(["", "Minutes", "PTS", "FGM-FGA", "3PM-3PA", "FTM-FTA", "REB", "AST", "STL", "BLK", "TOV", "+/-"], [
+      ["Season total", (cl.sec / 60).toFixed(0), cl.pts || 0, sh(cl.fgm, cl.fga), sh(cl.tpm, cl.tpa), sh(cl.ftm, cl.fta), cl.reb ?? "–", cl.ast || 0, cl.stl ?? "–", cl.blk ?? "–", cl.tov || 0, cl.pm || 0],
+      ["A game", (cl.sec / 60 / games).toFixed(1), pg(cl.pts), `${pg(cl.fgm)}-${pg(cl.fga)}`, `${pg(cl.tpm)}-${pg(cl.tpa)}`, `${pg(cl.ftm)}-${pg(cl.fta)}`, cl.reb != null ? pg(cl.reb) : "–", pg(cl.ast), cl.stl != null ? pg(cl.stl) : "–", cl.blk != null ? pg(cl.blk) : "–", pg(cl.tov), pg(cl.pm)],
+    ]));
+  }
   // turnovers
   out.push(U.sub("Turnovers"), U.note("How he lost it, and who took it from him."));
   const tk = Object.entries(X.tov_kind || {}).sort((a, b) => b[1] - a[1]);
