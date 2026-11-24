@@ -26663,6 +26663,9 @@ SLUMP_MIN_GAMES = 20        # no season-long slump before this many games
 SLUMP_ENTER_Z = -1.5        # season shot-making this far below expected (in standard deviations) is a slump
 SLUMP_EXIT_Z = -0.7         # and he is out of it once he is back above this
 SLUMP_RATING = 0.03         # extra rating drop while slumping
+PROMOTE_MIN_GAMES = 15      # no lineup change for form before this many games
+PROMOTE_PERF_GAP = 2.2      # a bench player this much better (z + recent form) than a starter at his spot takes the start
+PROMOTE_RATING_GAP = 0.06   # but only if his rating is within this of the starter's (a deep-bench player does not start)
 SLUMP_MINUTES_CUT = 0.25    # share of his minutes a slumping player loses (they go to the player who took his spot)
 
 
@@ -26725,18 +26728,42 @@ def apply_season_form(team: Team):
         roll_shift = max(-FORM_MAX, min(FORM_MAX, FORM_PER_POINT * (st or {}).get("roll", 0.0)))
         p.season_form = roll_shift - (SLUMP_RATING if p.season_slump else 0.0)
         p.form_label = form_label(st)
-    stars = team_top_options(team)   # a team's top two options keep starting through a slump (only the rating drop applies)
+    stars = team_top_options(team)   # a team's top two options always keep starting (a slump only costs them the rating drop)
+
+    def perf(x):   # how he has played this season: shot-making vs expected (z) plus his recent run
+        st = states.get(x.name) or {}
+        return st.get("z", 0.0) + 0.25 * st.get("roll", 0.0) if st.get("games", 0) >= PROMOTE_MIN_GAMES else None
+
+    def value(x):  # what he is worth right now: his rating with the season's form on it, plus how he has played
+        return overall_rating(x) * (1.0 + getattr(x, "season_form", 0.0)) + 0.02 * (perf(x) or 0.0)
+
+    def open_bench(pos, allow_any=False):
+        out = [b for b in team.roster[5:] if not getattr(b, "season_slump", False) and getattr(b, "slump_replacement_for", None) is None]
+        fit = [b for b in out if b.position == pos or can_play_position(b, pos)]
+        return fit if fit or not allow_any else out
+
     for i in range(min(5, len(team.roster))):
         p = team.roster[i]
-        if not p.season_slump or p.name in stars:
+        if p.name in stars:
             continue
-        bench = [b for b in team.roster[5:] if not getattr(b, "season_slump", False) and getattr(b, "slump_replacement_for", None) is None
-                 and (b.position == p.position or can_play_position(b, p.position))]
-        if not bench:   # nobody listed at his spot: the best healthy bench player starts, and the lineup balancer sorts out positions
-            bench = [b for b in team.roster[5:] if not getattr(b, "season_slump", False) and getattr(b, "slump_replacement_for", None) is None]
-        if not bench:
+        sub = None
+        if p.season_slump:
+            # a slumping starter loses his spot when his replacement is now the better player (rating + form + how they have played)
+            bench = open_bench(p.position, allow_any=True)
+            if bench:
+                cand = max(bench, key=value)
+                if value(cand) > value(p) - 0.02:
+                    sub = cand
+        if sub is None and perf(p) is not None:
+            # a bench player clearly outplaying a starter at his spot takes it, slump or not (a deep-bench player cannot)
+            mine = perf(p)
+            bench = [b for b in open_bench(p.position) if perf(b) is not None and overall_rating(b) >= overall_rating(p) - PROMOTE_RATING_GAP]
+            if bench:
+                cand = max(bench, key=lambda b: perf(b))
+                if perf(cand) - mine >= PROMOTE_PERF_GAP:
+                    sub = cand
+        if sub is None:
             continue
-        sub = max(bench, key=overall_rating)
         j = team.roster.index(sub)
         team.roster[i], team.roster[j] = sub, p
         sub.slump_replacement_for = p.name
@@ -26772,8 +26799,8 @@ def with_season_form(factory, forms):
 
 def apply_slump_minutes(team: Team):
     for p in team.roster:
-        if not getattr(p, "season_slump", False) or not any(getattr(q, "slump_replacement_for", None) == p.name for q in team.roster):
-            continue   # only a player who lost his starting spot loses minutes
+        if not any(getattr(q, "slump_replacement_for", None) == p.name for q in team.roster):
+            continue   # only a player who lost his starting spot (slumping, or outplayed by a bench player) loses minutes
         cut = int(round((p.target_minutes or 0) * SLUMP_MINUTES_CUT))
         if cut <= 0:
             continue
