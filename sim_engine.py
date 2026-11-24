@@ -7481,6 +7481,8 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
         print("#" * 80 + "\n")
 
         simulate_game(teamA, teamB)
+        update_season_form(teamA)   # playoff form keeps moving (only while a season's form is being carried)
+        update_season_form(teamB)
         if fantasy_customization:
             fantasy_config_state[teamA.name] = snapshot_fantasy_config(teamA)
             fantasy_config_state[teamB.name] = snapshot_fantasy_config(teamB)
@@ -26812,14 +26814,43 @@ def apply_season_form(team: Team):
 
 
 def season_form_start():
-    global SEASON_FORM_ACTIVE
+    global SEASON_FORM_ACTIVE, POSTSEASON_FORM_READY
     SEASON_FORM.clear()
     SEASON_FORM_ACTIVE = True
+    POSTSEASON_FORM_READY = False
 
 
 def season_form_end():
+    global SEASON_FORM_ACTIVE, POSTSEASON_FORM_READY
+    SEASON_FORM_ACTIVE = False
+    POSTSEASON_FORM_READY = bool(SEASON_FORM)   # the play-in and playoffs that follow pick up where the season left off
+
+
+POSTSEASON_FORM_READY = False
+
+
+def postseason_form_start() -> bool:
+    """Carry the regular season's form (hot / cold stretches, slumps, lineup changes) into the play-in and playoffs, and keep it
+    moving game to game. Returns whether there was a season's form to carry."""
+    global SEASON_FORM_ACTIVE
+    SEASON_FORM_ACTIVE = POSTSEASON_FORM_READY
+    return SEASON_FORM_ACTIVE
+
+
+def postseason_form_end():
     global SEASON_FORM_ACTIVE
     SEASON_FORM_ACTIVE = False
+
+
+def with_postseason_form(factory):
+    """Wrap a playoff team factory: the team it builds carries its current form and the lineup that form gives it."""
+    def build():
+        team = factory()
+        if SEASON_FORM_ACTIVE and SEASON_FORM.get(team.name):
+            apply_season_form(team)
+            team.init_lineup()
+        return team
+    return build
 
 
 def season_form_for(*team_names) -> Dict[str, Dict]:
@@ -27317,9 +27348,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
             yield team_a, team_b, order
 
     SEASON_STAR_MINUTES_CAP = 34
-    global SEASON_FORM_ACTIVE
-    SEASON_FORM.clear()
-    SEASON_FORM_ACTIVE = True
+    season_form_start()
     races_gate = {"at": 0.0, "cost": 0.0}   # the race tables are repainted about once a second, so they are only worked out that often
     try:
         results = parallel_results() if templates is not None else sequential_results()
@@ -27369,7 +27398,7 @@ def run_quiet_82_game_season(selected_names: List[str], factories: Dict[str, obj
                 print(f"Season sim progress: {completed_games}/{total_games} games.")
     finally:
         SEASON_STAR_MINUTES_CAP = None
-        SEASON_FORM_ACTIVE = False
+        season_form_end()
         if fantasy_trades:
             FANTASY_TRADE_STATE.update(active=False, hook=None)
             fantasy_trade_process_pending(apply_trade_to_season)   # a trade agreed as the season ended still goes through

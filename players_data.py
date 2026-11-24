@@ -481,6 +481,9 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
     team_b.home_court_override = False
     apply_star_clutchness(team_a, team_b)
     simulate_game(team_a, team_b)
+    import sim_engine as _form_engine
+    _form_engine.update_season_form(team_a)
+    _form_engine.update_season_form(team_b)
     if team_a.score >= team_b.score:
         winner, loser = high_name, low_name
     else:
@@ -505,6 +508,16 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
 
 
 def run_2027_postseason(standings, custom_factories=None):
+    """Play-in and playoffs, carrying the regular season's form (hot and cold stretches, slumps, who starts) into them."""
+    import sim_engine as _form_engine
+    _form_engine.postseason_form_start()
+    try:
+        return _run_2027_postseason(standings, custom_factories)
+    finally:
+        _form_engine.postseason_form_end()
+
+
+def _run_2027_postseason(standings, custom_factories=None):
     """Play-in tournament (7-10 seeds) followed by the full playoffs, seeded from season standings.
 
     custom_factories: {team name: factory} for a custom-team season; None uses the 2027 teams."""
@@ -530,6 +543,8 @@ def run_2027_postseason(standings, custom_factories=None):
                     factory_names[team.name] = factory_name
                     strengths[team.name] = team_strength_2027(team)
 
+    import sim_engine as _form_engine
+    factories = {n: _form_engine.with_postseason_form(f) for n, f in factories.items()}
     play_in = POSTSEASON_PLAY_IN
     print("\n" + "#" * 100)
     print(f"{POSTSEASON_YEAR_LABEL} PLAY-IN TOURNAMENT" if play_in else f"{POSTSEASON_YEAR_LABEL} PLAYOFF SEEDING (no play-in)")
