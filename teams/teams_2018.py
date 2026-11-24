@@ -309,7 +309,7 @@ def make_celtics_2018() -> Team:
                0.91, 0.87, 0.89, 0.76, 0.81,
                0.183, 0.52, 0.78,
                0.40, 0.58, 0.35, 0.62, 0.733, 0.733,
-               0.89, 0.80,
+               0.85, 0.80,
                clutchness=0.74, stamina=0.85, rookie=True),
 
         Player("Al Horford", "PF",
@@ -350,10 +350,10 @@ def make_celtics_2018() -> Team:
 
         Player("Daniel Theis", "C",
                0.12, 0.18, 0.34, 0.36, 0.40, 0.087,
-               0.64, 0.93, 0.92, 0.93, 0.74,
+               0.64, 0.90, 0.92, 0.85, 0.74,
                0.044, 0.65, 0.35,
-               0.80, 0.85, 0.71, 0.85, 0.533, 0.933,
-               0.67, 0.86, stamina=0.71, rookie=True),
+               0.18, 0.61, 0.71, 0.85, 0.533, 0.933,
+               0.54, 0.76, stamina=0.71, rookie=True),
     ]
     # Real 2017-18 per-game minutes (scaled to a 240-minute game); the inputs are fitted so the engine's rotation lands on them.
     # Ratings were calibrated by simulating full seasons until each player's per-minute line matched his real one.
@@ -1319,7 +1319,7 @@ def make_warriors_2018() -> Team:
                0.68, 0.15, 0.28, 0.03, 0.08, 0.900,
                0.99, 0.94, 0.93, 0.64, 0.91,
                0.310, 0.65, 0.95,
-               0.80, 0.44, 0.40, 0.70, 0.20, 0.45,
+               0.80, 0.44, 0.40, 0.70, 0.50, 0.45,
                0.67, 0.44,
                stamina=0.81, height=74),
         Player("Quinn Cook", "PG",

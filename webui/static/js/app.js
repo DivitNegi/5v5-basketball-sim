@@ -2735,7 +2735,8 @@ function defenseBox(d) {
 function ppFormLine(f) {
   if (!f || !f.label) return null;
   const pct = (v) => `${v > 0 ? "+" : ""}${(100 * v).toFixed(1)}%`;
-  const bits = [`recent games ${Math.abs(f.roll).toFixed(1)} pts/game ${f.roll >= 0 ? "above" : "below"} expected`, `season shot-making ${f.z >= 0 ? "above" : "below"} expected (${f.games} games)`];
+  const eff = (v) => `${Math.abs(100 * v).toFixed(1)}% ${v >= 0 ? "better" : "worse"} than expected`;
+  const bits = [`recent games: shots falling ${eff(f.pct || 0)}`, `season: ${eff(f.season_pct || 0)} (${f.games} games)`];
   if (f.rating) bits.push(`rating ${pct(f.rating)}`);
   if (f.slump) bits.push(`slumping ${f.slump_games} game${f.slump_games === 1 ? "" : "s"}`);
   if (f.replaced_by) bits.push(`lost his start to ${f.replaced_by}`);

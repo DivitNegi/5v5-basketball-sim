@@ -26684,6 +26684,7 @@ def season_replay_available(order) -> bool:
 # it all back once his season numbers recover.
 SEASON_FORM: Dict[str, Dict[str, Dict]] = {}   # team name -> {player name: form state}, kept while a season runs
 SEASON_FORM_ACTIVE = False
+FORM_LEAGUE = {"dev": 0.0, "exp": 0.0}   # the whole league's points above expected this season (form is measured against the league norm)
 FORM_EWMA = 0.30            # weight of the latest game in the rolling form
 FORM_PER_POINT = 0.009      # rating change per point a game above / below expected in the rolling form
 FORM_MAX = 0.05             # the most rolling form moves a rating
@@ -26697,25 +26698,39 @@ PROMOTE_RATING_GAP = 0.06   # but only if his rating is within this of the start
 SLUMP_MINUTES_CUT = 0.25    # share of his minutes a slumping player loses (they go to the player who took his spot)
 
 
-def game_shotmaking(player: Player) -> Tuple[float, float]:
-    """(points above expected, shots) for one game, from the per-shot expected points the engine logs."""
+def game_shotmaking(player: Player, with_exp: bool = False):
+    """(points above expected, shots[, expected points]) for one game, from the per-shot expected points the engine logs."""
     xr = (getattr(player, "analytics", None) or {}).get("xp_r") or {}
     pts = sum((v or {}).get("pts", 0) or 0 for v in xr.values())
     exp = sum((v or {}).get("exp", 0) or 0 for v in xr.values())
     n = sum((v or {}).get("n", 0) or 0 for v in xr.values())
-    return pts - exp, n
+    return (pts - exp, n, exp) if with_exp else (pts - exp, n)
+
+
+FORM_EXP_FLOOR = 5.0     # a game with only a few shots counts as if he had this many expected points (a 2-for-2 night is not a heater)
+FORM_PCT_SCALE = 16.0    # form is efficiency: how much better / worse than expected his shots are falling (+10% -> 1.6 on the old points scale)
 
 
 def update_season_form(team: Team):
     if not SEASON_FORM_ACTIVE:
         return
     states = SEASON_FORM.setdefault(team.name, {})
-    for p in team.roster:
-        if (p.minutes or 0) < 60:
-            continue   # did not play
-        dev, n = game_shotmaking(p)
+    games = [(p, *game_shotmaking(p, with_exp=True)) for p in team.roster if (p.minutes or 0) >= 60]
+    for _p, dev, _n, exp in games:   # league-wide shot-making vs expected: "hot" and "cold" are measured against it, so they stay balanced
+        FORM_LEAGUE["dev"] += dev
+        FORM_LEAGUE["exp"] += exp
+    bias = FORM_LEAGUE["dev"] / FORM_LEAGUE["exp"] if FORM_LEAGUE["exp"] > 50 else 0.0
+    for p, dev, n, exp in games:
+        dev -= bias * exp
         st = states.setdefault(p.name, {"roll": 0.0, "games": 0, "dev": 0.0, "shots": 0.0, "slump": False, "slump_games": 0})
-        st["roll"] = (1.0 - FORM_EWMA) * st["roll"] + FORM_EWMA * dev
+        # form is about efficiency, not volume: his recent shots falling better or worse than expected. A quiet scoring night on great
+        # shooting is still a good night; a big scoring night on bad shooting is not.
+        st["rdev"] = (1.0 - FORM_EWMA) * st.get("rdev", 0.0) + FORM_EWMA * dev
+        st["rexp"] = (1.0 - FORM_EWMA) * st.get("rexp", 0.0) + FORM_EWMA * exp
+        w = 1.0 - (1.0 - FORM_EWMA) ** (st["games"] + 1)   # the rolling averages start at zero: undo that early on
+        st["pct"] = (st["rdev"] / w) / max(FORM_EXP_FLOOR, st["rexp"] / w)
+        st["roll"] = FORM_PCT_SCALE * st["pct"]
+        st["exp"] = st.get("exp", 0.0) + exp
         st["games"] += 1
         st["dev"] += dev
         st["shots"] += n
@@ -26739,7 +26754,9 @@ def season_form_public(team_name, player_name):
     if not st:
         return None
     rating = max(-FORM_MAX, min(FORM_MAX, FORM_PER_POINT * st.get("roll", 0.0))) - (SLUMP_RATING if st.get("slump") else 0.0)
+    season_pct = st.get("dev", 0.0) / st["exp"] if st.get("exp") else 0.0
     return {"label": form_label(st), "roll": round(st.get("roll", 0.0), 2), "z": round(st.get("z", 0.0), 2), "games": st.get("games", 0),
+            "pct": round(st.get("pct", 0.0), 4), "season_pct": round(season_pct, 4),
             "slump": bool(st.get("slump")), "slump_games": st.get("slump_games", 0), "rating": round(rating, 4),
             "starting_for": st.get("starting_for"), "replaced_by": st.get("replaced_by")}
 
@@ -26816,6 +26833,7 @@ def apply_season_form(team: Team):
 def season_form_start():
     global SEASON_FORM_ACTIVE, POSTSEASON_FORM_READY
     SEASON_FORM.clear()
+    FORM_LEAGUE.update(dev=0.0, exp=0.0)
     SEASON_FORM_ACTIVE = True
     POSTSEASON_FORM_READY = False
 
