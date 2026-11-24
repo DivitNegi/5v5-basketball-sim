@@ -26660,8 +26660,8 @@ FORM_EWMA = 0.30            # weight of the latest game in the rolling form
 FORM_PER_POINT = 0.009      # rating change per point a game above / below expected in the rolling form
 FORM_MAX = 0.05             # the most rolling form moves a rating
 SLUMP_MIN_GAMES = 20        # no season-long slump before this many games
-SLUMP_ENTER_Z = -1.8        # season shot-making this far below expected (in standard deviations) is a slump
-SLUMP_EXIT_Z = -1.0         # and he is out of it once he is back above this
+SLUMP_ENTER_Z = -1.5        # season shot-making this far below expected (in standard deviations) is a slump
+SLUMP_EXIT_Z = -0.7         # and he is out of it once he is back above this
 SLUMP_RATING = 0.03         # extra rating drop while slumping
 SLUMP_MINUTES_CUT = 0.25    # share of his minutes a slumping player loses (they go to the player who took his spot)
 
