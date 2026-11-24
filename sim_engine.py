@@ -16536,13 +16536,13 @@ def real_play_type(off: Team, handler: Player) -> str:
         "floppy", "elevator", "backdoor", "drive_kick", "post_split", "iso"
     ]
     weights = [
-        (1.8 + handler.playmaking) * pnr_frequency * (1.0 + heliocentric * 0.18) * 2.0,
-        (1.1 + handler.ball_handle) * pnr_frequency * (1.0 + heliocentric * 0.28) * 2.0,
-        (0.9 + handler.playmaking * 0.8) * pnr_frequency * 2.0,
+        (1.8 + handler.playmaking) * pnr_frequency * (1.0 + heliocentric * 0.18) * 1.35,
+        (1.1 + handler.ball_handle) * pnr_frequency * (1.0 + heliocentric * 0.28) * 1.35,
+        (0.9 + handler.playmaking * 0.8) * pnr_frequency * 1.35,
         (1.0 + (0.6 if has_big_hub else 0.0)) * ball_movement,
         (0.9 + (0.4 if has_big_hub else 0.0)) * ball_movement,
-        (0.7 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (2.2 if has_movement else 0.0)) * ball_movement * three_pref,
-        (0.55 + (1.0 if has_movement or three_pref > 1.0 else 0.0) + (1.6 if has_movement else 0.0)) * ball_movement * three_pref,
+        (0.9 + (1.2 if has_movement or three_pref > 1.0 else 0.0) + (3.6 if has_movement else 0.0)) * ball_movement * three_pref,
+        (0.75 + (1.2 if has_movement or three_pref > 1.0 else 0.0) + (2.8 if has_movement else 0.0)) * ball_movement * three_pref,
         (0.55 + handler.playmaking * 0.7) * ball_movement,
         (0.75 + handler.playmaking) * (0.85 + ball_movement * 0.25),
         (0.7 + (0.8 if has_big_hub else 0.0)) * (1.0 + max(0.0, ball_movement - 1.0) * 0.40),
@@ -18005,8 +18005,8 @@ def maybe_pick_and_roll(off: Team, dff: Team,
         handler_edge = switch_handler_advantage(handler, defender, handler_def)
         screener_has_size_mismatch = screener_size_edge_on_handler_def >= 4
         force_screener_touch = screener_has_size_mismatch and random.random() < min(
-            0.88,
-            0.42 + handler.playmaking * 0.34 + screener_size_edge_on_handler_def * 0.035
+            0.60,
+            0.22 + handler.playmaking * 0.22 + screener_size_edge_on_handler_def * 0.025
         )
 
         if force_screener_touch and can_be_designed_shooter(screener) and has_shot_volume_left(screener):
@@ -18040,7 +18040,7 @@ def maybe_pick_and_roll(off: Team, dff: Team,
             print(f"{handler.name} keeps the dribble alive against the switch.")
             return handler, defender, screener, "handler"
 
-        if can_be_designed_shooter(screener) and has_shot_volume_left(screener) and random.random() < screener.rim_rating * 0.35:
+        if can_be_designed_shooter(screener) and has_shot_volume_left(screener) and random.random() < screener.rim_rating * 0.22:
             print(f"{screener.name} slips behind the switch and rolls to the rim.")
             lob_chance = min(0.65, 0.08 + handler.playmaking * 0.42 + screener.dunk_tendency * 0.22)
             if random.random() < lob_chance:
@@ -18058,14 +18058,15 @@ def maybe_pick_and_roll(off: Team, dff: Team,
         time.sleep(SLEEP * 0.6)
 
         height_mismatch = max(0, screener_size_edge_on_screener_def)
-        roll_chance = 0.32 + handler.playmaking * 0.28 + screener.rim_rating * 0.20 + height_mismatch * 0.035
-        pop_chance = 0.12 + screener.three_tendency * 0.28 + screener.mid_tendency * 0.16
+        # the handler keeps it about two thirds of the time (pull-up, turn the corner, kick out); the screener gets the rest
+        roll_chance = 0.18 + handler.playmaking * 0.14 + screener.rim_rating * 0.12 + height_mismatch * 0.02
+        pop_chance = 0.06 + screener.three_tendency * 0.18 + screener.mid_tendency * 0.08
         if height_mismatch >= 4 and screener.three_tendency >= 0.18 and screener.three_rating >= 0.70:
-            pop_chance += height_mismatch * 0.018
+            pop_chance += height_mismatch * 0.010
         if height_mismatch >= 4:
-            roll_chance += 0.12
-        roll_chance = min(0.86, roll_chance)
-        pop_chance = min(0.48, pop_chance)
+            roll_chance += 0.06
+        roll_chance = min(0.45, roll_chance)
+        pop_chance = min(0.28, pop_chance)
         catch_shoot_target = find_pnr_catch_shoot_target(off, handler, screener)
         if catch_shoot_target and random.random() < catch_shoot_creation_chance(handler, catch_shoot_target, "pnr"):
             target_def = matchups.get(catch_shoot_target, random.choice(dff.on_floor))
@@ -21128,7 +21129,7 @@ def _simulate_possession(off: Team, dff: Team,
 
     # GUARD-LED PICK AND ROLL WITH SWITCHES
     pnr_bonus = 0.26 if play_context in ("high_pnr", "empty_corner_pnr", "horns", "spain_pnr") else 0.0
-    if (not star_takeover_lock) and play_context not in ("deep_paint_touch", "iso") and (can_play_position(current_handler, "PG") or can_play_position(current_handler, "SG")) and random.random() < 0.82 + pnr_bonus:
+    if (not star_takeover_lock) and play_context not in ("deep_paint_touch", "iso") and (can_play_position(current_handler, "PG") or can_play_position(current_handler, "SG")) and random.random() < 0.72 + pnr_bonus:
         pnr_shooter, pnr_defender, screener, pnr_result = maybe_pick_and_roll(off, dff, current_handler, matchups)
 
         if pnr_result:
