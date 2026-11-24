@@ -2056,6 +2056,7 @@ def shot_family(shot_type: str) -> str:
 
 
 CURRENT_THREE_LOC = None   # where the three being recorded/commentated was taken from ("corner" | "above_break" | "deep")
+CURRENT_SHOT_FINISH = None   # finish of the shot being taken (cs_three, pullup_mid, ...), for the make / miss wording
 CURRENT_THREE_SUB = None   # "wing3" / "top3" for an above-the-break three
 CURRENT_MID_LOC = None     # "mid_base" | "mid_elbow" | "mid_wing"
 PBP_RECENT: "collections.deque" = None   # the last few play-by-play lines: (id, text)
@@ -2203,7 +2204,19 @@ def _shot_result_line(make: bool, shooter: str, defender: str, shot_type: str, d
     (a replay of a season game has to play out exactly like the quiet sim did)."""
     global CURRENT_THREE_LOC, CURRENT_MID_LOC, CURRENT_THREE_SUB
     spot_roll, pick, _unused, base_pick = random.random(), random.random(), random.random(), random.random()
-    choose = lambda lines: lines[int(pick * len(lines)) % len(lines)]
+    fin = CURRENT_SHOT_FINISH if shot_type in ("three", "mid") else None
+
+    def fits(line):   # a pull-up is never described as a catch, and a catch-and-shoot never as a pull-up
+        t = line.lower()
+        if fin and fin.startswith("pullup"):
+            return not any(k in t for k in ("catch", "kick-out", "sets his feet", "steps into"))
+        if fin and fin.startswith("cs"):
+            return not any(k in t for k in ("pull-up", "pulls up", "pull up"))
+        return True
+
+    def choose(lines):
+        ok = [l for l in lines if fits(l)] or lines
+        return ok[int(pick * len(ok)) % len(ok)]
     if shot_type == "three" and CURRENT_THREE_LOC == "corner":
         if spot_roll < 0.5:
             CURRENT_THREE_LOC = None
@@ -2218,6 +2231,7 @@ def _shot_result_line(make: bool, shooter: str, defender: str, shot_type: str, d
                 CURRENT_THREE_SUB = None
             return choose(table[key]).format(shooter=shooter, defender=defender)
     lines = (broadcast_make_lines if make else broadcast_miss_lines)[shot_family(shot_type)]
+    lines = [l for l in lines if fits(l)] or lines
     return lines[int(base_pick * len(lines)) % len(lines)].format(shooter=shooter, defender=defender, defense=defense_line)
 
 
@@ -6729,7 +6743,7 @@ def add_to_shot_diet(diet: Dict[str, int], shot_type: str, context: str = "", ma
 
         if is_paint_shot(shot_type):
             diet["paint"] = diet.get("paint", 0) + 1
-        if contexts & {"pnr_catch_shoot", "double_wide_open", "extra_pass_open", "drive_kick", "extra_pass", "late_catch_shoot", "fastbreak_catch_shoot"}:
+        if "dribbled" not in contexts and contexts & {"pnr_catch_shoot", "double_wide_open", "extra_pass_open", "drive_kick", "extra_pass", "late_catch_shoot", "fastbreak_catch_shoot"}:
             diet["catch_shoot"] = diet.get("catch_shoot", 0) + 1
         if "iso" in contexts:
             diet["iso"] = diet.get("iso", 0) + 1
@@ -13001,7 +13015,7 @@ CATCH_SHOOT_TAGS = {"pnr_catch_shoot", "extra_pass_open", "extra_pass", "drive_k
 OFF_PASS_FINISH_TAGS = {"roller", "alley_oop", "dump_off", "dump_off_elite_help", "backdoor", "deep_paint_touch", "inbound", "ato"}
 
 
-def finish_type_of(shot_type: str, context: str, play: str) -> str:
+def finish_type_of(shot_type: str, context: str, play: str, dribbled: bool = False) -> str:
     """The specific finish: pull-up / catch-and-shoot three or midrange, a drive's layup / floater / dunk, a layup or dunk off a pass,
     a post-up or post fadeaway, or a putback."""
     tags = set(str(context or "").split("|")) - {""}
@@ -13012,7 +13026,8 @@ def finish_type_of(shot_type: str, context: str, play: str) -> str:
     if shot_type == "post":
         return "post_up"
     if shot_type in ("three", "mid"):
-        how = "cs" if tags & CATCH_SHOOT_TAGS or play in ("spot_up", "off_screen") else "pullup"
+        # the play-by-play showed him dribbling into it (a dribble chain or an iso sequence): a pull-up, whatever set it up
+        how = "pullup" if dribbled else "cs" if tags & CATCH_SHOOT_TAGS or play in ("spot_up", "off_screen") else "pullup"
         return f"{how}_{'three' if shot_type == 'three' else 'mid'}"
     # layups and dunks
     dunk = shot_type == "dunk"
@@ -13070,10 +13085,15 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
         pbp = getattr(player, "_pbp_play", None)
         if play == "other" and pbp and pbp[0] == shot_type:
             play = pbp[1]
-        fin = finish_type_of(shot_type, context, play)
+        dribbled = bool(pbp and pbp[0] == shot_type and pbp[1] in ("dribble", "iso")) or bool(getattr(player, "_reset_dribble", False))
+        player._reset_dribble = False
+        fin = finish_type_of(shot_type, context, play, dribbled)
         if not made:
+            player._shot_dribbled = dribbled
             player._pbp_play = None
             player._pt_last = (shot_type, play, fin)
+    global CURRENT_SHOT_FINISH
+    CURRENT_SHOT_FINISH = fin   # the make / miss line follows it (no "catches" on a pull-up, no "pulls up" on a catch-and-shoot)
     fn = a.setdefault("fin", {}).setdefault(fin, {})
     if made:
         _bump(fn, "fgm"); _bump(fn, "pts", value)
@@ -13159,6 +13179,8 @@ def record_shot_diet(team: Team, shot_type: str, context: str = "", player: Play
     if player is not None:
         player._sq_quality = quality_mult
     analytics_shot(player, shot_type, context, False)
+    if player is not None and getattr(player, "_shot_dribbled", False):
+        context = f"{context}|dribbled"   # off the dribble: not a catch-and-shoot in the shot tables
     # 8: the defender on the shot was his own man (primary) or a helper
     if defender is not None and player is not None:
         own = (SIM_CONTEXT.get("matchups") or {}).get(player) if isinstance(globals().get("SIM_CONTEXT"), dict) else None
@@ -13225,6 +13247,8 @@ def record_shot_make(team: Team, shot_type: str, context: str = "", player: Play
     if SHOT_RESULT_HOOK is not None:
         SHOT_RESULT_HOOK("make", team=team, player=player, shot_type=shot_type, context=context)
     analytics_shot(player, shot_type, context, True)
+    if player is not None and getattr(player, "_shot_dribbled", False):
+        context = f"{context}|dribbled"
     team._last_fg_scorer = player   # every assist is credited right after the make it set up
     team._last_fg_region = shot_region(shot_type)
     if not hasattr(team, "shot_diet") or team.shot_diet is None:
@@ -21885,7 +21909,9 @@ def _simulate_possession(off: Team, dff: Team,
     elif catch_shoot_context and shot_type in ("three", "mid") and last_passer and last_passer is not shooter and not quick_shot_for_assist:
         # a pass that is not a one-motion catch-and-shoot (the shooter has to reset first) is described that way, because it is not
         # credited as an automatic assist: the line must not say "catches and shoots" about a shot that was not
-        print(f"{shooter.name} {random.choice(gather_before_shot_lines)}")
+        gather_line = random.choice(gather_before_shot_lines)
+        shooter._reset_dribble = "dribble" in gather_line   # he put it on the floor first: a pull-up, not a catch-and-shoot
+        print(f"{shooter.name} {gather_line}")
 
     elif catch_shoot_context and closeout_contest and shot_type in ("three", "mid"):
         print(f"{shooter.name} catches and rises over the closeout from {defender.name}.")
