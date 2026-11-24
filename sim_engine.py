@@ -26742,6 +26742,34 @@ def apply_season_form(team: Team):
         sub.slump_replacement_for = p.name
 
 
+def season_form_start():
+    global SEASON_FORM_ACTIVE
+    SEASON_FORM.clear()
+    SEASON_FORM_ACTIVE = True
+
+
+def season_form_end():
+    global SEASON_FORM_ACTIVE
+    SEASON_FORM_ACTIVE = False
+
+
+def season_form_for(*team_names) -> Dict[str, Dict]:
+    """A copy of the form of these teams, small enough to send to a worker process with its game."""
+    return {n: {k: dict(v) for k, v in SEASON_FORM.get(n, {}).items()} for n in team_names if n}
+
+
+def with_season_form(factory, forms):
+    """Wrap a team factory so the team it builds carries its season form (for games played in a worker process)."""
+    if not forms:
+        return factory
+
+    def build():
+        team = factory()
+        team.season_form_state = forms.get(team.name)
+        return team
+    return build
+
+
 def apply_slump_minutes(team: Team):
     for p in team.roster:
         if not getattr(p, "season_slump", False) or not any(getattr(q, "slump_replacement_for", None) == p.name for q in team.roster):

@@ -38,10 +38,12 @@ def factories_for_year(year: int) -> Dict[str, object]:
 
 def _run_year_season_game(task):
     """Worker entry point: simulate one silent season game and return the finished teams."""
-    home_key, away_key, order, seed, year = task
+    home_key, away_key, order, seed, year = task[:5]
+    forms = task[5] if len(task) > 5 else None   # the two teams' season form (hot / cold stretches, slumps)
     sim_engine.SEASON_STAR_MINUTES_CAP = 34
     team_a, team_b = simulate_silent_season_game(
-        getattr(pd, f"make_{home_key}_{year}"), getattr(pd, f"make_{away_key}_{year}"), seed
+        sim_engine.with_season_form(getattr(pd, f"make_{home_key}_{year}"), forms),
+        sim_engine.with_season_form(getattr(pd, f"make_{away_key}_{year}"), forms), seed
     )
     return home_key, away_key, team_a, team_b, order
 
@@ -90,7 +92,8 @@ def run_year_season(year: int, section_queue=None, progress_queue=None) -> Dict:
             batch = workers * 6
             for start in range(0, len(games), batch):
                 sim_engine.hold_season_while_paused(snap)
-                for result in pool.imap_unordered(_run_year_season_game, games[start:start + batch], chunksize=2):
+                tasks = [tuple(t[:5]) + (sim_engine.season_form_for(name_of_key.get(t[0]), name_of_key.get(t[1])),) for t in games[start:start + batch]]
+                for result in pool.imap_unordered(_run_year_season_game, tasks, chunksize=2):
                     yield result
         finally:
             pool.terminate()
@@ -106,11 +109,14 @@ def run_year_season(year: int, section_queue=None, progress_queue=None) -> Dict:
         use_parallel = (_os.cpu_count() or 1) >= 4
     except Exception:
         use_parallel = False
+    sim_engine.season_form_start()
     results = parallel_results() if use_parallel else sequential_results()
     for done, (home_key, away_key, team_a, team_b, order) in enumerate(results, start=1):
         sim_engine.hold_season_while_paused(snap)
         add_player_to_series_totals(player_totals, team_a)
         add_player_to_series_totals(player_totals, team_b)
+        sim_engine.update_season_form(team_a)
+        sim_engine.update_season_form(team_b)
         add_team_to_series_totals(team_totals, team_a)
         add_team_to_series_totals(team_totals, team_b)
         game_log.add(team_a, team_b, order)
@@ -148,6 +154,7 @@ def run_year_season(year: int, section_queue=None, progress_queue=None) -> Dict:
             print(f"Season sim progress: {done}/{total_games} games.")
 
     sim_engine.SEASON_STAR_MINUTES_CAP = None
+    sim_engine.season_form_end()
     sim_engine.SEASON_POSITIONAL_AWARDS = info["positional"]
     try:
         sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,

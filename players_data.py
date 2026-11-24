@@ -705,8 +705,10 @@ def _run_2027_season_game(task):
     # Regular season: first options play ~34-36 minutes, not playoff minutes.
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = 34
+    forms = task[4] if len(task) > 4 else None   # the two teams' season form (hot / cold stretches, slumps)
     team_a, team_b = simulate_silent_season_game(
-        globals()[f"make_{home_key}_2027"], globals()[f"make_{away_key}_2027"], seed
+        _sim_engine.with_season_form(globals()[f"make_{home_key}_2027"], forms),
+        _sim_engine.with_season_form(globals()[f"make_{away_key}_2027"], forms), seed
     )
     return home_key, away_key, team_a, team_b, order
 
@@ -830,6 +832,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
             # season between batches instead of the pool racing ahead.
             for tasks in season_batches(workers * 6):
                 _engine.hold_season_while_paused(snap)
+                tasks = [tuple(t[:4]) + (_engine.season_form_for(_name_of_key.get(t[0]), _name_of_key.get(t[1])),) for t in tasks]
                 for result in pool.imap_unordered(_run_2027_season_game, tasks, chunksize=2):
                     yield result
         finally:
@@ -849,6 +852,8 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
         use_parallel = (_os.cpu_count() or 1) >= 4
     except Exception:
         use_parallel = False
+    import sim_engine as _form_engine
+    _form_engine.season_form_start()
     results = parallel_results() if use_parallel else sequential_results()
     done = 0
     for home_key, away_key, team_a, team_b, order in results:
@@ -877,6 +882,8 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
             cup["results"][order] = (home_key, away_key, team_a.score, team_b.score)
         add_player_to_series_totals(player_totals, team_a)
         add_player_to_series_totals(player_totals, team_b)
+        _form_engine.update_season_form(team_a)
+        _form_engine.update_season_form(team_b)
         add_team_to_series_totals(team_totals, team_a)
         add_team_to_series_totals(team_totals, team_b)
         game_log.add(team_a, team_b, order)
@@ -916,6 +923,7 @@ def run_2027_season(section_queue=None, progress_queue=None) -> Dict:
 
     import sim_engine as _sim_engine
     _sim_engine.SEASON_STAR_MINUTES_CAP = None
+    _sim_engine.season_form_end()
     sections = build_season_sections(entries, player_totals, team_totals, game_log=game_log.rows,
                                      game_extras=game_log.extras, game_meta=game_log.games, fixtures=fixtures)
     if cup.get("summary"):
