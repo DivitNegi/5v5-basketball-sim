@@ -26698,6 +26698,22 @@ def update_season_form(team: Team):
         elif st["slump"] and z >= SLUMP_EXIT_Z:
             st["slump"] = False
         st["slump_games"] = st["slump_games"] + 1 if st["slump"] else 0
+    # who is starting in whose place after this game (shown in the player pop-up)
+    subs = {getattr(p, "slump_replacement_for", None): p.name for p in team.roster if getattr(p, "slump_replacement_for", None)}
+    for pn, st in states.items():
+        st["starting_for"] = next((a for a, b in subs.items() if b == pn), None)
+        st["replaced_by"] = subs.get(pn)
+
+
+def season_form_public(team_name, player_name):
+    """The player's current season form for display, or None when there is none."""
+    st = (SEASON_FORM.get(team_name) or {}).get(player_name)
+    if not st:
+        return None
+    rating = max(-FORM_MAX, min(FORM_MAX, FORM_PER_POINT * st.get("roll", 0.0))) - (SLUMP_RATING if st.get("slump") else 0.0)
+    return {"label": form_label(st), "roll": round(st.get("roll", 0.0), 2), "z": round(st.get("z", 0.0), 2), "games": st.get("games", 0),
+            "slump": bool(st.get("slump")), "slump_games": st.get("slump_games", 0), "rating": round(rating, 4),
+            "starting_for": st.get("starting_for"), "replaced_by": st.get("replaced_by")}
 
 
 def form_label(st) -> str:

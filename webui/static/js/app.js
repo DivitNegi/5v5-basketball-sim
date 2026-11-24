@@ -1447,7 +1447,7 @@ async function loadQuarters() {
       h("span", { class: "tot" }, `${tm.score} pts · ${tm.reb} reb · ${tm.ast} ast · FG ${tm.fgm}-${tm.fga} · 3PT ${tm.tpm}-${tm.tpa} · paint ${tm.points_paint} · fast break ${tm.fastbreak_pts}`)),
       h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, h("tr", {}, h("th", { class: "l" }, "Player"), ...head.map((x) => h("th", {}, x)))), h("tbody", {}, rows.map(row)))));
   });
-  $("#qtrBody").replaceChildren(h("div", { style: { display: "grid", gap: "18px" } }, blocks));
+  $("#qtrBody").replaceChildren(h("div", { style: { display: "grid", gap: "18px", gridTemplateColumns: "minmax(0, 1fr)" } }, blocks));
 }
 
 // ---- player card
@@ -2731,6 +2731,17 @@ function defenseBox(d) {
           h("td", { class: "l" }, h("div", { class: "pcell" }, faceEl(m.name), m.name)), h("td", {}, `${m.made}/${m.att}`),
           h("td", { class: cls(m.pct, df.league) }, `${m.pct}%`), h("td", {}, m.pts), h("td", {}, m.tov))))))) : null);
 }
+// the player's season form: a chip (hot / warm / steady / cool / cold / slumping) and what it does to him
+function ppFormLine(f) {
+  if (!f || !f.label) return null;
+  const pct = (v) => `${v > 0 ? "+" : ""}${(100 * v).toFixed(1)}%`;
+  const bits = [`recent games ${Math.abs(f.roll).toFixed(1)} pts/game ${f.roll >= 0 ? "above" : "below"} expected`, `season shot-making ${f.z >= 0 ? "above" : "below"} expected (${f.games} games)`];
+  if (f.rating) bits.push(`rating ${pct(f.rating)}`);
+  if (f.slump) bits.push(`slumping ${f.slump_games} game${f.slump_games === 1 ? "" : "s"}`);
+  if (f.replaced_by) bits.push(`lost his start to ${f.replaced_by}`);
+  if (f.starting_for) bits.push(`starting in place of ${f.starting_for}`);
+  return h("div", { class: "pcard-sub", style: { marginTop: "4px" } }, "Form", h("span", { class: `form-chip ${f.label}` }, f.label), h("span", { class: "muted", style: { marginLeft: "8px" } }, bits.join(" · ")));
+}
 async function openStatsPlayer(team, name, source, startTab = "stats") {
   window.__ppAt = performance.now();
   document.querySelector(".pp-back")?.remove();
@@ -2781,7 +2792,7 @@ async function openStatsPlayer(team, name, source, startTab = "stats") {
     if (v === "highs" && !highsView.childElementCount) ppHighs(highsView, team, d.name, (it) => show("games", it));
   };
   body.replaceChildren(
-    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
+    h("div", { class: "pcard-head", style: { "--c": color } }, face, h("div", {}, h("div", { class: "pcard-name" }, d.name), h("div", { class: "pcard-sub" }, `${id.year ? id.year + " " : ""}${id.short || team} · ${d.games} game${d.games === 1 ? "" : "s"} · ${d.source}`), ppFormLine(d.form), srcSeg), h("div", { style: { marginLeft: "auto" } }, seg)),
     tabs, statsView, offenseView, defenseView, splitsView, playsView, highsView, gamesView, compareView);
   show(startTab === "playtypes" ? "plays" : "stats");
 }

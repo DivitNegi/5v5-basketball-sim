@@ -1103,3 +1103,22 @@ select.bld-in { min-width: 0; }
 .pick-row > :last-child:not(.pick-main) { font-weight: 800; font-size: 16px; }
 .draft-act { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
 .draft-act .draft-ver { max-width: 210px; padding: 6px 8px; font-size: 12.5px; }
+
+/* pop-out window's score line: same layout as the play-by-play score bar (it sits outside .rawlog, so give it its own rules) */
+.pbp-float .pf-score .pbp-score { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+.pbp-float .pf-score .pbp-clock { flex: none; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; color: var(--accent-2); text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: rgba(245, 165, 36, .14); }
+.pbp-float .pf-score .sb-side { display: inline-flex; align-items: center; gap: 5px; min-width: 0; flex: 0 1 auto; color: var(--text-2); font-weight: 600; }
+.pbp-float .pf-score .sb-side::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.pbp-float .pf-score .sb-name { overflow: hidden; text-overflow: ellipsis; }
+.pbp-float .pf-score .sb-side b { flex: none; color: var(--text); font-weight: 800; }
+.pbp-float .pf-score .sb-side.hot b { color: var(--accent-2); }
+.pbp-float .pf-score .sb-dash { flex: none; color: var(--muted); }
+
+/* quarter box scores: the wide table scrolls inside its box instead of pushing the page out; the team line wraps */
+#qtrBody .court-team-head { flex-wrap: wrap; }
+#qtrBody .court-team-head .tot { white-space: normal; text-align: right; }
+
+/* player pop-up form chip */
+.form-chip { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; vertical-align: middle; border: 1px solid currentColor; }
+.form-chip.hot { color: #fb923c; } .form-chip.warm { color: #fbbf24; } .form-chip.steady { color: var(--text-2); }
+.form-chip.cool { color: #7dd3fc; } .form-chip.cold { color: #60a5fa; } .form-chip.slumping { color: var(--red); }
