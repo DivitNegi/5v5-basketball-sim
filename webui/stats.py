@@ -881,7 +881,7 @@ def player_splits(runner, source, team, name):
     def dd(g):
         return sum(1 for k in ("pts", "reb", "ast", "stl", "blk") if (g.get(k) or 0) >= 10)
     streaks = [["20+ points", longest(lambda g: g["pts"] >= 20)], ["30+ points", longest(lambda g: g["pts"] >= 30)],
-               ["Double-doubles", longest(lambda g: dd(g) >= 2)], ["3+ threes", longest(lambda g: (g.get("tpm") or 0) >= 3)],
+               ["Double-doubles", longest(lambda g: dd(g) >= 2)], ["Triple-doubles", longest(lambda g: dd(g) >= 3)], ["3+ threes", longest(lambda g: (g.get("tpm") or 0) >= 3)],
                ["50%+ shooting (8+ shots)", longest(lambda g: (g.get("fga") or 0) >= 8 and g["fgm"] / g["fga"] >= 0.5)],
                ["Team wins", longest(lambda g: g["win"])]]
     milestones = [["30-point games", sum(1 for g in games if g["pts"] >= 30)], ["40-point games", sum(1 for g in games if g["pts"] >= 40)],
