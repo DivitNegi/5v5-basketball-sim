@@ -901,8 +901,30 @@ def player_splits(runner, source, team, name):
     order = {"early": 0, "middle": 1, "late": 2, "transition / other": 3}
     clock = sorted(([k, v] for k, v in (a.get("clock") or {}).items()), key=lambda kv: order.get(kv[0], 9))
     reb = {"contested": a.get("reb_contested", 0) or 0, "uncontested": a.get("reb_uncontested", 0) or 0, "over": a.get("reb_over") or {}}
+    def longest_run(cond):
+        best, cur = [], []
+        for g in games:
+            cur = cur + [g["game"]] if cond(g) else []
+            if len(cur) > len(best):
+                best = list(cur)
+        return best
+    # the regular-season game numbers behind every row, so a click on a row can show just those games in the game log
+    games_of = {"split:Home": [g["game"] for g in games if g["home"]], "split:Away": [g["game"] for g in games if not g["home"]],
+                "split:Wins": [g["game"] for g in games if g["win"]], "split:Losses": [g["game"] for g in games if not g["win"]]}
+    for _, m in MONTHS:
+        games_of[f"month:{m}"] = [g["game"] for g in games if month_of(g["game"]) == m]
+    for o, gs in opps.items():
+        games_of[f"opp:{o}"] = [g["game"] for g in gs]
+    for label, cond in (("30-point games", lambda g: g["pts"] >= 30), ("40-point games", lambda g: g["pts"] >= 40), ("50-point games", lambda g: g["pts"] >= 50),
+                        ("Double-doubles", lambda g: dd(g) >= 2), ("Triple-doubles", lambda g: dd(g) >= 3), ("10-assist games", lambda g: g["ast"] >= 10),
+                        ("15-rebound games", lambda g: g["reb"] >= 15), ("5+ three games", lambda g: (g.get("tpm") or 0) >= 5)):
+        games_of[f"ms:{label}"] = [g["game"] for g in games if cond(g)]
+    for label, cond in (("20+ points", lambda g: g["pts"] >= 20), ("30+ points", lambda g: g["pts"] >= 30), ("Double-doubles", lambda g: dd(g) >= 2),
+                        ("Triple-doubles", lambda g: dd(g) >= 3), ("3+ threes", lambda g: (g.get("tpm") or 0) >= 3),
+                        ("50%+ shooting (8+ shots)", lambda g: (g.get("fga") or 0) >= 8 and g["fgm"] / g["fga"] >= 0.5), ("Team wins", lambda g: g["win"])):
+        games_of[f"streak:{label}"] = longest_run(cond)
     return {"name": name, "team": team, "has_log": bool(games), "splits": splits, "months": months, "opponents": opp_rows, "streaks": streaks,
-            "milestones": milestones, "trend": trend, "quarters": quarters, "clock": clock, "rebounding": reb}
+            "milestones": milestones, "trend": trend, "quarters": quarters, "clock": clock, "rebounding": reb, "games_of": games_of}
 
 
 def player_names(runner, source):

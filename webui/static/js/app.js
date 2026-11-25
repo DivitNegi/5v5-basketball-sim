@@ -2795,14 +2795,14 @@ async function openStatsPlayer(team, name, source, startTab = "stats") {
   const offenseView = h("div", { class: "pp-games" }), defenseView = h("div", { class: "pp-games" });
   const splitsView = h("div", { class: "pp-games" }), compareView = h("div", { class: "pp-games" });
   const tabs = h("div", { class: "seg pp-tabs" }, [["stats", "Stats"], ["offense", "Offense"], ["defense", "Defense"], ["splits", "Splits"], ["plays", "Play types"], ["highs", "Highs"], ["games", "Game log"], ["compare", "Compare"]].map(([v, l]) => h("button", { "data-v": v, onclick: () => show(v) }, l)));
-  const show = (v, openItem = null) => {
+  const show = (v, openItem = null, filter = null) => {
     statsView.hidden = v !== "stats"; gamesView.hidden = v !== "games"; highsView.hidden = v !== "highs"; playsView.hidden = v !== "plays"; seg.hidden = v !== "stats";
     offenseView.hidden = v !== "offense"; defenseView.hidden = v !== "defense"; splitsView.hidden = v !== "splits"; compareView.hidden = v !== "compare";
-    if (v === "splits" && !splitsView.childElementCount) ppSplits(splitsView, d, d.source || source);
+    if (v === "splits" && !splitsView.childElementCount) ppSplits(splitsView, d, d.source || source, (f) => show("games", null, f));
     if (v === "compare" && !compareView.childElementCount) ppCompare(compareView, d, d.source || source);
     if ((v === "offense" && !offenseView.childElementCount) || (v === "defense" && !defenseView.childElementCount)) ppLinks(offenseView, defenseView, d, d.source || source);
     tabs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
-    if (v === "games" && (openItem || !gamesView.childElementCount)) ppGameLog(gamesView, team, d.name, openItem);
+    if (v === "games" && (openItem || filter || !gamesView.childElementCount || gamesView.dataset.filtered)) ppGameLog(gamesView, team, d.name, openItem, filter);
     if (v === "highs" && !highsView.childElementCount) ppHighs(highsView, team, d.name, (it) => show("games", it));
   };
   body.replaceChildren(
@@ -2904,7 +2904,7 @@ async function ppLinks(offView, defView, d, source) {
 }
 const PP_R4 = ["paint", "post", "mid", "three"];
 // ---- Splits tab: home / away, wins / losses, by month, by opponent, streaks, milestones, the season trend, quarters, shot clock, rebounding
-async function ppSplits(root, d, source) {
+async function ppSplits(root, d, source, openGames = null) {
   root.replaceChildren(h("div", { class: "empty" }, "Loading…"));
   let S2;
   try { S2 = await api.get(`/api/stats/player_splits?source=${encodeURIComponent(source || "Season")}&team=${encodeURIComponent(d.team)}&name=${encodeURIComponent(d.name)}`); } catch { S2 = null; }
@@ -2914,9 +2914,16 @@ async function ppSplits(root, d, source) {
   const heads = ["", "GP", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TOV", "FG%", "3P%", "FT%", "+/-"];
   const lineRow = (lab, l) => [lab, l.gp, l.min, l.pts, l.reb, l.ast, l.stl, l.blk, l.tov, l.fg ?? "–", l.tp ?? "–", l.ft ?? "–", l.pm > 0 ? `+${l.pm}` : l.pm];
   const out = [];
+  // a row's games -> the game log, showing just those games (preview = only say whether the row has any)
+  const go = (key, title) => (ri, preview) => {
+    const ids = S2.games_of?.[key] || [];
+    if (preview) return ids.length > 0 && !!openGames;
+    if (ids.length && openGames) openGames({ title, games: ids });
+  };
+  const rowGo = (list, keyOf, titleOf) => (ri, preview) => go(keyOf(list[ri]), titleOf(list[ri]))(ri, preview);
   if (!S2.has_log) out.push(h("div", { class: "muted" }, "Game splits, opponents, streaks and the trend come from the regular-season game log; they appear after a season is played."));
-  if (S2.splits.length) out.push(h("h4", { class: "pp-sub" }, "Home / away and wins / losses"), ppTable(heads, S2.splits.map(([l, x]) => lineRow(l, x))));
-  if (S2.months.length) out.push(sub("By month"), ppTable(heads, S2.months.map(([l, x]) => lineRow(l, x))));
+  if (S2.splits.length) out.push(h("h4", { class: "pp-sub" }, "Home / away and wins / losses"), ppTable(heads, S2.splits.map(([l, x]) => lineRow(l, x)), rowGo(S2.splits, ([l]) => `split:${l}`, ([l]) => l)));
+  if (S2.months.length) out.push(sub("By month"), ppTable(heads, S2.months.map(([l, x]) => lineRow(l, x)), rowGo(S2.months, ([l]) => `month:${l}`, ([l]) => l)));
   if (S2.trend.length > 4) {
     const W = 680, H = 170, pad = 28, n = S2.trend.length, roll = (k) => S2.trend.map((_, i) => { const w = S2.trend.slice(Math.max(0, i - 9), i + 1); return w.reduce((t, g) => t + (g[k] || 0), 0) / w.length; });
     const series = [["pts", "#f5a524", "PTS"], ["reb", "#60a5fa", "REB"], ["ast", "#4ade80", "AST"]];
@@ -2928,9 +2935,10 @@ async function ppSplits(root, d, source) {
       `<text x="${pad}" y="${pad - 10}" fill="#94a3b8" font-size="12">${mx.toFixed(0)}</text><text x="${pad}" y="${H - 8}" fill="#94a3b8" font-size="12">game 1</text><text x="${W - pad}" y="${H - 8}" fill="#94a3b8" font-size="12" text-anchor="end">game ${S2.trend[n - 1].game}</text>`;
     out.push(sub("Season trend"), note("Rolling 10-game averages."), h("div", { style: { display: "flex", gap: "14px", fontSize: "12.5px", margin: "0 0 4px" } }, series.map(([, c, l]) => h("span", { style: { color: c, fontWeight: 700 } }, `— ${l}`))), svg);
   }
-  if (S2.streaks.length && S2.has_log) out.push(sub("Longest streaks"), ppTable(["Streak", "Games in a row"], S2.streaks));
-  if (S2.milestones.length && S2.has_log) out.push(sub("Milestones"), ppTable(["Milestone", "Games"], S2.milestones));
-  if (S2.opponents.length) out.push(sub("Against each team"), ppTable(["Opponent", ...heads.slice(1)], S2.opponents.map(([o, x]) => lineRow(shortTeam(identOf(o).short || o), x))));
+  if (S2.streaks.length && S2.has_log) out.push(sub("Longest streaks"), ppTable(["Streak", "Games in a row"], S2.streaks, rowGo(S2.streaks, ([l]) => `streak:${l}`, ([l, n]) => `Longest streak · ${l} (${n} in a row)`)));
+  if (S2.milestones.length && S2.has_log) out.push(sub("Milestones"), ppTable(["Milestone", "Games"], S2.milestones, rowGo(S2.milestones, ([l]) => `ms:${l}`, ([l]) => l)));
+  if (S2.opponents.length) out.push(sub("Against each team"), ppTable(["Opponent", ...heads.slice(1)], S2.opponents.map(([o, x]) => lineRow(shortTeam(identOf(o).short || o), x)),
+    rowGo(S2.opponents, ([o]) => `opp:${o}`, ([o]) => `vs ${shortTeam(identOf(o).short || o)}`)));
   if (S2.quarters.length) out.push(sub("By quarter"), note("Per game, in the quarters he played."), ppTable(["Quarter", "GP", "MIN", "PTS", "FGA", "FG%", "REB", "AST"], S2.quarters.map(([q, x]) => [q, x.gp, x.min, x.pts, x.fga, x.fg ?? "–", x.reb, x.ast])));
   out.push(sub("By shot clock"), note("Half-court shots by how much of the shot clock was used: early 0-7 s, middle 8-15, late 16+. Transition / other = fast breaks, putbacks and dead-ball sets."));
   out.push(S2.clock.length ? ppTable(["Clock", "FG", "FG%", "Pts / shot"], S2.clock.map(([k, v]) => [k, `${v.fgm || 0}/${v.fga || 0}`, v.fga ? `${(100 * (v.fgm || 0) / v.fga).toFixed(1)}%` : "–", v.fga ? ((v.pts || 0) / v.fga).toFixed(2) : "–"])) : h("div", { class: "muted" }, "Recorded for games played from now on."));
@@ -2978,9 +2986,14 @@ async function ppCompare(root, d, source) {
   root.replaceChildren(h("h4", { class: "pp-sub" }, "Compare with another player"), h("div", { class: "muted", style: { fontSize: "12px", margin: "-2px 0 6px" } }, "Per game, same set of games (season / playoffs). Green = the better number."),
     input, h("datalist", { id: listId }, names.filter((r) => !(r.name === d.name && r.team === d.team)).map((r) => h("option", { value: label(r) }))), out);
 }
-const ppTable = (heads, rows) => h("div", { class: "table-wrap" }, h("table", { class: "stats" },
+// onRow(i): a click on row i (rows become clickable); a row onRow returns false for stays plain
+const ppTable = (heads, rows, onRow = null) => h("div", { class: "table-wrap" }, h("table", { class: "stats" },
   h("thead", {}, h("tr", {}, heads.map((c, i) => h("th", { class: i === 0 ? "l" : "" }, c)))),
-  h("tbody", {}, rows.map((r) => h("tr", {}, r.map((c, i) => (c instanceof Node ? (c.tagName === "TD" ? c : h("td", { class: i === 0 ? "l" : "" }, c)) : h("td", { class: i === 0 ? "l" : "" }, c ?? "–"))))))));
+  h("tbody", {}, rows.map((r, ri) => {
+    const click = onRow && onRow(ri, true) !== false;
+    return h("tr", click ? { class: "pl-row", title: "Show these games in the game log", onclick: () => onRow(ri) } : {},
+      r.map((c, i) => (c instanceof Node ? (c.tagName === "TD" ? c : h("td", { class: i === 0 ? "l" : "" }, c)) : h("td", { class: i === 0 ? "l" : "" }, c ?? "–"))));
+  }))));
 const ppNameList = (map, cols, U, limit = 8) => {
   const rows = Object.entries(map || {}).sort((a, b) => b[1] - a[1]).slice(0, limit);
   return rows.length ? ppTable(cols, rows.map(([nm, c]) => [U.person(nm), c])) : h("div", { class: "muted" }, "None yet.");
@@ -3137,13 +3150,18 @@ async function ppCollectGames(team, name) {
   const other = [...S.gameSnapshots.keys()].sort((a, b) => b - a)
     .filter((n) => !used.has(n) && S.gameSnapshots.get(n)?.teams?.find((t) => t.name === team)?.box?.some((r) => r.name === name));
   if (other.length) groups.push(["Watched games", other.map((n) => ({ label: `Game ${n}`, snap: S.gameSnapshots.get(n), shots: S.gameShots.get(n) || [] }))]);
-  if (season.length) groups.push(["Regular season", season.map((g) => ({ label: `Game ${g.game}`, gid: g.gid,
+  if (season.length) groups.push(["Regular season", season.map((g) => ({ label: `Game ${g.game}`, gid: g.gid, game: g.game,
     snap: { teams: [{ ...identOf(g.team), name: g.team, score: g.mine, box: [{ ...g.row, listed: g.row.pos || "" }] }, { ...identOf(g.opp), name: g.opp, score: g.theirs, box: [] }] }, shots: [] }))]);
   return groups;
 }
-async function ppGameLog(root, team, name, openItem = null) {
+async function ppGameLog(root, team, name, openItem = null, filter = null) {
   root.replaceChildren(h("div", { class: "empty" }, "Loading games…"));
-  const groups = await ppCollectGames(team, name);
+  let groups = await ppCollectGames(team, name);
+  if (filter) {   // from a Splits row: just those regular-season games
+    const want = new Set(filter.games.map(Number));
+    groups = groups.filter(([t]) => t.startsWith("Regular")).map(([t, items]) => [`${filter.title} · ${items.filter((it) => want.has(Number(it.game))).length} games`, items.filter((it) => want.has(Number(it.game)))]).filter(([, items]) => items.length);
+    root.dataset.filtered = "1";
+  } else delete root.dataset.filtered;
   const shortOf = (nm) => oppShort(nm, team);
   if (!groups.length) { root.replaceChildren(h("div", { class: "empty" }, "No games for this player yet.")); return; }
   const row = (it) => {
@@ -3154,11 +3172,27 @@ async function ppGameLog(root, team, name, openItem = null) {
          h("td", {}, `${r.fgm}/${r.fga}`), h("td", {}, `${r.tpm}/${r.tpa}`), h("td", {}, `${r.ftm ?? 0}/${r.fta ?? 0}`), h("td", {}, r.pm > 0 ? `+${r.pm}` : String(r.pm ?? ""))];
     return h("tr", { class: "pl-row", title: "Open his card for this game", onclick: () => card(it) },
       h("td", { class: "l" }, it.label), h("td", { class: "l" }, h("div", { class: "pcell" }, logoEl(identOf(opp?.name || "")), shortOf(opp?.name))),
-      h("td", { class: win ? "pm-pos" : "pm-neg" }, `${win ? "W" : "L"} ${mine.score}-${opp?.score ?? 0}`), ...cells);
+      h("td", { class: win ? "pm-pos" : "pm-neg" }, `${win ? "W" : "L"} ${mine.score}-${opp?.score ?? 0}`), ...cells,
+      h("td", {}, h("button", { class: "btn small", title: "Both teams' full box score for this game", onclick: (e) => { e.stopPropagation(); showBox(it); } }, "Box score")));
   };
-  const head = h("tr", {}, ["Game", "Opponent", "Result", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3P", "FT", "+/-"].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)));
-  const list = () => root.replaceChildren(...groups.map(([title, items]) => h("div", { class: "pp-group" }, h("h4", {}, title),
-    h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head.cloneNode(true)), h("tbody", {}, items.map(row)))))));
+  const head = h("tr", {}, ["Game", "Opponent", "Result", "MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3P", "FT", "+/-", ""].map((c, i) => h("th", { class: i < 2 ? "l" : "" }, c)));
+  const back = filter ? h("div", { class: "filters" }, h("button", { class: "btn", onclick: () => ppGameLog(root, team, name) }, "‹ All games")) : null;
+  const list = () => root.replaceChildren(...(back ? [back] : []), ...(groups.length ? groups.map(([title, items]) => h("div", { class: "pp-group" }, h("h4", {}, title),
+    h("div", { class: "table-wrap" }, h("table", { class: "stats" }, h("thead", {}, head.cloneNode(true)), h("tbody", {}, items.map(row)))))) : [h("div", { class: "empty" }, "No games.")]));
+  // both teams' full box score: a regular-season game comes from the season box score (its snapshot only holds his own line);
+  // playoff and watched games already carry both teams' full boxes
+  async function showBox(it) {
+    let b;
+    if (it.gid != null) {
+      b = await api.get(`/api/season/box?gid=${encodeURIComponent(it.gid)}`);
+      if (b.error) { toast(b.error, "err"); return; }
+    } else {
+      b = { teams: it.snap.teams.map((t) => ({ ...identOf(t.name), name: t.name, score: t.score,
+        players: (t.box || []).map((r) => ({ ...r, pos: r.pos || r.listed || "", min: Number(r.min || 0), st: !!(r.st ?? r.starter) })) })) };
+    }
+    root.replaceChildren(h("div", { class: "filters" }, h("button", { class: "btn", onclick: list }, filter ? `‹ Back to ${filter.title}` : "‹ Back to game log"),
+      h("b", {}, `${it.label} · ${b.teams.map((t) => `${t.short || shortOf(t.name)} ${t.score}`).join("  –  ")}`)), fullBox(b, { player: name, team }));
+  }
   const card = (it) => {
     const c = cardFromSnapshot(it.snap, team, name, it.shots), p = c.player;
     const tile = (k, v) => h("div", { class: "tile" }, h("div", { class: "k" }, k), h("div", { class: `v${String(v).length > 6 ? " frac" : ""}` }, v));
