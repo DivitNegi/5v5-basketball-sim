@@ -21,6 +21,8 @@ SEASON_YEARS = {
     2021: {"label": "2021", "season_label": "2020-21", "play_in": True, "positional": True},
     2022: {"label": "2022", "season_label": "2021-22", "play_in": True, "positional": True},
     2023: {"label": "2023", "season_label": "2022-23", "play_in": True, "positional": True},
+    2024: {"label": "2024", "season_label": "2023-24", "play_in": True, "positional": False},
+    2025: {"label": "2025", "season_label": "2024-25", "play_in": True, "positional": False},
     2026: {"label": "2026", "season_label": "2025-26", "play_in": True, "positional": False},
 }
 

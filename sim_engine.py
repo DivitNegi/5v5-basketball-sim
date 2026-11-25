@@ -64,7 +64,7 @@ REBOUND_PUSH_SCALE = 0.36  # share of the old rebound-push chance that still run
 HALF_COURT_POSSESSION_RANGE = (11, 21)  # seconds; was (11, 22) (2025-26 ran ~3 shots a team short of the real pace), (11, 21) before that, (12, 24) before transition volume was cut
 # Real league pace (possessions per 48 minutes, Basketball-Reference) for the seasons with a full schedule. The half-court clock
 # above is set for 2025-26; a team from another of these seasons plays at its own season's real pace. Other years are unchanged.
-ERA_PACE = {2016: 95.8, 2018: 97.3, 2021: 99.2, 2022: 98.2, 2023: 99.1, 2026: 99.6, 2027: 99.6}
+ERA_PACE = {2016: 95.8, 2018: 97.3, 2021: 99.2, 2022: 98.2, 2023: 99.1, 2024: 98.5, 2025: 98.8, 2026: 99.6, 2027: 99.6}
 ERA_PACE_REF = 99.6
 
 
