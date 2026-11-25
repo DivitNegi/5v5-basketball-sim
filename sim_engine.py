@@ -20296,6 +20296,12 @@ def announce_ball_transfer(passer: Player | None, receiver: Player, context: str
             f"{passer.name} reverses it to {receiver.name} as the offense clears space.",
             f"{passer.name} gives it up to {receiver.name} with the clock getting serious.",
         ]
+    elif context == "back_to_creator":
+        lines = [
+            f"{passer.name} gives it right back to {receiver.name}.",
+            f"{passer.name} kicks it back out to {receiver.name} to go to work.",
+            f"{passer.name} returns it to {receiver.name} and clears out.",
+        ]
     elif context == "reroute":
         lines = [
             f"{passer.name} passes up the look and moves it to {receiver.name}.",
@@ -21452,6 +21458,11 @@ def _simulate_possession(off: Team, dff: Team,
     if true_iso_attempt:
         combo_chance = 0.0   # the isolation's own move line already describes how he got the shot: no second dribble chain
     if random.random() < combo_chance:
+        if combo_creator is not shooter and ball_owner is not combo_creator:
+            # the ball went to a player who does not create off the dribble: it has to come back before the creator can go to work
+            announce_ball_transfer(ball_owner, combo_creator, "back_to_creator")
+            last_passer = ball_owner
+            ball_owner = combo_creator
         combo_action, combo_quality = dribble_combo_action(combo_creator, combo_defender, off, dff, period, period_time, play_context)
         print_dribble_combo(combo_creator, combo_defender, combo_action)
         combo_creator.shot_quality_mult = getattr(combo_creator, "shot_quality_mult", 1.0) * combo_quality
