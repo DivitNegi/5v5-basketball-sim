@@ -26712,8 +26712,11 @@ FORM_EWMA = 0.30            # weight of the latest game in the rolling form
 FORM_PER_POINT = 0.009      # rating change per point a game above / below expected in the rolling form
 FORM_MAX = 0.05             # the most rolling form moves a rating
 SLUMP_MIN_GAMES = 20        # no season-long slump before this many games
-SLUMP_ENTER_Z = -1.5        # season shot-making this far below expected (in standard deviations) is a slump
-SLUMP_EXIT_Z = -0.7         # and he is out of it once he is back above this
+SLUMP_EWMA = 0.08           # the slump window: a rolling average weighted over roughly the last month (~25 games)
+SLUMP_EXP_FLOOR = 12.0      # a low-volume player counts as if he were expected ~12 points a game (a few bad bench nights are not a slump)
+SLUMP_ENTER_PCT = -0.09     # shots falling 9%+ worse than expected over that window (and still cold lately) is a slump
+SLUMP_EXIT_PCT = -0.04      # he is out of it once the window is back above -4%
+SLUMP_HOT_EXIT = 0.06       # or as soon as his recent games are falling 6% better than expected
 SLUMP_RATING = 0.03         # extra rating drop while slumping
 PROMOTE_MIN_GAMES = 15      # no lineup change for form before this many games
 PROMOTE_PERF_GAP = 2.2      # a bench player this much better (z + recent form) than a starter at his spot takes the start
@@ -26730,6 +26733,7 @@ def game_shotmaking(player: Player, with_exp: bool = False):
     return (pts - exp, n, exp) if with_exp else (pts - exp, n)
 
 
+FORM_BASE_SHRINK = 20.0  # games of "normal" his season norm is shrunk with (a few games do not set a norm)
 FORM_EXP_FLOOR = 5.0     # a game with only a few shots counts as if he had this many expected points (a 2-for-2 night is not a heater)
 FORM_PCT_SCALE = 16.0    # form is efficiency: how much better / worse than expected his shots are falling (+10% -> 1.6 on the old points scale)
 
@@ -26751,7 +26755,11 @@ def update_season_form(team: Team):
         st["rdev"] = (1.0 - FORM_EWMA) * st.get("rdev", 0.0) + FORM_EWMA * dev
         st["rexp"] = (1.0 - FORM_EWMA) * st.get("rexp", 0.0) + FORM_EWMA * exp
         w = 1.0 - (1.0 - FORM_EWMA) ** (st["games"] + 1)   # the rolling averages start at zero: undo that early on
-        st["pct"] = (st["rdev"] / w) / max(FORM_EXP_FLOOR, st["rexp"] / w)
+        # hot and cold are against HIS OWN norm this season (shrunk toward zero early on): a player who always runs a bit under or over
+        # the engine's expectation is not permanently cold or hot -- only a stretch that differs from how he usually shoots counts
+        g0 = st["games"]
+        st["base"] = st["dev"] / max(st.get("exp", 0.0), SLUMP_EXP_FLOOR * g0, 1.0) * g0 / (g0 + FORM_BASE_SHRINK) if g0 else 0.0
+        st["pct"] = (st["rdev"] / w) / max(FORM_EXP_FLOOR, st["rexp"] / w) - st["base"]
         st["roll"] = FORM_PCT_SCALE * st["pct"]
         st["exp"] = st.get("exp", 0.0) + exp
         st["games"] += 1
@@ -26759,9 +26767,15 @@ def update_season_form(team: Team):
         st["shots"] += n
         z = st["dev"] / (1.15 * max(1.0, st["shots"]) ** 0.5)
         st["z"] = z
-        if not st["slump"] and st["games"] >= SLUMP_MIN_GAMES and st["shots"] >= 60 and z <= SLUMP_ENTER_Z:
+        # a slump is a real cold stretch (about the last month), measured as efficiency: shots falling well below expected. A big
+        # shooter a few percent under his (high) expected over a whole season is not slumping, and a hot run gets anyone out of it.
+        st["ldev"] = (1.0 - SLUMP_EWMA) * st.get("ldev", 0.0) + SLUMP_EWMA * dev
+        st["lexp"] = (1.0 - SLUMP_EWMA) * st.get("lexp", 0.0) + SLUMP_EWMA * exp
+        lw = 1.0 - (1.0 - SLUMP_EWMA) ** st["games"]
+        st["lpct"] = (st["ldev"] / lw) / max(SLUMP_EXP_FLOOR, st["lexp"] / lw) - st.get("base", 0.0)
+        if not st["slump"] and st["games"] >= SLUMP_MIN_GAMES and st["shots"] >= 60 and st["lpct"] <= SLUMP_ENTER_PCT and st.get("pct", 0.0) < 0:
             st["slump"] = True
-        elif st["slump"] and z >= SLUMP_EXIT_Z:
+        elif st["slump"] and (st["lpct"] >= SLUMP_EXIT_PCT or st.get("pct", 0.0) >= SLUMP_HOT_EXIT):
             st["slump"] = False
         st["slump_games"] = st["slump_games"] + 1 if st["slump"] else 0
     # who is starting in whose place after this game (shown in the player pop-up)
@@ -26779,7 +26793,7 @@ def season_form_public(team_name, player_name):
     rating = max(-FORM_MAX, min(FORM_MAX, FORM_PER_POINT * st.get("roll", 0.0))) - (SLUMP_RATING if st.get("slump") else 0.0)
     season_pct = st.get("dev", 0.0) / st["exp"] if st.get("exp") else 0.0
     return {"label": form_label(st), "roll": round(st.get("roll", 0.0), 2), "z": round(st.get("z", 0.0), 2), "games": st.get("games", 0),
-            "pct": round(st.get("pct", 0.0), 4), "season_pct": round(season_pct, 4),
+            "pct": round(st.get("pct", 0.0), 4), "season_pct": round(season_pct, 4), "month_pct": round(st.get("lpct", 0.0), 4),
             "slump": bool(st.get("slump")), "slump_games": st.get("slump_games", 0), "rating": round(rating, 4),
             "starting_for": st.get("starting_for"), "replaced_by": st.get("replaced_by")}
 

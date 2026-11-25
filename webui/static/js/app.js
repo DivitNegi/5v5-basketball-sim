@@ -2745,7 +2745,8 @@ function ppFormLine(f) {
   if (!f || !f.label) return null;
   const pct = (v) => `${v > 0 ? "+" : ""}${(100 * v).toFixed(1)}%`;
   const eff = (v) => `${Math.abs(100 * v).toFixed(1)}% ${v >= 0 ? "better" : "worse"} than expected`;
-  const bits = [`recent games: shots falling ${eff(f.pct || 0)}`, `season: ${eff(f.season_pct || 0)} (${f.games} games)`];
+  const vsNorm = (v) => `${Math.abs(100 * v).toFixed(1)}% ${v >= 0 ? "above" : "below"} his norm`;
+  const bits = [`recent games: ${vsNorm(f.pct || 0)}`, `last month: ${vsNorm(f.month_pct || 0)}`, `season: shots falling ${eff(f.season_pct || 0)} (${f.games} games)`];
   if (f.rating) bits.push(`rating ${pct(f.rating)}`);
   if (f.slump) bits.push(`slumping ${f.slump_games} game${f.slump_games === 1 ? "" : "s"}`);
   if (f.replaced_by) bits.push(`lost his start to ${f.replaced_by}`);
