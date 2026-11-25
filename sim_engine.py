@@ -19515,6 +19515,31 @@ def immediate_catch_chance(passer: Player, base: float, slope: float = 0.44,
     return max(min(lo, 0.05), min(hi * 1.2, ASSIST_VOLUME_BOOST * (floor + (ceiling - floor) * playmaking_look_curve(passer.playmaking) + bonus)))
 
 
+FRONTCOURT_HUB_MIN = 0.60    # a PF/C passes out of the elbow/post only with playmaking above this (about 12% AST%)
+FRONTCOURT_HUB_MOVEMENT = 0.35   # how much of the usual extra-pass chance is left after a big's hub pass
+FRONTCOURT_HUB_RATE = 0.50   # chance per eligible possession that a 0.99 big gets the ball on the way to the shooter (scales down with playmaking)
+FRONTCOURT_HUB_LINES = (
+    "{src} swings it to {hub} at the elbow.",
+    "{src} enters it to {hub} at the high post.",
+    "{src} feeds {hub} on the block, and he reads the defense.",
+    "{src} hits {hub} flashing to the middle.",
+    "{src} gives it up to {hub} on the short roll.",
+)
+
+
+def choose_frontcourt_hub(team: Team, handler: Player, shooter: Player) -> "Player | None":
+    """A passing big on the floor (not the handler, not the shooter) who gets the ball and makes the next pass, by his playmaking."""
+    cands = [p for p in team.on_floor
+             if p is not handler and p is not shooter and not p.fouled_out
+             and p.position in ("PF", "C") and p.playmaking > FRONTCOURT_HUB_MIN]
+    if not cands:
+        return None
+    weights = [FRONTCOURT_HUB_RATE * (p.playmaking - FRONTCOURT_HUB_MIN) / (0.99 - FRONTCOURT_HUB_MIN) for p in cands]
+    if random.random() >= min(0.6, sum(weights)):
+        return None
+    return random.choices(cands, weights=weights, k=1)[0]
+
+
 ASSIST_CREDIT_SCALE = 1.32  # delayed (non-quick) finishes: league team assists were ~22.8/game vs ~26 real
 ASSIST_VOLUME_BOOST = 3.00  # overall: 20% more of the league's baskets come off a pass (the playmaking taper had left teams at ~20 assists a game vs ~24.5 real)
 
@@ -20830,6 +20855,18 @@ def _simulate_possession(off: Team, dff: Team,
             shooter = rerouted
             ball_owner = shooter
 
+    off._hub_feed = None
+    if shooter is not handler and not pass_already_narrated and play_context not in ("deep_paint_touch", "closing_star_touch"):
+        # A passing big runs some of the offense from the elbow or the post: the ball goes through him on the way to the shooter.
+        hub = choose_frontcourt_hub(off, handler, shooter)
+        if hub is not None:
+            off._hub_feed = hub
+            source = last_passer if last_passer and last_passer not in (hub, shooter) else handler
+            print(random.choice(FRONTCOURT_HUB_LINES).format(src=source.name, hub=hub.name))
+            last_passer = hub
+            quick_shot_for_assist = random.random() < immediate_catch_chance(
+                hub, base=0.24, slope=0.44, lo=0.20, hi=0.78, bonus=0.08 if "post_hub" in hub.badges else 0.0,
+            )
     if shooter is not handler:
         passer_for_entry = last_passer if last_passer and last_passer is not shooter else handler
         deep_paint_touch = is_non_shooting_big(shooter)
@@ -20913,6 +20950,8 @@ def _simulate_possession(off: Team, dff: Team,
             extra_pass_chance *= 0.25
     if last_passer is not None and SYSTEM_PLAYMAKERS.get(off.name) == last_passer.name:
         extra_pass_chance *= 0.40
+    if last_passer is not None and last_passer is getattr(off, "_hub_feed", None):
+        extra_pass_chance *= FRONTCOURT_HUB_MOVEMENT   # a big's elbow/post read: the catch is usually the shot
     if getattr(shooter, "keep_pace_shots", False) and paced_attempt_gap(shooter) > 1.0:
         extra_pass_chance *= 0.35
     extra_pass_chance *= getattr(shooter, "extra_pass_scale", 1.0)   # a role setting: how often this player swings it instead of shooting
@@ -20983,6 +21022,8 @@ def _simulate_possession(off: Team, dff: Team,
         movement_base = max(0.10, min(0.72, movement_base))
         if last_passer is not None and SYSTEM_PLAYMAKERS.get(off.name) == last_passer.name:
             movement_base *= 0.50
+        if last_passer is not None and last_passer is getattr(off, "_hub_feed", None):
+            movement_base *= FRONTCOURT_HUB_MOVEMENT   # the big's read created the look: the catch is usually the shot, not another swing
 
         touched = [handler]
         if last_passer:
