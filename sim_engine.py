@@ -25998,7 +25998,7 @@ def positional_award_teams(ranked: List[Tuple[str, str, Dict]], player_lookup: D
             return ("G",)
         if pos == "C":
             return ("C",)
-        if pos == "PF" and getattr(player, "height", 0) >= 82 and getattr(player, "interior_def", 0) >= 0.85 and getattr(player, "ball_handle", 0) < 0.70:
+        if pos == "PF" and getattr(player, "height", 0) >= 82 and getattr(player, "interior_def", 0) >= 0.85 and getattr(player, "ball_handle", 0) < 0.66                 and getattr(player, "usage", 0) < 0.33:
             return ("C", "F")   # a rim-protecting big (Anthony Davis) is voted at center; a ball-handling forward (Giannis) is not
         return ("F",)
 
