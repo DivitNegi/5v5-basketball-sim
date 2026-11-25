@@ -461,10 +461,10 @@ def run_2027_playoffs(field=None, factories=None, announce_seeds: bool = True, c
     push_gui_playoff_update(stage["players"], stage["teams"], stage["lines"], winner_name=champion)
 
 
-def record_2027_play_in(conference, slot, high_name, low_name, score_high=None, score_low=None, winner=None, boxes=None):
+def record_2027_play_in(conference, slot, high_name, low_name, score_high=None, score_low=None, winner=None, boxes=None, replay=None):
     play_in = BRACKET_STATE.setdefault("play_in", {}).setdefault(conference, {})
     play_in[slot] = {"a": high_name, "b": low_name, "score_a": score_high, "score_b": score_low, "winner": winner,
-                     "boxes": boxes}
+                     "boxes": boxes, "replay": replay}
     publish_bracket_state()
 
 
@@ -480,8 +480,9 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
     team_a.home_court_override = True
     team_b.home_court_override = False
     apply_star_clutchness(team_a, team_b)
-    simulate_game(team_a, team_b)
     import sim_engine as _form_engine
+    replay_key = _form_engine.playoff_replay_capture(f"playin|{conference}|{slot}|{high_name}|{low_name}", team_a, team_b)
+    simulate_game(team_a, team_b)
     _form_engine.update_season_form(team_a)
     _form_engine.update_season_form(team_b)
     if team_a.score >= team_b.score:
@@ -491,7 +492,7 @@ def run_2027_play_in_game(high_name: str, low_name: str, factories: Dict, label:
     print(f"\nPlay-in result: {winner} advance ({team_a.name} {team_a.score} - {team_b.score} {team_b.name}).")
     if conference is not None:
         record_2027_play_in(conference, slot, high_name, low_name, team_a.score, team_b.score, winner,
-                            boxes=[box_score_snapshot(team_a), box_score_snapshot(team_b)])
+                            boxes=[box_score_snapshot(team_a), box_score_snapshot(team_b)], replay=replay_key)
     if stage is not None:
         add_player_to_series_totals(stage["players"], team_a)
         add_player_to_series_totals(stage["players"], team_b)

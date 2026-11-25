@@ -28,7 +28,7 @@ SUPPORTED_MODES = (
     "Fantasy draft: 2027 players (season + playoffs)",
     "Fantasy draft: all-time (season + playoffs)", "Fantasy draft playoffs",
     "Olympic tournament",
-) + SEASON_LIKE + ("2027 play-in & playoffs", "Replay season game")
+) + SEASON_LIKE + ("2027 play-in & playoffs", "Replay season game", "Replay playoff game")
 ALL_MODES = (
     "Game", "Game 7", "1-on-1", "Playoff series", "Custom 16-team playoffs", "Full 2027 playoffs", "2027 season (82 games)",
     "2018 season (82 games)", "2016 season (82 games)", "2021 season (82 games)", "2022 season (82 games)", "2023 season (82 games)", "2024 season (82 games)", "2025 season (82 games)", "2026 season (82 games)",
@@ -217,13 +217,15 @@ class SimRunner:
             return "Choose both players for 1-on-1."
         if mode == "Replay season game" and not sim_engine.season_replay_available(options.get("order")):
             return "That season game is not available for replay."
+        if mode == "Replay playoff game" and not sim_engine.playoff_replay_available(options.get("key")):
+            return "That playoff game is not available for replay."
         with self.lock:
             if self.active:
                 return "A simulation is already running."
             self.active = True
         self.mode = mode
         self.options = options
-        keep = mode in ("2027 play-in & playoffs", "Replay season game")   # a replay must leave the finished season as it was
+        keep = mode in ("2027 play-in & playoffs", "Replay season game", "Replay playoff game")   # a replay must leave the finished season as it was
         self.score, self.series, self.flow, self.last_live = None, None, [], None
         self.shots, self._shot_count, self._pending_shot = [], 0, None
         if not keep:
@@ -553,6 +555,14 @@ class SimRunner:
                     sim_engine.simulate_game(team_a, team_b)
                 finally:
                     sim_engine.SEASON_STAR_MINUTES_CAP = previous_cap
+            elif mode == "Replay playoff game":
+                previous_cap, previous_playoff = sim_engine.SEASON_STAR_MINUTES_CAP, sim_engine.PLAYOFF_MODE
+                try:
+                    team_a, team_b, cap = sim_engine.build_playoff_replay_teams(self.options.get("key"))
+                    sim_engine.SEASON_STAR_MINUTES_CAP = cap
+                    sim_engine.simulate_game(team_a, team_b)
+                finally:
+                    sim_engine.SEASON_STAR_MINUTES_CAP, sim_engine.PLAYOFF_MODE = previous_cap, previous_playoff
             elif mode == "1-on-1":
                 def resolve(team_name, player_name):
                     if team_name not in self.factories:
@@ -630,7 +640,7 @@ class SimRunner:
             self._publish_unstamped()
             self._push_live(force=True)
             try:
-                if mode != "Replay season game":   # the replayed game's own tables must not replace the season's
+                if mode not in ("Replay season game", "Replay playoff game"):   # the replayed game's own tables must not replace the season's
                     merged = dict(self.sections or {})
                     merged.update(sim_engine.split_gui_series_sections("".join(proxy.full_output)))
                     self.sections = merged

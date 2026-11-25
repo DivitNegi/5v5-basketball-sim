@@ -7400,7 +7400,7 @@ def compact_series_totals(series_totals: Dict) -> Dict:
 
 
 def record_bracket_series_game(team_a: str, team_b: str, game_no: int, score_a: int, score_b: int,
-                               wins_a: int, wins_b: int, home: str, boxes=None, totals=None):
+                               wins_a: int, wins_b: int, home: str, boxes=None, totals=None, replay=None):
     series = BRACKET_STATE.setdefault("series", {})
     entry = series.setdefault(f"{team_a}|{team_b}", {"a": team_a, "b": team_b, "games": [], "winner": None})
     entry["wins_a"], entry["wins_b"] = wins_a, wins_b
@@ -7410,6 +7410,8 @@ def record_bracket_series_game(team_a: str, team_b: str, game_no: int, score_a: 
         entry["games"].append((game_no, score_a, score_b, home))
     if boxes:
         entry.setdefault("boxes", {})[game_no] = boxes
+    if replay:
+        entry.setdefault("replay", {})[game_no] = replay
     publish_bracket_state()
 
 
@@ -7491,6 +7493,7 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
         print(f"Series: {teamA.name} {series_wins[teamA.name]} - {series_wins[teamB.name]} {teamB.name}")
         print("#" * 80 + "\n")
 
+        replay_key = playoff_replay_capture(f"{teamA.name}|{teamB.name}|{game_num}", teamA, teamB)
         simulate_game(teamA, teamB)
         update_season_form(teamA)   # playoff form keeps moving (only while a season's form is being carried)
         update_season_form(teamB)
@@ -7553,7 +7556,7 @@ def run_best_of_7_series(teamA_factory, teamB_factory, fantasy_customization: bo
             teamA.name, teamB.name, game_num, teamA.score, teamB.score,
             series_wins[teamA.name], series_wins[teamB.name], home_team.name,
             boxes=[box_score_snapshot(teamA), box_score_snapshot(teamB)],
-            totals=compact_series_totals(series_totals),
+            totals=compact_series_totals(series_totals), replay=replay_key,
         )
         push_gui_series_update(series_totals, series_team_totals, game_logs, playoff_bracket_lines=playoff_bracket_lines)
 
@@ -26697,6 +26700,34 @@ def build_season_sections(entries: List[Dict],
 # Every season game is played from its own random seed, so the exact same game can be replayed later (play by play,
 # box score, ratings, cards): order -> (home name, away name, seed), and team name -> a function that builds a fresh team.
 SEASON_REPLAY: Dict = {"games": {}, "makers": {}, "versions": {}}
+# Playoff and play-in games: both teams exactly as they took the floor (series adjustments, form, home court) plus the game's
+# random seed, keyed by "teamA|teamB|game" (series) or "playin|conference|slot|high|low". A replay rebuilds that state and plays it out the same way.
+PLAYOFF_REPLAY: Dict = {}
+
+
+def playoff_replay_capture(key: str, team_a, team_b):
+    """Snapshot the two teams and seed the game so it can be replayed exactly. Returns the key, or None if it could not be stored."""
+    seed = random.getrandbits(32)
+    try:
+        PLAYOFF_REPLAY[key] = (copy.deepcopy(team_a), copy.deepcopy(team_b), seed, PLAYOFF_MODE, SEASON_STAR_MINUTES_CAP)
+    except Exception:
+        PLAYOFF_REPLAY.pop(key, None)
+    random.seed(seed)
+    return key if key in PLAYOFF_REPLAY else None
+
+
+def playoff_replay_available(key) -> bool:
+    return bool(key) and key in PLAYOFF_REPLAY
+
+
+def build_playoff_replay_teams(key):
+    """(team_a, team_b, star minutes cap) for a stored playoff game, with the random state as it was at tip-off."""
+    global PLAYOFF_MODE
+    team_a, team_b, seed, playoff_mode, cap = PLAYOFF_REPLAY[key]
+    PLAYOFF_MODE = playoff_mode
+    team_a, team_b = copy.deepcopy(team_a), copy.deepcopy(team_b)
+    random.seed(seed)
+    return team_a, team_b, cap
 
 
 def order_games_in_rounds(games):

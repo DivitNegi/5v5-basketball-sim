@@ -821,7 +821,7 @@ function clearAllResults(msg, keepSeason = false) {
 }
 
 function resetGame(msg) {
-  if (msg.mode !== "Replay season game") clearAllResults(msg, msg.mode === "2027 play-in & playoffs");   // a replay must leave the finished season as it was
+  if (msg.mode !== "Replay season game" && msg.mode !== "Replay playoff game") clearAllResults(msg, msg.mode === "2027 play-in & playoffs");   // a replay must leave the finished season as it was
   const quietSeason = isSeasonMode(msg.mode) && msg.mode !== "2027 play-in & playoffs";
   $("#scoreboard").classList.toggle("hidden", quietSeason);
   $("#simSeries").classList.toggle("hidden", !["Playoff series", "2027 play-in & playoffs"].includes(msg.mode));
@@ -1348,7 +1348,8 @@ function renderSeriesDetail() {
   if (BR.view === "playin") {
     const pi = BR.data?.play_in, g = pi && BR.pi && pi[BR.pi[0]]?.[BR.pi[1]];
     if (!g || !g.boxes) { root.replaceChildren(); return; }
-    root.replaceChildren(h("div", { class: "series-detail" }, h("div", { class: "panel-head" }, h("h2", {}, `${identOf(g.a).short} vs ${identOf(g.b).short}`), h("span", { class: "muted" }, `${BR.pi[0]} play-in · ${BR.pi[1].replace("v", " vs ")}`)), bracketBoxTables(g.boxes)));
+    root.replaceChildren(h("div", { class: "series-detail" }, h("div", { class: "panel-head" }, h("h2", {}, `${identOf(g.a).short} vs ${identOf(g.b).short}`), h("span", { class: "muted" }, `${BR.pi[0]} play-in · ${BR.pi[1].replace("v", " vs ")}`),
+      g.replay ? h("button", { class: "btn", onclick: () => startSpecial("Replay playoff game", { key: g.replay }) }, "Replay this game") : null), bracketBoxTables(g.boxes)));
     return;
   }
   const key = BR.selected;
@@ -1363,7 +1364,9 @@ function renderSeriesDetail() {
       h("div", { class: `sg ${!BR.avg && BR.game === n ? "on" : ""}`, onclick: () => { BR.avg = false; BR.game = n; renderSeriesDetail(); } }, `G${n} `, h("b", {}, `${sa}-${sb}`), ` · ${identOf(home).initials}`)));
   const head = h("div", { class: "panel-head" }, h("h2", {}, `${A.short} vs ${B.short}`), h("span", { class: "muted" }, sr.winner ? `${identOf(sr.winner).short} won ${Math.max(sr.wins_a, sr.wins_b)}-${Math.min(sr.wins_a, sr.wins_b)}` : `${sr.wins_a}-${sr.wins_b}`));
   const boxes = sr.boxes?.[BR.game];
-  const body = BR.avg ? seriesAverages(sr) : boxes ? bracketBoxTables(boxes) : h("div", { class: "muted" }, "Pick a game for its box score, or Series averages for the whole series.");
+  const replayKey = !BR.avg && (sr.replay?.[BR.game] || sr.replay?.[String(BR.game)]);
+  const replayBtn = replayKey ? h("div", { class: "filters" }, h("button", { class: "btn", onclick: () => startSpecial("Replay playoff game", { key: replayKey }) }, `Replay Game ${BR.game}`)) : null;
+  const body = BR.avg ? seriesAverages(sr) : boxes ? h("div", {}, replayBtn, bracketBoxTables(boxes)) : h("div", { class: "muted" }, "Pick a game for its box score, or Series averages for the whole series.");
   root.replaceChildren(h("div", { class: "series-detail" }, head, games, body));
 }
 function renderBracket() {
