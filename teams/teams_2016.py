@@ -149,7 +149,7 @@ def make_thunder_2016() -> Team:
                0.39, 0.34, 0.68, 0.03, 0.21, 0.99,
                0.75, 0.75, 0.90, 0.93, 0.82,
                0.49, 0.98, 0.97,
-               0.76, 0.42, 0.52, 0.88, 0.99, 0.47,
+               0.76, 0.42, 0.52, 0.88, 0.74, 0.47,
                0.85, 0.55,
                stamina=0.85, height=76,iso_tendency=.90),
         Player("Andre Roberson", "SG",
@@ -235,7 +235,6 @@ def make_thunder_2016() -> Team:
             player.target_fga_precision = 0.85
             player.target_minutes = 34.4
             player.extra_pass_scale = 0.5
-            player.foul_draw = 0.74   # he was drawing 10.9 FTA a game (real 7.2); the extra trips cost him shots
     t = Team("2016 Oklahoma City Thunder", players)
     t.init_lineup()
     return t
