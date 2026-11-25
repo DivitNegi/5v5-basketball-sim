@@ -19516,8 +19516,9 @@ def immediate_catch_chance(passer: Player, base: float, slope: float = 0.44,
 
 
 FRONTCOURT_HUB_MIN = 0.60    # a PF/C passes out of the elbow/post only with playmaking above this (about 12% AST%)
-FRONTCOURT_HUB_MOVEMENT = 0.35   # how much of the usual extra-pass chance is left after a big's hub pass
-FRONTCOURT_HUB_RATE = 0.50   # chance per eligible possession that a 0.99 big gets the ball on the way to the shooter (scales down with playmaking)
+FRONTCOURT_HUB_MOVEMENT = 0.25   # how much of the usual extra-pass chance is left after a big's hub pass
+FRONTCOURT_HUB_QUALITY = 0.12   # open-look bonus on a clean catch off a 0.99 big's hub pass (scales with his passing)
+FRONTCOURT_HUB_RATE = 0.75   # chance per eligible possession that a 0.99 big gets the ball on the way to the shooter (scales down with playmaking)
 FRONTCOURT_HUB_LINES = (
     "{src} swings it to {hub} at the elbow.",
     "{src} enters it to {hub} at the high post.",
@@ -20867,6 +20868,9 @@ def _simulate_possession(off: Team, dff: Team,
             quick_shot_for_assist = random.random() < immediate_catch_chance(
                 hub, base=0.24, slope=0.44, lo=0.20, hi=0.78, bonus=0.08 if "post_hub" in hub.badges else 0.0,
             )
+            if quick_shot_for_assist:
+                # the big's read finds the open man: a cleaner look, like an extra-pass catch
+                shooter.shot_quality_mult = getattr(shooter, "shot_quality_mult", 1.0) * (1.0 + FRONTCOURT_HUB_QUALITY * playmaking_look_curve(hub.playmaking))
     if shooter is not handler:
         passer_for_entry = last_passer if last_passer and last_passer is not shooter else handler
         deep_paint_touch = is_non_shooting_big(shooter)
