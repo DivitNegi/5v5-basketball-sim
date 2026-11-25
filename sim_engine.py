@@ -16738,6 +16738,8 @@ def _assist_load_factor_core(player: Player, team: Team) -> float:
 
 
 def assist_distribution_multiplier(player: Player, team: Team) -> float:
+    if getattr(player, "assist_hub", False):
+        return 1.0   # a designated hub is meant to hold an outsized share of his team's assists (same exemption as assist_load_factor)
     team_assists = sum(p.ast for p in team.roster)
     if team_assists < 6:
         return 1.0
