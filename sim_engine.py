@@ -61,7 +61,18 @@ SLEEP = 1.2                    # base sleep between lines
 THREE_ATTEMPT_SCALE = 0.88     # global 3PA volume scaler
 DUNK_RATE_SCALE = 0.25       # lowers how often rim attempts become dunk attempts
 REBOUND_PUSH_SCALE = 0.36  # share of the old rebound-push chance that still runs
-HALF_COURT_POSSESSION_RANGE = (11, 22)  # seconds; was (11, 21) (season pace ran ~3 possessions a game fast), (12, 24) before transition volume was cut
+HALF_COURT_POSSESSION_RANGE = (11, 21)  # seconds; was (11, 22) (2025-26 ran ~3 shots a team short of the real pace), (11, 21) before that, (12, 24) before transition volume was cut
+# Real league pace (possessions per 48 minutes, Basketball-Reference) for the seasons with a full schedule. The half-court clock
+# above is set for 2025-26; a team from another of these seasons plays at its own season's real pace. Other years are unchanged.
+ERA_PACE = {2016: 95.8, 2018: 97.3, 2021: 99.2, 2022: 98.2, 2023: 99.1, 2026: 99.6, 2027: 99.6}
+ERA_PACE_REF = 99.6
+
+
+def era_pace_factor(team) -> float:
+    """Above 1 = a faster season than 2025-26 (shorter half-court possessions), below 1 = slower."""
+    name = getattr(team, "name", "") or ""
+    year = int(name[:4]) if name[:4].isdigit() else None
+    return ERA_PACE.get(year, ERA_PACE_REF) / ERA_PACE_REF
 TRANSITION_FLAGRANT_RATE = 0.06  # very rare: portion of transition fouls upgraded
 TRANSITION_TAKE_FOUL_RATE = 0.20  # portion of transition fouls called as take fouls
 PLAYOFF_MODE = False            # tighter rotations, more physicality
@@ -20564,7 +20575,7 @@ def _simulate_possession(off: Team, dff: Team,
     # Team pace works both ways: fast teams shorten the half-court possession,
     # slow ones (grind / post-hub styles) let more of the clock run.
     pace = getattr(getattr(off, "coach_style", {}), "get", lambda *_: 1.0)("pace", 1.0)
-    pace = max(0.90, min(1.12, pace))
+    pace = max(0.90, min(1.12, pace)) * era_pace_factor(off)
     if pace != 1.0:
         possession_time = max(10, min(24, int(round(possession_time / pace))))
 
@@ -26719,7 +26730,7 @@ SLUMP_EXIT_PCT = -0.04      # he is out of it once the window is back above -4%
 SLUMP_HOT_EXIT = 0.06       # or as soon as his recent games are falling 6% better than expected
 SLUMP_RATING = 0.03         # extra rating drop while slumping
 PROMOTE_MIN_GAMES = 15      # no lineup change for form before this many games
-PROMOTE_PERF_GAP = 2.2      # a bench player this much better (z + recent form) than a starter at his spot takes the start
+PROMOTE_PERF_GAP = 2.2      # a bench player this much better (last month + recent form vs his own norm) than a starter at his spot takes the start
 PROMOTE_RATING_GAP = 0.06   # but only if his rating is within this of the starter's (a deep-bench player does not start)
 SLUMP_MINUTES_CUT = 0.25    # share of his minutes a slumping player loses (they go to the player who took his spot)
 
@@ -26828,9 +26839,9 @@ def apply_season_form(team: Team):
         p.form_label = form_label(st)
     stars = team_top_options(team)   # a team's top two options always keep starting (a slump only costs them the rating drop)
 
-    def perf(x):   # how he has played this season: shot-making vs expected (z) plus his recent run
-        st = states.get(x.name) or {}
-        return st.get("z", 0.0) + 0.25 * st.get("roll", 0.0) if st.get("games", 0) >= PROMOTE_MIN_GAMES else None
+    def perf(x):   # how he has played lately against his own norm: last month (lpct) plus his recent run (roll = 16 * pct)
+        st = states.get(x.name) or {}   # not the season z, which grows with shot volume and buried high-volume starters
+        return 10.0 * st.get("lpct", 0.0) + 0.25 * st.get("roll", 0.0) if st.get("games", 0) >= PROMOTE_MIN_GAMES else None
 
     def value(x):  # what he is worth right now: his rating with the season's form on it, plus how he has played
         return overall_rating(x) * (1.0 + getattr(x, "season_form", 0.0)) + 0.02 * (perf(x) or 0.0)
