@@ -13746,12 +13746,20 @@ OPEN_FLOATER_RELATIVE_MAKE = 0.80
 RIM_PUTBACK_SHARE = 0.10
 
 
+FLOOR_GENERAL_MAKE = 0.006         # teammates' make chance per badge tier of the best floor general on the court (bronze 0.6% .. HOF 2.4%)
+FLOOR_GENERAL_CLEAN_LOOK = 0.025   # per tier: how much more often his pass turns into a clean catch-and-shoot
+
+
 def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
                    team: Team = None, opponent: Team = None,
                    period: int = 1, period_time: int = 720) -> float:
     p = _shot_make_prob_rolled(shooter, defender, shot_type, team, opponent, period, period_time)
     if team is not None and opponent is not None:
         p = max(0.0, min(0.97, p * (1.0 + score_effect(team, opponent, period))))   # big leads relax, big deficits push
+    if shooter is not None and team is not None:
+        general = max((badge_tier(q, "floor_general") for q in getattr(team, "on_floor", ()) if q is not shooter), default=0)
+        if general:
+            p = min(0.97, p * (1.0 + FLOOR_GENERAL_MAKE * general))   # a floor general on the court gets his teammates better looks
     if shooter is not None and getattr(shooter, "hot_start", False):
         p = min(0.97, p * HOT_HAND_MAKE)   # the hot hand: he started hot and is still rolling
     if shooter is not None:
@@ -17622,7 +17630,10 @@ def dribble_combo_action(shooter: Player, defender: Player, team: Team, opponent
     rim_pull = shooter.drive_tendency * shooter.rim_rating
     three_pull = three_attempt_tendency_curve(shooter.three_tendency) * shooter.three_rating
     mid_pull = shooter.mid_tendency * shooter.mid_rating
-    pass_pull = shooter.playmaking * max(0.0, 0.78 - shooter.shot_iq + 0.20)
+    # Shot IQ is shot selection: a smart player takes the good look and passes up the bad one; a low-IQ player forces it either way.
+    # The look: how well he beats his man off the dribble plus how good a shooter / finisher he is.
+    look = max(0.0, min(1.0, 0.55 + handle_edge * 1.5 + (max(shooter.three_rating, shooter.mid_rating, shooter.rim_rating) - 0.82) * 1.2))
+    pass_pull = shooter.playmaking * max(0.0, 0.22 + (0.55 - look) * (shooter.shot_iq - 0.55) * 2.2)
 
     three_weight = max(0.02, 0.12 + three_pull * 0.52 + shooter.shot_tendency * 0.16 + max(0.0, handle_edge) * 0.12)
     mid_weight = max(0.02, 0.12 + mid_pull * 0.50 + shooter.shot_tendency * 0.14 + max(0.0, handle_edge) * 0.10)
@@ -20771,6 +20782,7 @@ def _simulate_possession(off: Team, dff: Team,
                 + 0.04 * shooter.shot_tendency
                 + 0.62 * playmaking_look_curve(play_passer.playmaking if play_passer is not None else handler.playmaking)
                 + 0.10 * (0.8 * shooter.three_rating + 0.2 * shooter.shot_iq - 0.78)   # the teammate catching it: a better shooter turns more passes into clean looks
+                + FLOOR_GENERAL_CLEAN_LOOK * badge_tier(play_passer if play_passer is not None else handler, "floor_general")   # a floor general puts it on time and on target
             )
             if play_context in ("floppy", "elevator", "handoff"):
                 immediate_chance += 0.10
