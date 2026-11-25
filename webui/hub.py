@@ -31,11 +31,22 @@ class EventHub:
             if keep:
                 self._backlog.append(event)
                 del self._backlog[:-self._backlog_size]
+        critical = event.get("type") in ("status", "finished", "reset")
         for client in clients:
             try:
                 client.put_nowait(event)
             except queue.Full:
-                pass
+                if not critical:
+                    continue   # a slow page misses some play-by-play, never the start / end of a run
+                try:
+                    for _ in range(200):   # make room by dropping the oldest events
+                        client.get_nowait()
+                except queue.Empty:
+                    pass
+                try:
+                    client.put_nowait(event)
+                except queue.Full:
+                    pass
 
     def clear_backlog(self):
         with self._lock:

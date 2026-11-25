@@ -855,6 +855,15 @@ function resetGame(msg) {
   renderScoreboard(); renderCourt(); renderCompare(); renderFlow("#flowMini", 320);
 }
 
+// While the page thinks a sim is running, it re-checks the server every few seconds: a page that was in the background (or fell behind
+// a very fast sim) can miss the "finished" event and would otherwise stay stuck on "Running" with Tip off greyed out.
+setInterval(async () => {
+  if (!S.active) return;
+  try {
+    const st = await api.get("/api/state");
+    if (!st.active) { applyStatus({ text: st.status, active: false, paused: false, speed: st.speed, seasonSpeed: st.seasonSpeed }); scheduleStats(); scheduleSeasonRefresh(); }
+  } catch {}
+}, 4000);
 function connect() {
   const conn = $("#conn");
   const es = new EventSource("/api/events");
