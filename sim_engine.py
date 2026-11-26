@@ -5022,6 +5022,16 @@ def has_badge(player: Player, badge_name: str) -> bool:
     return badge_tier(player, badge_name) > 0
 
 
+# skill badges: how he plays (range, finishing, passing, defence, rebounding) -- these work all game long
+ALL_GAME_BADGES = frozenset({
+    "limitless_range", "floater_ace", "catch_shoot", "movement_shooter", "deadeye", "midrange_maestro", "post_maestro", "sniper", "stretch_big",
+    "tough_shot_maker", "acrobat", "posterizer", "lob_threat", "giant_slayer", "ankle_breaker", "shot_creator", "iso_scorer", "bully", "foul_magnet",
+    "charity_stripe", "floor_general", "post_hub", "transition_engine", "dimer", "connector", "hands_up", "post_wall", "verticality",
+    "paint_patroller", "perimeter_lock", "closeout_king", "lockdown", "rim_protector", "defensive_anchor", "interceptor", "pickpocket",
+    "unpluckable", "chasedown", "pest", "rebounder", "box_out", "putback_boss", "iron_man",
+})   # everything else (clutch, closer, elimination, ice veins, fourth quarter, comeback, big stage, heat check, volume scorer, ...) is clutch-only
+
+
 def badges_active() -> bool:
     """Badges only work in the clutch (last five minutes of the 4th quarter or overtime, score within five) unless BADGE_EFFECTS is on."""
     return BADGE_EFFECTS or in_clutch_window()
@@ -5029,13 +5039,13 @@ def badges_active() -> bool:
 
 def badge_on(player, badge_name: str) -> bool:
     """A badge that is changing how he plays right now (only in the clutch)."""
-    return badge_name in getattr(player, "badges", ()) and badges_active()
+    return badge_name in getattr(player, "badges", ()) and (badge_name in ALL_GAME_BADGES or badges_active())
 
 
 def badge_tier(player: Player, badge_name: str) -> int:
-    if not badges_active():
-        return 0   # outside the clutch no badge changes the game (they are still earned and shown)
     base_name, _ = badge_parts(badge_name)
+    if base_name not in ALL_GAME_BADGES and not badges_active():
+        return 0   # a situational badge only changes the game in the clutch (skill badges work all game)
     best = 0
     for badge in getattr(player, "badges", ()):
         base, level = badge_parts(badge)
