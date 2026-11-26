@@ -621,7 +621,7 @@ def make_bulls_2016() -> Team:
                0.21, 0.61, 0.77,
                0.51, 0.44, 0.50, 0.62, 0.86, 0.35,
                0.92, 0.62,
-               clutchness=0.45, height=78, speed=0.82, shot_iq=0.40, stamina=0.72),
+               clutchness=0.45, height=78, speed=0.82, shot_iq=0.80, stamina=0.72),
         Player('Pau Gasol', 'C',
                0.07, 0.49, 0.09, 0.34, 0.08, 0.29,
                0.43, 0.88, 0.83, 0.73, 0.78,

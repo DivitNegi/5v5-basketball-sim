@@ -1603,7 +1603,7 @@ def make_warriors_2027() -> Team:
                0.660, 0.400, 0.650, 0.530, 0.870, 0.533,
                0.860, 0.800,
                clutchness=0.450, secondary_positions=('PF',), height=78, speed=0.820,
-               shot_iq=0.400, badges=('clutch_gold', 'closer'), stamina=0.72),
+               shot_iq=0.800, badges=('clutch_gold', 'closer'), stamina=0.72),
        
         Player('Draymond Green', 'C',
                0.34, 0.16, 0.14, 0.10, 0.16, 0.20,

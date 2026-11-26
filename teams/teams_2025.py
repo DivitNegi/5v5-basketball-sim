@@ -1022,7 +1022,7 @@ def make_warriors_2025() -> Team:
                0.33, 0.82, 0.75,
                0.59, 0.45, 0.58, 0.63, 0.93, 0.70,
                0.83, 0.73,
-               clutchness=0.45, height=78, speed=0.82, shot_iq=0.40, stamina=0.80),
+               clutchness=0.45, height=78, speed=0.82, shot_iq=0.80, stamina=0.80),
         Player('Jonathan Kuminga', 'PF',
                0.48, 0.18, 0.21, 0.13, 0.27, 0.71,
                0.70, 0.79, 0.90, 0.90, 0.72,

@@ -4887,6 +4887,8 @@ def has_position_overlap(player: Player, positions: List[str]) -> bool:
     return any(pos in allowed for pos in player_positions(player))
 
 
+BADGE_EFFECTS = False   # False: badges only change a game in the clutch (last 5 minutes of the 4th / OT, score within 5); True: all game long
+
 BADGE_TIER_VALUE = {
     "bronze": 1,
     "silver": 2,
@@ -5020,7 +5022,19 @@ def has_badge(player: Player, badge_name: str) -> bool:
     return badge_tier(player, badge_name) > 0
 
 
+def badges_active() -> bool:
+    """Badges only work in the clutch (last five minutes of the 4th quarter or overtime, score within five) unless BADGE_EFFECTS is on."""
+    return BADGE_EFFECTS or in_clutch_window()
+
+
+def badge_on(player, badge_name: str) -> bool:
+    """A badge that is changing how he plays right now (only in the clutch)."""
+    return badge_name in getattr(player, "badges", ()) and badges_active()
+
+
 def badge_tier(player: Player, badge_name: str) -> int:
+    if not badges_active():
+        return 0   # outside the clutch no badge changes the game (they are still earned and shown)
     base_name, _ = badge_parts(badge_name)
     best = 0
     for badge in getattr(player, "badges", ()):
@@ -8723,7 +8737,7 @@ def defensive_matchup_score(defender: Player, offensive_player: Player) -> float
     else:
         score = 0.25 * effective_perimeter_def(defender) + 0.75 * effective_interior_def(defender)
 
-    if "lockdown" in defender.badges:
+    if badge_on(defender, "lockdown"):
         score += 0.05 * caution
     if defender.pf >= 4:
         score -= 0.06
@@ -13090,7 +13104,7 @@ OFF_SCREEN_SET_RE = re.compile(r"(pindown|_pin$|chase|relocate|_split$|floppy|cu
 
 
 def is_movement_shooter(p) -> bool:
-    return p is not None and ("movement_shooter" in getattr(p, "badges", ()) or (p.three_rating >= 0.88 and p.three_tendency >= 0.40))
+    return p is not None and (badge_on(p, "movement_shooter") or (p.three_rating >= 0.88 and p.three_tendency >= 0.40))
 
 
 def play_type_of(shot_type: str, context: str) -> str:
@@ -13616,7 +13630,7 @@ def rebound_position_multiplier(player: Player, miss_type: str, offensive: bool)
     height_mult = 0.86 + max(0, min(14, player.height - 72)) * 0.022
     if player.height <= 74 and rating < 0.45:
         height_mult *= 0.90
-    if "rebounder" in getattr(player, "badges", ()):
+    if badge_on(player, "rebounder"):
         height_mult *= 1.12
 
     return max(0.45, min(1.65, mult * height_mult))
@@ -13626,11 +13640,11 @@ def rebound_weight(player: Player, miss_type: str, offensive: bool) -> float:
     rating = player.oreb if offensive else player.dreb
     rating = max(0.02, rating)
     position_mult = rebound_position_multiplier(player, miss_type, offensive)
-    motor = 0.90 + player.speed * 0.08 + (0.025 if "rebounder" in getattr(player, "badges", ()) else 0.0)
+    motor = 0.90 + player.speed * 0.08 + (0.025 if badge_on(player, "rebounder") else 0.0)
     current_boards = player.oreb_stat if offensive else player.dreb_stat
     total_boards = max(0, player.reb)
     glass_share_damper = 1.0 / (1.0 + current_boards * 0.135 + max(0, total_boards - 6) * 0.080)
-    if "rebounder" in getattr(player, "badges", ()):
+    if badge_on(player, "rebounder"):
         glass_share_damper = max(glass_share_damper, 0.50)
     else:
         glass_share_damper = max(glass_share_damper, 0.40)
@@ -14665,7 +14679,7 @@ def player_perimeter_gravity(player: Player) -> float:
         gravity *= 0.42
     if player.three_rating >= 0.86 and player.three_tendency >= 0.36:
         gravity += 0.10
-    if "movement_shooter" in player.badges or "catch_shoot" in player.badges:
+    if badge_on(player, "movement_shooter") or badge_on(player, "catch_shoot"):
         gravity += 0.06
     if player.usage >= 0.30 and player.iso_tendency >= 0.78:
         gravity += 0.04
@@ -15238,7 +15252,7 @@ def shot_quality(shooter: Player, defender: Player, shot_type: str, period: int,
     handle_creation = max(0.0, shooter.ball_handle - 0.76)
     if shot_type in ("three", "mid", "post_fade"):
         creation += handle_creation * 0.30
-        if "shot_creator" in getattr(shooter, "badges", ()):
+        if badge_on(shooter, "shot_creator"):
             creation += handle_creation * 0.14
         if badge_tier(shooter, "ankle_breaker") > 0:
             creation += handle_creation * (0.08 + badge_tier(shooter, "ankle_breaker") * 0.025)
@@ -15295,13 +15309,13 @@ def signature_move_line(player: Player, shot_type: str, context: str | None = No
         "late_catch_shoot", "late_oreb_kickout"
     }
     if (
-        "movement_shooter" in player.badges
+        badge_on(player, "movement_shooter")
         and shot_type == "three"
         and context in offball_contexts
         and random.random() < 0.18
     ):
         return "sprints off a screen and catches in rhythm."
-    if "lob_threat" in player.badges and shot_type == "dunk" and random.random() < 0.18:
+    if badge_on(player, "lob_threat") and shot_type == "dunk" and random.random() < 0.18:
         return "loads up above the rim as the pass arrives."
     return None
 
@@ -16574,9 +16588,9 @@ def role_discipline_multiplier(player: Player) -> float:
 
     if player.shot_iq < 0.62 and player.fga >= 7 and player.usage < 0.24:
         mult *= max(0.46, 1.0 - (player.fga - 6) * 0.10)
-    if "movement_shooter" in player.badges and player.three_tendency >= 0.45:
+    if badge_on(player, "movement_shooter") and player.three_tendency >= 0.45:
         mult *= 1.08
-    if "iso_scorer" in player.badges and player.usage >= 0.28:
+    if badge_on(player, "iso_scorer") and player.usage >= 0.28:
         mult *= 1.06
     if player.usage < 0.18 and player.fga >= 9 and getattr(player, "hot_streak", 0) < 2:
         mult *= max(0.42, 1.0 - (player.fga - 8) * 0.12)
@@ -16753,7 +16767,7 @@ def real_play_type(off: Team, handler: Player) -> str:
     style_name = styles.get("offensive_style", "balanced")
     plan = getattr(off, "game_plan", {}).get("offense", "balanced")
     has_big_hub = any((can_play_position(p, "C") or can_play_position(p, "PF")) and p.playmaking >= 0.70 for p in off.on_floor)
-    has_movement = any("movement_shooter" in p.badges for p in off.on_floor)
+    has_movement = any(badge_on(p, "movement_shooter") for p in off.on_floor)
     iso_creation = isolation_creation_score(handler)
 
     plays = [
@@ -16875,7 +16889,7 @@ def player_by_name(on_floor: List[Player], names: Tuple[str, ...]) -> Player | N
 
 
 def playmaking_hub_score(player: Player) -> float:
-    badge_bonus = 0.08 if ("post_hub" in player.badges or "transition_engine" in player.badges) else 0.0
+    badge_bonus = 0.08 if (badge_on(player, "post_hub") or badge_on(player, "transition_engine")) else 0.0
     if player.name == "Rajon Rondo":
         badge_bonus += 0.14
     return (
@@ -17416,7 +17430,7 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
                         key=lambda p: p.playmaking, default=None)
         pool = [p for p in off.on_floor if p is not previous_handler and (p is not handler or relay is not None)]
         if play_type == "floppy":
-            options = designed_shooter_options([p for p in pool if p is not relay and (p.three_rating >= 0.82 or "movement_shooter" in p.badges)], current_shooter)
+            options = designed_shooter_options([p for p in pool if p is not relay and (p.three_rating >= 0.82 or badge_on(p, "movement_shooter"))], current_shooter)
             target = best_play_target(options, lambda p: p.three_rating + (0.06 if is_movement_shooter(p) else 0.0), current_shooter)
             passer = (relay or handler) if target is handler else handler
             if target is handler and relay is not None:
@@ -17598,12 +17612,12 @@ def hunt_mismatch(off: Team, dff: Team, matchups: Dict[Player, Player],
             continue
         if target_bonus == 0 and effective_perimeter_def(defender) >= 0.68 and effective_interior_def(defender) >= 0.55:
             continue
-        if "lockdown" in defender.badges and target_bonus == 0:
+        if badge_on(defender, "lockdown") and target_bonus == 0:
             continue
 
         weakness_bonus = max(0.0, 0.68 - defender_quality) * 1.45
         good_defender_penalty = max(0.0, defender_quality - 0.64) * 1.20
-        if "lockdown" in defender.badges:
+        if badge_on(defender, "lockdown"):
             good_defender_penalty += 0.25
 
         edge = (
@@ -17749,10 +17763,9 @@ def catch_shoot_receiver_factor(player: Player) -> float:
     if player.ball_handle >= 0.86 and player.playmaking >= 0.76:
         factor *= 0.58
 
-    badges = getattr(player, "badges", set())
-    if "movement_shooter" in badges:
+    if badge_on(player, "movement_shooter"):
         factor *= 1.34
-    if "catch_shoot" in badges:
+    if badge_on(player, "catch_shoot"):
         factor *= 1.46
 
     return max(0.06, min(1.50, factor))
@@ -17760,9 +17773,9 @@ def catch_shoot_receiver_factor(player: Player) -> float:
 
 def catch_shoot_badge_quality_bonus(player: Player) -> float:
     bonus = 0.0
-    if "catch_shoot" in getattr(player, "badges", ()):
+    if badge_on(player, "catch_shoot"):
         bonus += 0.065
-    if "movement_shooter" in getattr(player, "badges", ()):
+    if badge_on(player, "movement_shooter"):
         bonus += 0.030
     return bonus
 
@@ -17910,7 +17923,7 @@ def print_dribble_combo(shooter: Player, defender: Player, action: str):
 
 
 def shot_creator_contested_bonus(player: Player, quality_label: str, shot_type: str) -> float:
-    if "shot_creator" not in getattr(player, "badges", ()):
+    if not badge_on(player, "shot_creator"):
         return 0.0
     if shot_type not in ("three", "mid"):
         return 0.0
@@ -17920,7 +17933,7 @@ def shot_creator_contested_bonus(player: Player, quality_label: str, shot_type: 
 
 
 def posterizer_quality_bonus(player: Player, defender: Player) -> float:
-    if "posterizer" not in getattr(player, "badges", ()):
+    if not badge_on(player, "posterizer"):
         return 0.0
     size_or_power = max(0.0, player.dunk_rating - defender.interior_def)
     return 0.055 + player.dunk_tendency * 0.045 + size_or_power * 0.030
@@ -17928,7 +17941,7 @@ def posterizer_quality_bonus(player: Player, defender: Player) -> float:
 
 def effective_dunk_attempt_chance(player: Player) -> float:
     chance = player.dunk_tendency * DUNK_RATE_SCALE
-    if "posterizer" in getattr(player, "badges", ()):
+    if badge_on(player, "posterizer"):
         chance += 0.055 + max(0.0, player.dunk_rating - 0.82) * 0.065
     return max(0.0, min(0.78, chance))
 
@@ -17978,9 +17991,9 @@ def catch_shoot_creation_chance(passer: Player, shooter: Player, context: str) -
         chance += 0.10
     elif shooter.three_rating >= 0.76 and shooter.three_tendency > 0:
         chance += 0.06
-    if "catch_shoot" in shooter.badges:
+    if badge_on(shooter, "catch_shoot"):
         chance += 0.07
-    if "movement_shooter" in shooter.badges:
+    if badge_on(shooter, "movement_shooter"):
         chance += 0.035
     if pass_decision_playmaking(passer) < 0.60:
         chance *= 0.70
@@ -18116,7 +18129,7 @@ def maybe_low_man_help(off: Team, dff: Team, driver: Player, defender: Player,
         - helper.interior_def * 0.10
         - helper.block * 0.05
     )
-    if "transition_engine" in driver.badges or "post_hub" in driver.badges:
+    if badge_on(driver, "transition_engine") or badge_on(driver, "post_hub"):
         dump_chance += 0.08
 
     if random.random() < max(0.08, min(0.62, dump_chance)):
@@ -19764,7 +19777,7 @@ def _assist_credit_chance_core(passer: Player, shooter: Player, shot_type: str,
     base = 0.36 + passer.playmaking * 0.34
     if can_play_position(passer, "PG"):
         base += 0.09
-    if "post_hub" in passer.badges or "transition_engine" in passer.badges:
+    if badge_on(passer, "post_hub") or badge_on(passer, "transition_engine"):
         base += 0.08
     if pnr_result in ("roller", "popper", "alley_oop"):
         base += 0.24
@@ -20289,7 +20302,7 @@ def should_push_after_rebound(rebounder: Player, team: Team, miss_kind: str,
     chance = 0.13 + transition_skill * 0.22 + max(0.0, pace - 1.0) * 0.12
     if miss_kind == "jumper":
         chance += 0.11
-    if "transition_engine" in lead_handler.badges:
+    if badge_on(lead_handler, "transition_engine"):
         chance += 0.10
     # Teams were running off nearly every other defensive board (~13 pushes a
     # game); most rebounds are walked up, only the real outlet pushes run.
@@ -21048,7 +21061,7 @@ def _simulate_possession(off: Team, dff: Team,
             print(random.choice(FRONTCOURT_HUB_LINES).format(src=source.name, hub=hub.name))
             last_passer = hub
             quick_shot_for_assist = random.random() < immediate_catch_chance(
-                hub, base=0.24, slope=0.44, lo=0.20, hi=0.78, bonus=0.08 if "post_hub" in hub.badges else 0.0,
+                hub, base=0.24, slope=0.44, lo=0.20, hi=0.78, bonus=0.08 if badge_on(hub, "post_hub") else 0.0,
             )
             if quick_shot_for_assist:
                 # the big's read finds the open man: a cleaner look, like an extra-pass catch
@@ -21073,7 +21086,7 @@ def _simulate_possession(off: Team, dff: Team,
             # playmaking, same as every other quick-shot decision.
             paint_touch_chance = immediate_catch_chance(
                 passer_for_entry, base=0.22, slope=0.42, lo=0.15, hi=0.72,
-                bonus=0.08 if "post_hub" in passer_for_entry.badges else 0.0,
+                bonus=0.08 if badge_on(passer_for_entry, "post_hub") else 0.0,
             )
             quick_shot_for_assist = random.random() < paint_touch_chance
         elif not pass_already_narrated:
@@ -23936,7 +23949,7 @@ def fantasy_ovr_uncapped(player: Player) -> int:
         elif pl >= 78 and (mpt >= 84 or tpt >= 80):
             center_creator_bonus = 7.0
         raw += center_creator_bonus
-        if "post_hub" in getattr(player, "badges", ()):
+        if badge_on(player, "post_hub"):
             raw += 4
     elif player.position == "SG":
         raw = (
