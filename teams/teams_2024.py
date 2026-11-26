@@ -100,7 +100,7 @@ def make_celtics_2024() -> Team:
                0.88, 0.92, 0.95, 0.84, 0.84,
                0.30, 0.70, 0.88,
                0.63, 0.60, 0.34, 0.89, 0.500, 0.733,
-               0.87, 0.81, secondary_positions = "SF", stamina=0.87),
+               0.87, 0.81, secondary_positions = "SF", stamina=0.87, shot_iq=0.5),
 
         Player("Jaylen Brown", "SF",
                0.20, 0.30, 0.28, 0.08, 0.45, 0.880,
