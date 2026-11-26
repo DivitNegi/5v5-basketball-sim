@@ -3294,7 +3294,10 @@ function renderStatsInto(root, data, opts = {}) {
   }
   const rerender = () => renderStatsInto(root, data, opts);
   const LABEL_COLS = ["Opponent", "Play type", "To", "Top play"];   // text columns: never a "rank by" choice
-  const rankCols = cols.slice(2).filter((c) => !LABEL_COLS.includes(c));
+  const isPair = (i) => data.rows.some((r) => typeof r[i] === "string" && r[i].includes("·"));
+  const PAIR_MODES = ["attempts", "makes", "FG%"];
+  const rankCols = cols.slice(2).filter((c) => !LABEL_COLS.includes(c))
+    .flatMap((c) => (isPair(cols.indexOf(c)) ? PAIR_MODES.map((m) => `${c} · ${m}`) : [c]));
   const maxGp = Math.max(1, ...(data.gp || [1]));
   const controls = h("div", { class: "stx-controls" },
     h("label", {}, h("span", {}, "Find"), h("input", { type: "search", placeholder: "Player name", value: st.search, oninput: (e) => { st.search = e.target.value.toLowerCase(); const pos = e.target.selectionStart; rerender(); const i = $(`#${root.id} .stx-controls input[type=search]`); i.focus(); i.setSelectionRange(pos, pos); } })),
@@ -3304,9 +3307,18 @@ function renderStatsInto(root, data, opts = {}) {
     h("span", { class: "stx-hint" }, `${maxGp > 1 ? `${maxGp} games played · ` : ""}click a column to sort`));
   let items = data.rows.map((r, i) => ({ r, gp: data.gp?.[i] ?? maxGp }))
     .filter((x) => x.gp >= st.minGp && (!st.search || String(x.r[1]).toLowerCase().includes(st.search)));
-  const colIdx = st.sort.column >= 0 ? st.sort.column : (st.rank !== "Team order" ? cols.indexOf(st.rank) : -1);
+  const pairRank = st.sort.column < 0 && st.rank.match(/^(.*) · (attempts|makes|FG%)$/);
+  const colIdx = st.sort.column >= 0 ? st.sort.column : (st.rank !== "Team order" ? cols.indexOf(pairRank ? pairRank[1] : st.rank) : -1);
   const dirn = st.sort.column >= 0 ? st.sort.direction : -1;
-  const byCol = (a, b) => dirn * (numOf(a.r[colIdx]) - numOf(b.r[colIdx]));
+  // a "made/attempts · FG%" cell: rank by attempts, makes or FG% (FG% needs a real sample: 15% of the column's most attempts, at least 3)
+  const pairParts = (v) => { const m = String(v ?? "").match(/(\d+)\/(\d+)/); return m ? [Number(m[1]), Number(m[2])] : [0, 0]; };
+  const minAtt = pairRank ? Math.max(3, 0.15 * Math.max(0, ...items.map((x) => pairParts(x.r[colIdx])[1]))) : 0;
+  const valOf = (v) => {
+    if (!pairRank) return numOf(v);
+    const [m, a] = pairParts(v);
+    return pairRank[2] === "attempts" ? a : pairRank[2] === "makes" ? m : (a >= minAtt ? m / a : -1e9);
+  };
+  const byCol = (a, b) => dirn * (valOf(a.r[colIdx]) - valOf(b.r[colIdx]));
   // team groups sort by minutes when there are minutes, else by the table's main count (TOTAL, FGA, AST, Shots)
   const defaultCol = Math.max(2, ["MPG", "MIN", "TOTAL", "FGA", "AST", "Shots"].map((c) => cols.indexOf(c)).find((i) => i >= 0) ?? 2);
   const flat = st.flat || st.rank !== "Team order" || st.sort.column >= 0;

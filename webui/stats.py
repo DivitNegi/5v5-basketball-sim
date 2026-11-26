@@ -129,7 +129,7 @@ def analytics_table(kind, players, teams, team_filter, result):
     result["note"] = ANALYTICS[kind]
     cols = {
         "onoff": ["GP", "MIN", "ON ORtg", "ON DRtg", "ON NET", "OFF ORtg", "OFF DRtg", "OFF NET", "NET SWING", "+/-"],
-        "playtypes": [],   # just the players: every number is in his pop-up's Play types tab
+        "playtypes": ["Shots"] + PLAY_SHORT,   # made/attempts · FG% on each play type; the full breakdown is in his pop-up
         "clutch": ["GP", "MIN", "PTS", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "TS%", "AST", "TOV", "+/-"],
         "xfg": ["Shots", "xPTS", "PTS", "PTS vs exp", "per 100 shots", "xeFG%", "eFG%"],
         "assists": ["To", "AST", "Share%"],
@@ -137,7 +137,7 @@ def analytics_table(kind, players, teams, team_filter, result):
     result["columns"] = ["Team", "Player"] + cols
     # whole-number totals (not per-game averages): shown without a decimal
     result["open_tab"] = "playtypes" if kind == "playtypes" else None   # clicking a player opens his pop-up on this tab
-    result["counts"] = {"onoff": [], "playtypes": [], "xfg": ["Shots", "PTS"], "assists": ["AST"],
+    result["counts"] = {"onoff": [], "playtypes": ["Shots"], "xfg": ["Shots", "PTS"], "assists": ["AST"],
                         "clutch": ["PTS", "FG", "FGA", "3P", "3PA", "FT", "FTA", "AST", "TOV", "+/-"]}[kind]
     shots = lambda st: sum(v.get("fga", 0) for v in ((st.get("analytics") or {}).get("pt") or {}).values())
     for tn, pp in players.items():
@@ -170,8 +170,14 @@ def analytics_table(kind, players, teams, team_filter, result):
                 add([gp, r1(mins / max(1, gp)), r1(on_o), r1(on_d), r1(on_n), r1(off_o), r1(off_d), r1(off_n),
                      r1(on_n - off_n) if on_n is not None and off_n is not None else None, r1((st.get("plus_minus", 0) or 0) / max(1, gp))])
             elif kind == "playtypes":   # one row per player who took a shot; the detail is in his pop-up
-                if sum(v.get("fga", 0) for v in (a.get("pt") or {}).values()):
-                    add([])
+                ptd = _merged(st, "pt")
+                total = sum(v.get("fga", 0) for v in ptd.values())
+                if total:
+                    def pair(k):
+                        v = ptd.get(k) or {}
+                        m, a2 = v.get("fgm", 0), v.get("fga", 0)
+                        return f"{m}/{a2} · {100 * m / a2:.0f}%" if a2 else "0/0 · —"
+                    add([total] + [pair(k) for k, _ in PLAY_LABELS])
             elif kind == "clutch":
                 c = a.get("clutch") or {}
                 if not c.get("sec") and not c.get("fga") and not c.get("fta"):
