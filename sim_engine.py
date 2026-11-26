@@ -16717,15 +16717,15 @@ def real_play_type(off: Team, handler: Player) -> str:
         "floppy", "elevator", "backdoor", "drive_kick", "post_split", "iso"
     ]
     weights = [
-        (1.8 + handler.playmaking) * pnr_frequency * (1.0 + heliocentric * 0.18) * 1.35,
+        (1.8 + pass_decision_playmaking(handler)) * pnr_frequency * (1.0 + heliocentric * 0.18) * 1.35,
         (1.1 + handler.ball_handle) * pnr_frequency * (1.0 + heliocentric * 0.28) * 1.35,
-        (0.9 + handler.playmaking * 0.8) * pnr_frequency * 1.35,
+        (0.9 + pass_decision_playmaking(handler) * 0.8) * pnr_frequency * 1.35,
         (1.0 + (0.6 if has_big_hub else 0.0)) * ball_movement,
         (0.9 + (0.4 if has_big_hub else 0.0)) * ball_movement,
         (0.9 + (1.2 if has_movement or three_pref > 1.0 else 0.0) + (3.6 if has_movement else 0.0)) * ball_movement * three_pref,
         (0.75 + (1.2 if has_movement or three_pref > 1.0 else 0.0) + (2.8 if has_movement else 0.0)) * ball_movement * three_pref,
-        (0.55 + handler.playmaking * 0.7) * ball_movement,
-        (0.75 + handler.playmaking) * (0.85 + ball_movement * 0.25),
+        (0.55 + pass_decision_playmaking(handler) * 0.7) * ball_movement,
+        (0.75 + pass_decision_playmaking(handler)) * (0.85 + ball_movement * 0.25),
         (0.7 + (0.8 if has_big_hub else 0.0)) * (1.0 + max(0.0, ball_movement - 1.0) * 0.40),
         (0.20 + handler.usage * 0.55 + handler.iso_tendency * 1.55 + iso_creation * 1.35) * (0.55 + heliocentric * 0.70) * 0.80,
     ]
