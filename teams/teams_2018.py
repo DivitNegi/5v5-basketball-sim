@@ -209,7 +209,7 @@ def make_rockets_2018() -> Team:
                0.89, 0.84, 0.97, 0.85, 0.86,
                0.95, 0.86, 0.99,
                0.85, 0.63, 0.38, 0.65, 0.99, 0.933,
-               0.65, 0.55, shot_iq = 0.50, stamina=0.85, clutchness=0.60, iso_tendency=.99),
+               0.65, 0.55, shot_iq = 0.30, stamina=0.85, clutchness=0.60, iso_tendency=.99),
         Player("Chris Paul", "PG",
                0.70, 0.35, 0.20, 0.10, 0.05, 0.78,
                0.87, 0.88, 0.89, 0.70, 0.92,

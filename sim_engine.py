@@ -14208,8 +14208,9 @@ def _shot_make_prob_base(shooter: Player, defender: Player, shot_type: str,
         shot_iq_efficiency += 0.004 * (math.exp(8.0 * (shooter.shot_iq - 0.85)) - 1.0)
     if shot_type in ("three", "mid") and shooter.shot_iq < 0.72:
         shot_iq_efficiency -= (0.72 - shooter.shot_iq) * 0.30
-    if is_paint_shot(shot_type) and shooter.shot_iq < 0.62:
-        shot_iq_efficiency -= (0.62 - shooter.shot_iq) * 0.14
+    if is_paint_shot(shot_type) and shooter.shot_iq < 0.72:
+        # a low shot IQ is a bad finisher too: he forces drives into traffic and takes the contested layup instead of the open one
+        shot_iq_efficiency -= (0.72 - shooter.shot_iq) * 0.30
     if quality_mult < 0.96:
         shot_iq_efficiency -= max(0.0, 0.70 - shooter.shot_iq) * 0.14
     if shooter.usage >= 0.28 and shooter.shot_iq < 0.62:
