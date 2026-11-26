@@ -16295,13 +16295,25 @@ def true_primary_shot_creator(player: Player) -> bool:
     )
 
 
+VOLUME_STAR_PASS_DAMP = 1.0   # share of the playmaking above 0.70 a full volume star does not use when deciding to pass instead of shoot
+
+
+def pass_decision_playmaking(player: Player) -> float:
+    """The playmaking a player uses when deciding whether to give up the ball. For a true volume star (usage 0.32+ and shot tendency
+    0.80+) the part above 0.70 counts less, so an elite passer who is also his team's scorer (Luka, Harden, Trae) keeps his own looks.
+    How good his passes are and his assists still use his full playmaking; a low-playmaking scorer is not affected."""
+    pm = player.playmaking
+    strength = max(0.0, min(1.0, (player.usage - 0.32) / 0.10)) * max(0.0, min(1.0, (player.shot_tendency - 0.80) / 0.15))
+    return pm - strength * max(0.0, pm - 0.70) * VOLUME_STAR_PASS_DAMP
+
+
 def shooter_weight(player: Player) -> float:
     if player.shot_tendency <= 0:
         return 0.0
 
     usage_factor = max(0.03, player.usage ** 1.95)
     shot_intent = max(0.03, player.shot_tendency ** 1.60)
-    playmaking_drag = 1.0 - 0.30 * player.playmaking
+    playmaking_drag = 1.0 - 0.30 * pass_decision_playmaking(player)
     if player.usage >= 0.30 and player.shot_tendency >= 0.55:
         playmaking_drag = max(playmaking_drag, 0.86)
     elif player.shot_tendency >= 0.70:
@@ -17770,12 +17782,13 @@ def dribble_combo_action(shooter: Player, defender: Player, team: Team, opponent
     # Shot IQ is shot selection: a smart player takes the good look and passes up the bad one; a low-IQ player forces it either way.
     # The look: how well he beats his man off the dribble plus how good a shooter / finisher he is.
     look = max(0.0, min(1.0, 0.55 + handle_edge * 1.5 + (max(shooter.three_rating, shooter.mid_rating, shooter.rim_rating) - 0.82) * 1.2))
-    pass_pull = shooter.playmaking * max(0.0, 0.22 + (0.55 - look) * (shooter.shot_iq - 0.55) * 2.2)
+    pass_pm = pass_decision_playmaking(shooter)
+    pass_pull = pass_pm * max(0.0, 0.22 + (0.55 - look) * (shooter.shot_iq - 0.55) * 2.2)
 
     three_weight = max(0.02, 0.12 + three_pull * 0.52 + shooter.shot_tendency * 0.16 + max(0.0, handle_edge) * 0.12)
     mid_weight = max(0.02, 0.12 + mid_pull * 0.50 + shooter.shot_tendency * 0.14 + max(0.0, handle_edge) * 0.10)
     drive_weight = max(0.03, 0.16 + rim_pull * 0.50 + effective_speed(shooter) * 0.16 + max(0.0, handle_edge) * 0.12)
-    pass_weight = max(0.02, 0.08 + pass_pull * 0.28 + shooter.playmaking * 0.12)
+    pass_weight = max(0.02, 0.08 + pass_pull * 0.28 + pass_pm * 0.12)
 
     if play_context in ("iso", "mismatch_hunt"):
         three_weight *= 1.14
@@ -17910,9 +17923,9 @@ def find_double_team_kickout(off: Team, shooter: Player) -> Player:
 
 
 def catch_shoot_creation_chance(passer: Player, shooter: Player, context: str) -> float:
-    chance = 0.08 + passer.playmaking * 0.34 + passer.ball_handle * 0.08
+    chance = 0.08 + pass_decision_playmaking(passer) * 0.34 + passer.ball_handle * 0.08
     if context == "double":
-        chance += 0.12 + max(0.0, passer.playmaking - 0.78) * 0.55
+        chance += 0.12 + max(0.0, pass_decision_playmaking(passer) - 0.78) * 0.55
     elif context == "pnr":
         chance += 0.05
     elif context == "swing":
@@ -17925,10 +17938,10 @@ def catch_shoot_creation_chance(passer: Player, shooter: Player, context: str) -
         chance += 0.07
     if "movement_shooter" in shooter.badges:
         chance += 0.035
-    if passer.playmaking < 0.60:
+    if pass_decision_playmaking(passer) < 0.60:
         chance *= 0.70
     chance *= catch_shoot_receiver_factor(shooter)
-    cap = 0.88 if context == "double" and passer.playmaking >= 0.86 else 0.68
+    cap = 0.88 if context == "double" and pass_decision_playmaking(passer) >= 0.86 else 0.68
     return max(0.05, min(cap, chance))
 
 
@@ -18054,7 +18067,7 @@ def maybe_low_man_help(off: Team, dff: Team, driver: Player, defender: Player,
 
     dump_chance = (
         0.08
-        + driver.playmaking * 0.42
+        + pass_decision_playmaking(driver) * 0.42
         + driver.ball_handle * 0.12
         - helper.interior_def * 0.10
         - helper.block * 0.05
@@ -18180,7 +18193,7 @@ def maybe_pick_and_roll(off: Team, dff: Team,
         screener_has_size_mismatch = screener_size_edge_on_handler_def >= 4
         force_screener_touch = screener_has_size_mismatch and random.random() < min(
             0.60,
-            0.22 + handler.playmaking * 0.22 + screener_size_edge_on_handler_def * 0.025
+            0.22 + pass_decision_playmaking(handler) * 0.22 + screener_size_edge_on_handler_def * 0.025
         )
 
         if force_screener_touch and can_be_designed_shooter(screener) and has_shot_volume_left(screener):
@@ -18191,7 +18204,7 @@ def maybe_pick_and_roll(off: Team, dff: Team,
             print(f"{screener.name} seals the smaller defender after the switch, and {handler.name} feeds him.")
             lob_chance = min(
                 0.78,
-                0.08 + handler.playmaking * 0.42 + screener.dunk_tendency * 0.22 + screener_size_edge_on_handler_def * 0.025
+                0.08 + pass_decision_playmaking(handler) * 0.42 + screener.dunk_tendency * 0.22 + screener_size_edge_on_handler_def * 0.025
             )
             if random.random() < lob_chance:
                 print(f"{handler.name} {random.choice(alley_oop_passes)} {screener.name}.")
@@ -18216,7 +18229,7 @@ def maybe_pick_and_roll(off: Team, dff: Team,
 
         if can_be_designed_shooter(screener) and has_shot_volume_left(screener) and random.random() < screener.rim_rating * 0.22:
             print(f"{screener.name} slips behind the switch and rolls to the rim.")
-            lob_chance = min(0.65, 0.08 + handler.playmaking * 0.42 + screener.dunk_tendency * 0.22)
+            lob_chance = min(0.65, 0.08 + pass_decision_playmaking(handler) * 0.42 + screener.dunk_tendency * 0.22)
             if random.random() < lob_chance:
                 print(f"{handler.name} {random.choice(alley_oop_passes)} {screener.name}.")
                 time.sleep(SLEEP * 0.5)
@@ -18233,7 +18246,7 @@ def maybe_pick_and_roll(off: Team, dff: Team,
 
         height_mismatch = max(0, screener_size_edge_on_screener_def)
         # the handler keeps it about two thirds of the time (pull-up, turn the corner, kick out); the screener gets the rest
-        roll_chance = 0.18 + handler.playmaking * 0.14 + screener.rim_rating * 0.12 + height_mismatch * 0.02
+        roll_chance = 0.18 + pass_decision_playmaking(handler) * 0.14 + screener.rim_rating * 0.12 + height_mismatch * 0.02
         pop_chance = 0.06 + screener.three_tendency * 0.18 + screener.mid_tendency * 0.08
         if height_mismatch >= 4 and screener.three_tendency >= 0.18 and screener.three_rating >= 0.70:
             pop_chance += height_mismatch * 0.010
@@ -18259,7 +18272,7 @@ def maybe_pick_and_roll(off: Team, dff: Team,
             if not can_be_designed_shooter(screener) or not has_shot_volume_left(screener):
                 print(f"{handler.name} keeps it after the roll is covered.")
                 return handler, handler_def, screener, "handler"
-            lob_chance = min(0.70, 0.10 + handler.playmaking * 0.45 + screener.dunk_tendency * 0.25 - screener_def.interior_def * 0.12)
+            lob_chance = min(0.70, 0.10 + pass_decision_playmaking(handler) * 0.45 + screener.dunk_tendency * 0.25 - screener_def.interior_def * 0.12)
             if random.random() < lob_chance:
                 print(f"{handler.name} {random.choice(alley_oop_passes)} {screener.name}.")
                 time.sleep(SLEEP * 0.5)
@@ -19832,9 +19845,9 @@ def run_fastbreak(def_team: Team, off_team: Team, period: int, period_time: int,
     finisher = handler
     fastbreak_passer = None
     if source == "steal":
-        pass_ahead_chance = max(0.18, min(0.48, 0.42 - effective_speed(handler) * 0.20 + handler.playmaking * 0.16))
+        pass_ahead_chance = max(0.18, min(0.48, 0.42 - effective_speed(handler) * 0.20 + pass_decision_playmaking(handler) * 0.16))
     elif source == "rebound":
-        pass_ahead_chance = max(0.50, min(0.82, 0.58 + handler.playmaking * 0.18 - effective_speed(handler) * 0.06))
+        pass_ahead_chance = max(0.50, min(0.82, 0.58 + pass_decision_playmaking(handler) * 0.18 - effective_speed(handler) * 0.06))
     else:
         pass_ahead_chance = 0.54
 
@@ -20857,7 +20870,7 @@ def _simulate_possession(off: Team, dff: Team,
         # the possession and create their own attempt.
         pass_chance = (
             0.18
-            + 0.56 * handler.playmaking
+            + 0.56 * pass_decision_playmaking(handler)
             + 0.10 * handler.ball_handle
             + 0.10 * max(-0.30, min(0.40, ball_movement - 1.0))
         )
@@ -21050,31 +21063,31 @@ def _simulate_possession(off: Team, dff: Team,
         last_passer = passer_for_entry
         ball_owner = shooter
 
-    extra_pass_chance = (0.15 + 0.52 * shooter.playmaking) * ball_movement
+    extra_pass_chance = (0.15 + 0.52 * pass_decision_playmaking(shooter)) * ball_movement
     if shooter.usage >= 0.36 and shooter.shot_tendency >= 0.70:
         extra_pass_chance *= 0.26 if true_primary_shot_creator(shooter) else 0.42
     elif shooter.usage >= 0.30 and shooter.shot_tendency >= 0.55:
         extra_pass_chance *= 0.68
     if fourth_star_mode and shooter in rotation_star_players(off):
         if period_time <= 6 * 60 and abs(off.score - dff.score) <= 12:
-            extra_pass_chance *= 0.30 if shooter.playmaking < 0.88 else 0.52
+            extra_pass_chance *= 0.30 if pass_decision_playmaking(shooter) < 0.88 else 0.52
         else:
-            extra_pass_chance *= 0.55 if shooter.playmaking < 0.88 else 0.72
-    if shooter.playmaking < 0.55:
+            extra_pass_chance *= 0.55 if pass_decision_playmaking(shooter) < 0.88 else 0.72
+    if pass_decision_playmaking(shooter) < 0.55:
         extra_pass_chance *= 0.38
-    elif shooter.playmaking < 0.62:
+    elif pass_decision_playmaking(shooter) < 0.62:
         extra_pass_chance *= 0.58
-    elif shooter.playmaking >= 0.82:
+    elif pass_decision_playmaking(shooter) >= 0.82:
         extra_pass_chance *= 1.12
     if true_primary_shot_creator(shooter):
         extra_pass_chance *= max(0.42, 1.0 - max(0.0, shooter.iso_tendency - 0.50) * 0.74)
-    if shooter.usage >= 0.28 and shooter.playmaking < 0.80:
+    if shooter.usage >= 0.28 and pass_decision_playmaking(shooter) < 0.80:
         extra_pass_chance *= 0.88
     if shooter.name == "Kevin Durant":
         extra_pass_chance *= 0.60
     if star_takeover_lock:
         if shooter is closing_star:
-            extra_pass_chance = 0.04 if shooter.playmaking < 0.90 else 0.12
+            extra_pass_chance = 0.04 if pass_decision_playmaking(shooter) < 0.90 else 0.12
         else:
             extra_pass_chance *= 0.25
     if last_passer is not None and SYSTEM_PLAYMAKERS.get(off.name) == last_passer.name:
@@ -21165,11 +21178,11 @@ def _simulate_possession(off: Team, dff: Team,
             passer = shooter
             if passer.playmaking < 0.45 and random.random() < 0.48:
                 break
-            if passer.usage >= 0.30 and passer.playmaking < 0.82 and random.random() < 0.42:
+            if passer.usage >= 0.30 and pass_decision_playmaking(passer) < 0.82 and random.random() < 0.42:
                 break
 
             pass_chance = movement_base
-            if passer.playmaking >= 0.72:
+            if pass_decision_playmaking(passer) >= 0.72:
                 pass_chance += 0.12
             elif passer.playmaking < 0.55:
                 pass_chance -= 0.10
@@ -21553,7 +21566,7 @@ def _simulate_possession(off: Team, dff: Team,
         forced_iso_attempt = iso_mult < 0.95
 
         # Playmaking kick-out
-        kickout_chance = shooter.playmaking * 0.14
+        kickout_chance = pass_decision_playmaking(shooter) * 0.14
         if shooter.shot_iq >= 0.82 and iso_mult < 0.92:
             kickout_chance += 0.18
         if getattr(shooter, "keep_pace_shots", False) and paced_attempt_gap(shooter) > 1.0:
