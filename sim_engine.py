@@ -9199,7 +9199,7 @@ def normalize_minute_targets(team: Team, game_minutes: int = 240):
     if team_has_real_minutes(team):
         hard_cap = 44  # real rotations: a 36-37 mpg starter keeps his minutes
     for p in players:
-        p.target_minutes = max(2, min(hard_cap, int(round(p.target_minutes * factor))))
+        p.target_minutes = max(2, min(max(hard_cap, getattr(p, "_season_minutes_cap", 0) if SEASON_STAR_MINUTES_CAP else 0), int(round(p.target_minutes * factor))))
     # rounding / caps: settle the remainder on the big-minute players
     shortfall = game_minutes - sum(p.target_minutes for p in players)
     ranked = sorted(players, key=lambda pl: pl.target_minutes, reverse=True)
@@ -9208,7 +9208,7 @@ def normalize_minute_targets(team: Team, game_minutes: int = 240):
         step = 1 if shortfall > 0 else -1
         moved = False
         for pl in ranked:
-            if step > 0 and pl.target_minutes < hard_cap:
+            if step > 0 and pl.target_minutes < max(hard_cap, getattr(pl, "_season_minutes_cap", 0) if SEASON_STAR_MINUTES_CAP else 0):
                 pl.target_minutes += 1
                 shortfall -= 1
                 moved = True
@@ -9223,6 +9223,36 @@ def normalize_minute_targets(team: Team, game_minutes: int = 240):
             break
 
 
+_REAL_MINUTES = None
+
+
+def _fold_name(name: str) -> str:
+    import unicodedata
+    n = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode().lower()
+    return " ".join(n.replace(".", "").replace("'", "").split())
+
+
+def real_season_mpg(team_name: str, player_name: str):
+    """His real minutes per game that season (real_minutes.json, from Basketball-Reference), or None."""
+    global _REAL_MINUTES
+    if _REAL_MINUTES is None:
+        import json, os
+        try:
+            raw = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "real_minutes.json"), encoding="utf-8"))
+        except Exception:
+            raw = {}
+        _REAL_MINUTES = {t: {_fold_name(n): m for n, m in pp.items()} for t, pp in raw.items()}
+    return (_REAL_MINUTES.get(team_name) or {}).get(_fold_name(player_name))
+
+
+def season_minutes_cap(team: Team, player: Player, cap: int) -> int:
+    """The regular-season minutes cap for one player: the team cap, or his real minutes (up to 40) when he really averaged 36+."""
+    real = real_season_mpg(team.name, player.name) or getattr(player, "real_mpg_actual", None)
+    if real and real >= 35.5:
+        return max(cap, min(40, int(round(real))))
+    return cap
+
+
 def team_has_real_minutes(team: Team) -> bool:
     """Historical teams can carry each player's real per-game minutes (`real_mpg`) in their roster data."""
     return bool(team.roster) and all(getattr(p, "real_mpg", None) for p in team.roster)
@@ -9235,8 +9265,13 @@ def initialize_minute_targets(team: Team):
         if team_has_real_minutes(team):
             cap = 40  # a real 36-37 mpg starter keeps his real minutes
         for p in team.roster:
-            if getattr(p, "target_minutes", 0) > cap:
-                p.target_minutes = random.randint(max(30, cap - 2), cap)
+            p_cap = season_minutes_cap(team, p, cap)
+            p._season_minutes_cap = p_cap
+            real = real_season_mpg(team.name, p.name)
+            if real and real >= 35.5 and getattr(p, "target_minutes", 0) >= 26:
+                p.target_minutes = max(p.target_minutes, min(40, int(round(real))) - 1)   # a real 36+ mpg starter plays his real minutes
+            if getattr(p, "target_minutes", 0) > p_cap:
+                p.target_minutes = random.randint(max(30, p_cap - 2), p_cap)
     normalize_minute_targets(team)
     if team.name == "2018 Oklahoma City Thunder":
         exact_rotation = {
@@ -16298,6 +16333,11 @@ def true_primary_shot_creator(player: Player) -> bool:
 VOLUME_STAR_PASS_DAMP = 1.0   # share of the playmaking above 0.70 a full volume star does not use when deciding to pass instead of shoot
 
 
+def volume_star_strength(player: Player) -> float:
+    """0..1: how much of a true volume star he is (usage 0.32 -> 0.42 and shot tendency 0.80 -> 0.95)."""
+    return max(0.0, min(1.0, (player.usage - 0.32) / 0.10)) * max(0.0, min(1.0, (player.shot_tendency - 0.80) / 0.15))
+
+
 def pass_decision_playmaking(player: Player) -> float:
     """The playmaking a player uses when deciding whether to give up the ball. For a true volume star (usage 0.32+ and shot tendency
     0.80+) the part above 0.70 counts less, so an elite passer who is also his team's scorer (Luka, Harden, Trae) keeps his own looks.
@@ -16342,9 +16382,10 @@ def shooter_weight(player: Player) -> float:
         role_volume *= max(0.34, 1.0 - (player.fga - 15) * 0.12)
     elif player.name in ("Andrew Nembhard", "Bennedict Mathurin", "Aaron Nesmith", "Obi Toppin", "T.J. McConnell") and player.fga >= 13:
         role_volume *= max(0.44, 1.0 - (player.fga - 12) * 0.10)
-    elif player.fga >= getattr(player, "volume_damper_start", 14):
-        # the usual high-volume damper starts at 14 shots; a roster entry can move it later for a true 22-shot scorer (volume_damper_start)
-        role_volume *= max(0.62, 1.0 - (player.fga - (getattr(player, "volume_damper_start", 14) - 1)) * 0.06)
+    elif player.fga >= getattr(player, "volume_damper_start", 14 + 8 * volume_star_strength(player)):
+        # the usual high-volume damper starts at 14 shots; for a true volume star it starts later (up to 22), and a roster entry can move it too
+        start = getattr(player, "volume_damper_start", 14 + 8 * volume_star_strength(player))
+        role_volume *= max(0.62, 1.0 - (player.fga - (start - 1)) * 0.06)
 
     soft_cap = shot_volume_soft_cap(player)
     if getattr(player, "hot_start", False):   # a player who started hot gets the ball more and is readier to shoot it
