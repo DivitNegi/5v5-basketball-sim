@@ -104,6 +104,17 @@ const BADGE_INFO = {
   limitless_range: "Takes and makes threes from far beyond the line", catch_shoot: "Cashes open catch-and-shoot looks", ankle_breaker: "Shakes defenders loose off the dribble",
   posterizer: "Dunks through contact", clutch: "Better late in close games", closer: "Takes over late", lockdown: "Gets the toughest defensive assignment",
   rim_protector: "Protects the paint", chasedown: "Chase-down blocks in transition", lob_threat: "Finishes lobs",
+  sniper: "Wide-open threes go in more", tough_shot_maker: "Heavily contested jumpers go in more",
+  volume_scorer: "Every shot goes in more once he has 12+ attempts in the game", heat_check: "Threes go in more after he makes his last two shots",
+  fourth_quarter: "Every shot goes in more in the fourth quarter and overtime", comeback: "Every shot goes in more while his team trails by 8+",
+  fast_starter: "Every shot goes in more in the first quarter", giant_slayer: "Layups and dunks over a defender 4+ inches taller go in more",
+  sparkplug: "Every shot goes in more when he comes off the bench", big_stage: "Every shot goes in more in playoff games",
+  stretch_big: "Threes by a power forward or center go in more", floater_ace: "Floaters and runners in the lane go in more",
+  paint_patroller: "Layups and dunks go in less while he is on the floor as the help defender",
+  perimeter_lock: "Guards and wings he defends finish worse on drives", closeout_king: "Wide-open threes against him go in less (he closes out late)",
+  charity_stripe: "Every free throw goes in more", pickpocket: "Strips the dribbler more often", box_out: "Wins more defensive rebounds",
+  putback_boss: "Wins more offensive rebounds", iron_man: "Feels much less fatigue late in games and long stints",
+  foul_magnet: "Draws more shooting fouls on jumpers", dimer: "Passes that lead to a shot after a move still count as his assist more often",
 };
 const TIER_ORDER = { bronze: 1, silver: 2, gold: 3, plat: 4, platinum: 4, hof: 4 };
 function badgeList(values) {

@@ -5213,6 +5213,47 @@ BADGE_LEGENDS.update({
 })
 
 
+def assign_specific_badges(p: "Player"):
+    """The situational badges, each earned from the ratings behind that skill."""
+    pos = (p.position or "").upper()
+    lvl = badge_level_from_rating
+    jumper = max(p.three_rating, p.mid_rating)
+    rules = (
+        ("sniper", lvl(p.three_rating, 0.90, 0.93, 0.96, 0.985), p.three_tendency >= 0.40),
+        ("tough_shot_maker", lvl(0.6 * jumper + 0.4 * p.ball_handle, 0.85, 0.89, 0.93, 0.97), p.usage >= 0.26 and jumper >= 0.85),
+        ("volume_scorer", lvl(p.usage, 0.36, 0.42, 0.48, 0.56), p.shot_tendency >= 0.65),
+        ("heat_check", lvl(0.5 * p.three_rating + 0.5 * p.clutchness, 0.82, 0.86, 0.90, 0.94), p.three_rating >= 0.84 and p.three_tendency >= 0.35),
+        ("fourth_quarter", lvl(p.clutchness, 0.78, 0.84, 0.90, 0.95), p.usage >= 0.24),
+        ("comeback", lvl(0.5 * p.clutchness + 0.5 * p.shot_iq, 0.74, 0.80, 0.86, 0.92), p.usage >= 0.20),
+        ("fast_starter", lvl(0.6 * max(p.three_rating, p.mid_rating, p.rim_rating) + 0.4 * min(1.0, p.usage / 0.34), 0.90, 0.93, 0.96, 0.985), p.shot_tendency >= 0.60 and p.usage >= 0.26),
+        ("giant_slayer", lvl(p.rim_rating, 0.85, 0.89, 0.93, 0.97), (p.height or 78) <= 76 and p.drive_tendency >= 0.25),
+        ("big_stage", lvl(p.clutchness, 0.85, 0.89, 0.93, 0.97), p.usage >= 0.22),
+        ("stretch_big", lvl(p.three_rating, 0.84, 0.88, 0.92, 0.96), pos in ("PF", "C") and p.three_tendency >= 0.30),
+        ("floater_ace", lvl(0.5 * p.rim_rating + 0.5 * p.ball_handle, 0.82, 0.86, 0.90, 0.94), (p.height or 78) <= 78 and p.rim_rating >= 0.82 and p.ball_handle >= 0.80),
+        ("paint_patroller", lvl(0.5 * p.interior_def + 0.5 * p.block, 0.72, 0.80, 0.88, 0.95), p.interior_def >= 0.80 and p.block >= 0.55),
+        ("perimeter_lock", lvl(p.perimeter_def, 0.86, 0.89, 0.92, 0.96), p.speed >= 0.72),
+        ("closeout_king", lvl(0.5 * p.perimeter_def + 0.5 * p.speed, 0.78, 0.83, 0.88, 0.93), p.perimeter_def >= 0.78 and (p.height or 78) >= 77),
+        ("charity_stripe", lvl(p.ft_rating, 0.85, 0.89, 0.92, 0.95), True),
+        ("pickpocket", lvl(p.steal, 0.80, 0.86, 0.91, 0.96), pos != "C"),
+        ("box_out", lvl(p.dreb, 0.84, 0.89, 0.94, 0.98), (p.height or 78) >= 79),
+        ("putback_boss", lvl(p.oreb, 0.80, 0.86, 0.92, 0.97), True),
+        ("iron_man", lvl(p.stamina, 0.85, 0.88, 0.91, 0.94), True),
+        ("foul_magnet", lvl(p.foul_draw, 0.85, 0.89, 0.93, 0.97), p.three_tendency + p.mid_tendency >= 0.40),
+        ("dimer", lvl(p.playmaking, 0.88, 0.92, 0.95, 0.98), True),
+    )
+    for name, level, ok in rules:
+        if level and ok:
+            add_badge(p, name, level)
+
+
+def assign_role_badges(team: "Team"):
+    """Badges that depend on his role on the team: Sparkplug for a scoring bench player (not one of the first five)."""
+    for i, p in enumerate(team.roster):
+        level = badge_level_from_rating(p.usage, 0.24, 0.28, 0.32, 0.36)
+        if i >= 5 and level and p.shot_tendency >= 0.50:
+            add_badge(p, "sparkplug", level)
+
+
 def assign_newer_badges(p: "Player"):
     jumper = max(p.three_rating, p.mid_rating)
     dead = badge_level_from_rating(0.55 * jumper + 0.25 * p.clutchness + 0.20 * p.shot_iq, 0.86, 0.89, 0.92, 0.95)
@@ -5245,6 +5286,7 @@ def assign_newer_badges(p: "Player"):
     vert = badge_level_from_rating(0.6 * p.block + 0.4 * p.interior_def, 0.78, 0.85, 0.91, 0.96)
     if vert and p.height >= 80:
         add_badge(p, "verticality", vert)
+    assign_specific_badges(p)
     for badge, names in BADGE_LEGENDS.items():
         if p.name in names:
             add_badge(p, badge, names[p.name])
@@ -5389,6 +5431,7 @@ def assign_player_badges(team: Team):
         if badge_tier(p, "chasedown") == 0 and p.block >= 0.42 and p.speed >= 0.72:
             tier = "gold" if p.block >= 0.64 and p.speed >= 0.80 else "silver" if p.block >= 0.52 else "bronze"
             add_badge(p, "chasedown", tier)
+    assign_role_badges(team)
 
 
 def infer_coach_style(team: Team):
@@ -8623,6 +8666,7 @@ def fatigue_factor(player: Player) -> float:
     else:
         base = max(0.94, 0.976 - (minutes - 42) * 0.006)
     drag = (1.0 - base + stint_drag) * stamina_fatigue_multiplier(player)
+    drag *= 1.0 - IRON_MAN_CUT.get(badge_tier(player, "iron_man"), 0.0)
     return max(0.85, 1.0 - drag)
 
 
@@ -8639,6 +8683,7 @@ def fatigue_offense_factor(player: Player) -> float:
     else:
         base = max(0.94, 0.976 - (minutes - 44) * 0.006)
     drag = (1.0 - base + stint_drag) * stamina_fatigue_multiplier(player)
+    drag *= 1.0 - IRON_MAN_CUT.get(badge_tier(player, "iron_man"), 0.0)
     return max(0.85, 1.0 - drag)
 
 
@@ -10644,6 +10689,7 @@ def effective_ft_rating(player: Player, team: Team, opponent: Team,
         rating *= 1.0 + (player.clutchness - 0.60) * 0.05 + badge_tier(player, "clutch") * 0.024
     if period >= 4 and period_time <= 5 * 60 and abs(team.score - opponent.score) <= 8:
         rating *= 1.0 + ICE_VEINS_BONUS.get(badge_tier(player, "ice_veins"), 0.0)
+    rating *= 1.0 + CHARITY_STRIPE_BONUS.get(badge_tier(player, "charity_stripe"), 0.0)
     return max(0.35, min(0.97, rating))
 
 
@@ -13493,6 +13539,7 @@ def attempt_on_ball_steal(handler: Player, defender: Player) -> bool:
     p = base * norm_steal / (0.5 + 0.5 * ball_sec) * risk
     p *= max(0.75, 1.0 - max(0.0, (defender.minutes / 60 - 36) * 0.006))
     p *= 1.0 + 0.5 * INTERCEPTOR_BONUS.get(badge_tier(defender, "interceptor"), 0.0)
+    p *= 1.0 + PICKPOCKET_BONUS.get(badge_tier(defender, "pickpocket"), 0.0)
     p *= 1.0 - UNPLUCKABLE_CUT.get(badge_tier(handler, "unpluckable"), 0.0)
     return random.random() < p
 
@@ -13553,7 +13600,8 @@ def rebound_weight(player: Player, miss_type: str, offensive: bool) -> float:
     else:
         glass_share_damper = max(glass_share_damper, 0.40)
     rating_weight = max(0.001, (rating + 0.10) ** 1.62)
-    return max(0.001, rating_weight * position_mult * motor * glass_share_damper)
+    glass = 1.0 + (PUTBACK_BOSS_BONUS.get(badge_tier(player, "putback_boss"), 0.0) if offensive else BOX_OUT_BONUS.get(badge_tier(player, "box_out"), 0.0))
+    return max(0.001, rating_weight * position_mult * motor * glass_share_damper * glass)
 
 
 def choose_rebounder(off: Team, dff: Team, miss_type: str) -> Tuple[Team, Player]:
@@ -13774,6 +13822,8 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
         general = max((badge_tier(q, "floor_general") for q in getattr(team, "on_floor", ()) if q is not shooter), default=0)
         if general:
             p = min(0.97, p * (1.0 + FLOOR_GENERAL_MAKE * general))   # a floor general on the court gets his teammates better looks
+    if shooter is not None:
+        p = max(0.0, min(0.97, p * specific_badge_shot_multiplier(shooter, defender, shot_type, team, opponent, period)))
     if shooter is not None and getattr(shooter, "hot_start", False):
         p = min(0.97, p * HOT_HAND_MAKE)   # the hot hand: he started hot and is still rolling
     if shooter is not None:
@@ -13805,6 +13855,8 @@ def _shot_make_prob_rolled(shooter: Player, defender: Player, shot_type: str,
     float_p = min(close_p, (p - (1 - share) * close_p) / share) if share > 0 else 0.0
     p = float_p if tok == "rim_float" else close_p
     p *= acrobat_finish_multiplier(shooter, defender, tok)
+    if tok == "rim_float":
+        p *= 1.0 + FLOATER_ACE_BONUS.get(badge_tier(shooter, "floater_ace"), 0.0)
     return max(0.0, min(0.97, p))
 
 
@@ -13820,6 +13872,73 @@ HANDS_UP_CUT = {1: 0.03, 2: 0.05, 3: 0.075, 4: 0.10}          # jumpers he conte
 POST_WALL_CUT = {1: 0.035, 2: 0.06, 3: 0.085, 4: 0.115}       # post-ups against him go in less (answers Post Maestro)
 VERTICALITY_CUT = {1: 0.025, 2: 0.04, 3: 0.06, 4: 0.08}       # layups at him go in less, and he is called for fewer fouls going straight up (answers Acrobat / Bully)
 VERTICALITY_FOUL_CUT = {1: 0.10, 2: 0.17, 3: 0.24, 4: 0.32}
+
+
+# ---- specific badges (each one boost in one situation), by tier bronze / silver / gold / HOF
+SNIPER_BONUS = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.10}            # wide-open threes
+TOUGH_SHOT_BONUS = {1: 0.04, 2: 0.06, 3: 0.08, 4: 0.11}        # heavily contested jumpers
+VOLUME_SCORER_BONUS = {1: 0.02, 2: 0.035, 3: 0.05, 4: 0.07}    # every shot once he has 12+ attempts in the game
+HEAT_CHECK_BONUS = {1: 0.04, 2: 0.06, 3: 0.08, 4: 0.11}        # threes after making his last two shots
+FOURTH_QUARTER_BONUS = {1: 0.025, 2: 0.04, 3: 0.055, 4: 0.075}  # every shot in the fourth quarter and overtime
+COMEBACK_BONUS = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.09}          # every shot while his team trails by 8+
+FAST_STARTER_BONUS = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.09}      # every shot in the first quarter
+GIANT_SLAYER_BONUS = {1: 0.05, 2: 0.08, 3: 0.11, 4: 0.15}      # layups and dunks over a defender 4+ inches taller
+SPARKPLUG_BONUS = {1: 0.025, 2: 0.04, 3: 0.055, 4: 0.075}      # every shot when he came off the bench
+BIG_STAGE_BONUS = {1: 0.02, 2: 0.03, 3: 0.045, 4: 0.06}        # every shot in a playoff game
+STRETCH_BIG_BONUS = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.10}       # threes by a power forward or center
+FLOATER_ACE_BONUS = {1: 0.05, 2: 0.08, 3: 0.11, 4: 0.15}       # floaters and runners in the lane
+PAINT_PATROLLER_CUT = {1: 0.02, 2: 0.03, 3: 0.04, 4: 0.055}    # layups and dunks go in less while he is on the floor helping (not his own man)
+PERIMETER_LOCK_CUT = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.09}      # guards and wings he defends finish worse on drives
+CLOSEOUT_KING_CUT = {1: 0.03, 2: 0.045, 3: 0.06, 4: 0.08}      # wide-open threes against him go in less (he closes out late)
+CHARITY_STRIPE_BONUS = {1: 0.02, 2: 0.035, 3: 0.05, 4: 0.07}   # every free throw
+PICKPOCKET_BONUS = {1: 0.15, 2: 0.27, 3: 0.40, 4: 0.55}        # more on-ball strips of the dribbler
+BOX_OUT_BONUS = {1: 0.06, 2: 0.10, 3: 0.15, 4: 0.20}           # wins more defensive rebounds
+PUTBACK_BOSS_BONUS = {1: 0.06, 2: 0.10, 3: 0.15, 4: 0.20}      # wins more offensive rebounds
+IRON_MAN_CUT = {1: 0.25, 2: 0.40, 3: 0.55, 4: 0.70}            # share of the usual fatigue drag he does not feel
+FOUL_MAGNET_BONUS = {1: 0.15, 2: 0.25, 3: 0.35, 4: 0.50}       # draws more shooting fouls on jumpers
+DIMER_BONUS = {1: 0.08, 2: 0.13, 3: 0.18, 4: 0.25}             # passes that lead to a shot after a move still count as his assist more often
+
+
+def specific_badge_shot_multiplier(shooter: Player, defender: Player, shot_type: str, team: Team = None, opponent: Team = None, period: int = 1) -> float:
+    """The situational shooting badges (Sniper, Tough Shot Maker, Heat Check, Giant Slayer, ...) and the defensive ones that answer them."""
+    if shooter is None:
+        return 1.0
+    q = getattr(shooter, "shot_quality_mult", 1.0)
+    jumper = shot_type in ("three", "mid", "post_fade")
+    inside = shot_type in ("rim", "dunk")
+    one_on_one = team is not None and len(getattr(team, "on_floor", ()) or ()) <= 1   # no quarters, no bench, no playoffs in 1-on-1
+    mult = 1.0
+    if shot_type == "three" and q >= 1.08:
+        mult *= 1.0 + SNIPER_BONUS.get(badge_tier(shooter, "sniper"), 0.0)
+    if jumper and q < 0.90:
+        mult *= 1.0 + TOUGH_SHOT_BONUS.get(badge_tier(shooter, "tough_shot_maker"), 0.0)
+    if (shooter.fga or 0) >= 12:
+        mult *= 1.0 + VOLUME_SCORER_BONUS.get(badge_tier(shooter, "volume_scorer"), 0.0)
+    if shot_type == "three" and getattr(shooter, "hot_streak", 0) >= 2:
+        mult *= 1.0 + HEAT_CHECK_BONUS.get(badge_tier(shooter, "heat_check"), 0.0)
+    if not one_on_one and period >= 4:
+        mult *= 1.0 + FOURTH_QUARTER_BONUS.get(badge_tier(shooter, "fourth_quarter"), 0.0)
+    if not one_on_one and period == 1:
+        mult *= 1.0 + FAST_STARTER_BONUS.get(badge_tier(shooter, "fast_starter"), 0.0)
+    if team is not None and opponent is not None and opponent.score - team.score >= 8:
+        mult *= 1.0 + COMEBACK_BONUS.get(badge_tier(shooter, "comeback"), 0.0)
+    if inside and defender is not None and (getattr(defender, "height", 78) or 78) - (getattr(shooter, "height", 78) or 78) >= 4:
+        mult *= 1.0 + GIANT_SLAYER_BONUS.get(badge_tier(shooter, "giant_slayer"), 0.0)
+    if not one_on_one and not getattr(shooter, "started_game", True):
+        mult *= 1.0 + SPARKPLUG_BONUS.get(badge_tier(shooter, "sparkplug"), 0.0)
+    if not one_on_one and team is not None and getattr(team, "series_wins", None) is not None:
+        mult *= 1.0 + BIG_STAGE_BONUS.get(badge_tier(shooter, "big_stage"), 0.0)
+    if shot_type == "three" and (shooter.position or "").upper() in ("PF", "C"):
+        mult *= 1.0 + STRETCH_BIG_BONUS.get(badge_tier(shooter, "stretch_big"), 0.0)
+    if defender is not None:
+        if inside and (shooter.position or "").upper() in ("PG", "SG", "SF"):
+            mult *= 1.0 - PERIMETER_LOCK_CUT.get(badge_tier(defender, "perimeter_lock"), 0.0)
+        if shot_type == "three" and q >= 1.08:
+            mult *= 1.0 - CLOSEOUT_KING_CUT.get(badge_tier(defender, "closeout_king"), 0.0)
+    if inside and opponent is not None:
+        helper = max((badge_tier(d, "paint_patroller") for d in getattr(opponent, "on_floor", ()) if d is not defender), default=0)
+        mult *= 1.0 - PAINT_PATROLLER_CUT.get(helper, 0.0)
+    return mult
 
 
 def badge_shot_multiplier(shooter: Player, shot_type: str, defender: Player = None) -> float:
@@ -13840,6 +13959,8 @@ def badge_shot_multiplier(shooter: Player, shot_type: str, defender: Player = No
 
 
 def bully_foul_multiplier(shooter: Player, shot_type: str, defender: Player = None) -> float:
+    if shooter is not None and shot_type in ("three", "mid", "post_fade"):
+        return 1.0 + FOUL_MAGNET_BONUS.get(badge_tier(shooter, "foul_magnet"), 0.0)   # sells the contact on jumpers
     if shooter is None or shot_type not in ("rim", "dunk", "post"):
         return 1.0
     mult = 1.0 + BULLY_FOUL_BONUS.get(badge_tier(shooter, "bully"), 0.0)
@@ -19562,7 +19683,8 @@ def assist_credit_chance(passer: Player, shooter: Player, shot_type: str,
     chance = _assist_credit_chance_core(passer, shooter, shot_type, pnr_result, quick_shot)
     if quick_shot:
         return chance
-    chance = min(0.97, chance * ASSIST_CREDIT_SCALE * ASSIST_VOLUME_BOOST * receiver_assist_factor(shooter, shot_type))
+    chance = min(0.97, chance * ASSIST_CREDIT_SCALE * ASSIST_VOLUME_BOOST * receiver_assist_factor(shooter, shot_type)
+                 * (1.0 + DIMER_BONUS.get(badge_tier(passer, "dimer"), 0.0)))
     if passer.playmaking < 0.75:
         # below 0.75 a player only turns a few passes a game into assists: his credit tapers off the same way his direct looks do
         chance *= 0.35 + 0.65 * (playmaking_look_curve(passer.playmaking) / 0.55)
