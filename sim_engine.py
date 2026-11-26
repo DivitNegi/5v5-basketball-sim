@@ -2138,7 +2138,7 @@ def three_location(shooter) -> str:
     # Limitless Range: a share of his ordinary threes come from well behind the line (27-33 ft) -- real logo shooters (Curry, Lillard, Trae)
     # take a quarter to a third of their threes from 28+ ft, a typical player ~5%. Location only: his 3P% is already calibrated to his real
     # mix, which includes those deep looks.
-    deep_p = LIMITLESS_DEEP_SHARE.get(limitless_range_tier(shooter), 0.0)
+    deep_p = LIMITLESS_DEEP_SHARE.get(badge_style_tier(shooter, "limitless_range"), 0.0)
     badges = tuple(getattr(shooter, "badges", ()) or ())
     archetype = str(getattr(shooter, "archetype", "") or "").lower()
     spot = 0.0
@@ -5022,14 +5022,22 @@ def has_badge(player: Player, badge_name: str) -> bool:
     return badge_tier(player, badge_name) > 0
 
 
-# skill badges: how he plays (range, finishing, passing, defence, rebounding) -- these work all game long
-ALL_GAME_BADGES = frozenset({
-    "limitless_range", "floater_ace", "catch_shoot", "movement_shooter", "deadeye", "midrange_maestro", "post_maestro", "sniper", "stretch_big",
-    "tough_shot_maker", "acrobat", "posterizer", "lob_threat", "giant_slayer", "ankle_breaker", "shot_creator", "iso_scorer", "bully", "foul_magnet",
-    "charity_stripe", "floor_general", "post_hub", "transition_engine", "dimer", "connector", "hands_up", "post_wall", "verticality",
-    "paint_patroller", "perimeter_lock", "closeout_king", "lockdown", "rim_protector", "defensive_anchor", "interceptor", "pickpocket",
-    "unpluckable", "chasedown", "pest", "rebounder", "box_out", "putback_boss", "iron_man",
-})   # everything else (clutch, closer, elimination, ice veins, fourth quarter, comeback, big stage, heat check, volume scorer, ...) is clutch-only
+# style badges: where and how he looks for his shot. All game long they only change his shot selection (more floaters, more catch-and-shoot
+# looks, more deep threes, ...); like every badge, their make-chance boosts happen only in the clutch.
+def badge_style(player, badge_name: str) -> bool:
+    """He has this badge (for shot selection: always, clutch or not)."""
+    return badge_name in getattr(player, "badges", ())
+
+
+def badge_style_tier(player, badge_name: str) -> int:
+    """His tier of a badge for shot selection (always, clutch or not)."""
+    base_name, _ = badge_parts(badge_name)
+    best = 0
+    for badge in getattr(player, "badges", ()):
+        base, level = badge_parts(badge)
+        if base == base_name:
+            best = max(best, BADGE_TIER_VALUE.get(level or "bronze", 1))
+    return best
 
 
 def badges_active() -> bool:
@@ -5039,13 +5047,13 @@ def badges_active() -> bool:
 
 def badge_on(player, badge_name: str) -> bool:
     """A badge that is changing how he plays right now (only in the clutch)."""
-    return badge_name in getattr(player, "badges", ()) and (badge_name in ALL_GAME_BADGES or badges_active())
+    return badge_name in getattr(player, "badges", ()) and badges_active()
 
 
 def badge_tier(player: Player, badge_name: str) -> int:
+    if not badges_active():
+        return 0   # badge boosts only happen in the clutch (all game, style badges only change shot selection: see badge_style)
     base_name, _ = badge_parts(badge_name)
-    if base_name not in ALL_GAME_BADGES and not badges_active():
-        return 0   # a situational badge only changes the game in the clutch (skill badges work all game)
     best = 0
     for badge in getattr(player, "badges", ()):
         base, level = badge_parts(badge)
@@ -5168,7 +5176,7 @@ def maybe_limitless_range_three(player: Player, team: Team, period: int, period_
     if is_late_close_game(team, opponent, period, period_time):
         return None
 
-    tier = limitless_range_tier(player)
+    tier = badge_style_tier(player, "limitless_range")   # how often he pulls from deep (shot selection: all game)
     jumper_streak = getattr(player, "jumper_make_streak", 0)
     if jumper_streak >= 3:
         player.jumper_make_streak = 0
@@ -13009,7 +13017,7 @@ def tag_three_location(player, context: str, consume: bool) -> str:
         if CURRENT_THREE_LOC == "corner" or CURRENT_THREE_SUB == "wing3":   # these spots exist on both sides of the floor
             loc += "|side_" + (hint_side or rolled_side)
         if CURRENT_THREE_LOC == "deep" and player is not None and "heave" not in str(context or "") \
-                and not getattr(player, "heat_check_attempt", False) and limitless_range_tier(player) >= 4 and random.random() < LOGO_SHARE_TOP_LIMITLESS:
+                and not getattr(player, "heat_check_attempt", False) and badge_style_tier(player, "limitless_range") >= 4 and random.random() < LOGO_SHARE_TOP_LIMITLESS:
             loc += "|logo"   # 30-36 ft: from the logo
         if player is not None:
             player._three_loc = None
@@ -13114,7 +13122,7 @@ OFF_SCREEN_SET_RE = re.compile(r"(pindown|_pin$|chase|relocate|_split$|floppy|cu
 
 
 def is_movement_shooter(p) -> bool:
-    return p is not None and (badge_on(p, "movement_shooter") or (p.three_rating >= 0.88 and p.three_tendency >= 0.40))
+    return p is not None and (badge_style(p, "movement_shooter") or (p.three_rating >= 0.88 and p.three_tendency >= 0.40))
 
 
 def play_type_of(shot_type: str, context: str) -> str:
@@ -13904,6 +13912,7 @@ def _shot_make_prob_rolled(shooter: Player, defender: Player, shot_type: str,
     close, near = prof.get("r", 0.0), prof.get("s", 0.0)
     share = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
     share = min(0.92, share / (1 - RIM_PUTBACK_SHARE))
+    share = min(0.92, share * (1.0 + 1.5 * STYLE_SHOT_SHARE.get(badge_style_tier(shooter, "floater_ace"), 0.0)))   # Floater Ace: more floaters
     tok = "rim_float" if random.random() < share else "rim_close"
     shooter._pending_rim_dist = tok
     rel = OPEN_FLOATER_RELATIVE_MAKE if getattr(shooter, "shot_quality_mult", 1.0) >= 1.08 else FLOATER_RELATIVE_MAKE
@@ -14689,7 +14698,7 @@ def player_perimeter_gravity(player: Player) -> float:
         gravity *= 0.42
     if player.three_rating >= 0.86 and player.three_tendency >= 0.36:
         gravity += 0.10
-    if badge_on(player, "movement_shooter") or badge_on(player, "catch_shoot"):
+    if badge_style(player, "movement_shooter") or badge_style(player, "catch_shoot"):
         gravity += 0.06
     if player.usage >= 0.30 and player.iso_tendency >= 0.78:
         gravity += 0.04
@@ -15319,13 +15328,13 @@ def signature_move_line(player: Player, shot_type: str, context: str | None = No
         "late_catch_shoot", "late_oreb_kickout"
     }
     if (
-        badge_on(player, "movement_shooter")
+        badge_style(player, "movement_shooter")
         and shot_type == "three"
         and context in offball_contexts
         and random.random() < 0.18
     ):
         return "sprints off a screen and catches in rhythm."
-    if badge_on(player, "lob_threat") and shot_type == "dunk" and random.random() < 0.18:
+    if badge_style(player, "lob_threat") and shot_type == "dunk" and random.random() < 0.18:
         return "loads up above the rim as the pass arrives."
     return None
 
@@ -16598,9 +16607,9 @@ def role_discipline_multiplier(player: Player) -> float:
 
     if player.shot_iq < 0.62 and player.fga >= 7 and player.usage < 0.24:
         mult *= max(0.46, 1.0 - (player.fga - 6) * 0.10)
-    if badge_on(player, "movement_shooter") and player.three_tendency >= 0.45:
+    if badge_style(player, "movement_shooter") and player.three_tendency >= 0.45:
         mult *= 1.08
-    if badge_on(player, "iso_scorer") and player.usage >= 0.28:
+    if badge_style(player, "iso_scorer") and player.usage >= 0.28:
         mult *= 1.06
     if player.usage < 0.18 and player.fga >= 9 and getattr(player, "hot_streak", 0) < 2:
         mult *= max(0.42, 1.0 - (player.fga - 8) * 0.12)
@@ -16777,7 +16786,7 @@ def real_play_type(off: Team, handler: Player) -> str:
     style_name = styles.get("offensive_style", "balanced")
     plan = getattr(off, "game_plan", {}).get("offense", "balanced")
     has_big_hub = any((can_play_position(p, "C") or can_play_position(p, "PF")) and p.playmaking >= 0.70 for p in off.on_floor)
-    has_movement = any(badge_on(p, "movement_shooter") for p in off.on_floor)
+    has_movement = any(badge_style(p, "movement_shooter") for p in off.on_floor)
     iso_creation = isolation_creation_score(handler)
 
     plays = [
@@ -17440,7 +17449,7 @@ def apply_play_type_setup(play_type: str | None, off: Team, handler: Player, cur
                         key=lambda p: p.playmaking, default=None)
         pool = [p for p in off.on_floor if p is not previous_handler and (p is not handler or relay is not None)]
         if play_type == "floppy":
-            options = designed_shooter_options([p for p in pool if p is not relay and (p.three_rating >= 0.82 or badge_on(p, "movement_shooter"))], current_shooter)
+            options = designed_shooter_options([p for p in pool if p is not relay and (p.three_rating >= 0.82 or badge_style(p, "movement_shooter"))], current_shooter)
             target = best_play_target(options, lambda p: p.three_rating + (0.06 if is_movement_shooter(p) else 0.0), current_shooter)
             passer = (relay or handler) if target is handler else handler
             if target is handler and relay is not None:
@@ -17773,9 +17782,9 @@ def catch_shoot_receiver_factor(player: Player) -> float:
     if player.ball_handle >= 0.86 and player.playmaking >= 0.76:
         factor *= 0.58
 
-    if badge_on(player, "movement_shooter"):
+    if badge_style(player, "movement_shooter"):
         factor *= 1.34
-    if badge_on(player, "catch_shoot"):
+    if badge_style(player, "catch_shoot"):
         factor *= 1.46
 
     return max(0.06, min(1.50, factor))
@@ -17951,7 +17960,7 @@ def posterizer_quality_bonus(player: Player, defender: Player) -> float:
 
 def effective_dunk_attempt_chance(player: Player) -> float:
     chance = player.dunk_tendency * DUNK_RATE_SCALE
-    if badge_on(player, "posterizer"):
+    if badge_style(player, "posterizer"):
         chance += 0.055 + max(0.0, player.dunk_rating - 0.82) * 0.065
     return max(0.0, min(0.78, chance))
 
@@ -17990,9 +17999,9 @@ def find_double_team_kickout(off: Team, shooter: Player) -> Player:
 
 
 def catch_shoot_creation_chance(passer: Player, shooter: Player, context: str) -> float:
-    chance = 0.08 + pass_decision_playmaking(passer) * 0.34 + passer.ball_handle * 0.08
+    chance = 0.08 + passer.playmaking * 0.34 + passer.ball_handle * 0.08
     if context == "double":
-        chance += 0.12 + max(0.0, pass_decision_playmaking(passer) - 0.78) * 0.55
+        chance += 0.12 + max(0.0, passer.playmaking - 0.78) * 0.55
     elif context == "pnr":
         chance += 0.05
     elif context == "swing":
@@ -18001,14 +18010,14 @@ def catch_shoot_creation_chance(passer: Player, shooter: Player, context: str) -
         chance += 0.10
     elif shooter.three_rating >= 0.76 and shooter.three_tendency > 0:
         chance += 0.06
-    if badge_on(shooter, "catch_shoot"):
+    if badge_style(shooter, "catch_shoot"):
         chance += 0.07
-    if badge_on(shooter, "movement_shooter"):
+    if badge_style(shooter, "movement_shooter"):
         chance += 0.035
-    if pass_decision_playmaking(passer) < 0.60:
+    if passer.playmaking < 0.60:
         chance *= 0.70
     chance *= catch_shoot_receiver_factor(shooter)
-    cap = 0.88 if context == "double" and pass_decision_playmaking(passer) >= 0.86 else 0.68
+    cap = 0.88 if context == "double" and passer.playmaking >= 0.86 else 0.68
     return max(0.05, min(cap, chance))
 
 
@@ -20341,6 +20350,19 @@ def post_fade_attempt_chance(shooter: Player, defender: Player) -> float:
     return max(0.0, min(0.48, chance))
 
 
+STYLE_SHOT_SHARE = {1: 0.06, 2: 0.11, 3: 0.16, 4: 0.22}   # how much more often a style badge's shot gets picked, by tier
+
+
+def style_badge_shot_weights(shooter: Player, raw_weights: list):
+    """Style badges steer where he shoots from (all game): Midrange Maestro more midrange, Post Maestro more post-ups, Sniper and Stretch Big
+    more threes, Acrobat / Giant Slayer / Floater Ace more drives. No make-chance change here (those boosts are clutch-only)."""
+    g = lambda name: STYLE_SHOT_SHARE.get(badge_style_tier(shooter, name), 0.0)
+    raw_weights[0] *= 1.0 + g("sniper") + (g("stretch_big") if (shooter.position or "").upper() in ("PF", "C") else 0.0)
+    raw_weights[1] *= 1.0 + g("midrange_maestro")
+    raw_weights[2] *= 1.0 + max(g("acrobat"), g("giant_slayer"), g("floater_ace"))
+    raw_weights[3] *= 1.0 + g("post_maestro")
+
+
 def choose_shot_type(shooter: Player, defender: Player,
                      team: Team = None, opponent: Team = None,
                      period: int = 1, period_time: int = 720) -> str:
@@ -20379,6 +20401,7 @@ def choose_shot_type(shooter: Player, defender: Player,
         # relative to how often a real post_tendency rating should get used.
         effective_tendency(shooter.post_tendency, shooter, team, opponent, period, period_time) * (1 - 0.30 * defender.interior_def) * 1.15,
     ]
+    style_badge_shot_weights(shooter, raw_weights)
     offball_gravity = team_offball_gravity(team, shooter)
     if offball_gravity >= 0.70:
         raw_weights[2] *= 1.0 + min(0.16, (offball_gravity - 0.70) * 0.55)
