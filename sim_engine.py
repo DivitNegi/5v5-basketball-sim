@@ -13910,6 +13910,8 @@ VERTICALITY_FOUL_CUT = {1: 0.10, 2: 0.17, 3: 0.24, 4: 0.32}
 
 
 # ---- specific badges (each one boost in one situation), by tier bronze / silver / gold / HOF
+SPECIFIC_BADGE_MAX_BOOST = 0.05   # all the situational shooting badges on one shot together add at most +5%
+SPECIFIC_BADGE_MAX_CUT = 0.06     # and the situational defensive badges take at most 6% off
 SNIPER_BONUS = {1: 0.03, 2: 0.05, 3: 0.07, 4: 0.10}            # wide-open threes
 TOUGH_SHOT_BONUS = {1: 0.04, 2: 0.06, 3: 0.08, 4: 0.11}        # heavily contested jumpers
 VOLUME_SCORER_BONUS = {1: 0.02, 2: 0.035, 3: 0.05, 4: 0.07}    # every shot once he has 12+ attempts in the game
@@ -13942,38 +13944,38 @@ def specific_badge_shot_multiplier(shooter: Player, defender: Player, shot_type:
     jumper = shot_type in ("three", "mid", "post_fade")
     inside = shot_type in ("rim", "dunk")
     one_on_one = team is not None and len(getattr(team, "on_floor", ()) or ()) <= 1   # no quarters, no bench, no playoffs in 1-on-1
-    mult = 1.0
+    boost = cut = 0.0   # situational boosts add up (they do not multiply), and the total is capped
     if shot_type == "three" and q >= 1.08:
-        mult *= 1.0 + SNIPER_BONUS.get(badge_tier(shooter, "sniper"), 0.0)
+        boost += SNIPER_BONUS.get(badge_tier(shooter, "sniper"), 0.0)
     if jumper and q < 0.90:
-        mult *= 1.0 + TOUGH_SHOT_BONUS.get(badge_tier(shooter, "tough_shot_maker"), 0.0)
+        boost += TOUGH_SHOT_BONUS.get(badge_tier(shooter, "tough_shot_maker"), 0.0)
     if (shooter.fga or 0) >= 12:
-        mult *= 1.0 + VOLUME_SCORER_BONUS.get(badge_tier(shooter, "volume_scorer"), 0.0)
+        boost += VOLUME_SCORER_BONUS.get(badge_tier(shooter, "volume_scorer"), 0.0)
     if shot_type == "three" and getattr(shooter, "hot_streak", 0) >= 2:
-        mult *= 1.0 + HEAT_CHECK_BONUS.get(badge_tier(shooter, "heat_check"), 0.0)
+        boost += HEAT_CHECK_BONUS.get(badge_tier(shooter, "heat_check"), 0.0)
     if not one_on_one and period >= 4:
-        mult *= 1.0 + FOURTH_QUARTER_BONUS.get(badge_tier(shooter, "fourth_quarter"), 0.0)
+        boost += FOURTH_QUARTER_BONUS.get(badge_tier(shooter, "fourth_quarter"), 0.0)
     if not one_on_one and period == 1:
-        mult *= 1.0 + FAST_STARTER_BONUS.get(badge_tier(shooter, "fast_starter"), 0.0)
+        boost += FAST_STARTER_BONUS.get(badge_tier(shooter, "fast_starter"), 0.0)
     if team is not None and opponent is not None and opponent.score - team.score >= 8:
-        mult *= 1.0 + COMEBACK_BONUS.get(badge_tier(shooter, "comeback"), 0.0)
+        boost += COMEBACK_BONUS.get(badge_tier(shooter, "comeback"), 0.0)
     if inside and defender is not None and (getattr(defender, "height", 78) or 78) - (getattr(shooter, "height", 78) or 78) >= 4:
-        mult *= 1.0 + GIANT_SLAYER_BONUS.get(badge_tier(shooter, "giant_slayer"), 0.0)
+        boost += GIANT_SLAYER_BONUS.get(badge_tier(shooter, "giant_slayer"), 0.0)
     if not one_on_one and not getattr(shooter, "started_game", True):
-        mult *= 1.0 + SPARKPLUG_BONUS.get(badge_tier(shooter, "sparkplug"), 0.0)
+        boost += SPARKPLUG_BONUS.get(badge_tier(shooter, "sparkplug"), 0.0)
     if not one_on_one and team is not None and getattr(team, "series_wins", None) is not None:
-        mult *= 1.0 + BIG_STAGE_BONUS.get(badge_tier(shooter, "big_stage"), 0.0)
+        boost += BIG_STAGE_BONUS.get(badge_tier(shooter, "big_stage"), 0.0)
     if shot_type == "three" and (shooter.position or "").upper() in ("PF", "C"):
-        mult *= 1.0 + STRETCH_BIG_BONUS.get(badge_tier(shooter, "stretch_big"), 0.0)
+        boost += STRETCH_BIG_BONUS.get(badge_tier(shooter, "stretch_big"), 0.0)
     if defender is not None:
         if inside and (shooter.position or "").upper() in ("PG", "SG", "SF"):
-            mult *= 1.0 - PERIMETER_LOCK_CUT.get(badge_tier(defender, "perimeter_lock"), 0.0)
+            cut += PERIMETER_LOCK_CUT.get(badge_tier(defender, "perimeter_lock"), 0.0)
         if shot_type == "three" and q >= 1.08:
-            mult *= 1.0 - CLOSEOUT_KING_CUT.get(badge_tier(defender, "closeout_king"), 0.0)
+            cut += CLOSEOUT_KING_CUT.get(badge_tier(defender, "closeout_king"), 0.0)
     if inside and opponent is not None:
         helper = max((badge_tier(d, "paint_patroller") for d in getattr(opponent, "on_floor", ()) if d is not defender), default=0)
-        mult *= 1.0 - PAINT_PATROLLER_CUT.get(helper, 0.0)
-    return mult
+        cut += PAINT_PATROLLER_CUT.get(helper, 0.0)
+    return (1.0 + min(boost, SPECIFIC_BADGE_MAX_BOOST)) * (1.0 - min(cut, SPECIFIC_BADGE_MAX_CUT))
 
 
 def badge_shot_multiplier(shooter: Player, shot_type: str, defender: Player = None) -> float:
