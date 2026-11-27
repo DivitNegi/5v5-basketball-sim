@@ -13309,8 +13309,16 @@ def analytics_shot(player: Player, shot_type: str, context: str, made: bool):
     if made:
         _bump(clk, "pts", 3 if shot_type == "three" else 2)
     _bump(sqr, f"{sq}_m" if made else f"{sq}_a")
-    clutch = a.setdefault("clutch", {}) if in_clutch_window() else None
+    # a shot is counted as an attempt first and as a make afterwards (once the score has changed), so a make belongs to the clutch only if
+    # its attempt did: otherwise a three that cuts a 6-point lead to 3 would add a clutch make with no clutch attempt
     if made:
+        in_clutch = bool(getattr(player, "_clutch_attempt", False))
+    else:
+        in_clutch = in_clutch_window()
+        player._clutch_attempt = in_clutch
+    clutch = a.setdefault("clutch", {}) if in_clutch else None
+    if made:
+        player._clutch_attempt = False
         _bump(pt, "fgm"); _bump(pt, "pts", value)
         if getattr(player, "_xfg_pending", None) == shot_type:   # only shots that carried a make chance count toward actual vs expected
             _bump(xp, "pts", value)
