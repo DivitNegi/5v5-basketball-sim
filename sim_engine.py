@@ -2472,11 +2472,14 @@ def commentator_game_tying_shot(shooter: str, team: str, shot_type: str, score_t
     return random.choice(pool).format(shooter=shooter, team=team, time_left=time_left_phrase(score_time))
 
 
-SPOT_UP_SHOOTERS = {"Klay Thompson", "Davion Mitchell"}   # take their threes off the catch: few isolations, no dribble-combo pull-ups
+# take their threes off the catch: no isolations or dribble-combo pull-ups. A name alone = every season; (name, season) = that season only.
+SPOT_UP_SHOOTERS = {"Klay Thompson", ("Davion Mitchell", "2027")}
 
 
 def is_spot_up_shooter(player) -> bool:
-    return getattr(player, "name", "") in SPOT_UP_SHOOTERS or bool(getattr(player, "spot_up_shooter", False))
+    name = getattr(player, "name", "")
+    season = str(getattr(player, "_team_season", "") or "")
+    return name in SPOT_UP_SHOOTERS or (name, season) in SPOT_UP_SHOOTERS or bool(getattr(player, "spot_up_shooter", False))
 
 
 def dribble_chain_count_for_player(player) -> int:
@@ -3716,6 +3719,8 @@ class Team:
     shot_diet: Dict[str, int] = field(default_factory=dict)
 
     def init_lineup(self):
+        for p in self.roster:   # the season this version of him is from (season-specific player rules read it)
+            p._team_season = str(getattr(p, "source_team", "") or self.name)[:4]
         # First 5 in roster are starters
         self.on_floor = self.roster[:5]
         self.bench = self.roster[5:]
