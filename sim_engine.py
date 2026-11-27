@@ -2472,7 +2472,16 @@ def commentator_game_tying_shot(shooter: str, team: str, shot_type: str, score_t
     return random.choice(pool).format(shooter=shooter, team=team, time_left=time_left_phrase(score_time))
 
 
+SPOT_UP_SHOOTERS = {"Klay Thompson", "Davion Mitchell"}   # take their threes off the catch: few isolations, no dribble-combo pull-ups
+
+
+def is_spot_up_shooter(player) -> bool:
+    return getattr(player, "name", "") in SPOT_UP_SHOOTERS or bool(getattr(player, "spot_up_shooter", False))
+
+
 def dribble_chain_count_for_player(player) -> int:
+    if is_spot_up_shooter(player):
+        return 0
     handle = getattr(player, "ball_handle", 0.0)
     if handle < 0.70:
         return 0
@@ -2498,7 +2507,33 @@ def should_print_dribble_chain(shooter, shot_type: str, context: str | None) -> 
     return True
 
 
+FLOATER_FINISHES = [
+    "pulls up in the lane and lofts a floater over the big.",
+    "throws up a teardrop over the outstretched arm.",
+    "stops short in the paint and flips up a floater.",
+    "floats a runner up from the middle of the lane.",
+    "kisses a running floater off the glass.",
+    "rises off one foot and drops in a soft floater attempt.",
+]
+
+
+def rim_float_share(shooter) -> float:
+    """How often his rim attempts are floaters / runners (3-10 ft) instead of right at the cup: his real splits, plus Floater Ace."""
+    prof = getattr(shooter, "shot_profile", None) or {}
+    close, near = prof.get("r", 0.0), prof.get("s", 0.0)
+    share = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
+    share = min(0.92, share / (1 - RIM_PUTBACK_SHARE))
+    if getattr(shooter, "name", "") in NO_FLOATER_PLAYERS:
+        return 0.0
+    return min(0.92, share * (1.0 + 1.5 * STYLE_SHOT_SHARE.get(badge_style_tier(shooter, "floater_ace"), 0.0)))   # Floater Ace: more floaters
+
+
 def layup_finish_line(shooter) -> str:
+    # decide here whether this drive ends at the cup or in a floater, so the description matches the shot (the make chance uses it too)
+    tok = "rim_float" if random.random() < rim_float_share(shooter) else "rim_close"
+    shooter._preset_rim_dist = tok
+    if tok == "rim_float":
+        return random.choice(FLOATER_FINISHES)
     handle = getattr(shooter, "ball_handle", 0.0)
     rim = getattr(shooter, "rim_rating", 0.0)
     shot_iq = getattr(shooter, "shot_iq", 0.70)
@@ -5232,8 +5267,8 @@ BADGE_LEGENDS = {
 }
 
 
-BADGE_EXCLUDE = {"bully": {"Rudy Gobert"}, "floater_ace": {"Kyrie Irving"}}
-NO_FLOATER_PLAYERS = {"Kyrie Irving"}   # finish at the rim: none of their drives end in a floater
+BADGE_EXCLUDE = {"bully": {"Rudy Gobert"}}
+NO_FLOATER_PLAYERS = set()   # players whose drives never end in a floater (none right now)
 BADGE_LEGENDS.update({
     "hands_up": {"Kawhi Leonard": "hof", "Michael Jordan": "hof", "Gary Payton": "hof", "Scottie Pippen": "hof", "Bruce Bowen": "hof",
                  "Tony Allen": "gold", "Jrue Holiday": "gold", "Marcus Smart": "gold", "Herbert Jones": "gold", "Luguentz Dort": "gold",
@@ -13910,15 +13945,12 @@ def _shot_make_prob_rolled(shooter: Player, defender: Player, shot_type: str,
     if shooter is None:
         return p
     if shot_type != "rim":
+        shooter._preset_rim_dist = None   # a described layup that became another shot type: nothing carries over to his next drive
         return max(0.0, min(0.97, p * badge_shot_multiplier(shooter, shot_type, defender)))
-    prof = getattr(shooter, "shot_profile", None) or {}
-    close, near = prof.get("r", 0.0), prof.get("s", 0.0)
-    share = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
-    share = min(0.92, share / (1 - RIM_PUTBACK_SHARE))
-    if shooter.name in NO_FLOATER_PLAYERS:
-        share = 0.0
-    share = min(0.92, share * (1.0 + 1.5 * STYLE_SHOT_SHARE.get(badge_style_tier(shooter, "floater_ace"), 0.0)))   # Floater Ace: more floaters
-    tok = "rim_float" if random.random() < share else "rim_close"
+    share = rim_float_share(shooter)
+    preset = getattr(shooter, "_preset_rim_dist", None)   # decided when the finish was described (layup_finish_line)
+    shooter._preset_rim_dist = None
+    tok = preset if preset in ("rim_float", "rim_close") else ("rim_float" if random.random() < share else "rim_close")
     shooter._pending_rim_dist = tok
     rel = OPEN_FLOATER_RELATIVE_MAKE if getattr(shooter, "shot_quality_mult", 1.0) >= 1.08 else FLOATER_RELATIVE_MAKE
     avg = share * rel + (1 - share)
@@ -15380,7 +15412,7 @@ def run_inbound_play(off: Team, dff: Team, period: int, period_time: int,
     #  - an ordinary dead-ball inbound is usually just a plain inbound pass
     #    into a normal possession; only sometimes is it a drawn-up play.
     #    Timeouts and late close games still get the drawn-up play.
-    if 5 <= period_time <= 24 or (not after_timeout and not late_ato and random.random() >= 0.25):
+    if 5 <= period_time <= 24 or (late_ato and period_time > 3) or (not after_timeout and not late_ato and random.random() >= 0.25):
         off.inbound_pending = False
         off.ato_pending = False
         return None
@@ -17776,6 +17808,8 @@ def catch_shoot_receiver_factor(player: Player) -> float:
     prefer using them as initiators instead of parking them as spot-up targets.
     """
     factor = 1.0
+    if is_spot_up_shooter(player):
+        return 1.5   # a spot-up shooter is the man the offense looks for off the catch
 
     if player.iso_tendency >= 0.88 and player.usage >= 0.28:
         factor *= 0.16
@@ -18017,6 +18051,8 @@ def catch_shoot_creation_chance(passer: Player, shooter: Player, context: str) -
         chance += 0.06
     if badge_style(shooter, "catch_shoot"):
         chance += 0.07
+    if is_spot_up_shooter(shooter):
+        chance += 0.12
     if badge_style(shooter, "movement_shooter"):
         chance += 0.035
     if passer.playmaking < 0.60:
@@ -19645,6 +19681,7 @@ def choose_ballhandler(team: Team) -> Player:
         * fatigue_touch_multiplier(p)
         * (0.28 if can_play_position(p, "C") else 1.0)
         * (0.55 if can_play_position(p, "PF") and not can_play_position(p, "SF") else 1.0)
+        * (0.30 if is_spot_up_shooter(p) else 1.0)   # a spot-up shooter is not the one bringing it up
         for p in top_four
     ]
     return random.choices(top_four, weights=weights, k=1)[0]
@@ -20980,6 +21017,8 @@ def _simulate_possession(off: Team, dff: Team,
         score_first_bias = max(0.0, min(1.0, getattr(handler, "score_first_bias", 0.0)))
         pass_chance *= 1.0 - 0.45 * score_first_bias
         pass_chance = max(0.30, min(0.90, pass_chance))
+        if is_spot_up_shooter(handler):
+            pass_chance = max(pass_chance, 0.88)   # a spot-up shooter with the ball moves it on and waits for the catch
         if random.random() >= pass_chance:
             shooter = handler
     primary_creator_keep = shooter.usage >= 0.36 and shooter.shot_tendency >= 0.70
@@ -21590,6 +21629,8 @@ def _simulate_possession(off: Team, dff: Team,
         iso_prob += 0.06
     elif shooter.iso_tendency < 0.25:
         iso_prob *= 0.55
+    if is_spot_up_shooter(shooter):
+        iso_prob *= 0.20   # a spot-up shooter rarely isolates: his threes come off the catch
     if play_context in PLAYBOOK_CONTEXTS or play_context in ("floppy", "elevator", "handoff", "horns", "drive_kick", "post_split", "ball_movement_chain"):
         iso_prob *= 0.35 + shooter.iso_tendency * 0.18
 
@@ -22225,7 +22266,7 @@ def _simulate_possession(off: Team, dff: Team,
     elif catch_shoot_context and shot_type in ("three", "mid") and last_passer and last_passer is not shooter and not quick_shot_for_assist:
         # a pass that is not a one-motion catch-and-shoot (the shooter has to reset first) is described that way, because it is not
         # credited as an automatic assist: the line must not say "catches and shoots" about a shot that was not
-        gather_line = random.choice(gather_before_shot_lines)
+        gather_line = random.choice([l for l in gather_before_shot_lines if "dribble" not in l] if is_spot_up_shooter(shooter) else gather_before_shot_lines)
         shooter._reset_dribble = "dribble" in gather_line   # he put it on the floor first: a pull-up, not a catch-and-shoot
         print(f"{shooter.name} {gather_line}")
 

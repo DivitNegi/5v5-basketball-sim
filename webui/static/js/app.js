@@ -1531,7 +1531,7 @@ function pcDonut(z) {
 }
 // ---- styled hover tooltip (replaces the browser's plain title box): any element with setTip() shows it
 // what a shot is called in the hover card; a midrange jumper the engine placed (and the play-by-play named) says where it came from
-const shotZoneName = (z, ev) => (z === "mid" && ["base", "elbow", "wing"].includes(ev?.loc) ? { base: "baseline jumper", elbow: "elbow jumper", wing: "wing jumper" }[ev.loc]
+const shotZoneName = (z, ev) => (z === "rim" && ev?.dist === "float" ? "floater" : z === "mid" && ["base", "elbow", "wing"].includes(ev?.loc) ? { base: "baseline jumper", elbow: "elbow jumper", wing: "wing jumper" }[ev.loc]
   : { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[z] || z || "shot");
 function shotWhen(ev) {
   const clk = Number(ev.clock), per = Number(ev.period);
@@ -3377,14 +3377,14 @@ function shotSpot(ev, side, spread = false) {
   if (z === "dunk") inLane(0, 20, 1.3, 1.4, 60);
   else if (z === "rim") {
     // the engine says whether it was right at the rim (0-3 ft) or a floater / runner (3-10 ft+), from the player's real splits
-    const q = ev.dist === "close" ? rnd() * 0.76 : ev.dist === "float" ? 0.8 : rnd();
+    const q = ev.dist === "float" ? 0.8 : rnd() * 0.76;   // no distance tag: drawn at the cup like a layup (only a tagged floater goes up the lane)
     if (q < 0.6) inLane(3, 40, 1.9, 1.55, 70);   // at the basket: layups, putbacks, tips (within ~4 ft, most of them right at the rim)
     else if (q < 0.76) {                          // a dump-off or a big finishing along the edges: the baseline side of the lane and the blocks
       // in front of the backboard (it sits 4 ft off the baseline); only out wide, past the lane line, can a finish come from the baseline side
       const wide = rnd() < 0.25, dy = wide ? 80 + 22 * rnd() : 46 + 36 * rnd();
       x = wide ? 50 + 60 * rnd() : 78 + 70 * Math.pow(rnd(), 1.3); y = HY + (rnd() < 0.5 ? -1 : 1) * dy;
     }
-    else inLane(42, 125, 1.5, 0.95, 92);          // a floater or short runner: 4-17 ft, rarer the further out
+    else inLane(42, 90, 1.5, 0.95, 88);           // a floater or short runner: about 4-13 ft, rarer the further out
   }
   else if (z === "post") inLane(35, 85, 1.3, 1.15, 96);   // post-ups and hooks: around the block, rarely past the lane lines
   else if (z === "post_fade") inLane(70, 80, 1.2, 1.35, 125);   // fadeaways off the block: 7-15 ft, the short corner to the edge of the lane
@@ -3424,8 +3424,8 @@ function shotSpot(ev, side, spread = false) {
     else if (ev.loc === "elbow") {
       // A shot the engine tagged as an elbow jumper sits AT an elbow: the corner where the free-throw line meets the lane line (a few feet
       // around it, mostly just outside the lane), with an occasional one at the middle of the line. Not a wide slice out toward the arc.
-      const centre = rnd() < 0.18, dy = centre ? 40 * rnd() : 62 + 52 * rnd(), sgn = side;
-      x = (dy > 84 ? 200 : 226) + 55 * Math.pow(rnd(), 1.3);
+      const dy = 66 + 44 * rnd(), sgn = side;   // at one of the elbows (where the free-throw line meets the lane line), never the middle of the line
+      x = 214 + 50 * Math.pow(rnd(), 1.3);
       y = HY + sgn * dy;
     }
     else for (let k = 0; k < 30; k++) {

@@ -232,6 +232,7 @@ class SimRunner:
             self.sections = {}
             self.season = {"progress": None, "races": None, "standings": None, "ready": False}
             self.bracket = {}
+            sim_engine.BRACKET_STATE.clear()   # an earlier run's playoff series must not show up in this run's game logs
             self.post = {"standings": None, "factories": None, "year": None}
         self._live_signature = None
         self.hub.clear_backlog()
