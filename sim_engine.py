@@ -2782,6 +2782,15 @@ def print_shot_attempt_sequence(shooter, shot_type: str, context: str | None = N
             print(f"{shooter.name} {line}.")
             time.sleep(SLEEP * 0.42)
         return True
+    if is_spot_up_shooter(shooter) and key in ("three", "mid"):
+        # a spot-up shooter's jumper comes off the catch: no dribble moves, no pull-up
+        shooter._pbp_play = (shot_type, "spot_up")
+        print(f"{shooter.name} " + random.choice([
+            "catches it in rhythm and lets it go.", "sets his feet off the catch and fires.", "gets the ball on the move, squares up, and shoots.",
+            "relocates to the open spot, catches, and rises.", "takes the swing pass and shoots it in one motion.",
+        ] if key == "three" else ["catches at the elbow and rises straight into the jumper.", "takes the pass, squares up, and knocks down the look." ]))
+        time.sleep(SLEEP * 0.42)
+        return True
     if should_print_dribble_chain(shooter, key, context):
         shooter._pbp_play = (shot_type, "dribble")   # a chain of his own dribble moves
         return print_dribble_chain_attempt(shooter, key, context)
@@ -17857,7 +17866,7 @@ def ankle_breaker_chance(shooter: Player, defender: Player, play_context: str | 
 
 def dribble_combo_chance(shooter: Player, defender: Player, play_context: str | None,
                          period: int, period_time: int) -> float:
-    if period_time <= 8:
+    if period_time <= 8 or is_spot_up_shooter(shooter):   # a spot-up shooter does not go into dribble combos (no pull-up threes off them)
         return 0.0
     if shooter.ball_handle < 0.76:
         return 0.0
@@ -19681,7 +19690,6 @@ def choose_ballhandler(team: Team) -> Player:
         * fatigue_touch_multiplier(p)
         * (0.28 if can_play_position(p, "C") else 1.0)
         * (0.55 if can_play_position(p, "PF") and not can_play_position(p, "SF") else 1.0)
-        * (0.30 if is_spot_up_shooter(p) else 1.0)   # a spot-up shooter is not the one bringing it up
         for p in top_four
     ]
     return random.choices(top_four, weights=weights, k=1)[0]
@@ -21048,6 +21056,19 @@ def _simulate_possession(off: Team, dff: Team,
     pnr_result: str | None = None
     true_iso_attempt = False
     deep_paint_touch = False
+    if shooter is handler and is_spot_up_shooter(handler) and not closing_star_mode and period_time - 0 > 8:
+        # a spot-up shooter can bring it up, but he does not isolate: he swings it, relocates and gets it back for the catch
+        mates = [p for p in off.on_floor if p is not handler and not p.fouled_out]
+        if mates:
+            mate = max(mates, key=lambda p: 0.6 * p.playmaking + 0.4 * p.ball_handle)
+            print(random.choice([
+                f"{handler.name} swings it to {mate.name}, relocates, and gets it right back.",
+                f"{handler.name} gives it up to {mate.name} and fades to the open spot for the return pass.",
+                f"{handler.name} hands it off to {mate.name}, sprints into space, and {mate.name} finds him.",
+            ]))
+            last_passer = mate
+            quick_shot_for_assist = True
+            handler._spot_relocated = True
     if closing_star_mode and random.random() < 0.72:
         play_type = clutch_package_play(off, need_three=(off.score - dff.score <= -3 and period_time <= 90))
     elif fourth_star_mode and random.random() < fourth_star_chance * 0.42:
