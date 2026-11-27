@@ -19404,6 +19404,8 @@ def isolation_shot_creation(shooter: Player, defender: Player) -> Tuple[str, flo
 # less often, so his pass is the one that usually ends up as the assist (the
 # generic ball-movement chain used to hand the credit to the second passer).
 SYSTEM_PLAYMAKERS = {
+    "2021 Phoenix Suns": "Chris Paul",
+    "2022 Phoenix Suns": "Chris Paul",
     "2027 Washington Wizards": "Trae Young",
     "2027 Miami Heat": "Davion Mitchell",
     "2027 Philadelphia 76ers": "LeBron James",
@@ -19419,13 +19421,15 @@ WARRIORS_2018_ASSIST_BIAS = {"Draymond Green": 1.6, "Stephen Curry": 0.65}   # w
 NUGGETS_2024_ASSIST_BIAS = {"Nikola Jokić": 2.0, "Jamal Murray": 0.75}
 # 2025-26 Nuggets: Jokic was the hub again (10.7 assists a night in 34.8 minutes).
 NUGGETS_2026_ASSIST_BIAS = {"Nikola Jokić": 3.6, "Jamal Murray": 0.55}
+SUNS_CP3_HANDLER_SHARE = 0.80   # share of possessions Chris Paul brings up while on the floor (2021 / 2022 Suns)
+SUNS_CP3_ASSIST_BIAS = {"Chris Paul": 2.4, "Devin Booker": 0.8}
 NUGGETS_2026_HANDLER_SHARE = 0.88     # share of possessions Jokic initiates while on the floor (he averaged 10.7 assists)
 SIXERS_2027_MAXEY_HANDLER_SHARE = 0.60   # share of possessions Maxey brings the ball up while on the floor
 SIXERS_2027_LEBRON_KEEP = 0.70           # share of his own "LeBron creates" sets he finishes himself instead of passing
 NUGGETS_2024_HANDLER_SHARE = 0.70     # share of possessions Jokic initiates while on the floor
 # 2020-21 Sixers: Simmons ran the offense at 6.9 assists a night; the generic split left him near 4.
 SIXERS_2021_ASSIST_BIAS = {"Ben Simmons": 2.4}
-TEAM_ASSIST_BIAS = {"2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS, "2026 Denver Nuggets": NUGGETS_2026_ASSIST_BIAS,
+TEAM_ASSIST_BIAS = {"2021 Phoenix Suns": SUNS_CP3_ASSIST_BIAS, "2022 Phoenix Suns": SUNS_CP3_ASSIST_BIAS, "2018 Golden State Warriors": WARRIORS_2018_ASSIST_BIAS, "2024 Denver Nuggets": NUGGETS_2024_ASSIST_BIAS, "2026 Denver Nuggets": NUGGETS_2026_ASSIST_BIAS,
                     "2021 Philadelphia 76ers": SIXERS_2021_ASSIST_BIAS}
 
 
@@ -19495,6 +19499,12 @@ def choose_ballhandler(team: Team) -> Player:
                 for p in preferred
             ]
             return random.choices(preferred, weights=weights, k=1)[0]
+
+    if team.name in ("2021 Phoenix Suns", "2022 Phoenix Suns"):
+        cp3 = player_by_name(team.on_floor, ("Chris Paul",))
+        # Paul ran the Suns' offense (10.8 assists a night in 2021-22): he brings it up on most trips while he is on the floor
+        if cp3 is not None and not cp3.fouled_out and random.random() < SUNS_CP3_HANDLER_SHARE:
+            return cp3
 
     if team.name in ("2024 Denver Nuggets", "2026 Denver Nuggets"):
         jokic = player_by_name(team.on_floor, ("Nikola Jokić", "Nikola Jokic"))

@@ -3404,10 +3404,10 @@ function shotSpot(ev, side, spread = false) {
       // Corner, wing and top share their edges, so the band has no gaps; a few untagged threes are 27-30 ft pull-ups.
       const BREAK = 1.18, sgn = ev.side === "L" ? -1 : ev.side === "R" ? 1 : rnd() < 0.5 ? -1 : 1;
       const kind = ev.loc === "corner" || ev.loc === "wing" || ev.loc === "top" ? ev.loc : (q => q < 0.2 ? "corner" : q < 0.62 ? "wing" : "top")(rnd());
-      if (kind === "corner") { x = 34 + rnd() * 138; y = HY + sgn * (222 + rnd() * 24); }
+      if (kind === "corner") { x = 34 + rnd() * 150; y = HY + sgn * (222 + rnd() * 24); }   // the corner runs to just past the break, so it meets the wing with no gap
       else {
         const far = !ev.loc && rnd() < 0.08, r = 240 + (far ? 30 + rnd() * 35 : 27 * Math.pow(rnd(), 1.3));
-        const a = kind === "top" ? (rnd() * 2 - 1) * 0.42 : sgn * (0.42 + rnd() * (BREAK - 0.42));
+        const a = kind === "top" ? (rnd() * 2 - 1) * 0.42 : sgn * (0.42 + rnd() * (BREAK + 0.05 - 0.42));   // the wing reaches down to the break
         x = HX + r * Math.cos(a); y = HY + r * Math.sin(a);
         y = Math.max(Y0 + 4, Math.min(Y0 + CH - 4, y));
       }
