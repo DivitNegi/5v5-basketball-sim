@@ -26307,6 +26307,55 @@ ROOKIE_CLASS_2026 = (
 )
 
 
+_MIP_DATA = None
+
+
+def mip_data() -> Dict:
+    """mip_data.json: each season's real top-5 Most Improved vote-getters with their real previous-season per-game line."""
+    global _MIP_DATA
+    if _MIP_DATA is None:
+        import json, os
+        try:
+            _MIP_DATA = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mip_data.json"), encoding="utf-8"))
+        except Exception:
+            _MIP_DATA = {}
+    return _MIP_DATA
+
+
+def mip_improvement(stats: Dict, prev) -> float:
+    """How much better his sim season is than his real previous season: points, rebounds, assists and minutes per game."""
+    gp = max(1, stats.get("games", 1))
+    return ((stats.get("pts", 0) / gp - prev[0]) + 0.5 * (stats.get("reb", 0) / gp - prev[1]) + 0.7 * (stats.get("ast", 0) / gp - prev[2])
+            + 0.1 * (stats.get("minutes", 0) / 60 / gp - prev[3]))
+
+
+def mip_line(stats: Dict, prev) -> str:
+    gp = max(1, stats.get("games", 1))
+    p, r, a = stats.get("pts", 0) / gp, stats.get("reb", 0) / gp, stats.get("ast", 0) / gp
+    return f"{p:.1f} PPG ({p - prev[0]:+.1f}), {r:.1f} RPG ({r - prev[1]:+.1f}), {a:.1f} APG ({a - prev[2]:+.1f}) | last season {prev[0]:.1f} / {prev[1]:.1f} / {prev[2]:.1f}"
+
+
+def mip_candidates(players, eligible) -> list:
+    """The Most Improved candidates as (item, previous line), best first: each year's real top-5 vote-getters; a season with no real
+    vote yet (2027) takes the five players who improved most on their real previous season."""
+    data = mip_data()
+    cands = data.get("candidates", {})
+    by_year: Dict[str, list] = {}
+    for item in players:
+        m = re.match(r"^(\d{4}) ", item[0] or "")
+        by_year.setdefault(m.group(1) if m else "2027", []).append(item)
+    out = []
+    for year, items in by_year.items():
+        if year in cands:
+            want = {rookie_name_key(c[0]): c[1:] for c in cands[year]}
+            out += [(it, want[rookie_name_key(it[1])]) for it in items if rookie_name_key(it[1]) in want and eligible(it)]
+        elif year in data.get("previous", {}):
+            prev = {rookie_name_key(n): v for n, v in data["previous"][year].items()}
+            pool = [(it, prev[rookie_name_key(it[1])]) for it in items if rookie_name_key(it[1]) in prev and eligible(it)]
+            out += sorted(pool, key=lambda x: mip_improvement(x[0][2], x[1]), reverse=True)[:5]
+    return sorted(out, key=lambda x: mip_improvement(x[0][2], x[1]), reverse=True)
+
+
 def rookie_name_key(name: str) -> str:
     import unicodedata
     text = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode().lower()
@@ -26519,7 +26568,7 @@ def build_season_sections(entries: List[Dict],
 
     awards = []
     awards_table = []
-    season_races = {"mvp": [], "dpoy": [], "roy": []}
+    season_races = {"mvp": [], "dpoy": [], "roy": [], "mip": []}
     if all_players:
         def stat_line(team_name: str, stats: Dict) -> str:
             gp = max(1, stats.get("games", 1))
@@ -26753,6 +26802,9 @@ def build_season_sections(entries: List[Dict],
                      for i, it in enumerate([x for x in defenders if in_race(x)][:5], start=1)],
             "roy": [{"rank": i, "player": it[1], "team": it[0], "stats": stat_line(it[0], it[2])}
                     for i, it in enumerate(sorted(rookie_pool, key=roy_key, reverse=True)[:5], start=1)],
+            # Most Improved: the year's real top-5 vote-getters (or the five biggest improvers), ranked by how much better than last season
+            "mip": [{"rank": i, "player": it[1], "team": it[0], "stats": mip_line(it[2], prev)}
+                    for i, (it, prev) in enumerate(mip_candidates([x for x in all_players if not _is_rookie(x)], in_race)[:5], start=1)],
         }
         if races_only:
             return {"_season_races": season_races}
@@ -26967,6 +27019,16 @@ def build_season_sections(entries: List[Dict],
                 label = "All-Rookie First Team" if team_no == 1 else "All-Rookie Second Team"
                 for idx, (team_name, name, stats) in enumerate(ranked_rookies[start:start + 5], start=1):
                     all_rookie_rows.append({"award": label, "player": f"{idx}. {name}", "team": team_name, "stats": stat_line(team_name, stats)})
+
+        # Most Improved Player: the best of the year's top-5 candidates (listed right after Rookie of the Year / DPOY)
+        mip_list = mip_candidates([x for x in all_players if not _is_rookie(x)], in_race)
+        if mip_list:
+            (mip_team, mip_name, mip_stats), mip_prev = mip_list[0]
+            after = "Rookie of the Year" if any(a[0] == "Rookie of the Year" for a in awards) else "DPOY"
+            at = next((i + 1 for i, a in enumerate(awards) if a[0] == after), len(awards))
+            awards.insert(at, ("Most Improved Player", mip_name, f"{mip_team} | {mip_line(mip_stats, mip_prev)}"))
+            at = next((i + 1 for i, a in enumerate(awards_table) if a.get("award") == after), len(awards_table))
+            awards_table.insert(at, {"award": "Most Improved Player", "player": mip_name, "team": mip_team, "stats": mip_line(mip_stats, mip_prev)})
 
         if SEASON_POSITIONAL_AWARDS:
             nba_teams = positional_award_teams(all_nba, player_lookup, 3)
@@ -27483,7 +27545,7 @@ def live_season_races_payload(entries, player_totals, team_totals, completed: in
         _RACE_QUALITY_CACHE.clear()
         _RACE_ADVANCED_CACHE.clear()
     sections = build_season_sections(entries, player_totals, team_totals, include_rookies=True, races_only=True)
-    return {"season_races": sections.get("_season_races") or {"mvp": [], "dpoy": [], "roy": []}, "completed": completed, "total": total}
+    return {"season_races": sections.get("_season_races") or {"mvp": [], "dpoy": [], "roy": [], "mip": []}, "completed": completed, "total": total}
 
 
 def copy_season_totals(value):

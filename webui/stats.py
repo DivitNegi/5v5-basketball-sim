@@ -71,6 +71,10 @@ FINISH_LABELS = [("pullup_three", "Off-the-dribble 3"), ("pullup_mid", "Off-the-
                  ("off_pass", "Finish off a pass (older games)"), ("post", "Post move (older games)")]
 
 
+FINISH_SHORT = ["PULL-UP 3", "PULL-UP MID", "C&S 3", "C&S MID", "DRIVE LAYUP", "FLOATER", "DRIVE DUNK", "LAYUP OFF PASS", "DUNK OFF PASS",
+                "POST", "FADEAWAY", "PUTBACK"]   # the finishes table's columns, same order as the first twelve FINISH_LABELS
+
+
 PLAY_ALIASES = {"drive": "dribble", "pullup": "dribble"}   # games saved before the merge filed these two separately
 
 
@@ -112,6 +116,7 @@ def play_type_breakdown(mine, pool, key="pt", labels=None):
 ANALYTICS = {
     "onoff": "Team offense and defense per 100 possessions with him on the floor and on the bench. Possessions are the team's, split by his share of the minutes.",
     "playtypes": "Click a player to see his full play-type breakdown: how often he runs each play, how well, and how that compares with the league.",
+    "finishes": "How each shot ended (pull-up, catch and shoot, driving layup, floater, dunk, post move, putback): made/attempts, FG% and points per shot. Rank by PPS to see who is most efficient at each finish.",
     "clutch": "Last five minutes of the 4th quarter or overtime with the score within five. Season totals, not per game: clutch samples are small.",
     "xfg": "Every shot carries the make chance the engine rolled. Expected points add those up; the gap to the points he really scored is shot-making above or below expected.",
     "assists": "Who his assists went to: one row per passer and teammate.",
@@ -129,21 +134,22 @@ def analytics_table(kind, players, teams, team_filter, result):
     result["note"] = ANALYTICS[kind]
     cols = {
         "onoff": ["GP", "MIN", "ON ORtg", "ON DRtg", "ON NET", "OFF ORtg", "OFF DRtg", "OFF NET", "NET SWING", "+/-"],
-        "playtypes": ["Shots"] + PLAY_SHORT,   # made/attempts · FG% on each play type; the full breakdown is in his pop-up
+        "playtypes": ["Shots"] + PLAY_SHORT,
+        "finishes": ["Shots"] + FINISH_SHORT,   # made/attempts · FG% on each play type; the full breakdown is in his pop-up
         "clutch": ["GP", "MIN", "PTS", "FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "TS%", "AST", "TOV", "+/-"],
         "xfg": ["Shots", "xPTS", "PTS", "PTS vs exp", "per 100 shots", "xeFG%", "eFG%"],
         "assists": ["To", "AST", "Share%"],
     }[kind]
     result["columns"] = ["Team", "Player"] + cols
     # whole-number totals (not per-game averages): shown without a decimal
-    result["open_tab"] = "playtypes" if kind == "playtypes" else None   # clicking a player opens his pop-up on this tab
-    result["counts"] = {"onoff": [], "playtypes": ["Shots"], "xfg": ["Shots", "PTS"], "assists": ["AST"],
+    result["open_tab"] = "playtypes" if kind in ("playtypes", "finishes") else None   # clicking a player opens his pop-up on this tab
+    result["counts"] = {"onoff": [], "playtypes": ["Shots"], "finishes": ["Shots"], "xfg": ["Shots", "PTS"], "assists": ["AST"],
                         "clutch": ["PTS", "FG", "FGA", "3P", "3PA", "FT", "FTA", "AST", "TOV", "+/-"]}[kind]
     shots = lambda st: sum(v.get("fga", 0) for v in ((st.get("analytics") or {}).get("pt") or {}).values())
     for tn, pp in players.items():
         if team_filter not in ("All teams", tn):
             continue
-        if kind == "playtypes":
+        if kind in ("playtypes", "finishes"):
             pp = dict(sorted(pp.items(), key=lambda kv: -shots(kv[1])))
         tt = teams.get(tn, {}) or {}
         other = next((v for k, v in teams.items() if k != tn), {}) or {}
@@ -178,6 +184,15 @@ def analytics_table(kind, players, teams, team_filter, result):
                         m, a2, pts = v.get("fgm", 0), v.get("fga", 0), v.get("pts", 0)
                         return f"{m}/{a2} · {100 * m / a2:.0f}% · {pts / a2:.2f} PPS" if a2 else "0/0 · —"
                     add([total] + [pair(k) for k, _ in PLAY_LABELS])
+            elif kind == "finishes":   # one row per player who took a shot: how his shots ended
+                fin = _merged(st, "fin")
+                total = sum(v.get("fga", 0) for v in fin.values())
+                if total:
+                    def fpair(k):
+                        v = fin.get(k) or {}
+                        m, a2, pts = v.get("fgm", 0), v.get("fga", 0), v.get("pts", 0)
+                        return f"{m}/{a2} · {100 * m / a2:.0f}% · {pts / a2:.2f} PPS" if a2 else "0/0 · —"
+                    add([total] + [fpair(k) for k, _ in FINISH_LABELS[:len(FINISH_SHORT)]])
             elif kind == "clutch":
                 c = a.get("clutch") or {}
                 if not c.get("sec") and not c.get("fga") and not c.get("fta"):

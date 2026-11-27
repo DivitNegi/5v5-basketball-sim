@@ -1034,7 +1034,7 @@ function renderRaces() {
   const ready = !!SE.data?.state?.ready;
   if (!ready) {
     const races = SE.data?.races || {};
-    const titles = { mvp: "MVP race", dpoy: "DPOY race", roy: "Rookie of the Year race" };
+    const titles = { mvp: "MVP race", dpoy: "DPOY race", roy: "Rookie of the Year race", mip: "Most Improved race" };
     const cards = Object.keys(titles).filter((k) => (races[k] || []).length).map((k) => raceCard(titles[k], races[k]));
     return cards.length ? h("div", {}, h("div", { class: "muted", style: { marginBottom: "10px" } }, "Live standings for the awards. They update as the season goes and become the official awards when it ends."), h("div", { class: "race-grid" }, cards))
       : h("div", { class: "empty" }, "The award races appear once games are played.");
