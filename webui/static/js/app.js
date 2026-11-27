@@ -3295,9 +3295,9 @@ function renderStatsInto(root, data, opts = {}) {
   const rerender = () => renderStatsInto(root, data, opts);
   const LABEL_COLS = ["Opponent", "Play type", "To", "Top play"];   // text columns: never a "rank by" choice
   const isPair = (i) => data.rows.some((r) => typeof r[i] === "string" && r[i].includes("·"));
-  const PAIR_MODES = ["attempts", "makes", "FG%"];
+  const hasPps = (i) => data.rows.some((r) => typeof r[i] === "string" && r[i].includes("PPS"));
   const rankCols = cols.slice(2).filter((c) => !LABEL_COLS.includes(c))
-    .flatMap((c) => (isPair(cols.indexOf(c)) ? PAIR_MODES.map((m) => `${c} · ${m}`) : [c]));
+    .flatMap((c) => { const i = cols.indexOf(c); return isPair(i) ? ["attempts", "makes", "FG%", ...(hasPps(i) ? ["PPS (efficiency)"] : [])].map((m) => `${c} · ${m}`) : [c]; });
   const maxGp = Math.max(1, ...(data.gp || [1]));
   const controls = h("div", { class: "stx-controls" },
     h("label", {}, h("span", {}, "Find"), h("input", { type: "search", placeholder: "Player name", value: st.search, oninput: (e) => { st.search = e.target.value.toLowerCase(); const pos = e.target.selectionStart; rerender(); const i = $(`#${root.id} .stx-controls input[type=search]`); i.focus(); i.setSelectionRange(pos, pos); } })),
@@ -3307,7 +3307,7 @@ function renderStatsInto(root, data, opts = {}) {
     h("span", { class: "stx-hint" }, `${maxGp > 1 ? `${maxGp} games played · ` : ""}click a column to sort`));
   let items = data.rows.map((r, i) => ({ r, gp: data.gp?.[i] ?? maxGp }))
     .filter((x) => x.gp >= st.minGp && (!st.search || String(x.r[1]).toLowerCase().includes(st.search)));
-  const pairRank = st.sort.column < 0 && st.rank.match(/^(.*) · (attempts|makes|FG%)$/);
+  const pairRank = st.sort.column < 0 && st.rank.match(/^(.*) · (attempts|makes|FG%|PPS \(efficiency\))$/);
   const colIdx = st.sort.column >= 0 ? st.sort.column : (st.rank !== "Team order" ? cols.indexOf(pairRank ? pairRank[1] : st.rank) : -1);
   const dirn = st.sort.column >= 0 ? st.sort.direction : -1;
   // a "made/attempts · FG%" cell: rank by attempts, makes or FG% (FG% needs a real sample: 15% of the column's most attempts, at least 3)
@@ -3316,6 +3316,7 @@ function renderStatsInto(root, data, opts = {}) {
   const valOf = (v) => {
     if (!pairRank) return numOf(v);
     const [m, a] = pairParts(v);
+    if (pairRank[2].startsWith("PPS")) { const pp = String(v ?? "").match(/([\d.]+) PPS/); return pp && a >= minAtt ? Number(pp[1]) : -1e9; }
     return pairRank[2] === "attempts" ? a : pairRank[2] === "makes" ? m : (a >= minAtt ? m / a : -1e9);
   };
   const byCol = (a, b) => dirn * (valOf(a.r[colIdx]) - valOf(b.r[colIdx]));

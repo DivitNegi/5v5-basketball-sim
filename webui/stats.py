@@ -175,8 +175,8 @@ def analytics_table(kind, players, teams, team_filter, result):
                 if total:
                     def pair(k):
                         v = ptd.get(k) or {}
-                        m, a2 = v.get("fgm", 0), v.get("fga", 0)
-                        return f"{m}/{a2} · {100 * m / a2:.0f}%" if a2 else "0/0 · —"
+                        m, a2, pts = v.get("fgm", 0), v.get("fga", 0), v.get("pts", 0)
+                        return f"{m}/{a2} · {100 * m / a2:.0f}% · {pts / a2:.2f} PPS" if a2 else "0/0 · —"
                     add([total] + [pair(k) for k, _ in PLAY_LABELS])
             elif kind == "clutch":
                 c = a.get("clutch") or {}
