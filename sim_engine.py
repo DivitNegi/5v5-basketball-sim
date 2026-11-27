@@ -5282,6 +5282,7 @@ BADGE_LEGENDS = {
 
 
 BADGE_EXCLUDE = {"bully": {"Rudy Gobert"}}
+FIXED_BADGE_LEVELS = {"Klay Thompson": {"limitless_range": "silver"}}   # a badge set at exactly one level for a player in every season
 NO_FLOATER_PLAYERS = set()   # players whose drives never end in a floater (none right now)
 BADGE_LEGENDS.update({
     "hands_up": {"Kawhi Leonard": "hof", "Michael Jordan": "hof", "Gary Payton": "hof", "Scottie Pippen": "hof", "Bruce Bowen": "hof",
@@ -5377,6 +5378,9 @@ def assign_newer_badges(p: "Player"):
     for badge, names in BADGE_EXCLUDE.items():   # players who should never carry a badge the formula gives them
         if p.name in names:
             p.badges = tuple(b for b in p.badges if badge_parts(b)[0] != badge)
+    for badge, level in FIXED_BADGE_LEVELS.get(p.name, {}).items():   # exactly this level, every season, whatever his ratings would earn
+        p.badges = tuple(b for b in p.badges if badge_parts(b)[0] != badge)
+        add_badge(p, badge, level)
 
 
 # legendary isolation scorers: Hall of Fame Iso Scorer in their prime seasons only (other versions get what their ratings earn)
