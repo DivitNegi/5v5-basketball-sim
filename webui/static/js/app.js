@@ -1531,7 +1531,9 @@ function pcDonut(z) {
 }
 // ---- styled hover tooltip (replaces the browser's plain title box): any element with setTip() shows it
 // what a shot is called in the hover card; a midrange jumper the engine placed (and the play-by-play named) says where it came from
-const shotZoneName = (z, ev) => (z === "rim" && ev?.dist === "float" ? "floater" : z === "mid" && ["base", "elbow", "wing"].includes(ev?.loc) ? { base: "baseline jumper", elbow: "elbow jumper", wing: "wing jumper" }[ev.loc]
+// about 3 in 10 of the shots tagged "elbow" are taken from the middle of the free-throw line: decided from the shot itself, so the chart dot and the label agree
+const isFtLineShot = (ev) => ev?.loc === "elbow" && ev?.dist !== "long" && ((hashStr(String(ev.player || "")) ^ Math.imul((ev.n || 0) + 7, 40503)) >>> 0) % 100 < 30;
+const shotZoneName = (z, ev) => (z === "rim" && ev?.dist === "float" ? "floater" : z === "mid" && isFtLineShot(ev) ? "free-throw line jumper" : z === "mid" && ["base", "elbow", "wing"].includes(ev?.loc) ? { base: "baseline jumper", elbow: "elbow jumper", wing: "wing jumper" }[ev.loc]
   : { three: "three", mid: "midrange jumper", rim: "layup", dunk: "dunk", post: "post shot", post_fade: "post fade" }[z] || z || "shot");
 function shotWhen(ev) {
   const clk = Number(ev.clock), per = Number(ev.period);
@@ -3425,8 +3427,9 @@ function shotSpot(ev, side, spread = false) {
     else if (ev.loc === "elbow") {
       // A shot the engine tagged as an elbow jumper sits AT an elbow: the corner where the free-throw line meets the lane line (a few feet
       // around it, mostly just outside the lane), with an occasional one at the middle of the line. Not a wide slice out toward the arc.
-      const dy = 66 + 44 * rnd(), sgn = side;   // at one of the elbows (where the free-throw line meets the lane line), never the middle of the line
-      x = 214 + 50 * Math.pow(rnd(), 1.3);
+      const ft = isFtLineShot(ev);   // the middle of the free-throw line, or one of the elbows (where the line meets the lane line)
+      const dy = ft ? 62 * rnd() : 66 + 44 * rnd(), sgn = side;
+      x = ft ? 222 + 46 * Math.pow(rnd(), 1.2) : 214 + 50 * Math.pow(rnd(), 1.3);
       y = HY + sgn * dy;
     }
     else for (let k = 0; k < 30; k++) {
