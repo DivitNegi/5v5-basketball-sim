@@ -5232,7 +5232,8 @@ BADGE_LEGENDS = {
 }
 
 
-BADGE_EXCLUDE = {"bully": {"Rudy Gobert"}}
+BADGE_EXCLUDE = {"bully": {"Rudy Gobert"}, "floater_ace": {"Kyrie Irving"}}
+NO_FLOATER_PLAYERS = {"Kyrie Irving"}   # finish at the rim: none of their drives end in a floater
 BADGE_LEGENDS.update({
     "hands_up": {"Kawhi Leonard": "hof", "Michael Jordan": "hof", "Gary Payton": "hof", "Scottie Pippen": "hof", "Bruce Bowen": "hof",
                  "Tony Allen": "gold", "Jrue Holiday": "gold", "Marcus Smart": "gold", "Herbert Jones": "gold", "Luguentz Dort": "gold",
@@ -13914,6 +13915,8 @@ def _shot_make_prob_rolled(shooter: Player, defender: Player, shot_type: str,
     close, near = prof.get("r", 0.0), prof.get("s", 0.0)
     share = near / (close + near) if close + near > 0.05 else DEFAULT_FLOAT_SHARE
     share = min(0.92, share / (1 - RIM_PUTBACK_SHARE))
+    if shooter.name in NO_FLOATER_PLAYERS:
+        share = 0.0
     share = min(0.92, share * (1.0 + 1.5 * STYLE_SHOT_SHARE.get(badge_style_tier(shooter, "floater_ace"), 0.0)))   # Floater Ace: more floaters
     tok = "rim_float" if random.random() < share else "rim_close"
     shooter._pending_rim_dist = tok
