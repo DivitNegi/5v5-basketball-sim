@@ -1690,8 +1690,8 @@ async function loadPlayerCard() {
   const numTiles = [];   // plain numbers count up from their previous value on the next refresh
   const tile = (k, v) => { const vEl = h("div", { class: `v${String(v).length > 6 ? " frac" : ""}`, "data-k": k }, v); if (typeof v === "number") numTiles.push([vEl, v]); return h("div", { class: "tile" }, h("div", { class: "k" }, k), vEl); };
   const form = GV.pc.game === "live" && GV.pc.quarter === "all" ? shotForm(p.name) : "";
-  const zoneBox = (title, z) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
-    h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))), distRow(z));
+  const zoneBox = (title, z, dist) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
+    h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))), dist ? distRow({ dist }) : null);
   const qmatch = (pb) => GV.pc.quarter === "all" || String(periodIndex(pb.period) + 1) === GV.pc.quarter || (GV.pc.quarter === "OT" && periodIndex(pb.period) >= 4);
   const chosenBracket = String(GV.pc.game).startsWith("b:") ? bracketGame(seriesGames.find((g) => g.value === GV.pc.game)) : null;
   const chosenGame = GV.pc.game === "live" ? S.gameNo : chosenBracket ? chosenBracket[2] : Number(GV.pc.game);
@@ -1700,6 +1700,7 @@ async function loadPlayerCard() {
   const gameLabel = chosenBracket ? `Game ${String(GV.pc.game).split(":").pop()}` : pastGame ? `Game ${GV.pc.game}` : `Game ${liveNo}`;
   const qNote = GV.pc.quarter !== "all" && pastGame && !d.quarterLine ? h("div", { class: "muted", style: { margin: "6px 0" } }, "The stat tiles show this earlier game's full line; the shot map, shot diet and points chart follow the quarter.") : null;
   const plays = S.goodPlays.filter((pb) => pb.game === chosenGame && pb.text.includes(p.name) && qmatch(pb)).slice(0, 40);
+  const cardShots = GV.pc.game === "live" ? S.shots : chosenBracket ? chosenBracket[1] : (S.gameShots.get(Number(GV.pc.game)) || []);
   $("#pcardBody").replaceChildren(
     h("div", { class: "pcard-head", style: { "--c": d.team.color } }, face, h("div", {}, h("div", { class: "pcard-name" }, p.name, p.rookie ? h("span", { class: "tag rk" }, "R") : null,
       form ? h("span", { class: `form ${form}`, style: { fontSize: "18px" } }, form === "hot" ? "🔥" : "🧊") : null),
@@ -1714,8 +1715,10 @@ async function loadPlayerCard() {
       h("div", { class: "pc-panel" }, h("h4", {}, "Impact"), pcRadar(p, chartColor(d.team))),
       h("div", { class: "pc-panel" }, h("h4", {}, `Shot diet · ${qLabel}`), pcDonut(d.shots)),
       h("div", { class: "pc-panel" }, h("h4", {}, pastGame ? "Field-goal points by quarter" : "Points by quarter"), pcSpark(d.by_quarter, chartColor(d.team)) || h("div", { class: "muted" }, "–"))),
-    h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${gameLabel} · ${qLabel}`), pcShotMap(p.name, GV.pc.team, GV.pc.quarter, GV.pc.game === "live" ? S.shots : chosenBracket ? chosenBracket[1] : (S.gameShots.get(Number(GV.pc.game)) || []))),
-    h("div", { class: "conf-grid" }, zoneBox(d.scope === "quarter" ? `Shot diet · ${qLabel}` : "Shot diet", d.shots), d.defended ? zoneBox(d.scope === "quarter" ? "Shots defended · full game" : "Shots defended", d.defended) : null),
+    h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot map · ${gameLabel} · ${qLabel}`), pcShotMap(p.name, GV.pc.team, GV.pc.quarter, cardShots)),
+    h("div", { class: "conf-grid" }, zoneBox(d.scope === "quarter" ? `Shot diet · ${qLabel}` : "Shot diet", d.shots,
+      // by distance: measured from where each of his dots sits on the shot map (same shots, same quarter filter)
+      distanceBands(cardShots.filter((e) => e.player === p.name && (GV.pc.quarter === "all" || (GV.pc.quarter === "OT" ? e.period >= 5 : e.period === Number(GV.pc.quarter)))), (ev) => shotSpot(ev, 0))), d.defended ? zoneBox(d.scope === "quarter" ? "Shots defended · full game" : "Shots defended", d.defended) : null),
     h("h3", { style: { margin: "18px 0 6px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, `Positive plays · ${p.name}`),
     h("div", { class: "pc-plays" }, plays.length ? plays.map((pb) => h("div", { class: "ev score" }, h("div", { class: "rail", style: { background: "var(--line-strong)" } }, ""), h("div", {}, h("span", { class: "sc" }, `${pb.period} ${pb.clock} · ${pb.score}`), pb.text))) : h("div", { class: "muted" }, "No plays logged yet for this selection.")));
   pcAfterRender(numTiles);
@@ -1734,6 +1737,21 @@ function zoneClass(key, made, att) {
   if (key === "three") return pct > 36 ? "good" : "ok";   // threes: green above 36% (40%+ included), yellow below
   const [hi, lo] = key === "rim" ? [50, 40] : key === "mid" ? [40, 30] : key === "post" ? [48, 38] : [42, 33];
   return pct > hi ? "good" : pct >= lo ? "ok" : "bad";
+}
+// Basketball-Reference's distance bands, measured off the shot chart: each dot's distance from the rim (10 chart units = 1 ft); threes are 3P.
+// The shot chart and these cards always agree because they use the same drawn positions.
+function distanceBands(events, spot) {
+  const bands = [["0-3 ft", 0, 0], ["3-10 ft", 0, 0], ["10-16 ft", 0, 0], ["16 ft-3P", 0, 0], ["3P", 0, 0]];
+  for (const ev of events) {
+    if (ev.extra) continue;   // a missed heave is not a field-goal attempt
+    let i = 4;
+    if (ev.zone !== "three") {
+      const [x, y] = spot(ev), ft = Math.hypot(x - SC_GEO.HX, y - SC_GEO.CY) / 10;
+      i = ft < 3 ? 0 : ft < 10 ? 1 : ft < 16 ? 2 : 3;
+    }
+    bands[i][2]++; if (ev.made) bands[i][1]++;
+  }
+  return bands;
 }
 // his shots by distance, in Basketball-Reference's bands (0-3 ft, 3-10 ft, 10-16 ft, 16 ft-3P, 3P)
 function distRow(z) {
@@ -2350,7 +2368,8 @@ async function openTeamCard(team) {
 // the team pop-up's deeper panels: advanced radars ranked against the other teams, the team's shot diet and zones, and its whole shot chart
 function teamInsights(t, id, team) {
   const color = chartColor(id);
-  const zoneRow = h("div", {}, h("div", { class: "zone-row" }, [["Rim", t.shots.rim, "rim"], ["Mid", t.shots.mid, "mid"], ["3PT", t.shots.three, "three"], ["Post", t.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k))), distRow(t.shots));
+  const distBox = h("div", {});   // filled by the shot chart: his shots by distance, measured from where each dot sits
+  const zoneRow = h("div", {}, h("div", { class: "zone-row" }, [["Rim", t.shots.rim, "rim"], ["Mid", t.shots.mid, "mid"], ["3PT", t.shots.three, "three"], ["Post", t.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k))), distBox);
   const hasZones = Object.values(t.shots).some((z) => z[1] > 0);
   const sub = (txt) => h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, txt);
   return [
@@ -2360,7 +2379,7 @@ function teamInsights(t, id, team) {
     hasZones && t.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, "Shot zones · against the other teams"),
       sub("For the rim, midrange, three and post: how well the team shoots it (FG%) and how often (shots a game), ranked among the teams."), percentileRadar(t.zone_ranks, color)) : null,
     hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Team shot chart · ${t.source}`),
-      seasonShotChart(id.short || team, t.shots, t.zone_avg, "league", { three: t.three_split, mid: t.mid_split, dist: t.dist_split, fine: t.fine, fineAvg: t.fine_avg })) : null,
+      seasonShotChart(id.short || team, t.shots, t.zone_avg, "league", { three: t.three_split, mid: t.mid_split, dist: t.dist_split, fine: t.fine, fineAvg: t.fine_avg, distBox })) : null,
   ].filter(Boolean);   // replaceChildren would print a skipped panel as "null"
 }
 
@@ -2441,6 +2460,7 @@ function seasonShotChart(name, zones, avg, vs, split) {
     far("rim", "rim_float", "float", "close"); far("mid", "mid_long", "long", "short");
   }
   const total = events.length, state = { view: "shots" };
+  if (split?.distBox) split.distBox.replaceChildren(distRow({ dist: distanceBands(events, (ev) => shotSpot(ev, 0, true)) }) || "");
   const svg = svgEl("svg", { viewBox: "20 60 490 520", class: "court-svg pc-map pro" });
   svg.innerHTML = proCourt();
   const under = svgEl("g"), heat = svgEl("g", { class: "heat" }), dots = svgEl("g", { class: "dots" }), zoneG = svgEl("g", { class: "zonemap" });
@@ -2556,7 +2576,8 @@ function insightsBox(first, color, fetchGroup) {
 }
 function playerInsights(d, color) {
   const cmpLbl = !d.group || d.group === "all" ? "the league" : `other ${d.group}`;
-  const zoneRow = h("div", {}, h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k))), distRow(d.shots));
+  const distBox = h("div", {});   // filled by the shot chart: his shots by distance, measured from where each dot sits
+  const zoneRow = h("div", {}, h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k))), distBox);
   const hasZones = Object.values(d.shots).some((z) => z[1] > 0);
   return [
     h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, `Compared to ${cmpLbl}`),
@@ -2569,7 +2590,7 @@ function playerInsights(d, color) {
     hasZones && d.zone_ranks?.length ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot zones · compared to ${cmpLbl}`),
       h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, "For the rim, midrange, three and post: how well he shoots it (FG%) and how often he shoots it (shots a game), ranked against the other players. A zone he barely uses shows 0 for FG%."),
       percentileRadar(d.zone_ranks, color)) : null,
-    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group, { three: d.three_split, mid: d.mid_split, dist: d.dist_split, fine: d.fine, fineAvg: d.fine_avg })) : null,
+    hasZones ? h("div", { class: "pc-panel", style: { marginTop: "12px" } }, h("h4", {}, `Shot chart · ${d.source}`), seasonShotChart(d.name, d.shots, d.zone_avg, !d.group || d.group === "all" ? "league" : d.group, { three: d.three_split, mid: d.mid_split, dist: d.dist_split, fine: d.fine, fineAvg: d.fine_avg, distBox })) : null,
   ];
 }
 
