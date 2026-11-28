@@ -16849,6 +16849,71 @@ def team_playbook_play(off: Team) -> str | None:
     return None
 
 
+# Generated play packages: every team without a hand-built playbook gets its own set names, built from its roster (its lead
+# creator, its main big, its best shooter) and named in its own terminology. They only change how a possession is called and
+# described: the play type, shooter, passer and every roll stay exactly what they would have been (the set is picked with its
+# own random generator, so the main dice are never touched and a seeded game plays out the same, shot for shot).
+GENERATED_PLAYBOOKS = True
+GENERATED_SET_CALL_CHANCE = 0.30   # how often the bench call is narrated on a generic play (the rest run without a call)
+GENERATED_SET_NAMES = {
+    # play type -> the set names a team can use for it (each team keeps one per play type)
+    "high_pnr": ("High", "Fist", "Middle", "Thumbs Up", "Step Up", "Angle"),
+    "empty_corner_pnr": ("Empty", "Empty Side", "Clear 1", "Strong Empty", "Ear"),
+    "spain_pnr": ("Spain", "Stack", "Spain Pop", "Spain Flare"),
+    "handoff": ("Delay", "Chicago", "Get", "Zipper Away", "Wheel", "Dribble Weave"),
+    "horns": ("Horns", "Horns Flare", "Horns Twist", "Horns Elbow", "Horns Rip", "Horns Down"),
+    "floppy": ("Floppy", "Floppy Double", "Pin Down", "Staggers", "Flex Pin"),
+    "elevator": ("Elevator", "Gate", "Elevator Doors", "Shuffle Gate"),
+    "backdoor": ("Blind Pig", "Chin", "Back Door", "Point Rip", "Hammer Back"),
+    "drive_kick": ("5 Out", "Attack", "Spread", "Four Low", "Rip Spread"),
+    "post_split": ("Split", "Post Split", "Feed the Post", "Hi-Lo", "Duck In", "Loop"),
+    "iso": ("Clear", "Iso", "Cutthroat", "1-4 Flat", "Fist Down", "Pistol Iso"),
+}
+_GENERATED_PLAYBOOK_CACHE: Dict[str, Dict[str, str]] = {}
+_GENERATED_SET_RNG = random.Random(0x5E75)   # its own dice: the game's random stream is never used here
+
+
+def _team_nickname(team_name: str) -> str:
+    parts = str(team_name or "").split(" ", 1)
+    rest = parts[1] if len(parts) > 1 and parts[0].isdigit() else str(team_name or "")
+    words = rest.split()
+    if len(words) >= 2 and words[-2] in ("Trail", "Red", "Green", "Blue"):
+        return " ".join(words[-2:])
+    return words[-1] if words else str(team_name or "")
+
+
+def generated_playbook(team_name: str) -> Dict[str, str]:
+    """The team's package: the set name it uses for each play type. Seeded by the team name, so a team always keeps the same
+    terminology and two teams rarely share a whole package."""
+    cached = _GENERATED_PLAYBOOK_CACHE.get(team_name)
+    if cached is None:
+        namer = random.Random("generated-playbook|" + str(team_name))
+        cached = {play: namer.choice(options) for play, options in GENERATED_SET_NAMES.items()}
+        _GENERATED_PLAYBOOK_CACHE[team_name] = cached
+    return cached
+
+
+def uses_generated_playbook(off: Team, play_type: str | None) -> bool:
+    return bool(GENERATED_PLAYBOOKS and play_type in GENERATED_SET_NAMES and not TEAM_PLAYBOOKS.get(getattr(off, "name", "")))
+
+
+def generated_set_call(off: Team, play_type: str | None, featured: Player | None) -> str | None:
+    """The bench call for a generic play run by a team without a hand-built playbook, naming the player the play actually went
+    to, e.g. "Hawks run 'Horns Flare' for Trae Young." None when the team has its own playbook or this one goes uncalled."""
+    if not uses_generated_playbook(off, play_type) or _GENERATED_SET_RNG.random() >= GENERATED_SET_CALL_CHANCE:
+        return None
+    set_name = generated_playbook(off.name).get(play_type)
+    if not set_name:
+        return None
+    nick = _team_nickname(off.name)
+    if featured is not None and featured in getattr(off, "on_floor", ()):
+        return _GENERATED_SET_RNG.choice((
+            f"{nick} run '{set_name}' for {featured.name}.",
+            f"The {nick} bench calls '{set_name}' to get {featured.name} a look.",
+            f"'{set_name}' from the {nick}, and it goes to {featured.name}.",
+        ))
+    return _GENERATED_SET_RNG.choice((f"{nick} run '{set_name}'.", f"The {nick} bench calls '{set_name}'."))
+
 def real_play_type(off: Team, handler: Player) -> str:
     team_play = team_playbook_play(off)
     if team_play:
@@ -21115,7 +21180,19 @@ def _simulate_possession(off: Team, dff: Team,
         play_type = clutch_package_play(off, need_three=(off.score - dff.score <= -3 and period_time <= 90))
     else:
         play_type = real_play_type(off, handler)
-    play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter, previous_handler=previous_handler)
+    if uses_generated_playbook(off, play_type):
+        # the team's own set name goes on the call (narration only: the play runs exactly as it would without it); the play's
+        # own description is held back so the call reads first and names the player the play actually went to
+        _play_text = io.StringIO()
+        with contextlib.redirect_stdout(_play_text):
+            play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter, previous_handler=previous_handler)
+        set_call = generated_set_call(off, play_type, play_shooter)
+        if set_call:
+            print(set_call)
+        if _play_text.getvalue():
+            print(_play_text.getvalue(), end="")
+    else:
+        play_shooter, play_passer, play_context = apply_play_type_setup(play_type, off, handler, shooter, previous_handler=previous_handler)
     if play_shooter is not shooter and getattr(shooter, "keep_pace_shots", False):
         # A featured scorer with a per-game attempt role that is behind his
         # minute-by-minute pace keeps some of the possessions the play type
