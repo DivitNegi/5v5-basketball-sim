@@ -891,7 +891,7 @@ def make_lakers_2027() -> Team:
                        0.700, 0.960, 0.920,
                        0.66, 0.53, 0.55, 0.82, 0.990, 0.800,
                        0.59, 0.58,
-                       clutchness=0.940, iso_tendency=0.99, stamina=0.73, shot_iq = .89),
+                       clutchness=0.940, iso_tendency=0.99, stamina=0.73, shot_iq = 0.75),
         Player('Austin Reaves', 'SG',
                0.42, 0.30, 0.22, 0.06, 0.08, 0.68,
                0.920, 0.950, 0.950, 0.700, 0.860,
