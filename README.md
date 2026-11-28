@@ -46,7 +46,6 @@ the server started.
 - **`broadcast.py`**, **`archetypes.py`**, **`media_ids.py`**: commentary, player archetypes, headshot/logo ids.
 - **Data:** `real_minutes.json` (real minutes per team-season), `shot_profiles.json` (real shot-distance splits),
   `mip_data.json` (Most Improved candidates), `schedule_2027.json`, `headshot_ids_extra.json`.
-- **`ratings_*.md`**: how each built season's ratings were derived from real stats.
 
 `players_data.py` imports `sim_engine.py`; the few engine functions that need the team registries import
 `players_data` inside the function to avoid a circular import. Simulation speed/pause globals (`SLEEP`,
