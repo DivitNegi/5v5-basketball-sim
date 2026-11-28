@@ -10698,7 +10698,7 @@ def effective_rating_components(player: Player, team: Team, opponent: Team,
     if getattr(player, "injury_limited", False):
         fatigue_drag += 0.035
 
-    hot_hand = HOT_HAND_RATING if getattr(player, "hot_start", False) else 0.0
+    hot_hand = HOT_HAND_RATING * hot_start_strength(player) if getattr(player, "hot_start", False) else 0.0
 
     return {
         "Hot hand": hot_hand,
@@ -13970,7 +13970,7 @@ def shot_make_prob(shooter: Player, defender: Player, shot_type: str,
     if shooter is not None:
         p = max(0.0, min(0.97, p * specific_badge_shot_multiplier(shooter, defender, shot_type, team, opponent, period)))
     if shooter is not None and getattr(shooter, "hot_start", False):
-        p = min(0.97, p * HOT_HAND_MAKE)   # the hot hand: he started hot and is still rolling
+        p = min(0.97, p * (1.0 + (HOT_HAND_MAKE - 1.0) * hot_start_strength(shooter)))   # the hot hand: he started hot and is still rolling
     if shooter is not None:
         shooter._xfg = (shot_type, p)   # kept for shot-making vs expected; the attempt that follows picks it up
     return p
@@ -15129,6 +15129,21 @@ HOT_HAND_MAKE = 1.04          # and his shots go in this much more often
 ROLE_HOT_TOUCH_BOOST = 2.6    # how much more often the hot role player is the one shooting (his base share is small)
 ROLE_HOT_DAMPER_SHIFT = 8     # his usual role-player shot dampers start this many shots later on his night
 ROLE_HOT_FGA_BONUS = 7.0      # and his shot-volume limit sits this much higher
+HOT_START_SOFTEN_FROM = 0.22  # a star who started hot keeps the full extra feed up to this usage...
+HOT_START_SOFTEN_TO = 0.34    # ...and from this usage on keeps only HOT_START_SOFTEN_FLOOR of it (the extra touches, extra shot room,
+HOT_START_SOFTEN_FLOOR = 0.2  # teammates swinging him the ball, and the make/ratings bump): a high-usage star already gets his shots
+
+
+def hot_start_strength(player: Player) -> float:
+    """How much of the started-hot extras a player gets (1.0 = all). A role player on his night and anyone in 1-on-1 get all of it; a star
+    gets less the higher his usage, so a high-usage star's hot start no longer snowballs into 50 as often. Shot-by-shot heat is separate."""
+    if getattr(player, "role_hot", False):
+        return 1.0
+    team, _opponent = _team_and_opponent_for(player)
+    if team is not None and getattr(team, "is_1v1", False):
+        return 1.0
+    t = (float(getattr(player, "usage", 0.0) or 0.0) - HOT_START_SOFTEN_FROM) / (HOT_START_SOFTEN_TO - HOT_START_SOFTEN_FROM)
+    return 1.0 - (1.0 - HOT_START_SOFTEN_FLOOR) * max(0.0, min(1.0, t))
 
 
 def update_role_hot(player: Player):
@@ -16502,8 +16517,9 @@ def shooter_weight(player: Player) -> float:
 
     soft_cap = shot_volume_soft_cap(player)
     if getattr(player, "hot_start", False):   # a player who started hot gets the ball more and is readier to shoot it
-        role_volume *= ROLE_HOT_TOUCH_BOOST if getattr(player, "role_hot", False) else HOT_START_TOUCH_BOOST
-        soft_cap += ROLE_HOT_FGA_BONUS if getattr(player, "role_hot", False) else HOT_START_FGA_BONUS
+        strength = hot_start_strength(player)
+        role_volume *= ROLE_HOT_TOUCH_BOOST if getattr(player, "role_hot", False) else 1.0 + (HOT_START_TOUCH_BOOST - 1.0) * strength
+        soft_cap += ROLE_HOT_FGA_BONUS if getattr(player, "role_hot", False) else HOT_START_FGA_BONUS * strength
     if SEASON_STAR_MINUTES_CAP and player.pts >= 30:
         soft_cap += HOT_GAME_SEASON_FGA_BONUS  # regular season: a hot night may run past the usual volume cap
     explicit_target = getattr(player, "target_fga_soft_cap", None)
@@ -16666,7 +16682,7 @@ HOT_GAME_SEASON_FGA_BONUS = 10.0
 def has_shot_volume_left(player: Player) -> bool:
     bonus = HOT_GAME_SEASON_FGA_BONUS if (SEASON_STAR_MINUTES_CAP and player.pts >= 30) else 0.0
     if getattr(player, "hot_start", False):
-        bonus += ROLE_HOT_FGA_BONUS if getattr(player, "role_hot", False) else HOT_START_FGA_BONUS
+        bonus += ROLE_HOT_FGA_BONUS if getattr(player, "role_hot", False) else HOT_START_FGA_BONUS * hot_start_strength(player)
     if player.shot_tendency >= 0.48 or player.usage >= 0.32:
         return player.fga <= shot_volume_soft_cap(player) + 3.0 + bonus
     return player.fga <= shot_volume_soft_cap(player) + 1.0 + bonus
@@ -18664,9 +18680,12 @@ def maybe_reroute_hot_start(team: Team, shooter: Player) -> Player:
     if getattr(shooter, "hot_start", False):
         return shooter
     hot = [p for p in team.on_floor if p is not shooter and getattr(p, "hot_start", False) and not p.fouled_out and has_shot_volume_left(p)]
-    if not hot or random.random() >= HOT_START_REROUTE:
+    if not hot:
         return shooter
-    return max(hot, key=lambda p: p.pts)
+    target = max(hot, key=lambda p: p.pts)
+    if random.random() >= HOT_START_REROUTE * hot_start_strength(target):   # a high-usage star gets less of this (see hot_start_strength)
+        return shooter
+    return target
 
 
 def maybe_reroute_go_to_scorer(team: Team, shooter: Player) -> Player:
