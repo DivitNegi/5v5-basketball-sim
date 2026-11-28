@@ -29,34 +29,52 @@ the server started.
 
 ## Project structure
 
-- **`sim_engine.py`**: the whole engine. `Player`/`Team` models, possessions, play types and team playbooks, shot choice
-  and make chance, fouls, passing and assists, rebounds, badges, minutes and rotations, play-by-play, seasons, awards,
-  playoffs, fantasy drafts and the analytics counters. `simulate_game` is the 5-on-5 game loop, `simulate_1v1_game` the
-  1-on-1 mode and `simulate_silent_season_game` a quiet seeded game.
+```
+main_web.py            browser UI entry point (python main_web.py)
+main.py                Tkinter desktop app entry point (backup)
+project_paths.py       puts engine/, seasons/ and desktop/ on the import path
+engine/                the simulator
+seasons/               82-game season runners
+teams/                 one roster file per season
+webui/                 the browser UI (Python API + static front end)
+desktop/               the Tkinter desktop app
+data/                  JSON data files the engine reads
+nba_logo_cache/, nba_headshot_cache/   downloaded images (git-ignored)
+```
+
+- **`engine/sim_engine.py`**: the whole engine. `Player`/`Team` models, possessions, play types and team playbooks, shot
+  choice and make chance, fouls, passing and assists, rebounds, badges, minutes and rotations, play-by-play, seasons,
+  awards, playoffs, fantasy drafts and the analytics counters. `simulate_game` is the 5-on-5 game loop,
+  `simulate_1v1_game` the 1-on-1 mode and `simulate_silent_season_game` a quiet seeded game.
+- **`engine/players_data.py`**: imports every team file, applies real-stat calibration (`engine/real_stat_calibration.py`)
+  and holds the team-factory registries (`gui_team_factories()`), divisions and postseason runners.
+- **`engine/broadcast.py`**, **`engine/archetypes.py`**, **`engine/media_ids.py`**: commentary, player archetypes,
+  headshot/logo ids.
 - **`teams/teams_YYYY.py`**: one file per season, each team a `make_<team>_<year>` factory of `Player(...)` ratings and
   tendencies. `teams/teams_olympic.py` holds the international teams.
-- **`players_data.py`**: imports every team file, applies real-stat calibration (`real_stat_calibration.py`) and holds
-  the team-factory registries (`gui_team_factories()`), divisions and postseason runners.
-- **`season_year.py`** / **`season_2018.py`**: 82-game seasons (`SEASON_YEARS`, `run_year_season`). They use
-  multiprocessing, so a script that calls them needs an `if __name__ == "__main__":` guard.
+- **`seasons/season_year.py`** / **`seasons/season_2018.py`**: 82-game seasons (`SEASON_YEARS`, `run_year_season`).
+  They use multiprocessing, so a script that calls them needs an `if __name__ == "__main__":` guard.
 - **`webui/`**: the browser UI. `server.py` (HTTP API), `runner.py` (runs every mode), `stats.py` (stats tables and
   player pages), `live.py` (live game), `ratings_editor.py`, `builder.py`, `shots.py`, `badges.py`, `hub.py`, and
   `static/` (`index.html`, `js/app.js`, `css/app.css`).
-- **`gui_app.py`**: the Tkinter desktop app.
-- **`broadcast.py`**, **`archetypes.py`**, **`media_ids.py`**: commentary, player archetypes, headshot/logo ids.
-- **Data:** `real_minutes.json` (real minutes per team-season), `shot_profiles.json` (real shot-distance splits),
-  `mip_data.json` (Most Improved candidates), `schedule_2027.json`, `headshot_ids_extra.json`.
+- **`desktop/gui_app.py`**: the Tkinter desktop app.
+- **`data/`**: `real_minutes.json` (real minutes per team-season), `shot_profiles.json` (real shot-distance splits),
+  `mip_data.json` (Most Improved candidates), `schedule_2027.json`, `headshot_ids_extra.json`. Created players and
+  saved roster swaps go to `data/custom_players.json` and `data/custom_roster_swaps.json` (git-ignored).
 
+Modules import each other by plain name (`import sim_engine`, `from season_year import ...`) because
+`project_paths.py` adds the code folders to `sys.path`; `main.py`, `main_web.py` and `webui/__init__.py` import it first.
 `players_data.py` imports `sim_engine.py`; the few engine functions that need the team registries import
 `players_data` inside the function to avoid a circular import. Simulation speed/pause globals (`SLEEP`,
 `SIM_FAST_FORWARD`, `SIM_PAUSED`, ...) live in `sim_engine.py` and are changed through `sim_engine.<name>`.
 
 ## Testing a change
 
-The engine prints a lot, so redirect stdout when importing it:
+Run from the project folder. Import `project_paths` first, and redirect stdout because the engine prints a lot:
 
 ```python
 import contextlib, io
+import project_paths   # engine/, seasons/, desktop/ on the import path
 with contextlib.redirect_stdout(io.StringIO()):
     import sim_engine as se, players_data as pd
 

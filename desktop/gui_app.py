@@ -334,10 +334,11 @@ def run_gui_app():
     logo_images = {}
     headshot_images = {}
     headshot_downloads = set()
-    logo_cache_dir = os.path.join(os.path.dirname(__file__), "nba_logo_cache")
-    headshot_cache_dir = os.path.join(os.path.dirname(__file__), "nba_headshot_cache")
-    court_background_path = os.path.join(os.path.dirname(__file__), "court_background.png")
-    court_background_gui_path = os.path.join(os.path.dirname(__file__), "court_background_gui.png")
+    _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # caches sit in the project folder, beside webui/
+    logo_cache_dir = os.path.join(_PROJECT_DIR, "nba_logo_cache")
+    headshot_cache_dir = os.path.join(_PROJECT_DIR, "nba_headshot_cache")
+    court_background_path = os.path.join(_PROJECT_DIR, "court_background.png")
+    court_background_gui_path = os.path.join(_PROJECT_DIR, "court_background_gui.png")
     court_background_cache = {"size": None, "image": None}
 
     scoreboard_status_var = tk.StringVar(value="Select a mode and teams, then start the sim.")

@@ -56,7 +56,7 @@ def shot_profiles():
     global _SHOT_PROFILES
     if _SHOT_PROFILES is None:
         import json, os
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shot_profiles.json")
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "shot_profiles.json")
         try:
             with open(path, encoding="utf-8") as handle:
                 _SHOT_PROFILES = json.load(handle)

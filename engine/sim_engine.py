@@ -170,8 +170,9 @@ GUI_SCOREBOARD_QUEUE = None
 GUI_FANTASY_PICKER = None
 GUI_POSITION_PICKER = None
 GUI_OPTION_PICKER = None
-CUSTOM_ROSTER_SWAPS_PATH = os.path.join(os.path.dirname(__file__), "custom_roster_swaps.json")
-CUSTOM_PLAYERS_PATH = os.path.join(os.path.dirname(__file__), "custom_players.json")
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")   # data/ next to engine/
+CUSTOM_ROSTER_SWAPS_PATH = os.path.join(DATA_DIR, "custom_roster_swaps.json")
+CUSTOM_PLAYERS_PATH = os.path.join(DATA_DIR, "custom_players.json")
 
 
 def enable_keyboard_controls(teamA=None, teamB=None):
@@ -9326,7 +9327,7 @@ def real_season_mpg(team_name: str, player_name: str):
     if _REAL_MINUTES is None:
         import json, os
         try:
-            raw = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "real_minutes.json"), encoding="utf-8"))
+            raw = json.load(open(os.path.join(DATA_DIR, "real_minutes.json"), encoding="utf-8"))
         except Exception:
             raw = {}
         _REAL_MINUTES = {t: {_fold_name(n): m for n, m in pp.items()} for t, pp in raw.items()}
@@ -26406,7 +26407,7 @@ def mip_data() -> Dict:
     if _MIP_DATA is None:
         import json, os
         try:
-            _MIP_DATA = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mip_data.json"), encoding="utf-8"))
+            _MIP_DATA = json.load(open(os.path.join(DATA_DIR, "mip_data.json"), encoding="utf-8"))
         except Exception:
             _MIP_DATA = {}
     return _MIP_DATA

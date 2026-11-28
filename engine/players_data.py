@@ -615,7 +615,7 @@ SEASON_2027_DIVISIONS = {
 import json
 import os
 
-SCHEDULE_2027_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schedule_2027.json")
+SCHEDULE_2027_FILE = os.path.join(DATA_DIR, "schedule_2027.json")
 CUP_PHASE_GAMES_2027 = 30   # 4 quarterfinals + 2 semifinals count as regular-season games, plus 24 more that set the last two games of each team
 
 
@@ -1047,7 +1047,7 @@ def _fantasy_pool_signature():
     sig = []
     for path in ("custom_players.json", "custom_roster_swaps.json"):
         try:
-            sig.append(os.path.getmtime(os.path.join(os.path.dirname(os.path.abspath(__file__)), path)))
+            sig.append(os.path.getmtime(os.path.join(DATA_DIR, path)))
         except OSError:
             sig.append(0.0)
     return tuple(sig)

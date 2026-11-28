@@ -4,6 +4,7 @@
 import multiprocessing
 import sys
 
+import project_paths  # noqa: F401  (puts engine/, seasons/, desktop/ on the import path)
 from webui.server import run
 
 

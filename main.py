@@ -3,6 +3,7 @@
 import multiprocessing
 import sys
 
+import project_paths  # noqa: F401  (puts engine/, seasons/, desktop/ on the import path)
 from gui_app import run_gui_app
 
 

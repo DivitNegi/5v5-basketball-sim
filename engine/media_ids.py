@@ -32,7 +32,7 @@ PLAYER_HEADSHOT_URLS = {
 def _load_extra_ids():
     import json
     import os
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "headshot_ids_extra.json")
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "headshot_ids_extra.json")
     try:
         with open(path, encoding="utf-8") as fh:
             for name, pid in json.load(fh).items():
