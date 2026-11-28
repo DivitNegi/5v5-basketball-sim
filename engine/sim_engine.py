@@ -5418,6 +5418,7 @@ POSTERIZER_PRIMES = {
 
 # badges for specific seasons of a player (his prime), not every version of him
 SEASON_BADGES = [
+    ("floater_ace", "hof", {("Naji Marshall", "2025"), ("Naji Marshall", "2026")}),
 ]
 
 
