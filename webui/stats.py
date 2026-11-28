@@ -529,7 +529,7 @@ def player_detail(runner, source, team, name, group="all"):
     zone = lambda k: [int(diet.get(k + "_made", 0)), int(diet.get(k, 0))]
     defense = _defense_block(mine, pool, g)
     return {"form": engine.season_form_public(team, name) if source == "Season" else None, "defense": defense, "name": name, "team": team, "source": source, "sources": main, "games": int(st["games"]), "totals": totals, "per_game": per_game, "ranks": ranks, "adv_groups": adv_groups, "zone_ranks": zone_ranks, "zone_avg": zone_avg,
-            "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post")},
+            "pool": len(qualified), "group": group, "position": POSITION_GROUPS.get(_positions(runner, team).get(name), ""), "min_gp": min_gp, "shots": {"rim": [a + b for a, b in zip(zone("rim"), zone("dunk"))], "mid": zone("mid"), "three": zone("three"), "post": zone("post"), "dist": engine.shot_distance_zones(diet)},
             "three_split": {"corner": zone("corner3"), "above_break": zone("atb3"), "deep": zone("deep3"), "wing": zone("wing3"), "top": zone("top3"), "heave": zone("heave3"), "heatcheck": zone("heatcheck3"), "logo": zone("logo3"),
                             "corner_L": zone("corner3_L"), "corner_R": zone("corner3_R"), "wing_L": zone("wing3_L"), "wing_R": zone("wing3_R")},
             "mid_split": {"base": zone("mid_base"), "elbow": zone("mid_elbow"), "wing": zone("mid_wing"),
@@ -604,7 +604,7 @@ def team_detail(runner, team):
         return [int(d.get(k + "_made", 0)), int(d.get(k, 0))]
 
     def zones_of(d):
-        return {"rim": [a + b for a, b in zip(zone(d, "rim"), zone(d, "dunk"))], "mid": zone(d, "mid"), "three": zone(d, "three"), "post": zone(d, "post")}
+        return {"rim": [a + b for a, b in zip(zone(d, "rim"), zone(d, "dunk"))], "mid": zone(d, "mid"), "three": zone(d, "three"), "post": zone(d, "post"), "dist": engine.shot_distance_zones(d)}
     FINE = [("ra", ("rim", "dunk")), ("paint", ("post",)), ("elbow", ("mid_elbow",)), ("mid_wing", ("mid_wing",)), ("baseline", ("mid_base",)),
             ("corner3", ("corner3",)), ("wing3", ("wing3",)), ("top3", ("top3",))]
 

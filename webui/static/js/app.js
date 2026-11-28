@@ -1691,7 +1691,7 @@ async function loadPlayerCard() {
   const tile = (k, v) => { const vEl = h("div", { class: `v${String(v).length > 6 ? " frac" : ""}`, "data-k": k }, v); if (typeof v === "number") numTiles.push([vEl, v]); return h("div", { class: "tile" }, h("div", { class: "k" }, k), vEl); };
   const form = GV.pc.game === "live" && GV.pc.quarter === "all" ? shotForm(p.name) : "";
   const zoneBox = (title, z) => h("div", {}, h("h3", { style: { margin: "14px 0 8px", fontSize: "12px", letterSpacing: ".14em", textTransform: "uppercase", color: "var(--accent-2)" } }, title),
-    h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))));
+    h("div", { class: "zone-row" }, [["Rim", z.rim, "rim"], ["Mid", z.mid, "mid"], ["3PT", z.three, "three"], ["Post", z.post, "post"]].map(([lbl, v, key]) => zoneCard(lbl, v, key))), distRow(z));
   const qmatch = (pb) => GV.pc.quarter === "all" || String(periodIndex(pb.period) + 1) === GV.pc.quarter || (GV.pc.quarter === "OT" && periodIndex(pb.period) >= 4);
   const chosenBracket = String(GV.pc.game).startsWith("b:") ? bracketGame(seriesGames.find((g) => g.value === GV.pc.game)) : null;
   const chosenGame = GV.pc.game === "live" ? S.gameNo : chosenBracket ? chosenBracket[2] : Number(GV.pc.game);
@@ -1734,6 +1734,13 @@ function zoneClass(key, made, att) {
   if (key === "three") return pct > 36 ? "good" : "ok";   // threes: green above 36% (40%+ included), yellow below
   const [hi, lo] = key === "rim" ? [50, 40] : key === "mid" ? [40, 30] : key === "post" ? [48, 38] : [42, 33];
   return pct > hi ? "good" : pct >= lo ? "ok" : "bad";
+}
+// his shots by distance, in Basketball-Reference's bands (0-3 ft, 3-10 ft, 10-16 ft, 16 ft-3P, 3P)
+function distRow(z) {
+  if (!z || !Array.isArray(z.dist) || !z.dist.some((r) => r[2] > 0)) return null;
+  const key = { "0-3 ft": "rim", "3-10 ft": "post", "10-16 ft": "mid", "16 ft-3P": "mid", "3P": "three" };
+  return h("div", {}, h("div", { class: "muted", style: { fontSize: "12px", margin: "12px 0 6px", letterSpacing: ".08em", textTransform: "uppercase" } }, "By distance"),
+    h("div", { class: "zone-row" }, z.dist.map(([lbl, m, a]) => zoneCard(lbl, [m, a], key[lbl]))));
 }
 function zoneCard(label, v, key) {
   const [m, a] = v || [0, 0];
@@ -2343,7 +2350,7 @@ async function openTeamCard(team) {
 // the team pop-up's deeper panels: advanced radars ranked against the other teams, the team's shot diet and zones, and its whole shot chart
 function teamInsights(t, id, team) {
   const color = chartColor(id);
-  const zoneRow = h("div", { class: "zone-row" }, [["Rim", t.shots.rim, "rim"], ["Mid", t.shots.mid, "mid"], ["3PT", t.shots.three, "three"], ["Post", t.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
+  const zoneRow = h("div", {}, h("div", { class: "zone-row" }, [["Rim", t.shots.rim, "rim"], ["Mid", t.shots.mid, "mid"], ["3PT", t.shots.three, "three"], ["Post", t.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k))), distRow(t.shots));
   const hasZones = Object.values(t.shots).some((z) => z[1] > 0);
   const sub = (txt) => h("div", { class: "muted", style: { fontSize: "12.5px", margin: "-2px 0 6px" } }, txt);
   return [
@@ -2549,7 +2556,7 @@ function insightsBox(first, color, fetchGroup) {
 }
 function playerInsights(d, color) {
   const cmpLbl = !d.group || d.group === "all" ? "the league" : `other ${d.group}`;
-  const zoneRow = h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k)));
+  const zoneRow = h("div", {}, h("div", { class: "zone-row" }, [["Rim", d.shots.rim, "rim"], ["Mid", d.shots.mid, "mid"], ["3PT", d.shots.three, "three"], ["Post", d.shots.post, "post"]].map(([l, v, k]) => zoneCard(l, v, k))), distRow(d.shots));
   const hasZones = Object.values(d.shots).some((z) => z[1] > 0);
   return [
     h("div", { class: "pc-panel", style: { marginTop: "14px" } }, h("h4", {}, `Compared to ${cmpLbl}`),

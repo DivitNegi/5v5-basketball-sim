@@ -13146,6 +13146,19 @@ def tag_shot_distance(player, shot_type: str, context: str) -> str:
     return f"{context}|{tok}" if context else tok
 
 
+def shot_distance_zones(diet) -> list:
+    """His shots by distance, in Basketball-Reference's bands: [label, made, attempts] for 0-3 ft, 3-10 ft, 10-16 ft, 16 ft to the arc, and 3P.
+    0-3 ft = layups at the cup and dunks; 3-10 ft = floaters / runners and post moves; 10-16 ft = short midrange; 16 ft-3P = long twos."""
+    diet = diet or {}
+    g = lambda k: (int(diet.get(k + "_made", 0)), int(diet.get(k, 0)))
+    rim, dunk, flt, post, mid, lng, three = (g(k) for k in ("rim", "dunk", "rim_float", "post", "mid", "mid_long", "three"))
+    return [["0-3 ft", rim[0] - flt[0] + dunk[0], rim[1] - flt[1] + dunk[1]],
+            ["3-10 ft", flt[0] + post[0], flt[1] + post[1]],
+            ["10-16 ft", mid[0] - lng[0], mid[1] - lng[1]],
+            ["16 ft-3P", lng[0], lng[1]],
+            ["3P", three[0], three[1]]]
+
+
 def reuse_shot_distance(player, shot_type: str, context: str) -> str:
     """The make of a rim / midrange attempt carries the distance tag its attempt got."""
     used = getattr(player, "_dist_tok_used", None) if player is not None else None

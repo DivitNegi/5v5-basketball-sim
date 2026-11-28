@@ -158,7 +158,9 @@ def _zone(diet: Dict, key: str):
 
 def zones(diet: Optional[Dict]) -> Dict:
     diet = diet or {}
-    return {k: _zone(diet, k) for k in ("rim", "paint", "mid", "three", "post", "dunk")}
+    out = {k: _zone(diet, k) for k in ("rim", "paint", "mid", "three", "post", "dunk")}
+    out["dist"] = sim_engine.shot_distance_zones(diet)   # Basketball-Reference distance bands
+    return out
 
 
 _LAST_TEAMS = (None, None)   # the last live pair, kept while a quiet sim (sim series / sim to Final) has the engine busy
