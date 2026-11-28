@@ -1,53 +1,70 @@
 # 5v5 Basketball Sim
 
-A text-driven basketball simulation engine with a Tkinter GUI (and a secondary
-lightweight web GUI), covering full 5-on-5 games, a 1-on-1 street-ball mode,
-season/playoff/fantasy-draft simulation, and a large roster of historical,
-current, Olympic, and custom teams.
+A possession-by-possession NBA basketball simulator with live play-by-play, shot charts and a deep stats layer, played
+through a browser UI (with the original Tkinter desktop app kept as a backup).
 
-## Project structure
-
-Originally a single ~43,000-line script; split into modules by concern:
-
-- **`sim_engine.py`** — the core simulation engine: `Player`/`Team` data
-  models, shot math, possession resolution, box scores, ratings/badges,
-  play-by-play commentary, the full 5-on-5 game loop (`simulate_game`), the
-  1-on-1 mode (`simulate_1v1_game`), and the season/playoff/fantasy-draft
-  subsystem.
-- **`teams/teams_YYYY.py`** — one file per season holding that season's team
-  rosters (`make_*_YYYY` factory functions), e.g. `teams/teams_2018.py`.
-  `teams/teams_olympic.py` holds the special international teams (1992 Dream Team,
-  2008 Redeem Team and the 2024 Olympic field).
-- **`players_data.py`** — imports every `teams/teams_YYYY.py`, applies the
-  real-stat calibration overrides, and holds the fantasy player pool builder,
-  the postseason/season runners and the team-factory registries
-  (`gui_team_factories`, `fantasy_team_factories`).
-- **`gui_app.py`** — the primary Tkinter desktop GUI.
-- **`web_app.py`** — a secondary, browser-based GUI served over local HTTP
-  (used as a fallback when Tkinter isn't available).
-- **`main.py`** — entry point; running it opens the GUI.
-
-### A note on the split
-
-`players_data.py` imports from `sim_engine.py` (team factories need the
-`Player`/`Team` classes and a few lineup-balancing helpers). A handful of
-functions in `sim_engine.py`'s season/fantasy-draft/Olympic-tournament code
-need to call back into `players_data.py`'s team-factory registries; those
-use function-local imports to avoid a circular import at module load time.
-
-A small set of simulation-speed/pause/queue globals (`SLEEP`,
-`SIM_FAST_FORWARD`, `SIM_PAUSED`, the GUI queues, etc.) are owned by
-`sim_engine.py`. Code in `gui_app.py`/`web_app.py` that needs to read or
-change them does so through qualified `sim_engine.<name>` access rather than
-a bare `global` statement, since `global` always binds to the module a
-function is defined in.
+- **Games:** single games, Game 7s, a 1-on-1 street mode, NBA or FIBA rules, with live speed control and "sim to" jumps.
+- **Seasons:** full 82-game seasons on the real NBA schedule for 2016, 2018 and 2021-2027, with hot/cold form, the play-in,
+  playoffs, replays of any season or playoff game, and awards (MVP, DPOY, Rookie of the Year, Most Improved, All-NBA,
+  All-Defensive, All-Rookie) with live award races.
+- **Other modes:** playoff series, custom 16-team playoffs, custom 82-game seasons, fantasy drafts (2027 players or
+  all-time) and an Olympic tournament.
+- **Teams:** 341 teams from 1962 to 2027, plus the 1992 Dream Team, the 2008 Redeem Team and the 2024 Olympic field.
+- **Stats:** box scores, advanced stats, shot charts and zones, defended shots, matchups, on/off, play types, finishes,
+  clutch, shot-making vs expected, assist networks, splits and game logs.
+- **Tools:** a live ratings editor, team/player builder, lineups, coaching and draft & trades.
 
 ## Running it
 
 ```bash
-python main.py               # opens the Tkinter desktop GUI
+python main_web.py                # browser UI at http://127.0.0.1:8790 (opens a tab)
+python main_web.py --no-browser   # same, without opening a tab
+python main.py                    # Tkinter desktop app (backup)
 ```
 
-Requires Python 3.10+. `Pillow` is optional (used for logo/headshot images
-in the GUI; the app falls back to plain drawn placeholders if it's not
-installed).
+Requires Python 3.10+ and nothing else. `Pillow` is optional (logos and headshots in the desktop app).
+
+Restarting the web server locks in ratings-editor edits: the editor's Reset and revert arrows only cover edits made since
+the server started.
+
+## Project structure
+
+- **`sim_engine.py`**: the whole engine. `Player`/`Team` models, possessions, play types and team playbooks, shot choice
+  and make chance, fouls, passing and assists, rebounds, badges, minutes and rotations, play-by-play, seasons, awards,
+  playoffs, fantasy drafts and the analytics counters. `simulate_game` is the 5-on-5 game loop, `simulate_1v1_game` the
+  1-on-1 mode and `simulate_silent_season_game` a quiet seeded game.
+- **`teams/teams_YYYY.py`**: one file per season, each team a `make_<team>_<year>` factory of `Player(...)` ratings and
+  tendencies. `teams/teams_olympic.py` holds the international teams.
+- **`players_data.py`**: imports every team file, applies real-stat calibration (`real_stat_calibration.py`) and holds
+  the team-factory registries (`gui_team_factories()`), divisions and postseason runners.
+- **`season_year.py`** / **`season_2018.py`**: 82-game seasons (`SEASON_YEARS`, `run_year_season`). They use
+  multiprocessing, so a script that calls them needs an `if __name__ == "__main__":` guard.
+- **`webui/`**: the browser UI. `server.py` (HTTP API), `runner.py` (runs every mode), `stats.py` (stats tables and
+  player pages), `live.py` (live game), `ratings_editor.py`, `builder.py`, `shots.py`, `badges.py`, `hub.py`, and
+  `static/` (`index.html`, `js/app.js`, `css/app.css`).
+- **`gui_app.py`**: the Tkinter desktop app.
+- **`broadcast.py`**, **`archetypes.py`**, **`media_ids.py`**: commentary, player archetypes, headshot/logo ids.
+- **Data:** `real_minutes.json` (real minutes per team-season), `shot_profiles.json` (real shot-distance splits),
+  `mip_data.json` (Most Improved candidates), `schedule_2027.json`, `headshot_ids_extra.json`.
+- **`ratings_*.md`**: how each built season's ratings were derived from real stats.
+
+`players_data.py` imports `sim_engine.py`; the few engine functions that need the team registries import
+`players_data` inside the function to avoid a circular import. Simulation speed/pause globals (`SLEEP`,
+`SIM_FAST_FORWARD`, `SIM_PAUSED`, ...) live in `sim_engine.py` and are changed through `sim_engine.<name>`.
+
+## Testing a change
+
+The engine prints a lot, so redirect stdout when importing it:
+
+```python
+import contextlib, io
+with contextlib.redirect_stdout(io.StringIO()):
+    import sim_engine as se, players_data as pd
+
+se.SEASON_STAR_MINUTES_CAP = 34          # regular-season minutes rules, as in a real season
+f = pd.gui_team_factories()
+a, b = se.simulate_silent_season_game(f["2024 Boston Celtics"], f["2024 Dallas Mavericks"], seed=1)
+```
+
+The same seed always plays out the same game. Check per-player numbers over at least a full season per team
+(`season_year.run_year_season(year)`, about 10 minutes): a few dozen games per player is too noisy.
